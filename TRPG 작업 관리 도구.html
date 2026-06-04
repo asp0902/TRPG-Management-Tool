@@ -22122,9 +22122,11 @@ function tbWrapMacro(css) {
 
 // ─── 툴바 기능 함수들 ───
 function shouldUseNativeHistoryShortcut(e) {
-  if (currentPage !== 'css-macro') return false;
   const target = e.target;
   if (!target?.closest) return false;
+  const recordModal = document.getElementById('record-form-modal');
+  if (recordModal?.classList.contains('open') && target.closest('#record-form-modal')) return true;
+  if (currentPage !== 'css-macro') return false;
   return !!target.closest('#css-macro-search, #css-dict-form-name, #css-dict-form-content');
 }
 function tbUndo() {
