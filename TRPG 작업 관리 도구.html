@@ -22126,6 +22126,7 @@ function shouldUseNativeHistoryShortcut(e) {
   if (!target?.closest) return false;
   const recordModal = document.getElementById('record-form-modal');
   if (recordModal?.classList.contains('open') && target.closest('#record-form-modal')) return true;
+  if (target.classList?.contains('btcp-textarea') || target.classList?.contains('btcp-macro-ta')) return true;
   if (currentPage !== 'css-macro') return false;
   return !!target.closest('#css-macro-search, #css-dict-form-name, #css-dict-form-content');
 }
