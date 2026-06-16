@@ -3213,6 +3213,15 @@ body.is-block-range-selecting * {
   padding: 8px 10px; border-top: 1px solid #f0f0f0;
 }
 .block-text-css-panel.open { display: flex; }
+/* CSS 매크로 필드 (cssMacroField 모듈) — block-text-css-panel과 동일한 own-row 레이아웃 */
+.css-macro-field {
+  display: none; flex: 0 0 100%;
+  width: 100%; align-self: stretch;
+  flex-direction: column; gap: 6px;
+  padding: 8px 10px; border-top: 1px solid #f0f0f0;
+}
+.css-macro-field.open { display: flex; }
+.css-macro-field .cmf-preset { margin-bottom: 8px; }
 .btcp-label { font-size: 10px; color: #aaa; font-weight: 600; margin-bottom: 2px; }
 .btcp-textarea {
   width: 100%; min-height: 32px; border: 1px solid #e4e4e4; border-radius: 5px;
@@ -4278,6 +4287,9 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 .block.block-roll .block-body {
   padding: 0;
 }
+/* CSS 서식 패널(flex:0 0 100%)이 열릴 때 같은 flex 줄에 끼어 본문이 0폭으로
+   찌그러지는 것을 막는다. 본문이 한 줄을 차지하게 해 패널을 다음 줄로 내린다. */
+.block.block-roll > .block-body { flex-basis: 100%; }
 .roll-header {
   --roll-start: #0dd4d9;
   --roll-end: #fb8d5c;
@@ -8857,6 +8869,9 @@ function commitScenarioHistory(key = 'edit', options = {}) {
     return;
   }
   if (historyApplying) return;
+  // 시나리오 편집 커밋은 히스토리 스냅샷뿐 아니라 저장소에도 반영한다
+  // (룰북 분기와 동일하게). persist()는 디바운스되므로 빈번한 호출도 안전.
+  persist();
   const { force = false } = options;
   const history = ensureScenarioHistory();
   if (!history) return;
@@ -12733,39 +12748,17 @@ function mkTextBlockEl(b, cid, ctx = {}) {
   floatActions.appendChild(delBtn);
 
 
-  // CSS 인라인 패널
+  // CSS 매크로 필드 (deep module)
   const cssPanel = document.createElement('div');
-  cssPanel.className = 'block-text-css-panel';
-  cssPanel.innerHTML = `
-    <div>
-      <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
-      <textarea class="btcp-textarea" placeholder="font-weight:bold; color:#cc0000;" spellcheck="false">${b.css || ''}</textarea>
-    </div>
-    <div class="btcp-footer">
-      <button class="btcp-remove">서식 제거</button>
-      <button class="btcp-apply">적용</button>
-    </div>`;
-
-  const cssTA = cssPanel.querySelector('.btcp-textarea');
-  cssPanel.querySelector('.btcp-apply').onmousedown = e => e.preventDefault();
-  cssPanel.querySelector('.btcp-apply').onclick = () => {
-    const val = cssTA.value.trim();
-    b.css = val;
-    upd(b.id, 'css', val, cid);
-    applyTextBlockCssPreview(ce, val);
-    cssBadge.classList.toggle('active', !!val);
-    cssPanel.classList.remove('open');
-  };
-  cssPanel.querySelector('.btcp-remove').onmousedown = e => e.preventDefault();
-  cssPanel.querySelector('.btcp-remove').onclick = () => {
-    cssTA.value = '';
-    b.css = '';
-    upd(b.id, 'css', '', cid);
-    applyTextBlockCssPreview(ce, '');
-    cssBadge.classList.remove('active');
-    cssPanel.classList.remove('open');
-  };
-  if (b.css) cssBadge.classList.add('active');
+  cssMacroField.mount(cssPanel, {
+    get: () => b.css || '',
+    set: v => { b.css = v; },
+    save: () => commitBlockTreeChange(`block:${b.id}:css`, cid),
+    badge: cssBadge,
+    macro: () => getPresetBlockMacro(b),
+    editablePreset: canEditPresetBlockMacro(b),
+    preview: v => applyTextBlockCssPreview(ce, v),
+  });
 
   el.style.position = 'relative';
   el.appendChild(handle);
@@ -14247,23 +14240,106 @@ function tbUnwrapVariation(root, variation) {
   root.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+// ── cssMacroField — CSS 매크로 오버라이드를 편집하는 깊은(deep) 모듈 ──
+// 패널 마크업·토글·읽기·쓰기·저장을 한곳에서 소유한다. 호출지는 자리표시자
+// <div>를 방출하고 mount(host, opts)를 호출한다.
+//   opts.get():string        대상 css 읽기 (필수)
+//   opts.set(v):void         대상 css 원시 쓰기, HTML 정규화 없음 (필수)
+//   opts.save():void         영속화/히스토리 커밋 (선택; 보통 commitBlockTreeChange)
+//   opts.badge:HTMLElement   active 클래스를 토글할 ✦ 배지 (선택)
+//   opts.macro:string|fn     읽기전용 기본 매크로 섹션 (선택)
+//   opts.editablePreset:bool 빈 css를 기본 매크로로 시드 (chapter)
+//   opts.preview(v):void     적용 시 라이브 미리보기 콜백 (선택)
+const cssMacroField = (() => {
+  const LEGACY = '.block-text-css-panel.open, .roll-result-css-panel, .ending-css-panel, '
+    + '.ib-roll-css-panel, .ib-roll-result-css-panel, .branch-ib-css-panel, '
+    + '.branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, '
+    + '.nested-text-css-panel, .nested-speech-css-panel';
+  function resolveMacro(opts) {
+    return opts.macro ? (typeof opts.macro === 'function' ? (opts.macro() || '') : opts.macro) : '';
+  }
+  function closeAll(except) {
+    document.querySelectorAll('.css-macro-field.open').forEach(p => { if (p !== except) p.classList.remove('open'); });
+    document.querySelectorAll(LEGACY).forEach(p => { if (p !== except) { p.style.display = 'none'; p.classList.remove('open'); } });
+  }
+  function syncPreset(host, opts) {
+    const wrap = host.querySelector('.cmf-preset');
+    const macro = resolveMacro(opts);
+    if (macro && !opts.editablePreset) {
+      wrap.style.display = '';
+      const mta = wrap.querySelector('.btcp-macro-ta');
+      mta.value = macro;
+      btcpAutoResize(mta);
+    } else {
+      wrap.style.display = 'none';
+    }
+  }
+  function sync(host) {
+    const opts = host._cmf; if (!opts) return;
+    const ta = host.querySelector('.btcp-textarea');
+    const cur = opts.get() || '';
+    ta.value = (opts.editablePreset && !cur.trim()) ? (resolveMacro(opts) || cur) : cur;
+    syncPreset(host, opts);
+    if (opts.badge) opts.badge.classList.toggle('active', !!cur.trim());
+  }
+  function commit(host, remove) {
+    const opts = host._cmf; if (!opts) return;
+    const ta = host.querySelector('.btcp-textarea');
+    const val = remove ? '' : (ta.value || '').trim();
+    if (remove) ta.value = '';
+    opts.set(val);                       // 원시 저장 — normalizeEditableHtml 안 거침
+    if (opts.preview) opts.preview(val);
+    if (opts.badge) opts.badge.classList.toggle('active', !!val);
+    host.classList.remove('open');
+    if (opts.save) opts.save();
+  }
+  function toggle(host) {
+    if (!host || !host._cmf) return;
+    const willOpen = !host.classList.contains('open');
+    closeAll(host);
+    if (!willOpen) { host.classList.remove('open'); return; }
+    host.classList.add('open');
+    sync(host);
+    ensureCssMacroPickerButtonInCssPanel(host);
+    const ta = host.querySelector('.btcp-textarea');
+    btcpAutoResize(ta); ta.focus();
+  }
+  function mount(host, opts) {
+    if (!host) return null;
+    host.classList.add('css-macro-field');
+    host.innerHTML = `
+      <div class="cmf-preset" style="display:none">
+        <div class="btcp-label">기본 매크로 (Roll20용)</div>
+        <textarea class="btcp-macro-ta" readonly spellcheck="false"></textarea>
+      </div>
+      <div>
+        <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+        <textarea class="btcp-textarea" placeholder="font-weight:bold; color:#cc0000;" spellcheck="false"></textarea>
+      </div>
+      <div class="btcp-footer">
+        <button class="btcp-remove" type="button">서식 제거</button>
+        <button class="btcp-apply" type="button">적용</button>
+      </div>`;
+    const apply = host.querySelector('.btcp-apply');
+    const remove = host.querySelector('.btcp-remove');
+    apply.onmousedown = remove.onmousedown = e => e.preventDefault();
+    apply.onclick = () => commit(host, false);
+    remove.onclick = () => commit(host, true);
+    host._cmf = opts;
+    sync(host);
+    return host;
+  }
+  return { mount, toggle, sync };
+})();
+
+// 레거시 진입점 — 이제 cssMacroField 모듈로 위임 (badge·컨텍스트 메뉴 호출 유지).
 function tbOpenCssPanel(blockId, el, ce) {
   tbCloseVariationEditor();
-  document.querySelectorAll('.block-text-css-panel.open').forEach(p => {
-    if (p !== el.querySelector('.block-text-css-panel')) p.classList.remove('open');
-  });
-  const panel = el.querySelector('.block-text-css-panel');
-  if (!panel) return;
-  const cid = el?.dataset?.cid || 'blocks-container';
-  const block = getGenericBlockById(blockId, cid);
-  panel.classList.toggle('open');
-  if (panel.classList.contains('open')) {
-    syncBlockCssPanel(panel, block);
-    ensureCssMacroPickerButtonInCssPanel(panel);
-    const ta = panel.querySelector('.btcp-textarea');
-    btcpAutoResize(ta);
-    ta.focus();
-  }
+  // 이 블록 "자신"의 필드(closest('.block')===el)를 고른다. 자식 블록 패널 아님.
+  const host = [...el.querySelectorAll('.css-macro-field')].find(p => p.closest('.block') === el)
+    || el.querySelector('.css-macro-field');
+  if (!host) return;
+  cssMacroField.toggle(host);
 }
 
 const DIVIDER_DEFAULT_LINE_COLOR = '#333333';
@@ -15007,32 +15083,8 @@ function mkDividerEl(b, cid, ctx = {}) {
   preview.innerHTML = `<div class="divider-line"></div><span class="divider-mark">✷</span><div class="divider-line"></div>`;
   applyDividerPreviewColors(b, preview);
 
-  // CSS 패널
+  // CSS 매크로 필드 (deep module) — cssBadge 선언 뒤 아래에서 mount
   const cssPanel = document.createElement('div');
-  cssPanel.className = 'block-text-css-panel';
-  cssPanel.innerHTML = `
-    <div>
-      <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
-      <textarea class="btcp-textarea" placeholder="font-weight:bold; color:#cc0000;" spellcheck="false">${b.css || ''}</textarea>
-    </div>
-    <div class="btcp-footer">
-      <button class="btcp-remove">서식 제거</button>
-      <button class="btcp-apply">적용</button>
-    </div>`;
-  const cssTA = cssPanel.querySelector('.btcp-textarea');
-  cssPanel.querySelector('.btcp-apply').onmousedown = e => e.preventDefault();
-  cssPanel.querySelector('.btcp-apply').onclick = () => {
-    const val = cssTA.value.trim();
-    b.css = val; upd(b.id, 'css', val, cid);
-    cssBadge.classList.toggle('active', !!val);
-    cssPanel.classList.remove('open');
-  };
-  cssPanel.querySelector('.btcp-remove').onmousedown = e => e.preventDefault();
-  cssPanel.querySelector('.btcp-remove').onclick = () => {
-    cssTA.value = ''; b.css = ''; upd(b.id, 'css', '', cid);
-    cssBadge.classList.remove('active');
-    cssPanel.classList.remove('open');
-  };
 
   // 플로팅 액션
   const floatActions = document.createElement('div');
@@ -15057,9 +15109,16 @@ function mkDividerEl(b, cid, ctx = {}) {
   const cssBadge = document.createElement('span');
   cssBadge.className = 'block-act block-text-css-badge';
   cssBadge.title = 'CSS 서식 편집'; cssBadge.textContent = '✦';
-  if (b.css) cssBadge.classList.add('active');
   cssBadge.onmousedown = e => e.preventDefault();
   cssBadge.onclick = () => tbOpenCssPanel(b.id, el, null);
+  cssMacroField.mount(cssPanel, {
+    get: () => b.css || '',
+    set: v => { b.css = v; },
+    save: () => commitBlockTreeChange(`block:${b.id}:css`, cid),
+    badge: cssBadge,
+    macro: () => getPresetBlockMacro(b),
+    editablePreset: canEditPresetBlockMacro(b),
+  });
 
   const upBtn = document.createElement('button');
   upBtn.className = 'block-act'; upBtn.title = '위로'; upBtn.textContent = '↑';
@@ -15301,38 +15360,21 @@ function mkBlockEl(b, cid, ctx = {}) {
   }
 
 
-  // CSS 인라인 패널
+  // CSS 매크로 필드 (deep module)
   const cssPanel = document.createElement('div');
-  cssPanel.className = 'block-text-css-panel';
-  cssPanel.innerHTML = `
-    <div>
-      <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
-      <textarea class="btcp-textarea" placeholder="font-weight:bold; color:#cc0000;" spellcheck="false">${b.css || ''}</textarea>
-    </div>
-    <div class="btcp-footer">
-      <button class="btcp-remove">서식 제거</button>
-      <button class="btcp-apply">적용</button>
-    </div>`;
-  const cssTA = cssPanel.querySelector('.btcp-textarea');
   const cssBadgeSpan = document.createElement('span');
   cssBadgeSpan.className = 'block-act block-text-css-badge';
   cssBadgeSpan.textContent = '✦';
   cssBadgeSpan.title = 'CSS 서식 편집';
   cssBadgeSpan.onmousedown = e => e.preventDefault();
-  cssPanel.querySelector('.btcp-apply').onmousedown = e => e.preventDefault();
-  cssPanel.querySelector('.btcp-apply').onclick = () => {
-    const val = cssTA.value.trim();
-    b.css = val; upd(b.id, 'css', val, cid);
-    cssBadgeSpan.classList.toggle('active', !!val);
-    cssPanel.classList.remove('open');
-  };
-  cssPanel.querySelector('.btcp-remove').onmousedown = e => e.preventDefault();
-  cssPanel.querySelector('.btcp-remove').onclick = () => {
-    cssTA.value = ''; b.css = ''; upd(b.id, 'css', '', cid);
-    cssBadgeSpan.classList.remove('active');
-    cssPanel.classList.remove('open');
-  };
-  if (b.css) cssBadgeSpan.classList.add('active');
+  cssMacroField.mount(cssPanel, {
+    get: () => b.css || '',
+    set: v => { b.css = v; },
+    save: () => commitBlockTreeChange(`block:${b.id}:css`, cid),
+    badge: cssBadgeSpan,
+    macro: () => getPresetBlockMacro(b),
+    editablePreset: canEditPresetBlockMacro(b),
+  });
   cssBadgeSpan.onclick = () => tbOpenCssPanel(b.id, el, null);
 
   // 복사 버튼
