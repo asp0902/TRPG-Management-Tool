@@ -14850,6 +14850,34 @@ function mountRollResultBlockLists(blockEl, block, cid, depth = 0) {
   });
 }
 
+// 분기 내부블록(ib) 항목 밑에 generic 하위 블록(3차)을 렌더한다.
+// 항목 el에 직접 .block-children-wrap을 붙여 기존 generic 자식 머신을 재사용.
+function mountBibItemChildren(blockEl, branchBlock, cid, depth = 0) {
+  if (!blockEl || branchBlock?.type !== 'branch') return;
+  blockEl.querySelectorAll('.branch-inner-block[data-ib-id]').forEach(ibEl => {
+    const ibId = ibEl.dataset.ibId;
+    ibEl.querySelectorAll(':scope > .bib-items > .bib-item[data-item-id]').forEach(itemEl => {
+      // 이미 자식 wrap이 붙은 항목은 건너뛴다 (중복 방지)
+      if (itemEl.querySelector(':scope > .block-children-wrap')) return;
+      const itemId = itemEl.dataset.itemId;
+      const item = getIbItemByIds(branchBlock.id, ibId, itemId);
+      if (!item) return; // 중첩 분기의 ib는 여기서 못 찾음 → 해당 분기 자체 mount가 처리
+      if (!Array.isArray(item.children)) item.children = [];
+      const wrap = document.createElement('div');
+      wrap.className = 'block-children-wrap';
+      wrap.dataset.parentId = item.id;
+      wrap.dataset.mount = 'bib-item';
+      wrap.dataset.empty = item.children.length === 0 ? '1' : '0';
+      renderBlockListInto(wrap, item.children, {
+        cid,
+        targetKey: makeChildBlockTargetKey(item.id, cid),
+        depth: (depth || 0) + 2,
+      });
+      itemEl.appendChild(wrap);
+    });
+  });
+}
+
 function getRollTargetText(block) {
   return extractBlockPlainText(block?.target, '{탐사자}');
 }
@@ -15449,6 +15477,10 @@ function mkBlockEl(b, cid, ctx = {}) {
 
     bindRollResultInteractions(el, b.id, cid);
     syncRollResultCssPreviews(el, b);
+  }
+
+  if (b.type === 'branch') {
+    mountBibItemChildren(el, b, cid);
   }
 
   if (b.type === 'callout') {
@@ -17503,6 +17535,8 @@ function normalizeIbItems(ib) {
     if (!item.id) item.id = mkId();
     if (item.type === 'callout') normalizeIbCalloutBodyOrder(item);
     if (item.type === 'roll') normalizeEmbeddedRollBlock(item);
+    if (!Array.isArray(item.children)) item.children = [];
+    item.children = normalizeBlockTree(item.children);  // 3차 하위 블록
     return item;
   });
 }
@@ -18130,11 +18164,14 @@ function openIbRollItemCtxMenu(e, blockId, ibId, itemId, cid) {
   e.stopImmediatePropagation?.();
   if ((cid || 'blocks-container') === 'blocks-container') selectBlock(blockId);
   const variationItems = tbGetVariationCtxItems(e);
+  const item = getIbItemByIds(blockId, ibId, itemId);
+  const itemEl = e.target.closest?.('.bib-item') || document.querySelector(`.bib-item[data-item-id="${itemId}"]`);
   const items = [
     { icon: '↑', label: '위로 이동', action: () => moveIbItem(blockId, ibId, itemId, 'up', cid) },
     { icon: '↓', label: '아래로 이동', action: () => moveIbItem(blockId, ibId, itemId, 'down', cid) },
     ...(variationItems.length ? [{ sep: true }, ...variationItems, { sep: true }] : [{ sep: true }]),
     ...buildIbRollCtxMenu(blockId, ibId, itemId, cid),
+    ...(item && itemEl ? [{ sep: true }, makeChildInsertCtxItem(item, itemEl, cid, e)] : []),
     { sep: true },
     { icon: '✕', label: '판정 블록 삭제', action: () => delIbItem(blockId, ibId, itemId, cid), danger: true },
   ];
@@ -18250,11 +18287,14 @@ function openIbItemCalloutCtxMenu(e, blockId, ibId, itemId, cid) {
   e.stopImmediatePropagation?.();
   if ((cid || 'blocks-container') === 'blocks-container') selectBlock(blockId);
   const variationItems = tbGetVariationCtxItems(e);
+  const calloutItem = getIbItemByIds(blockId, ibId, itemId);
+  const calloutItemEl = e.target.closest?.('.bib-item') || document.querySelector(`.bib-item[data-item-id="${itemId}"]`);
   const items = [
     ...variationItems,
     ...(variationItems.length ? [{ sep: true }] : []),
     { icon: '＋', label: '하위 콜아웃 추가', action: () => addIbNestedCallout(blockId, ibId, itemId, cid) },
     { icon: '🎲', label: '판정 추가', action: () => addIbCalloutRoll(blockId, ibId, itemId, cid) },
+    ...(calloutItem && calloutItemEl ? [makeChildInsertCtxItem(calloutItem, calloutItemEl, cid, e)] : []),
     { sep: true },
     { icon: '≡', label: '기본 블록 추가', action: () => addIbTextItem(blockId, ibId, cid) },
     { icon: '＋', label: '콜아웃 추가', action: () => addIbCalloutItem(blockId, ibId, cid) },
@@ -18654,11 +18694,18 @@ function openBranchInnerBlockCtxMenu(e, blockId, ibId, cid) {
   const canMoveUp = idx > 0;
   const canMoveDown = idx >= 0 && idx < (b?.innerBlocks || []).length - 1;
   const variationItems = tbGetVariationCtxItems(e);
+  // 우클릭한 특정 항목(2차) 밑에 generic 하위 블록(3차)을 추가하는 항목
+  const targetItemEl = e.target.closest?.('.bib-item');
+  const targetItem = targetItemEl?.dataset?.itemId ? getIbItemByIds(blockId, ibId, targetItemEl.dataset.itemId) : null;
+  const childInsert = (targetItem && targetItemEl)
+    ? (() => { const m = makeChildInsertCtxItem(targetItem, targetItemEl, cid, e); m.label = '이 항목에 하위 블록'; return m; })()
+    : null;
   const items = [
     { icon: '↑', label: '위로 이동', disabled: !canMoveUp, action: () => moveBranchInnerBlock(blockId, ibId, 'up', cid) },
     { icon: '↓', label: '아래로 이동', disabled: !canMoveDown, action: () => moveBranchInnerBlock(blockId, ibId, 'down', cid) },
     ...(variationItems.length ? [{ sep: true }, ...variationItems] : []),
     { sep: true },
+    ...(childInsert ? [childInsert] : []),
     {
       icon: '＋',
       label: '하위 블록 추가',
