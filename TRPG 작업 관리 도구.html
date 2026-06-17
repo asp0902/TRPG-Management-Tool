@@ -4260,7 +4260,8 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 #blocks-container .block.block-roll > .block-side-handle {
   display: flex; align-items: center; justify-content: center;
   position: absolute; left: 4px; top: 4px;
-  width: 18px; height: 20px; color: rgba(255,255,255,0.9); font-size: 11px;
+  width: 18px; height: 20px; color: rgba(255,255,255,0.9);
+  font-size: 11px; line-height: 1;
   background: rgba(0,0,0,0.18); border-radius: 4px;
   cursor: grab; user-select: none; z-index: 6;
   opacity: 0; transition: opacity 0.12s, background 0.12s;
@@ -13031,6 +13032,13 @@ function mkTextBlockEl(b, cid, ctx = {}) {
   el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; setBlockDropIndicator(el, getBlockDropPosition(e, el)); });
   el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
   el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(b.id, cid, position); });
+  // 판정 블록 등 헤더가 contenteditable이라 본문으로 드래그 시작이 안 되는 경우를 위해
+  // 좌상단 그립을 직접 draggable로 만들어 네이티브 드래그를 확실히 시작한다.
+  const _sideHandle = el.querySelector(':scope > .block-side-handle');
+  if (_sideHandle) {
+    _sideHandle.draggable = true;
+    _sideHandle.addEventListener('dragstart', e => { e.stopPropagation(); beginBlockDrag(e, b.id, cid, el); });
+  }
   appendGenericChildren(el, b, cid, ctx.depth || 0);
   return el;
 }
@@ -15378,6 +15386,13 @@ function mkDividerEl(b, cid, ctx = {}) {
   el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; setBlockDropIndicator(el, getBlockDropPosition(e, el)); });
   el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
   el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(b.id, cid, position); });
+  // 판정 블록 등 헤더가 contenteditable이라 본문으로 드래그 시작이 안 되는 경우를 위해
+  // 좌상단 그립을 직접 draggable로 만들어 네이티브 드래그를 확실히 시작한다.
+  const _sideHandle = el.querySelector(':scope > .block-side-handle');
+  if (_sideHandle) {
+    _sideHandle.draggable = true;
+    _sideHandle.addEventListener('dragstart', e => { e.stopPropagation(); beginBlockDrag(e, b.id, cid, el); });
+  }
   appendGenericChildren(el, b, cid, ctx.depth || 0);
   return el;
 }
@@ -15750,6 +15765,13 @@ function mkBlockEl(b, cid, ctx = {}) {
   el.addEventListener('dragover', e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; setBlockDropIndicator(el, getBlockDropPosition(e, el)); });
   el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
   el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(b.id, cid, position); });
+  // 판정 블록 등 헤더가 contenteditable이라 본문으로 드래그 시작이 안 되는 경우를 위해
+  // 좌상단 그립을 직접 draggable로 만들어 네이티브 드래그를 확실히 시작한다.
+  const _sideHandle = el.querySelector(':scope > .block-side-handle');
+  if (_sideHandle) {
+    _sideHandle.draggable = true;
+    _sideHandle.addEventListener('dragstart', e => { e.stopPropagation(); beginBlockDrag(e, b.id, cid, el); });
+  }
   appendGenericChildren(el, b, cid, ctx.depth || 0);
   return el;
 }
