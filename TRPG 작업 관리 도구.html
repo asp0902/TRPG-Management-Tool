@@ -9059,6 +9059,7 @@ function ensureRulebookHistory(id = currentRulebookId) {
 }
 function commitRulebookHistory(key = 'rulebook', options = {}) {
   if (rulebookHistoryApplying) return;
+  persist();  // commit ⟹ persist 불변식 (시나리오와 동일). 디바운스되므로 안전.
   const { force = false } = options;
   const history = ensureRulebookHistory();
   if (!history) return;
@@ -9409,6 +9410,7 @@ function ensureCssMacroHistory() {
 }
 function commitCssMacroHistory(key = 'css-macro', options = {}) {
   if (cssMacroHistoryApplying) return;
+  persist();  // commit ⟹ persist 불변식 (시나리오와 동일). 디바운스되므로 안전.
   const { force = false } = options;
   const history = ensureCssMacroHistory();
   if (!history) return;
@@ -11942,6 +11944,20 @@ function commitBlockTreeChange(label, cid = 'blocks-container', options = {}) {
     persist();
   } else {
     commitScenarioHistory(label, options);
+  }
+}
+
+// 단일 저장 이음새 — scope에 맞는 히스토리 커밋을 호출한다.
+// 모든 commit*History가 이제 스스로 persist하므로(불변식) 여기서는 디스패치만 한다.
+// scope: 'scenario' | 'rulebook' | 'cssMacro' | 'dataSheet' | 'block'
+function recordChange(scope, key = 'edit', options = {}) {
+  switch (scope) {
+    case 'scenario': commitScenarioHistory(key, options); break;
+    case 'rulebook': commitRulebookHistory(key, options); break;
+    case 'cssMacro': commitCssMacroHistory(key, options); break;
+    case 'block':    commitBlockTreeChange(key, options.cid || 'blocks-container', options); break;
+    case 'dataSheet': persist(); break; // persist()가 datasheet 히스토리 스냅샷을 트리거
+    default: persist(); break;
   }
 }
 

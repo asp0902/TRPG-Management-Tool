@@ -27,3 +27,7 @@ _Avoid_: 스타일, 서식 문자열
 **CSS 매크로 필드 (cssMacroField)**:
 CSS 매크로 오버라이드를 편집하는 깊은(deep) 모듈. 패널 마크업·토글·읽기·쓰기·저장을 한곳에서 소유하고, 호출지는 대상 `css`에 대한 `get/set` 접근자만 주입한다. 현재 36곳에 흩어진 얕은(shallow) 중복을 대체한다.
 _Avoid_: css 패널, btcp, 서식 편집기
+
+**저장 이음새 (recordChange)**:
+편집을 영속화하는 단일 진입점. scope('scenario'|'rulebook'|'cssMacro'|'block'|'dataSheet')에 맞는 히스토리 커밋으로 디스패치한다. 모든 `commit*History`는 "commit ⟹ persist" 불변식을 지켜 스스로 `persist()`(디바운스)를 예약하므로, 어떤 편집도 저장을 빠뜨리지 않는다.
+_Avoid_: save, flush, 자동저장
