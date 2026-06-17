@@ -2999,8 +2999,7 @@ body.is-block-range-selecting * {
 }
 .block.block-text:hover { background: #e2e2e2; }
 .block.block-text.selected { background: #d5d5d5; }
-.block.block-text.drag-over { border-top: 2px solid #000 !important; }
-.block.block-text.dragging { opacity: 0.4; }
+.block.block-text.dragging { opacity: 0.45; }
 .block-text-handle { display: none; }
 .block-text-ce {
   flex: 1 1 100%; min-width: 0; width: 100%; max-width: 100%; min-height: 24px; outline: none;
@@ -4245,12 +4244,13 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 /* ─── BLOCK ─── */
 .block {
   background: #fff; border: 1px solid #e8e8e8; border-radius: 7px;
-  transition: box-shadow 0.15s; position: relative;
+  transition: box-shadow 0.12s ease, opacity 0.15s ease; position: relative;
   display: flex; align-items: stretch; flex-wrap: wrap;
 }
 .block:hover { box-shadow: none; }
-.block.drag-over { border-top: 2px solid #000 !important; }
-.block.dragging { opacity: 0.4; }
+/* 드롭 위치 표시는 before/after의 inset box-shadow로만 한다 (border는 2px 레이아웃
+   시프트를 일으켜 드래그가 버벅인다). */
+.block.dragging { opacity: 0.45; }
 .block-header { display: none; }
 .block-badge { display: none; }
 /* 드래그 핸들 — 숨김 (블록 자체 드래그로 대체) */
@@ -13029,7 +13029,7 @@ function mkTextBlockEl(b, cid, ctx = {}) {
     ));
   });
   el.addEventListener('dragstart', e => beginBlockDrag(e, b.id, cid, el));
-  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; setBlockDropIndicator(el, getBlockDropPosition(e, el)); });
+  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; scheduleBlockDropIndicator(el, e.clientY); });
   el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
   el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(b.id, cid, position); });
   // 판정 블록 등 헤더가 contenteditable이라 본문으로 드래그 시작이 안 되는 경우를 위해
@@ -15383,7 +15383,7 @@ function mkDividerEl(b, cid, ctx = {}) {
     ));
   });
   el.addEventListener('dragstart', e => beginBlockDrag(e, b.id, cid, el));
-  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; setBlockDropIndicator(el, getBlockDropPosition(e, el)); });
+  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; scheduleBlockDropIndicator(el, e.clientY); });
   el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
   el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(b.id, cid, position); });
   // 판정 블록 등 헤더가 contenteditable이라 본문으로 드래그 시작이 안 되는 경우를 위해
@@ -15762,7 +15762,7 @@ function mkBlockEl(b, cid, ctx = {}) {
     ));
   });
   el.addEventListener('dragstart', e => beginBlockDrag(e, b.id, cid, el));
-  el.addEventListener('dragover', e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; setBlockDropIndicator(el, getBlockDropPosition(e, el)); });
+  el.addEventListener('dragover', e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; scheduleBlockDropIndicator(el, e.clientY); });
   el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
   el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(b.id, cid, position); });
   // 판정 블록 등 헤더가 contenteditable이라 본문으로 드래그 시작이 안 되는 경우를 위해
@@ -15787,7 +15787,7 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
   el.addEventListener('dragstart', e => {
     beginBlockDrag(e, ending.id, cid, el);
   });
-  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; setBlockDropIndicator(el, getBlockDropPosition(e, el)); });
+  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; scheduleBlockDropIndicator(el, e.clientY); });
   el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
   el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(ending.id, cid, position); });
   const collapsed = ending.collapsed ?? true;
@@ -20297,6 +20297,7 @@ function resetBlockDragState() {
   });
   document.querySelectorAll('.block-gap.gap-open').forEach(el => el.classList.remove('gap-open'));
   document.body.classList.remove('block-drag-active');
+  cancelBlockDropIndicator();
   dragId = null;
   dragCid = null;
   stopDragAutoScroll();
@@ -20316,6 +20317,29 @@ function setBlockDropIndicator(el, position) {
 function clearBlockDropIndicator(el) {
   if (!el) return;
   el.classList.remove('drag-over','drag-over-before','drag-over-after');
+}
+// dragover는 초당 수십 번 발생한다. 매번 getBoundingClientRect를 호출하면 레이아웃
+// thrash로 버벅인다. 프레임당 한 번만 위치를 계산해 인디케이터를 갱신한다.
+let _dropIndicatorRaf = null, _dropIndicatorEl = null, _dropIndicatorY = 0, _dropIndicatorPrev = null;
+function scheduleBlockDropIndicator(el, clientY) {
+  _dropIndicatorEl = el;
+  _dropIndicatorY = clientY;
+  if (_dropIndicatorRaf != null) return;
+  _dropIndicatorRaf = requestAnimationFrame(() => {
+    _dropIndicatorRaf = null;
+    const target = _dropIndicatorEl;
+    if (!target || !dragId) return;
+    const rect = target.getBoundingClientRect();
+    const position = _dropIndicatorY > rect.top + rect.height / 2 ? 'after' : 'before';
+    if (_dropIndicatorPrev && _dropIndicatorPrev !== target) clearBlockDropIndicator(_dropIndicatorPrev);
+    _dropIndicatorPrev = target;
+    setBlockDropIndicator(target, position);
+  });
+}
+function cancelBlockDropIndicator() {
+  if (_dropIndicatorRaf != null) { cancelAnimationFrame(_dropIndicatorRaf); _dropIndicatorRaf = null; }
+  _dropIndicatorEl = null;
+  _dropIndicatorPrev = null;
 }
 function beginBlockDrag(e, blockId, cid, el) {
   e.stopPropagation();
