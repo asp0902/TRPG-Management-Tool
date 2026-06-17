@@ -2984,6 +2984,7 @@ body.is-block-range-selecting * {
 .block.block-text {
   background: transparent; border: none; border-radius: 5px;
   box-shadow: none; display: flex; align-items: center; flex-wrap: wrap;
+  width: 100%; min-width: 0;
   min-height: 32px; padding: 0 0 0 10px; transition: background 0.1s;
 }
 .block.block-text:hover { background: #e2e2e2; }
@@ -2992,9 +2993,9 @@ body.is-block-range-selecting * {
 .block.block-text.dragging { opacity: 0.4; }
 .block-text-handle { display: none; }
 .block-text-ce {
-  flex: 1; min-height: 24px; outline: none;
+  flex: 1 1 100%; min-width: 0; width: 100%; max-width: 100%; min-height: 24px; outline: none;
   font-size: 14px; line-height: 1.4; color: #222;
-  background: transparent; word-break: break-word;
+  background: transparent; word-break: break-word; overflow-wrap: break-word;
   font-family: inherit; padding: 3px 4px 1px 0;
 }
 .block-text-ce [data-text-css-preview="1"] {
@@ -3223,6 +3224,8 @@ body.is-block-range-selecting * {
 .css-macro-field.open { display: flex; }
 .css-macro-field .cmf-preset { margin-bottom: 8px; }
 .btcp-label { font-size: 10px; color: #aaa; font-weight: 600; margin-bottom: 2px; }
+.btcp-label-pick { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.btcp-label-pick:hover { color: #6366f1; }
 .btcp-textarea {
   width: 100%; min-height: 32px; border: 1px solid #e4e4e4; border-radius: 5px;
   padding: 6px 8px; font-size: 12px; font-family: 'Courier New', monospace;
@@ -3513,7 +3516,7 @@ body.is-block-range-selecting * {
 .block.block-branch:hover { box-shadow: none !important; }
 /* 최상위 branch 블록 자신의 플로팅 액션만 숨김 (하위 블록은 유지) */
 .block.block-branch:not(.block-child) > .block-actions { display: none !important; }
-.block.block-branch .block-body { padding: 0; width: 100%; }
+.block.block-branch .block-body { padding: 0; width: 100%; flex: 0 0 100%; max-width: 100%; }
 .block.block-branch .block-side-handle { display: none; }
 .block.block-branch { overflow: visible; }
 /* 내용 블록 플로팅 액션 */
@@ -4158,6 +4161,26 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   padding-left: 0;
   border-left: none;
 }
+.block.block-text:has(> .block-text-ce:empty):has(> .block-children-wrap:not([data-empty="1"])) {
+  min-height: 0;
+  padding: 0;
+  background: transparent !important;
+}
+.block.block-text:has(> .block-text-ce:empty):has(> .block-children-wrap:not([data-empty="1"])) > :is(
+  .block-text-handle,
+  .block-text-ce,
+  .block-actions,
+  .css-macro-field,
+  .tb-variation-panel
+) {
+  display: none !important;
+}
+.block.block-text:has(> .block-text-ce:empty):has(> .block-children-wrap:not([data-empty="1"])) > .block-children-wrap {
+  flex-basis: 100%;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+}
 
 /* ─── 블록 사이 + 삽입 버튼 ─── */
 .block-gap {
@@ -4369,6 +4392,9 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   padding: 0 0 0 10px !important;
   margin: 0 !important;
 }
+.roll-result-blocks > .block.block-text.block-child:has(> .block-text-ce:empty):has(> .block-children-wrap:not([data-empty="1"])) {
+  padding-left: 0 !important;
+}
 .roll-result-blocks > .block.block-text.block-child .block-text-ce {
   min-height: 22px !important;
   padding-top: 1px !important;
@@ -4377,6 +4403,22 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 }
 .roll-result-block.rrb-speech {
   display: block;
+}
+.roll-result-blocks .block.block-speech.block-child {
+  margin: 3px 0 !important;
+}
+.roll-result-blocks .block.block-speech.block-child > .block-body {
+  padding-top: 5px;
+  padding-bottom: 0;
+}
+.roll-result-blocks .block.block-speech.block-child > .block-body > .speech-row {
+  align-items: center;
+}
+.roll-result-blocks .block.block-speech.block-child > .block-body > .speech-row > .block-ce {
+  min-height: 24px;
+  line-height: 24px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 .roll-result-block.rrb-speech .speech-row { width: 100%; }
 .roll-result-block.rrb-speech .rrb-ce {
@@ -4589,7 +4631,16 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 /* Speech */
 .block.block-speech .block-body { padding: 5px 12px; }
 .speech-row { display: flex; align-items: center; gap: 10px; }
-.speech-row .block-ce { min-height: 26px; position: relative; top: 0.9px; font-size: 14px; }
+.speech-row .block-ce {
+  min-height: 26px;
+  position: relative;
+  top: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  padding-top: calc((26px - 1.65em) / 2);
+  padding-bottom: calc((26px - 1.65em) / 2);
+  box-sizing: border-box;
+}
 .speech-badge-wrap { position: relative; flex-shrink: 0; }
 .speech-badge {
   display: inline-flex; align-items: center;
@@ -5007,29 +5058,51 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   overflow: visible;
 }
 .bib-item-text {
-  display: flex; align-items: flex-start; gap: 4px;
+  display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 4px; row-gap: 0;
+  width: 100%; min-width: 0; box-sizing: border-box;
   padding: 3px 10px;
 }
 .bib-item-speech {
-  display: flex; align-items: flex-start; gap: 6px;
+  display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 6px; row-gap: 0;
+  width: 100%; min-width: 0; box-sizing: border-box;
   padding: 4px 10px;
+  border: 1px solid rgb(232, 232, 232);
   overflow: visible;
 }
 .bib-item-speech .speech-row {
-  flex: 1;
+  flex: 1 1 100%;
+  width: 100%;
   min-width: 0;
-  align-items: flex-start;
+  align-items: center;
   overflow: visible;
 }
-.bib-item-speech .bib-item-ctrl {
-  margin-left: auto;
-  padding-top: 2px;
+.bib-item-speech > .bib-item-ctrl {
+  position: absolute;
+  top: -10px;
+  right: 8px;
+  display: none;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  background: #fff;
+  border: 1px solid #e4e4e4;
+  border-radius: 5px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  padding: 2px 3px;
+  z-index: 30;
+}
+.bib-item-speech:hover > .bib-item-ctrl,
+.bib-item-speech:focus-within > .bib-item-ctrl {
+  display: flex;
 }
 .bib-item-speech-ce {
-  flex: 1; min-height: 28px; outline: none;
+  flex: 1; min-width: 0; max-width: 100%; min-height: 28px; outline: none;
   font-size: 13px; line-height: 1.65; color: #222;
-  font-family: inherit; white-space: pre-wrap; word-break: break-word;
-  position: relative; top: 0.9px;
+  font-family: inherit; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;
+  position: relative; top: 0;
+  padding-top: calc((28px - 1.65em) / 2);
+  padding-bottom: calc((28px - 1.65em) / 2);
+  box-sizing: border-box;
 }
 .bib-item-speech-ce:empty::before {
   content: attr(data-ph); color: #ccc; pointer-events: none; display: block;
@@ -5093,9 +5166,9 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 .bib-item-btn.del:hover { color: #ef4444; }
 .bib-item-btn:disabled { color: #e8e8e8; cursor: default; pointer-events: none; }
 .bib-item-text-ce {
-  flex: 1; min-height: 22px; outline: none;
+  flex: 1 1 100%; min-width: 0; width: 100%; max-width: 100%; min-height: 22px; outline: none;
   font-size: 13px; line-height: 1.65; color: #222;
-  font-family: inherit; white-space: pre-wrap; word-break: break-word;
+  font-family: inherit; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;
 }
 .bib-item-text-ce:empty::before { content: attr(data-ph); color: #ccc; pointer-events: none; display: block; }
 .bib-add-row { display: flex; gap: 4px; padding: 4px 10px 8px; }
@@ -5135,6 +5208,11 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 .branch-inner-block .branch-inner-block-ce:empty::before {
   content: none !important;
   display: none !important;
+}
+.branch-inner-block .bib-item-text:has(> .bib-item-text-ce:empty + .block-children-wrap:not([data-empty="1"])) > .bib-item-text-ce {
+  display: none;
+  min-height: 0;
+  padding: 0;
 }
 .bib-item-callout .bib-item-ctrl,
 .bib-item-roll .bib-item-ctrl { margin-left: auto; }
@@ -6815,7 +6893,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
                 <span class="info-title-css-badge" id="i-title-css-badge" title="CSS 서식 적용됨 (클릭하여 편집)" style="display:none" onclick="openInfoTitleCssPanel()">✦</span>
               </div>
               <div class="info-title-css-panel" id="info-title-css-panel">
-                <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+                <div class="btcp-label">CSS 매크로 서식</div>
                 <textarea class="btcp-textarea" id="info-title-css-ta" placeholder="font-weight:bold; color:#cc0000;" spellcheck="false" oninput="btcpAutoResize(this)"></textarea>
                 <div class="btcp-footer">
                   <button class="btcp-remove" type="button" onmousedown="event.preventDefault()" onclick="applyInfoTitleCss(true)">서식 제거</button>
@@ -8109,6 +8187,7 @@ const scenarioSidebarRuleState = Object.create(null);
 const characterSidebarRuleState = Object.create(null);
 const rulebookSidebarState = Object.create(null);
 const LAST_SCRIPT_VIEW_KEY = 'trpg-last-script-view';
+const SCRIPT_TOC_OPEN_KEY = 'trpg-script-toc-open';
 const SCRIPT_SIDE_PANEL_WIDTH_KEYS = {
   toc: 'trpg-script-toc-width',
   memo: 'trpg-script-memo-width',
@@ -11968,6 +12047,7 @@ function appendGenericChildren(el, block, cid, depth = 0) {
 
   const { host, mount } = getGenericChildrenHost(el, block);
   if (!host) return;
+  if (mount === 'callout-body' && block.children.length === 0) return;
 
   const wrap = document.createElement('div');
   wrap.className = 'block-children-wrap';
@@ -12052,7 +12132,7 @@ function mkGapEl(cid, insertIdx, prevBlock, nextBlock, targetKey = makeRootBlock
     e.stopPropagation();
     if (_blockClipboard) {
       tbShowCtxMenu(e.clientX, e.clientY, [
-        { icon: '📋', label: '여기에 붙여넣기', action: () => pasteBlock(insertIdx, targetKey) },
+        { icon: '<i class="fa-solid fa-paste"></i>', label: '여기에 붙여넣기', action: () => pasteBlock(insertIdx, targetKey) },
         { sep: true },
         { icon: '＋', label: '새 블록 추가', action: () => openInsertPopupAtPoint(e.clientX, e.clientY, cid, insertIdx, targetKey) },
       ]);
@@ -12432,7 +12512,7 @@ function getIbCalloutNestedRollHtml(blockId, ibId, itemId, roll, rollId, orderId
           </div>
           <div class="bib-roll-result-ce" contenteditable="true" data-ib-id="${ibId}" data-item-id="${itemId}" data-roll-id="${rollId}" data-nr-ri="${ri}" data-ph="내용을 입력하세요" oninput="updIbCalloutRollResult('${blockId}','${ibId}','${itemId}','${rollId}',${ri},this.innerHTML)" oncontextmenu="return openIbCalloutRollResultCtxMenu(event,'${blockId}','${ibId}','${itemId}','${rollId}',${ri},'${cid}')" spellcheck="false"></div>
           <div class="ib-roll-result-css-panel" style="display:none">
-            <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+            <div class="btcp-label">CSS 매크로 서식</div>
             <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(r.css||'')}</textarea>
             <div class="btcp-footer">
               <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyIbCalloutRollResultCss('${blockId}','${ibId}','${itemId}','${rollId}',${ri},this,true)">서식 제거</button>
@@ -12442,7 +12522,7 @@ function getIbCalloutNestedRollHtml(blockId, ibId, itemId, roll, rollId, orderId
         </div>`).join('')}
       </div>
       <div class="ib-roll-css-panel" style="display:none">
-        <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+        <div class="btcp-label">CSS 매크로 서식</div>
         <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(roll.css||'')}</textarea>
         <div class="btcp-footer">
           <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyIbCalloutRollCss('${blockId}','${ibId}','${itemId}','${rollId}',this,true)">서식 제거</button>
@@ -12518,7 +12598,7 @@ function getBranchBlockHtml(block, cid) {
                 </div>
                 <div class="bib-roll-result-ce" contenteditable="true" data-ib-id="${ib.id}" data-bib-result-idx="${ri}" data-ph="내용을 입력하세요" oninput="updBranchIbRollResult('${branchBlock.id}','${ib.id}',${ri},this.innerHTML)" oncontextmenu="return openBranchIbRollResultCtxMenu(event,'${branchBlock.id}','${ib.id}',${ri},'${cid}')" spellcheck="false"></div>
                 <div class="branch-ib-roll-result-css-panel" style="display:none">
-                  <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+                  <div class="btcp-label">CSS 매크로 서식</div>
                   <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(r.css||'')}</textarea>
                   <div class="btcp-footer">
                     <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyBranchIbRollResultCss('${branchBlock.id}','${ib.id}',${ri},this,true)">서식 제거</button>
@@ -12535,7 +12615,7 @@ function getBranchBlockHtml(block, cid) {
               <button class="branch-inner-block-act del" title="삭제" onmousedown="event.preventDefault()" onclick="delBranchInnerBlock('${branchBlock.id}','${ib.id}','${cid}')">✕</button>
             </div>
             <div class="branch-inner-roll-css-panel" data-ib-id="${ib.id}" style="display:none">
-              <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+              <div class="btcp-label">CSS 매크로 서식</div>
               <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(ib.css||'')}</textarea>
               <div class="btcp-footer">
                 <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyBranchIbCss('${branchBlock.id}','${ib.id}',this,true)">서식 제거</button>
@@ -12580,7 +12660,7 @@ function getBranchBlockHtml(block, cid) {
               <button class="branch-inner-block-act del" title="삭제" onmousedown="event.preventDefault()" onclick="delBranchInnerBlock('${branchBlock.id}','${ib.id}','${cid}')">✕</button>
             </div>
             <div class="branch-ib-css-panel" data-ib-id="${ib.id}" style="display:none">
-              <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+              <div class="btcp-label">CSS 매크로 서식</div>
               <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(ib.css||'')}</textarea>
               <div class="btcp-footer">
                 <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyBranchIbCss('${branchBlock.id}','${ib.id}',this,true)">서식 제거</button>
@@ -13048,23 +13128,25 @@ function tbShowCtxMenu(x, y, items, opts = {}) {
 }
 
 function tbBuildBlockCtxMenu(e, id, cid, cssItem = null, extraItems = [], deleteAction = null, deleteLabel = '블록 삭제') {
+  const infoForPaste = getBlockArrayInfo(id, cid);
+  const pasteTargetKey = makeBlockTargetKeyForArrayInfo(infoForPaste);
+  const hasClip = !!_blockClipboard;
   const items = [
     { icon: '↑', label: '위로 이동', action: () => moveBlock(id, 'up', cid) },
     { icon: '↓', label: '아래로 이동', action: () => moveBlock(id, 'down', cid) },
-    { icon: '📋', label: '복사', action: () => copyBlock(id, cid) },
-    { icon: '✂', label: '잘라내기', action: () => cutBlock(id, cid) },
     { sep: true },
+    { icon: '<i class="fa-solid fa-scissors"></i>', label: '잘라내기', action: () => cutBlock(id, cid) },
+    { icon: '<i class="fa-solid fa-copy"></i>', label: '복사', action: () => copyBlock(id, cid) },
   ];
-  const infoForPaste = getBlockArrayInfo(id, cid);
-  const pasteTargetKey = makeBlockTargetKeyForArrayInfo(infoForPaste);
   if (infoForPaste && pasteTargetKey) {
-    const hasClip = !!_blockClipboard;
-    items.push(
-      { icon: '📋', label: '위에 붙여넣기', action: () => pasteBlock(infoForPaste.index, pasteTargetKey), disabled: !hasClip },
-      { icon: '📋', label: '아래에 붙여넣기', action: () => pasteBlock(infoForPaste.index + 1, pasteTargetKey), disabled: !hasClip },
-      { sep: true }
-    );
+    items.push({
+      icon: '<i class="fa-solid fa-paste"></i>',
+      label: '붙여넣기',
+      action: () => pasteBlock(infoForPaste.index + 1, pasteTargetKey),
+      disabled: !hasClip,
+    });
   }
+  items.push({ sep: true });
   const rulebookTocItem = rbGetBlockTocCtxItem(id, cid);
   if (rulebookTocItem) {
     items.push(rulebookTocItem, { sep: true });
@@ -14311,7 +14393,7 @@ const cssMacroField = (() => {
         <textarea class="btcp-macro-ta" readonly spellcheck="false"></textarea>
       </div>
       <div>
-        <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+        <div class="btcp-label">CSS 매크로 서식</div>
         <textarea class="btcp-textarea" placeholder="font-weight:bold; color:#cc0000;" spellcheck="false"></textarea>
       </div>
       <div class="btcp-footer">
@@ -14436,6 +14518,15 @@ function normalizeEditableHtml(value) {
     .replace(/<\/?(div|p|span|font|b|strong|i|em|u|s)[^>]*>/gi, '')
     .trim();
   return normalized ? sanitized : '';
+}
+function clearWhitespaceOnlyRollTitleEditable(target) {
+  if (!target?.matches?.('.roll-target-ce, .roll-skill-ce, .bib-roll-target, .bib-roll-skill')) return;
+  if (!target.innerHTML) return;
+  if (target.querySelector?.('img,hr,table,ul,ol,li,blockquote')) return;
+  const text = String(target.textContent || '').replace(/\u00a0/g, ' ').replace(/\u200b/g, '');
+  if (text.trim()) return;
+  target.innerHTML = '';
+  target.dispatchEvent(new Event('input', { bubbles: true }));
 }
 function countEditableBlankLineHtml(value) {
   const html = String(value || '');
@@ -14819,8 +14910,8 @@ function getRollBlockHtml(block, cid) {
   normalizeRollBlock(block);
   return `
     <div class="roll-header" style="--roll-start:${esc(block.rollColorStart)};--roll-end:${esc(block.rollColorEnd)};">
-      <div class="roll-target-ce" contenteditable="true" data-field="target" data-ph="판정 대상 (예: 탐사자 전원)" oninput="upd('${block.id}','target',this.innerHTML,'${cid}')"></div>
-      <div class="roll-skill-ce" contenteditable="true" data-field="content" data-ph="판정 기능치 (예: 《듣기》 판정)" oninput="upd('${block.id}','content',this.innerHTML,'${cid}')"></div>
+      <div class="roll-target-ce" contenteditable="true" data-field="target" data-ph="판정 대상" oninput="upd('${block.id}','target',this.innerHTML,'${cid}')"></div>
+      <div class="roll-skill-ce" contenteditable="true" data-field="content" data-ph="판정 기능치" oninput="upd('${block.id}','content',this.innerHTML,'${cid}')"></div>
     </div>
     <div class="roll-subs">
       ${block.rollResults.map(result => getRollResultHtml(block.id, result, cid)).join('')}
@@ -14998,7 +15089,7 @@ function syncBlockCssPanel(panel, block) {
     panel.insertBefore(sec, panel.firstChild);
     btcpAutoResize(sec.querySelector('.btcp-macro-ta'));
   }
-  label.textContent = 'CSS 서식 (Roll20 매크로용)';
+  label.textContent = 'CSS 매크로 서식';
   ta.value = block?.css || '';
   ta.readOnly = false;
   ta.placeholder = 'font-weight:bold; color:#cc0000;';
@@ -15642,7 +15733,7 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
           </div>
           <div class="block-ce" contenteditable="true" data-field="condition" data-ph="엔딩 달성 조건" oninput="updEnding('${ending.id}','condition',this.innerHTML,'${cid}')" oncontextmenu="return openEndingFieldCtxMenu(event,'${ending.id}','condition','${cid}')" spellcheck="false"></div>
           <div class="ending-css-panel">
-            <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+            <div class="btcp-label">CSS 매크로 서식</div>
             <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;" oninput="btcpAutoResize(this)">${esc(ending.conditionCss||'')}</textarea>
             <div class="btcp-footer">
               <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyEndingCss('${ending.id}','condition',this,true,'${cid}')">서식 제거</button>
@@ -15663,7 +15754,7 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
           </div>
           <div class="block-ce" contenteditable="true" data-field="reward" data-ph="보상 내용" oninput="updEnding('${ending.id}','reward',this.innerHTML,'${cid}')" oncontextmenu="return openEndingFieldCtxMenu(event,'${ending.id}','reward','${cid}')" spellcheck="false"></div>
           <div class="ending-css-panel">
-            <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+            <div class="btcp-label">CSS 매크로 서식</div>
             <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;" oninput="btcpAutoResize(this)">${esc(ending.rewardCss||'')}</textarea>
             <div class="btcp-footer">
               <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyEndingCss('${ending.id}','reward',this,true,'${cid}')">서식 제거</button>
@@ -15678,7 +15769,7 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
           </div>
           <div class="block-ce" contenteditable="true" data-field="aftermath" data-ph="후일담" oninput="updEnding('${ending.id}','aftermath',this.innerHTML,'${cid}')" oncontextmenu="return openEndingFieldCtxMenu(event,'${ending.id}','aftermath','${cid}')" spellcheck="false"></div>
           <div class="ending-css-panel">
-            <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+            <div class="btcp-label">CSS 매크로 서식</div>
             <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;" oninput="btcpAutoResize(this)">${esc(ending.aftermathCss||'')}</textarea>
             <div class="btcp-footer">
               <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyEndingCss('${ending.id}','aftermath',this,true,'${cid}')">서식 제거</button>
@@ -18724,7 +18815,7 @@ function openBranchInnerBlockCtxMenu(e, blockId, ibId, cid) {
   const targetItemEl = e.target.closest?.('.bib-item');
   const targetItem = targetItemEl?.dataset?.itemId ? getIbItemByIds(blockId, ibId, targetItemEl.dataset.itemId) : null;
   const childInsert = (targetItem && targetItemEl)
-    ? (() => { const m = makeChildInsertCtxItem(targetItem, targetItemEl, cid, e); m.label = '이 항목에 하위 블록'; return m; })()
+    ? (() => { const m = makeChildInsertCtxItem(targetItem, targetItemEl, cid, e); m.label = '하위 블록 추가'; return m; })()
     : null;
   const items = [
     { icon: '↑', label: '위로 이동', disabled: !canMoveUp, action: () => moveBranchInnerBlock(blockId, ibId, 'up', cid) },
@@ -18732,16 +18823,6 @@ function openBranchInnerBlockCtxMenu(e, blockId, ibId, cid) {
     ...(variationItems.length ? [{ sep: true }, ...variationItems] : []),
     { sep: true },
     ...(childInsert ? [childInsert] : []),
-    {
-      icon: '＋',
-      label: '하위 블록 추가',
-      submenu: [
-        { icon: '<i class="fa-regular fa-file-lines"></i>', label: '내용 추가', action: () => addIbTextItem(blockId, ibId, cid, e) },
-        { icon: '<i class="fa-solid fa-comment"></i>', label: '대사 추가', action: () => addIbSpeechItem(blockId, ibId, cid, e) },
-        { icon: '<i class="fa-solid fa-circle-exclamation"></i>', label: '콜아웃 추가', action: () => addIbCalloutItem(blockId, ibId, cid, e) },
-        { icon: '<i class="fa-solid fa-dice"></i>', label: '판정 블록 추가', action: () => addIbRollItem(blockId, ibId, cid, e) },
-      ],
-    },
   ];
   tbShowCtxMenu(e.clientX, e.clientY, items);
   return false;
@@ -19408,7 +19489,7 @@ function mkNestedSpeechHtml(blockId, item, idx = 0, total = 1, contentSlot = 0, 
       <button class="nested-speech-act del" onclick="delNestedCallout('${blockId}','${item.id}')" title="삭제">✕</button>
     </div>
     <div class="nested-speech-css-panel" style="display:none">
-      <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+      <div class="btcp-label">CSS 매크로 서식</div>
       <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(item.css || '')}</textarea>
       <div class="btcp-footer">
         <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyNestedSpeechCss('${blockId}','${item.id}',this,true)">서식 제거</button>
@@ -19435,7 +19516,7 @@ function mkNestedTextHtml(blockId, item, idx = 0, total = 1, contentSlot = 0, ha
       <button class="nested-speech-act del" onclick="delNestedCallout('${blockId}','${item.id}')" title="삭제">✕</button>
     </div>
     <div class="nested-text-css-panel" style="display:none">
-      <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
+      <div class="btcp-label">CSS 매크로 서식</div>
       <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(item.css || '')}</textarea>
       <div class="btcp-footer">
         <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyNestedTextCss('${blockId}','${item.id}',this,true)">서식 제거</button>
@@ -20779,8 +20860,12 @@ function switchTab(tab) {
   document.getElementById('panel-body').classList.toggle('active', tab==='body');
   document.getElementById('right-panel').classList.toggle('hidden', tab==='info');
   syncFormatBarVisibility();
-  if (tab === 'info') document.getElementById('toc-panel').classList.add('hidden');
-  if (tab === 'body') updateBodyHeader();
+  if (tab === 'body') {
+    restoreScriptTocOpenState();
+    updateBodyHeader();
+  } else {
+    setTocPanelOpen(false);
+  }
   if (currentPage === 'script' && cur()) saveLastScriptView(tab);
 }
 
@@ -20799,6 +20884,33 @@ function syncFormatBarVisibility() {
 
 function getScriptSidePanelElement(type) {
   return document.getElementById(type === 'memo' ? 'memo-panel' : 'toc-panel');
+}
+function isScriptBodyTabActive() {
+  const bodyPanel = document.getElementById('panel-body');
+  return currentPage === 'script' && !!bodyPanel && bodyPanel.classList.contains('active');
+}
+function loadScriptTocOpenState() {
+  return localStorage.getItem(SCRIPT_TOC_OPEN_KEY) === '1';
+}
+function saveScriptTocOpenState(open) {
+  localStorage.setItem(SCRIPT_TOC_OPEN_KEY, open ? '1' : '0');
+}
+function setTocPanelOpen(open, options = {}) {
+  const panel = getScriptSidePanelElement('toc');
+  if (!panel) return;
+  const shouldOpen = !!open && isScriptBodyTabActive();
+  panel.classList.toggle('hidden', !shouldOpen);
+  const btn = document.getElementById('rp-toc-btn');
+  btn?.classList.toggle('rp-item-active', shouldOpen);
+  if (shouldOpen) {
+    applyScriptSidePanelWidth('toc', loadScriptSidePanelWidth('toc'));
+    const s = cur();
+    if (s) renderToc(s.blocks || []);
+  }
+  if (options.persist) saveScriptTocOpenState(!!open);
+}
+function restoreScriptTocOpenState() {
+  setTocPanelOpen(loadScriptTocOpenState());
 }
 function getScriptSidePanelWidthLimit() {
   return Math.max(SCRIPT_SIDE_PANEL_MIN_WIDTH, Math.min(SCRIPT_SIDE_PANEL_MAX_WIDTH, window.innerWidth - 260));
@@ -20922,14 +21034,8 @@ function stopRulebookTocResize() {
 
 function toggleToc() {
   const panel = document.getElementById('toc-panel');
-  const btn = document.getElementById('rp-toc-btn');
-  const isHidden = panel.classList.toggle('hidden');
-  btn?.classList.toggle('rp-item-active', !isHidden);
-  if (!isHidden) {
-    applyScriptSidePanelWidth('toc', loadScriptSidePanelWidth('toc'));
-    const s = cur();
-    if (s) renderToc(s.blocks || []);
-  }
+  if (!panel) return;
+  setTocPanelOpen(panel.classList.contains('hidden'), { persist: true });
 }
 function toggleMemo() {
   const panel = document.getElementById('memo-panel');
@@ -26625,24 +26731,15 @@ function ensureCssMacroPickerButtonInCssPanel(panel) {
   const ta = panel.querySelector('.btcp-textarea');
   if (!ta) return;
 
-  if (panel.querySelector('.btcp-macro-picker-btn')) return;
-
-  const helperRow = document.createElement('div');
-  helperRow.className = 'btcp-helper-row';
-  helperRow.innerHTML = `
-    <button type="button" class="btcp-macro-picker-btn">CSS 매크로 보기</button>
-  `;
-
-  const firstBlock = ta.closest('div');
-  if (firstBlock && firstBlock.parentNode === panel) {
-    firstBlock.appendChild(helperRow);
-  } else {
-    panel.insertBefore(helperRow, panel.querySelector('.btcp-footer'));
-  }
-
-  const btn = helperRow.querySelector('.btcp-macro-picker-btn');
-  btn.onmousedown = e => e.preventDefault();
-  btn.onclick = () => openCssMacroPicker(ta);
+  // [CSS 매크로 서식] 라벨을 클릭하면 매크로 보기 창이 뜬다 (기존 "CSS 매크로 보기" 버튼 대체).
+  // 미리보기 프리셋 라벨이 아니라, css textarea와 같은 묶음의 라벨만 대상으로 한다.
+  const label = (ta.parentElement && ta.parentElement.querySelector('.btcp-label')) || panel.querySelector('.btcp-label');
+  if (!label || label.dataset.cmfPickWired === '1') return;
+  label.dataset.cmfPickWired = '1';
+  label.classList.add('btcp-label-pick');
+  label.title = '클릭하여 CSS 매크로 보기';
+  label.onmousedown = e => e.preventDefault();
+  label.onclick = () => openCssMacroPicker(ta);
 }
 function renderCssMacroPage() {
   const wrap = document.getElementById('css-macro-list');
@@ -27265,6 +27362,8 @@ document.addEventListener('input', e => {
   if (e.target.classList.contains('fb-textarea')) fbAutoResize(e.target);
   if (e.target.classList.contains('tbvp-textarea')) btcpAutoResize(e.target);
 });
+document.addEventListener('focusin', e => clearWhitespaceOnlyRollTitleEditable(e.target));
+document.addEventListener('focusout', e => clearWhitespaceOnlyRollTitleEditable(e.target));
 
 document.addEventListener('click', e => {
   const btn = e.target.closest('.tb-variation-copy-btn');
