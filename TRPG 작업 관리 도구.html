@@ -1762,7 +1762,14 @@ tr.ct-row-end .ct-select:focus {
   font-weight: 800;
   color: #111;
   word-break: break-word;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
 }
+.css-macro-picker-name:hover { color: #4f46e5; }
 .css-macro-picker-tags {
   display: flex;
   flex-wrap: wrap;
@@ -1830,9 +1837,12 @@ tr.ct-row-end .ct-select:focus {
   box-sizing: border-box;
 }
 .css-macro-picker-preview-wrap {
-  display: flex;
+  display: none;
   flex-direction: column;
   gap: 6px;
+}
+.css-macro-picker-preview-wrap.open {
+  display: flex;
 }
 .css-macro-picker-preview-label {
   font-size: 10px;
@@ -4140,6 +4150,9 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   padding-top: 2px;
   padding-bottom: 2px;
 }
+.toggle-content-wrap > .block-children-wrap > .block.block-text > .block-text-ce {
+  padding-left: 4px;
+}
 
 /* 분기점 박스 안 */
 .branch-block > .block-children-wrap {
@@ -4194,6 +4207,8 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 }
 .block-gap.gap-same-type { height: 3px; }
 .block-gap:hover, .block-gap.gap-open { opacity: 1; }
+.block.drag-over-before { box-shadow: inset 0 2px 0 #111; }
+.block.drag-over-after { box-shadow: inset 0 -2px 0 #111; }
 .block-gap-line {
   position: absolute; left: 0; right: 0; top: 50%;
   height: 2px; background: #d1d5db; transform: translateY(-50%); border-radius: 1px;
@@ -4240,6 +4255,19 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 .block-badge { display: none; }
 /* 드래그 핸들 — 숨김 (블록 자체 드래그로 대체) */
 .block-side-handle { display: none; }
+/* 판정 블록은 헤더가 거의 contenteditable이라 본문을 잡아 드래그할 영역이 없다.
+   → 판정 블록에 한해 좌상단 드래그 그립을 hover 시 노출 (overflow:hidden이라 내부 배치). */
+#blocks-container .block.block-roll > .block-side-handle {
+  display: flex; align-items: center; justify-content: center;
+  position: absolute; left: 4px; top: 4px;
+  width: 18px; height: 20px; color: rgba(255,255,255,0.9); font-size: 11px;
+  background: rgba(0,0,0,0.18); border-radius: 4px;
+  cursor: grab; user-select: none; z-index: 6;
+  opacity: 0; transition: opacity 0.12s, background 0.12s;
+}
+#blocks-container .block.block-roll:hover > .block-side-handle { opacity: 1; }
+#blocks-container .block.block-roll > .block-side-handle:hover { background: rgba(0,0,0,0.3); }
+#blocks-container .block.block-roll > .block-side-handle:active { cursor: grabbing; }
 /* 본문 영역 */
 .block-body { flex: 1; padding: 8px 12px; min-width: 0; }
 /* 우상단 플로팅 액션 */
@@ -6898,7 +6926,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
                 <span class="info-title-css-badge" id="i-title-css-badge" title="CSS 서식 적용됨 (클릭하여 편집)" style="display:none" onclick="openInfoTitleCssPanel()">✦</span>
               </div>
               <div class="info-title-css-panel" id="info-title-css-panel">
-                <div class="btcp-label">CSS 매크로 서식</div>
+                <div class="btcp-label">수정 CSS 매크로</div>
                 <textarea class="btcp-textarea" id="info-title-css-ta" placeholder="font-weight:bold; color:#cc0000;" spellcheck="false" oninput="btcpAutoResize(this)"></textarea>
                 <div class="btcp-footer">
                   <button class="btcp-remove" type="button" onmousedown="event.preventDefault()" onclick="applyInfoTitleCss(true)">서식 제거</button>
@@ -8237,7 +8265,7 @@ function mkScenario(folderId = '') {
       overview:'', truth:'', cautions:'', triggers:'', other:'', afterword:'',
       sessionCard: null
     },
-    introCode: '', blocks: [], endings: [], speakerTokens: [], memos: [],
+    introCode: '', blocks: [], endings: [], speakerTokens: [], speakerTokenHiddenKeys: [], memos: [],
     folderId
   };
 }
@@ -8456,6 +8484,7 @@ function normalizeScenarioRecord(input = {}) {
   next.blocks = Array.isArray(input?.blocks) ? input.blocks : [];
   next.endings = Array.isArray(input?.endings) ? input.endings : [];
   next.speakerTokens = Array.isArray(input?.speakerTokens) ? input.speakerTokens : [];
+  next.speakerTokenHiddenKeys = Array.isArray(input?.speakerTokenHiddenKeys) ? input.speakerTokenHiddenKeys : [];
   next.memos = Array.isArray(input?.memos) ? input.memos : [];
   next.folderId = typeof input?.folderId === 'string' ? input.folderId : '';
   normalizeScenarioBlocksForStorage(next);
@@ -12536,7 +12565,7 @@ function getIbCalloutNestedRollHtml(blockId, ibId, itemId, roll, rollId, orderId
           </div>
           <div class="bib-roll-result-ce" contenteditable="true" data-ib-id="${ibId}" data-item-id="${itemId}" data-roll-id="${rollId}" data-nr-ri="${ri}" data-ph="내용을 입력하세요" oninput="updIbCalloutRollResult('${blockId}','${ibId}','${itemId}','${rollId}',${ri},this.innerHTML)" oncontextmenu="return openIbCalloutRollResultCtxMenu(event,'${blockId}','${ibId}','${itemId}','${rollId}',${ri},'${cid}')" spellcheck="false"></div>
           <div class="ib-roll-result-css-panel" style="display:none">
-            <div class="btcp-label">CSS 매크로 서식</div>
+            <div class="btcp-label">수정 CSS 매크로</div>
             <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(r.css||'')}</textarea>
             <div class="btcp-footer">
               <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyIbCalloutRollResultCss('${blockId}','${ibId}','${itemId}','${rollId}',${ri},this,true)">서식 제거</button>
@@ -12546,7 +12575,7 @@ function getIbCalloutNestedRollHtml(blockId, ibId, itemId, roll, rollId, orderId
         </div>`).join('')}
       </div>
       <div class="ib-roll-css-panel" style="display:none">
-        <div class="btcp-label">CSS 매크로 서식</div>
+        <div class="btcp-label">수정 CSS 매크로</div>
         <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(roll.css||'')}</textarea>
         <div class="btcp-footer">
           <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyIbCalloutRollCss('${blockId}','${ibId}','${itemId}','${rollId}',this,true)">서식 제거</button>
@@ -12622,7 +12651,7 @@ function getBranchBlockHtml(block, cid) {
                 </div>
                 <div class="bib-roll-result-ce" contenteditable="true" data-ib-id="${ib.id}" data-bib-result-idx="${ri}" data-ph="내용을 입력하세요" oninput="updBranchIbRollResult('${branchBlock.id}','${ib.id}',${ri},this.innerHTML)" oncontextmenu="return openBranchIbRollResultCtxMenu(event,'${branchBlock.id}','${ib.id}',${ri},'${cid}')" spellcheck="false"></div>
                 <div class="branch-ib-roll-result-css-panel" style="display:none">
-                  <div class="btcp-label">CSS 매크로 서식</div>
+                  <div class="btcp-label">수정 CSS 매크로</div>
                   <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(r.css||'')}</textarea>
                   <div class="btcp-footer">
                     <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyBranchIbRollResultCss('${branchBlock.id}','${ib.id}',${ri},this,true)">서식 제거</button>
@@ -12639,7 +12668,7 @@ function getBranchBlockHtml(block, cid) {
               <button class="branch-inner-block-act del" title="삭제" onmousedown="event.preventDefault()" onclick="delBranchInnerBlock('${branchBlock.id}','${ib.id}','${cid}')">✕</button>
             </div>
             <div class="branch-inner-roll-css-panel" data-ib-id="${ib.id}" style="display:none">
-              <div class="btcp-label">CSS 매크로 서식</div>
+              <div class="btcp-label">수정 CSS 매크로</div>
               <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(ib.css||'')}</textarea>
               <div class="btcp-footer">
                 <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyBranchIbCss('${branchBlock.id}','${ib.id}',this,true)">서식 제거</button>
@@ -12684,7 +12713,7 @@ function getBranchBlockHtml(block, cid) {
               <button class="branch-inner-block-act del" title="삭제" onmousedown="event.preventDefault()" onclick="delBranchInnerBlock('${branchBlock.id}','${ib.id}','${cid}')">✕</button>
             </div>
             <div class="branch-ib-css-panel" data-ib-id="${ib.id}" style="display:none">
-              <div class="btcp-label">CSS 매크로 서식</div>
+              <div class="btcp-label">수정 CSS 매크로</div>
               <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(ib.css||'')}</textarea>
               <div class="btcp-footer">
                 <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyBranchIbCss('${branchBlock.id}','${ib.id}',this,true)">서식 제거</button>
@@ -12999,9 +13028,9 @@ function mkTextBlockEl(b, cid, ctx = {}) {
     ));
   });
   el.addEventListener('dragstart', e => beginBlockDrag(e, b.id, cid, el));
-  el.addEventListener('dragover',  e => { e.preventDefault(); e.stopPropagation(); el.classList.add('drag-over'); });
-  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) el.classList.remove('drag-over'); });
-  el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); el.classList.remove('drag-over'); dropBlock(b.id, cid); });
+  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; setBlockDropIndicator(el, getBlockDropPosition(e, el)); });
+  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
+  el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(b.id, cid, position); });
   appendGenericChildren(el, b, cid, ctx.depth || 0);
   return el;
 }
@@ -14413,11 +14442,11 @@ const cssMacroField = (() => {
     host.classList.add('css-macro-field');
     host.innerHTML = `
       <div class="cmf-preset" style="display:none">
-        <div class="btcp-label">기본 매크로 (Roll20용)</div>
+        <div class="btcp-label">기본 CSS 매크로</div>
         <textarea class="btcp-macro-ta" readonly spellcheck="false"></textarea>
       </div>
       <div>
-        <div class="btcp-label">CSS 매크로 서식</div>
+        <div class="btcp-label">수정 CSS 매크로</div>
         <textarea class="btcp-textarea" placeholder="font-weight:bold; color:#cc0000;" spellcheck="false"></textarea>
       </div>
       <div class="btcp-footer">
@@ -15049,7 +15078,7 @@ function getRollMacro(block) {
   const roll = normalizeRollBlock({ ...(block || {}), type: 'roll' });
   const target = getRollTargetText(roll);
   const skill = getRollSkillText(roll);
-  return `/desc [✷　${target}, 《${skill}》 판정　✷](#" style=" text-decoration: none; font-weight:bold; font-style: normal !important; text-align: center; display: inline-block; color: white; letter-spacing: -1px; border-radius: 20px; padding: 5px 25px;margin-left: -4px;background-image: linear-gradient(135deg, ${roll.rollColorStart}, ${roll.rollColorEnd} )`;
+  return `/desc [✷　${target}, 《${skill}》 판정　✷](#" style=" text-decoration: none; font-weight:bold; font-style: normal !important; text-align: center; display: inline-block; color: white; letter-spacing: -1px; border-radius: 20px; padding: 5px 25px;margin-left: -4px;background-image: linear-gradient(135deg, ${roll.rollColorStart}, ${roll.rollColorEnd}) @판정`;
 }
 
 function getChapterMacro(b) {
@@ -15098,7 +15127,7 @@ function syncBlockCssPanel(panel, block) {
   panel.querySelector('.btcp-macro-section')?.remove();
   const macro = getPresetBlockMacro(block);
   if (macro && canEditPresetBlockMacro(block)) {
-    label.textContent = '기본 매크로 편집 (Roll20용)';
+    label.textContent = '기본 CSS 매크로 편집';
     ta.value = getEditablePresetBlockMacro(block);
     ta.readOnly = false;
     ta.placeholder = macro;
@@ -15109,11 +15138,11 @@ function syncBlockCssPanel(panel, block) {
   if (macro) {
     const sec = document.createElement('div');
     sec.className = 'btcp-macro-section';
-    sec.innerHTML = `<div class="btcp-label">기본 매크로 (Roll20용)</div><textarea class="btcp-macro-ta" readonly spellcheck="false">${esc(macro)}</textarea>`;
+    sec.innerHTML = `<div class="btcp-label">기본 CSS 매크로</div><textarea class="btcp-macro-ta" readonly spellcheck="false">${esc(macro)}</textarea>`;
     panel.insertBefore(sec, panel.firstChild);
     btcpAutoResize(sec.querySelector('.btcp-macro-ta'));
   }
-  label.textContent = 'CSS 매크로 서식';
+  label.textContent = '수정 CSS 매크로';
   ta.value = block?.css || '';
   ta.readOnly = false;
   ta.placeholder = 'font-weight:bold; color:#cc0000;';
@@ -15346,9 +15375,9 @@ function mkDividerEl(b, cid, ctx = {}) {
     ));
   });
   el.addEventListener('dragstart', e => beginBlockDrag(e, b.id, cid, el));
-  el.addEventListener('dragover',  e => { e.preventDefault(); e.stopPropagation(); el.classList.add('drag-over'); });
-  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) el.classList.remove('drag-over'); });
-  el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); el.classList.remove('drag-over'); dropBlock(b.id, cid); });
+  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; setBlockDropIndicator(el, getBlockDropPosition(e, el)); });
+  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
+  el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(b.id, cid, position); });
   appendGenericChildren(el, b, cid, ctx.depth || 0);
   return el;
 }
@@ -15718,9 +15747,9 @@ function mkBlockEl(b, cid, ctx = {}) {
     ));
   });
   el.addEventListener('dragstart', e => beginBlockDrag(e, b.id, cid, el));
-  el.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); el.classList.add('drag-over'); });
-  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) el.classList.remove('drag-over'); });
-  el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); el.classList.remove('drag-over'); dropBlock(b.id, cid); });
+  el.addEventListener('dragover', e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; setBlockDropIndicator(el, getBlockDropPosition(e, el)); });
+  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
+  el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(b.id, cid, position); });
   appendGenericChildren(el, b, cid, ctx.depth || 0);
   return el;
 }
@@ -15736,9 +15765,9 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
   el.addEventListener('dragstart', e => {
     beginBlockDrag(e, ending.id, cid, el);
   });
-  el.addEventListener('dragover',  e => { e.preventDefault(); e.stopPropagation(); el.classList.add('drag-over'); });
-  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) el.classList.remove('drag-over'); });
-  el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); el.classList.remove('drag-over'); dropBlock(ending.id, cid); });
+  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; setBlockDropIndicator(el, getBlockDropPosition(e, el)); });
+  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
+  el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(ending.id, cid, position); });
   const collapsed = ending.collapsed ?? true;
   el.innerHTML = `
     <span class="block-side-handle" title="드래그하여 순서 변경">⋮⋮</span>
@@ -15757,7 +15786,7 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
           </div>
           <div class="block-ce" contenteditable="true" data-field="condition" data-ph="엔딩 달성 조건" oninput="updEnding('${ending.id}','condition',this.innerHTML,'${cid}')" oncontextmenu="return openEndingFieldCtxMenu(event,'${ending.id}','condition','${cid}')" spellcheck="false"></div>
           <div class="ending-css-panel">
-            <div class="btcp-label">CSS 매크로 서식</div>
+            <div class="btcp-label">수정 CSS 매크로</div>
             <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;" oninput="btcpAutoResize(this)">${esc(ending.conditionCss||'')}</textarea>
             <div class="btcp-footer">
               <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyEndingCss('${ending.id}','condition',this,true,'${cid}')">서식 제거</button>
@@ -15778,7 +15807,7 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
           </div>
           <div class="block-ce" contenteditable="true" data-field="reward" data-ph="보상 내용" oninput="updEnding('${ending.id}','reward',this.innerHTML,'${cid}')" oncontextmenu="return openEndingFieldCtxMenu(event,'${ending.id}','reward','${cid}')" spellcheck="false"></div>
           <div class="ending-css-panel">
-            <div class="btcp-label">CSS 매크로 서식</div>
+            <div class="btcp-label">수정 CSS 매크로</div>
             <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;" oninput="btcpAutoResize(this)">${esc(ending.rewardCss||'')}</textarea>
             <div class="btcp-footer">
               <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyEndingCss('${ending.id}','reward',this,true,'${cid}')">서식 제거</button>
@@ -15793,7 +15822,7 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
           </div>
           <div class="block-ce" contenteditable="true" data-field="aftermath" data-ph="후일담" oninput="updEnding('${ending.id}','aftermath',this.innerHTML,'${cid}')" oncontextmenu="return openEndingFieldCtxMenu(event,'${ending.id}','aftermath','${cid}')" spellcheck="false"></div>
           <div class="ending-css-panel">
-            <div class="btcp-label">CSS 매크로 서식</div>
+            <div class="btcp-label">수정 CSS 매크로</div>
             <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;" oninput="btcpAutoResize(this)">${esc(ending.aftermathCss||'')}</textarea>
             <div class="btcp-footer">
               <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyEndingCss('${ending.id}','aftermath',this,true,'${cid}')">서식 제거</button>
@@ -15922,6 +15951,14 @@ function ensureScenarioSpeakerTokens(scenario = cur()) {
   if (!Array.isArray(scenario.speakerTokens)) scenario.speakerTokens = [];
   return scenario.speakerTokens;
 }
+function ensureScenarioSpeakerTokenHiddenKeys(scenario = cur()) {
+  if (!scenario) return [];
+  if (!Array.isArray(scenario.speakerTokenHiddenKeys)) scenario.speakerTokenHiddenKeys = [];
+  scenario.speakerTokenHiddenKeys = scenario.speakerTokenHiddenKeys
+    .map(key => getSpeakerTokenKey(key))
+    .filter(Boolean);
+  return scenario.speakerTokenHiddenKeys;
+}
 function getSpeakerTokenKey(name = '') {
   return String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
@@ -15931,6 +15968,9 @@ function registerScenarioSpeakerToken(name, color, scenario = cur()) {
   if (!tokenName || tokenName === DEFAULT_SPEAKER_NAME) return null;
   const tokens = ensureScenarioSpeakerTokens(scenario);
   const key = getSpeakerTokenKey(tokenName);
+  const hiddenKeys = ensureScenarioSpeakerTokenHiddenKeys(scenario);
+  const hiddenIndex = hiddenKeys.indexOf(key);
+  if (hiddenIndex >= 0) hiddenKeys.splice(hiddenIndex, 1);
   const currentIndex = tokens.findIndex(token => getSpeakerTokenKey(token?.name) === key);
   const nextToken = {
     id: currentIndex >= 0 ? (tokens[currentIndex].id || mkId()) : mkId(),
@@ -15953,12 +15993,13 @@ function getScenarioSpeakerTokens(scenario = cur()) {
   if (!scenario) return [];
   const merged = [];
   const seen = new Set();
+  const hiddenKeys = new Set(ensureScenarioSpeakerTokenHiddenKeys(scenario));
   
   const pushToken = (name, color) => {
     const tokenName = String(name || '').replace(/\s+/g, ' ').trim();
     if (!tokenName || tokenName === DEFAULT_SPEAKER_NAME) return;
     const key = getSpeakerTokenKey(tokenName);
-    if (seen.has(key)) return;
+    if (hiddenKeys.has(key) || seen.has(key)) return;
     seen.add(key);
     merged.push({ name: tokenName, color: color || DEFAULT_SPEECH_COLOR });
   };
@@ -16014,11 +16055,46 @@ function getSpeechTokenButtonsHtml(tokens, activeKey, onClickAction) {
   return tokens.map(token => `
     <button type="button" class="speech-token${getSpeakerTokenKey(token.name) === activeKey ? ' active' : ''}"
       data-name="${esc(token.name)}" data-color="${esc(token.color || DEFAULT_SPEECH_COLOR)}"
-      onclick="${onClickAction}">
+      onclick="${onClickAction}"
+      oncontextmenu="return openSpeechTokenContextMenu(event,this)">
       <span class="speech-token-dot" style="background:${esc(token.color || DEFAULT_SPEECH_COLOR)}"></span>
       <span class="speech-token-name">${esc(token.name)}</span>
     </button>
   `).join('');
+}
+function removeSpeechTokenButtonsFromDom(tokenKey) {
+  document.querySelectorAll('.speech-token-list').forEach(list => {
+    list.querySelectorAll('.speech-token').forEach(btn => {
+      if (getSpeakerTokenKey(btn.dataset.name || '') === tokenKey) btn.remove();
+    });
+    if (!list.querySelector('.speech-token')) {
+      list.innerHTML = `<div class="speech-token-empty">등록된 화자가 없습니다</div>`;
+    }
+  });
+}
+function deleteScenarioSpeakerTokenByName(name) {
+  const scenario = cur();
+  const tokenKey = getSpeakerTokenKey(name);
+  if (!scenario || !tokenKey) return;
+
+  const tokens = ensureScenarioSpeakerTokens(scenario);
+  scenario.speakerTokens = tokens.filter(token => getSpeakerTokenKey(token?.name) !== tokenKey);
+
+  const hiddenKeys = ensureScenarioSpeakerTokenHiddenKeys(scenario);
+  if (!hiddenKeys.includes(tokenKey)) hiddenKeys.push(tokenKey);
+
+  removeSpeechTokenButtonsFromDom(tokenKey);
+  persist();
+}
+function openSpeechTokenContextMenu(event, tokenEl) {
+  event.preventDefault();
+  event.stopPropagation();
+  const name = tokenEl?.dataset?.name || '';
+  if (!name) return false;
+  tbShowCtxMenu(event.clientX, event.clientY, [
+    { icon: '✕', label: '화자 토큰 삭제', action: () => deleteScenarioSpeakerTokenByName(name), danger: true },
+  ]);
+  return false;
 }
 
 /**
@@ -19513,7 +19589,7 @@ function mkNestedSpeechHtml(blockId, item, idx = 0, total = 1, contentSlot = 0, 
       <button class="nested-speech-act del" onclick="delNestedCallout('${blockId}','${item.id}')" title="삭제">✕</button>
     </div>
     <div class="nested-speech-css-panel" style="display:none">
-      <div class="btcp-label">CSS 매크로 서식</div>
+      <div class="btcp-label">수정 CSS 매크로</div>
       <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(item.css || '')}</textarea>
       <div class="btcp-footer">
         <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyNestedSpeechCss('${blockId}','${item.id}',this,true)">서식 제거</button>
@@ -19540,7 +19616,7 @@ function mkNestedTextHtml(blockId, item, idx = 0, total = 1, contentSlot = 0, ha
       <button class="nested-speech-act del" onclick="delNestedCallout('${blockId}','${item.id}')" title="삭제">✕</button>
     </div>
     <div class="nested-text-css-panel" style="display:none">
-      <div class="btcp-label">CSS 매크로 서식</div>
+      <div class="btcp-label">수정 CSS 매크로</div>
       <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(item.css || '')}</textarea>
       <div class="btcp-footer">
         <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyNestedTextCss('${blockId}','${item.id}',this,true)">서식 제거</button>
@@ -19973,12 +20049,28 @@ function copyNestedSpeech(blockId, itemId, btn) {
 
 // ─── DRAG & DROP ───
 let dragId = null, dragCid = null;
+function hasContentEditableDragSelection(target) {
+  const node = target?.nodeType === Node.TEXT_NODE ? target.parentElement : target;
+  const ce = node?.closest?.('[contenteditable="true"]');
+  const sel = window.getSelection?.();
+  if (!ce || !sel || sel.isCollapsed || sel.rangeCount === 0) return false;
+
+  for (let i = 0; i < sel.rangeCount; i += 1) {
+    const range = sel.getRangeAt(i);
+    const common = range.commonAncestorContainer;
+    const commonEl = common?.nodeType === Node.ELEMENT_NODE ? common : common?.parentElement;
+    if (commonEl && ce.contains(commonEl)) return true;
+    try {
+      if (range.intersectsNode(ce)) return true;
+    } catch (err) {}
+  }
+
+  return false;
+}
 function isBlockEditTarget(target) {
   const node = target?.nodeType === Node.TEXT_NODE ? target.parentElement : target;
   if (!node) return false;
-  return !!node.closest?.(
-    '[contenteditable="true"], input, textarea, select, button, a, .block-actions, .branch-inner-block-actions'
-  );
+  return !!node.closest?.('input, textarea, select, button, a, .block-actions, .branch-inner-block-actions');
 }
 function syncBlockDraggableState(root = document) {
   root.querySelectorAll?.('.block').forEach(el => {
@@ -19986,16 +20078,24 @@ function syncBlockDraggableState(root = document) {
   });
 }
 // mousedown 시점에 클릭 위치를 판별해 draggable을 동적으로 토글한다.
-// - 모서리/패딩(블록 wrapper, .block-body 등)에서 시작하면 → draggable=true → 드래그로 위치 이동
-// - 본문 contenteditable / input / 버튼 등에서 시작하면 → draggable=false → 네이티브 텍스트 선택 등 정상 동작
+// - contenteditable 본문을 포함한 블록 내부에서 시작하면 → draggable=true → 드래그로 위치 이동
+// - input / 버튼 / 액션 영역에서 시작하면 → draggable=false → 네이티브 편집 동작 유지
 // 또한 본문 영역(#panel-body) 안에서 블록 바깥을 클릭하면 선택을 해제한다.
 document.addEventListener('mousedown', e => {
   if (e.button !== 0) return;
   const block = e.target?.closest?.('.block');
   const panelBody = document.getElementById('panel-body');
 
+  syncBlockDraggableState();
+
   if (block) {
-    block.draggable = !isBlockEditTarget(e.target);
+    const canDragBlock = !isBlockEditTarget(e.target);
+    block.draggable = canDragBlock;
+    if (canDragBlock) {
+      document.querySelectorAll('.block').forEach(el => {
+        if (el !== block && el.contains(block)) el.draggable = false;
+      });
+    }
 
     if (!isBlockRangeStartTarget(e.target)) {
       clearBlockRangeSelection();
@@ -20037,7 +20137,7 @@ document.addEventListener('mousedown', e => {
   }
 
   const startBlock = getRangeSelectableBlock(e.target);
-  if (!startBlock || !isBlockRangeStartTarget(e.target)) {
+  if (!startBlock || startBlock.draggable || !isBlockRangeStartTarget(e.target) || hasContentEditableDragSelection(e.target)) {
     return;
   }
 
@@ -20169,23 +20269,47 @@ document.addEventListener('keydown', e => {
   }
 }, true);
 function resetBlockDragState() {
-  document.querySelectorAll('.block').forEach(el => el.classList.remove('dragging','drag-over'));
+  document.querySelectorAll('.block').forEach(el => {
+    el.classList.remove('dragging','drag-over','drag-over-before','drag-over-after');
+    el.draggable = true;
+  });
   document.querySelectorAll('.block-gap.gap-open').forEach(el => el.classList.remove('gap-open'));
   document.body.classList.remove('block-drag-active');
   dragId = null;
   dragCid = null;
   stopDragAutoScroll();
 }
+function getBlockDropPosition(e, el) {
+  if (!e || !el?.getBoundingClientRect) return 'before';
+  const rect = el.getBoundingClientRect();
+  const midY = rect.top + rect.height / 2;
+  return e.clientY > midY ? 'after' : 'before';
+}
+function setBlockDropIndicator(el, position) {
+  if (!el) return;
+  el.classList.add('drag-over');
+  el.classList.toggle('drag-over-before', position !== 'after');
+  el.classList.toggle('drag-over-after', position === 'after');
+}
+function clearBlockDropIndicator(el) {
+  if (!el) return;
+  el.classList.remove('drag-over','drag-over-before','drag-over-after');
+}
 function beginBlockDrag(e, blockId, cid, el) {
+  e.stopPropagation();
   if (isBlockEditTarget(e.target)) {
     e.preventDefault();
     return false;
   }
+  clearBlockRangeSelection();
   dragId = blockId;
   dragCid = cid;
   document.body.classList.add('block-drag-active');
   el.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', blockId);
+  }
   return true;
 }
 document.addEventListener('dragover', e => {
@@ -20273,7 +20397,7 @@ function dropBlockAtTarget(insertIdx, targetKey) {
   focusBlockAfterRender(movedId);
   resetBlockDragState();
 }
-function dropBlock(targetId, targetCid) {
+function dropBlock(targetId, targetCid, position = 'before') {
   if (!dragId || dragId === targetId || dragCid !== targetCid) return;
   let fromInfo = getBlockArrayInfo(dragId, dragCid);
   let targetInfo = getBlockArrayInfo(targetId, targetCid);
@@ -20295,13 +20419,22 @@ function dropBlock(targetId, targetCid) {
 
   const movedId = dragId;
   const [item] = fromInfo.array.splice(fromInfo.index, 1);
+  targetInfo = getBlockArrayInfo(targetId, targetCid);
+  if (!targetInfo || fromInfo.rootCid !== targetInfo.rootCid) {
+    fromInfo.array.splice(fromInfo.index, 0, item);
+    resetBlockDragState();
+    return;
+  }
+
   const targetIndex = targetInfo.array.findIndex(b => b.id === targetId);
   if (targetIndex < 0) {
     fromInfo.array.splice(fromInfo.index, 0, item);
     resetBlockDragState();
     return;
   }
-  targetInfo.array.splice(targetIndex, 0, item);
+
+  const insertIndex = targetIndex + (position === 'after' ? 1 : 0);
+  targetInfo.array.splice(insertIndex, 0, item);
 
   commitBlockTreeChange(`block:${movedId}:drop`, fromInfo.rootCid, { force: true });
   renderRootBlocksByCid(fromInfo.rootCid);
@@ -23456,7 +23589,7 @@ const FR_SKIP_FIELDS = new Set([
   'writer','rule','format','background','playtime','players',
   'skills','relations','madness','combat','lost',
   'insaneCard','sceneTable',
-  'sessionCard','speakerTokens','folderId','introCode'
+  'sessionCard','speakerTokens','speakerTokenHiddenKeys','folderId','introCode'
 ]);
 
 // 조사 목록 (길이 내림차순으로 정렬 — 긴 형태 먼저 매칭)
@@ -26238,6 +26371,7 @@ function trimCssMacroPreviewImage(img) {
   }
 }
 const cssMacroPreviewOpenMap = Object.create(null);
+const cssMacroPickerPreviewOpenMap = Object.create(null);
 function isCssMacroPreviewOpen(itemId) {
   return !!cssMacroPreviewOpenMap[itemId];
 }
@@ -26599,6 +26733,7 @@ let cssMacroPickerTargetTextarea = null;
 
 function openCssMacroPicker(targetTextarea = null) {
   cssMacroPickerTargetTextarea = targetTextarea || null;
+  Object.keys(cssMacroPickerPreviewOpenMap).forEach(key => delete cssMacroPickerPreviewOpenMap[key]);
 
   const backdrop = document.getElementById('css-macro-picker-backdrop');
   if (!backdrop) return;
@@ -26615,6 +26750,18 @@ function openCssMacroPicker(targetTextarea = null) {
 function closeCssMacroPicker() {
   document.getElementById('css-macro-picker-backdrop')?.classList.remove('open');
   cssMacroPickerTargetTextarea = null;
+}
+function isCssMacroPickerPreviewOpen(itemId) {
+  return !!cssMacroPickerPreviewOpenMap[itemId];
+}
+function toggleCssMacroPickerPreview(itemId) {
+  cssMacroPickerPreviewOpenMap[itemId] = !cssMacroPickerPreviewOpenMap[itemId];
+  const card = document.querySelector(`.css-macro-picker-card[data-css-macro-id="${CSS.escape(itemId)}"]`);
+  const wrap = card?.querySelector('.css-macro-picker-preview-wrap');
+  const title = card?.querySelector('.css-macro-picker-name');
+  const open = !!cssMacroPickerPreviewOpenMap[itemId];
+  if (wrap) wrap.classList.toggle('open', open);
+  if (title) title.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
 function renderCssMacroPicker() {
@@ -26660,11 +26807,12 @@ function renderCssMacroPicker() {
         const tags = Array.isArray(item.tags) ? item.tags : [];
         const itemId = String(item.id || '');
         const itemArg = esc(JSON.stringify(itemId));
+        const previewOpen = isCssMacroPickerPreviewOpen(itemId);
         return `
           <article class="css-macro-picker-card" data-css-macro-id="${esc(itemId)}">
             <div class="css-macro-picker-card-head">
               <div>
-                <div class="css-macro-picker-name">${esc(item.title || '제목 없음')}</div>
+                <button type="button" class="css-macro-picker-name" aria-expanded="${previewOpen ? 'true' : 'false'}" onclick="toggleCssMacroPickerPreview(${itemArg})">${esc(item.title || '제목 없음')}</button>
                 ${tags.length ? `
                   <div class="css-macro-picker-tags">
                     ${tags.map(tag => `<span class="css-macro-picker-tag">#${esc(tag)}</span>`).join('')}
@@ -26679,7 +26827,7 @@ function renderCssMacroPicker() {
 
             <textarea class="css-macro-picker-textarea" readonly spellcheck="false">${esc(content)}</textarea>
 
-            <div class="css-macro-picker-preview-wrap">
+            <div class="css-macro-picker-preview-wrap${previewOpen ? ' open' : ''}">
               <div class="css-macro-picker-preview-label">PREVIEW</div>
               <div class="css-macro-preview-chatbox">
                 <div class="css-macro-preview-body">${renderCssMacroPreviewHtml(content)}</div>
@@ -26755,7 +26903,7 @@ function ensureCssMacroPickerButtonInCssPanel(panel) {
   const ta = panel.querySelector('.btcp-textarea');
   if (!ta) return;
 
-  // [CSS 매크로 서식] 라벨을 클릭하면 매크로 보기 창이 뜬다 (기존 "CSS 매크로 보기" 버튼 대체).
+  // [수정 CSS 매크로] 라벨을 클릭하면 매크로 보기 창이 뜬다 (기존 "CSS 매크로 보기" 버튼 대체).
   // 미리보기 프리셋 라벨이 아니라, css textarea와 같은 묶음의 라벨만 대상으로 한다.
   const label = (ta.parentElement && ta.parentElement.querySelector('.btcp-label')) || panel.querySelector('.btcp-label');
   if (!label || label.dataset.cmfPickWired === '1') return;
