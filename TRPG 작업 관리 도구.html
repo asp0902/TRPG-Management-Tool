@@ -11704,11 +11704,21 @@ function findGenericBlockArrayInfo(blocks, targetId, parent = null, relation = '
 
     if (Array.isArray(block.rollResults)) {
       for (const result of block.rollResults) {
-        if (!Array.isArray(result?.blocks)) continue;
-        const found = findGenericBlockArrayInfo(result.blocks, targetId, block, 'rollResultBlocks');
-        if (found) {
-          found.rollResultId = result.id;
-          return found;
+        // 결과칸 자체를 id로 매칭 → result.children을 generic 'children' 키로 다룰 수 있게 한다.
+        if (result && result.id === targetId) {
+          return { array: block.rollResults, index: block.rollResults.indexOf(result), block: result, parent: block, relation: 'rollResults' };
+        }
+        if (Array.isArray(result?.blocks)) {
+          const found = findGenericBlockArrayInfo(result.blocks, targetId, block, 'rollResultBlocks');
+          if (found) {
+            found.rollResultId = result.id;
+            return found;
+          }
+        }
+        // 분기 판정 결과칸의 3차 하위 블록 (result.children)
+        if (Array.isArray(result?.children)) {
+          const found = findGenericBlockArrayInfo(result.children, targetId, block, 'children');
+          if (found) return found;
         }
       }
     }
@@ -12123,6 +12133,7 @@ function normalizeEmbeddedRollBlock(block) {
     label: typeof result?.label === 'string' ? result.label : '',
     content: normalizeEditableHtml(result?.content || ''),
     css: typeof result?.css === 'string' ? result.css : '',
+    children: normalizeBlockTree(Array.isArray(result?.children) ? result.children : []),  // 결과칸 3차 하위 블록
   }));
   if (!block.rollResults.length) {
     block.rollResults.push({ id: mkId(), type: 'other', label: '결과', content: '', css: '' });
@@ -14874,6 +14885,27 @@ function mountBibItemChildren(blockEl, branchBlock, cid, depth = 0) {
         depth: (depth || 0) + 2,
       });
       itemEl.appendChild(wrap);
+
+      // 판정 항목의 각 결과칸(성공/실패/기타) 밑 3차 하위 블록
+      if (item.type === 'roll' && Array.isArray(item.rollResults)) {
+        itemEl.querySelectorAll('.bib-roll-result[data-item-result-id]').forEach(resEl => {
+          if (resEl.querySelector(':scope > .block-children-wrap')) return;
+          const result = item.rollResults.find(r => r.id === resEl.dataset.itemResultId);
+          if (!result) return;
+          if (!Array.isArray(result.children)) result.children = [];
+          const rWrap = document.createElement('div');
+          rWrap.className = 'block-children-wrap';
+          rWrap.dataset.parentId = result.id;
+          rWrap.dataset.mount = 'bib-roll-result';
+          rWrap.dataset.empty = result.children.length === 0 ? '1' : '0';
+          renderBlockListInto(rWrap, result.children, {
+            cid,
+            targetKey: makeChildBlockTargetKey(result.id, cid),
+            depth: (depth || 0) + 3,
+          });
+          resEl.appendChild(rWrap);
+        });
+      }
     });
   });
 }
@@ -18206,6 +18238,8 @@ function openIbRollResultCtxMenu(e, blockId, ibId, itemId, resultIdx, cid) {
         || document.querySelector(`.bib-item-roll[data-item-id="${itemId}"] .bib-roll-result[data-item-result-id="${result.id}"] .branch-inner-css-badge`);
       if (targetBadge) toggleIbRollResultCssPanel(blockId, ibId, itemId, resultIdx, targetBadge);
     }},
+    ...(resultEl ? [{ sep: true }, makeChildInsertCtxItem(result, resultEl, cid, e)] : []),
+    { sep: true },
     { icon: '↑', label: '결과 줄 위로 이동', disabled: resultIdx <= 0, action: () => moveIbRollResult(blockId, ibId, itemId, resultIdx, 'up', cid) },
     { icon: '↓', label: '결과 줄 아래로 이동', disabled: resultIdx >= item.rollResults.length - 1, action: () => moveIbRollResult(blockId, ibId, itemId, resultIdx, 'down', cid) },
     { icon: '<i class="fa-regular fa-clone"></i>', label: '결과 복제', action: () => duplicateIbRollResult(blockId, ibId, itemId, resultIdx, cid) },
