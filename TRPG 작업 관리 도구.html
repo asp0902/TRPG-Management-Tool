@@ -12394,24 +12394,10 @@ function getBibItemHtml(blockId, ibId, item, idx, total, cid) {
               </div>
             </div>
             <div class="bib-roll-result-ce" contenteditable="true" data-ib-id="${ibId}" data-item-id="${item.id}" data-item-ri="${ri}" data-ph="내용을 입력하세요" oninput="updIbRollResult('${blockId}','${ibId}','${item.id}',${ri},this.innerHTML)" oncontextmenu="return openIbRollResultCtxMenu(event,'${blockId}','${ibId}','${item.id}',${ri},'${cid}')" spellcheck="false"></div>
-            <div class="ib-roll-result-css-panel" style="display:none">
-              <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
-              <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(r.css||'')}</textarea>
-              <div class="btcp-footer">
-                <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyIbRollResultCss('${blockId}','${ibId}','${item.id}',${ri},this,true)">서식 제거</button>
-                <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyIbRollResultCss('${blockId}','${ibId}','${item.id}',${ri},this,false)">적용</button>
-              </div>
-            </div>
+            <div class="css-macro-field" data-cmf-ib-roll-result="${r.id}"></div>
           </div>`).join('')}
         </div>
-        <div class="ib-roll-css-panel" style="display:none">
-          <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
-          <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(item.css||'')}</textarea>
-          <div class="btcp-footer">
-            <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyIbRollCss('${blockId}','${ibId}','${item.id}',this,true)">서식 제거</button>
-            <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyIbRollCss('${blockId}','${ibId}','${item.id}',this,false)">적용</button>
-          </div>
-        </div>
+        <div class="css-macro-field" data-cmf-ib-roll="${item.id}"></div>
       </div>
     </div>`;
   }
@@ -14904,6 +14890,30 @@ function mountBibItemChildren(blockEl, branchBlock, cid, depth = 0) {
             depth: (depth || 0) + 3,
           });
           resEl.appendChild(rWrap);
+        });
+      }
+
+      // 판정 항목/결과 CSS 매크로 필드 (cssMacroField로 이전)
+      if (item.type === 'roll') {
+        const itemCssHost = itemEl.querySelector(`.css-macro-field[data-cmf-ib-roll="${item.id}"]`);
+        if (itemCssHost) {
+          cssMacroField.mount(itemCssHost, {
+            get: () => getIbRollItem(branchBlock.id, ibId, itemId).item?.css || '',
+            set: v => { const { item: it } = getIbRollItem(branchBlock.id, ibId, itemId); if (it) it.css = v; },
+            save: () => commitBlockTreeChange(`ib-roll:${ibId}:${itemId}:css`, cid),
+            badge: itemEl.querySelector('.bib-item-roll-floating-actions .branch-inner-css-badge'),
+          });
+        }
+        itemEl.querySelectorAll('.bib-roll-result[data-item-result-id]').forEach(resEl => {
+          const rid = resEl.dataset.itemResultId;
+          const rHost = resEl.querySelector('.css-macro-field[data-cmf-ib-roll-result]');
+          if (!rHost) return;
+          cssMacroField.mount(rHost, {
+            get: () => getIbRollItem(branchBlock.id, ibId, itemId).item?.rollResults?.find(r => r.id === rid)?.css || '',
+            set: v => { const r = getIbRollItem(branchBlock.id, ibId, itemId).item?.rollResults?.find(x => x.id === rid); if (r) r.css = v; },
+            save: () => commitBlockTreeChange(`ib-roll:${ibId}:${itemId}:${rid}:css`, cid),
+            badge: resEl.querySelector('.branch-inner-css-badge'),
+          });
         });
       }
     });
@@ -18006,17 +18016,8 @@ function copyIbRollItem(blockId, ibId, itemId, btn) {
   });
 }
 function toggleIbRollCssPanel(blockId, ibId, itemId, badgeEl) {
-  const panel = badgeEl.closest('.bib-sub-block-roll')?.querySelector('.ib-roll-css-panel');
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  document.querySelectorAll('.roll-result-css-panel, .branch-ib-css-panel, .branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, .ib-roll-css-panel, .ib-roll-result-css-panel').forEach(p => { p.style.display = 'none'; });
-  if (!isOpen) {
-    panel.style.display = 'flex';
-    ensureCssMacroPickerButtonInCssPanel(panel);
-    const ta = panel.querySelector('.btcp-textarea');
-    btcpAutoResize(ta);
-    ta.focus();
-  }
+  const host = badgeEl.closest('.bib-sub-block-roll')?.querySelector(`.css-macro-field[data-cmf-ib-roll="${itemId}"]`);
+  if (host) cssMacroField.toggle(host);
 }
 function applyIbRollCss(blockId, ibId, itemId, btn, remove) {
   const { item } = getIbRollItem(blockId, ibId, itemId);
@@ -18107,17 +18108,8 @@ function copyIbRollResult(blockId, ibId, itemId, resultIdx, btn) {
   });
 }
 function toggleIbRollResultCssPanel(blockId, ibId, itemId, resultIdx, badgeEl) {
-  const panel = badgeEl.closest('.bib-roll-result')?.querySelector('.ib-roll-result-css-panel');
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  document.querySelectorAll('.roll-result-css-panel, .branch-ib-css-panel, .branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, .ib-roll-css-panel, .ib-roll-result-css-panel').forEach(p => { p.style.display = 'none'; });
-  if (!isOpen) {
-    panel.style.display = 'flex';
-    ensureCssMacroPickerButtonInCssPanel(panel);
-    const ta = panel.querySelector('.btcp-textarea');
-    btcpAutoResize(ta);
-    ta.focus();
-  }
+  const host = badgeEl.closest('.bib-roll-result')?.querySelector('.css-macro-field[data-cmf-ib-roll-result]');
+  if (host) cssMacroField.toggle(host);
 }
 function applyIbRollResultCss(blockId, ibId, itemId, resultIdx, btn, remove) {
   const { result } = getIbRollResult(blockId, ibId, itemId, resultIdx);
