@@ -14000,7 +14000,8 @@ function tbGetVariationPanel(root) {
   if (!panel) {
     panel = tbCreateVariationPanel();
     const insertBefore = Array.from(host.children || []).find(child =>
-      child.classList?.contains('roll-result-css-panel')
+      child.classList?.contains('css-macro-field')
+      || child.classList?.contains('roll-result-css-panel')
       || child.classList?.contains('ib-roll-result-css-panel')
       || child.classList?.contains('ib-roll-css-panel')
       || child.classList?.contains('branch-inner-roll-css-panel')
@@ -14335,9 +14336,9 @@ const cssMacroField = (() => {
 // 레거시 진입점 — 이제 cssMacroField 모듈로 위임 (badge·컨텍스트 메뉴 호출 유지).
 function tbOpenCssPanel(blockId, el, ce) {
   tbCloseVariationEditor();
-  // 이 블록 "자신"의 필드(closest('.block')===el)를 고른다. 자식 블록 패널 아님.
-  const host = [...el.querySelectorAll('.css-macro-field')].find(p => p.closest('.block') === el)
-    || el.querySelector('.css-macro-field');
+  // 이 블록 "자신"의 필드 = el의 직계 자식 .css-macro-field. 결과칸/자식 블록 필드 아님.
+  const host = el.querySelector(':scope > .css-macro-field')
+    || [...el.querySelectorAll('.css-macro-field')].find(p => p.closest('.block') === el && !p.hasAttribute('data-cmf-roll-result'));
   if (!host) return;
   cssMacroField.toggle(host);
 }
@@ -14813,14 +14814,7 @@ function getRollResultHtml(blockId, result, cid) {
         data-roll-block-id="${blockId}"
         data-roll-result-id="${result.id}">
       </div>
-      <div class="roll-result-css-panel" style="display:none">
-        <div class="btcp-label">CSS 서식 (Roll20 매크로용)</div>
-        <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(result.css || '')}</textarea>
-        <div class="btcp-footer">
-          <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyRollResultCss('${blockId}','${result.id}',this,true)">서식 제거</button>
-          <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyRollResultCss('${blockId}','${result.id}',this,false)">적용</button>
-        </div>
-      </div>
+      <div class="css-macro-field" data-cmf-roll-result="${result.id}"></div>
     </div>
   </div>`;
 }
@@ -16585,6 +16579,7 @@ function applyRollResultCssPreview(sectionEl, cssValue) {
   applyTextBlockCssPreview(target, cssValue);
 }
 function syncRollResultCssPreviews(blockEl, block) {
+  const cid = blockEl?.dataset?.cid || 'blocks-container';
   blockEl?.querySelectorAll?.('.roll-sub[data-roll-result-id]')?.forEach(sectionEl => {
     const resultId = sectionEl.dataset.rollResultId;
     const result = getRollResultById(block, resultId);
@@ -16592,8 +16587,19 @@ function syncRollResultCssPreviews(blockEl, block) {
     applyRollResultCssPreview(sectionEl, cssValue);
     const badge = sectionEl.querySelector('.roll-sub-css-badge');
     if (badge) badge.classList.toggle('active', !!cssValue);
-    const ta = sectionEl.querySelector('.roll-result-css-panel .btcp-textarea');
-    if (ta) ta.value = cssValue;
+    const host = sectionEl.querySelector(`.css-macro-field[data-cmf-roll-result="${resultId}"]`);
+    if (host && result) {
+      // 클로저는 blockId로 매번 라이브 조회 — 캡처한 block 참조가 stale돼도 안전
+      // (검증된 applyRollResultCss와 동일하게 getRollBlockById 경유).
+      const blockId = block.id;
+      cssMacroField.mount(host, {
+        get: () => getRollResultById(getRollBlockById(blockId, cid), resultId)?.css || '',
+        set: v => { const r = getRollResultById(getRollBlockById(blockId, cid), resultId); if (r) r.css = v; },
+        save: () => commitBlockTreeChange(`roll:${blockId}:${resultId}:css`, cid),
+        badge,
+        preview: v => applyRollResultCssPreview(sectionEl, v),
+      });
+    }
   });
 }
 function bindRollResultInteractions(blockEl, blockId, cid) {
@@ -16618,21 +16624,9 @@ function bindRollResultInteractions(blockEl, blockId, cid) {
   });
 }
 function toggleRollResultCssPanel(blockId, resultId, badgeEl) {
-  const panel = badgeEl.closest('.roll-sub')?.querySelector('.roll-result-css-panel');
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  document.querySelectorAll('.roll-result-css-panel, .ending-css-panel, .branch-ib-css-panel, .branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, .ib-roll-css-panel, .ib-roll-result-css-panel').forEach(p => {
-    p.style.display = 'none';
-  });
-  if (!isOpen) {
-    panel.style.display = 'flex';
-    ensureCssMacroPickerButtonInCssPanel(panel);
-    const ta = panel.querySelector('.btcp-textarea');
-    if (ta) {
-      btcpAutoResize(ta);
-      ta.focus();
-    }
-  }
+  // 결과칸 자식 블록도 각자 .css-macro-field를 가지므로 resultId로 이 결과의 것만 고른다.
+  const host = badgeEl.closest('.roll-sub')?.querySelector(`.css-macro-field[data-cmf-roll-result="${resultId}"]`);
+  if (host) cssMacroField.toggle(host);
 }
 function applyRollResultCss(blockId, resultId, btn, remove) {
   const block = getRollBlockById(blockId);
