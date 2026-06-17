@@ -4135,6 +4135,11 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   --child-indent: 6px;
   margin-top: 4px;
 }
+/* 토글 내부 기본(text) 블록 — 상하 여백 2px */
+.toggle-content-wrap .block-children-wrap .block.block-text > .block-text-ce {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
 
 /* 분기점 박스 안 */
 .branch-block > .block-children-wrap {
@@ -11641,7 +11646,10 @@ function expandGenericTextChildLines(children) {
     });
   });
 
-  return next;
+  // 분할/정리가 없었으면 원본 배열을 그대로 반환해 배열 identity를 보존한다.
+  // (drag&drop의 splice가 같은 배열 인스턴스를 가정 — 재할당 시 중복/유실 발생)
+  const unchanged = next.length === children.length && next.every((c, i) => c === children[i]);
+  return unchanged ? children : next;
 }
 
 function normalizeEndingContentChildren(ending) {
