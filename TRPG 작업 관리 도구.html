@@ -4092,16 +4092,15 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   padding-left: 0;
   border-left: none;
 }
+/* 콜아웃 내부 기본(text) 블록은 일반 기본 블록과 크기·여백을 동일하게 한다. */
 .callout-body > .block-children-wrap > .block.block-text.block-child {
-  min-height: auto;
-  padding-top: 2px;
-  padding-bottom: 2px;
+  min-height: 24px;
+  padding: 0 10px;
 }
 .callout-body > .block-children-wrap > .block.block-text.block-child .block-text-ce {
-  padding-top: 2px;
-  padding-bottom: 2px;
-  padding-left: 12px;
-  padding-right: 12px;
+  min-height: 24px;
+  line-height: 1.4;
+  padding: 3px 4px 0 0;
   box-sizing: border-box;
 }
 
