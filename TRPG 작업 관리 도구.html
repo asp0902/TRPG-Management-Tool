@@ -2995,7 +2995,7 @@ body.is-block-range-selecting * {
   background: transparent; border: none; border-radius: 5px;
   box-shadow: none; display: flex; align-items: center; flex-wrap: wrap;
   width: 100%; min-width: 0;
-  min-height: 32px; padding: 0 0 0 10px; transition: background 0.1s;
+  min-height: 24px; padding: 0 10px 0 10px; transition: background 0.1s;
 }
 .block.block-text:hover { background: #e2e2e2; }
 .block.block-text.selected { background: #d5d5d5; }
@@ -3005,7 +3005,7 @@ body.is-block-range-selecting * {
   flex: 1 1 100%; min-width: 0; width: 100%; max-width: 100%; min-height: 24px; outline: none;
   font-size: 14px; line-height: 1.4; color: #222;
   background: transparent; word-break: break-word; overflow-wrap: break-word;
-  font-family: inherit; padding: 3px 4px 1px 0;
+  font-family: inherit; padding: 3px 4px 0 0;
 }
 .block-text-ce [data-text-css-preview="1"] {
   box-sizing: border-box;
@@ -4039,19 +4039,19 @@ body.is-block-range-selecting * {
 }
 
 body.block-drag-active .block-children-wrap[data-empty="1"] {
-  height: 8px;
-  min-height: 8px;
-  margin-top: 2px;
+  height: 0;
+  min-height: 0;
+  margin-top: 0;
 }
 
 body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap:first-child,
 body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap:last-child {
-  display: flex !important;
+  display: none !important;
 }
 
 body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
-  height: 8px;
-  min-height: 8px;
+  height: 0;
+  min-height: 0;
 }
 
 .block-children-wrap > .block-gap {
@@ -4208,6 +4208,55 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 .block-gap:hover, .block-gap.gap-open { opacity: 1; }
 .block.drag-over-before { box-shadow: inset 0 2px 0 #111; }
 .block.drag-over-after { box-shadow: inset 0 -2px 0 #111; }
+.block.drag-over-inside {
+  box-shadow: inset 0 0 0 2px #111;
+}
+.block.drag-over-inside::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: #111;
+  pointer-events: none;
+  z-index: 7;
+}
+.block.drag-over-inside::after {
+  content: '하위로 넣기';
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  pointer-events: none;
+  z-index: 7;
+}
+body.block-drag-active .block-gap,
+body.block-drag-active .block-gap.gap-same-type,
+body.block-drag-active .block-children-wrap > .block-gap,
+body.block-drag-active .block-children-wrap > .block-gap:hover,
+body.block-drag-active .block-children-wrap > .block-gap.gap-open {
+  height: 2px;
+  min-height: 0;
+}
+body.block-drag-active .block-gap.gap-open {
+  opacity: 1;
+}
+body.block-drag-active .block-gap-btn {
+  display: none;
+}
+body.block-drag-active .block-gap-line {
+  height: 2px;
+  background: #111;
+}
 .block-gap-line {
   position: absolute; left: 0; right: 0; top: 50%;
   height: 2px; background: #d1d5db; transform: translateY(-50%); border-radius: 1px;
@@ -4251,6 +4300,24 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 /* 드롭 위치 표시는 before/after의 inset box-shadow로만 한다 (border는 2px 레이아웃
    시프트를 일으켜 드래그가 버벅인다). */
 .block.dragging { opacity: 0.45; }
+body.block-pointer-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+.block.block-drag-clone {
+  opacity: 0.96;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.18), 0 3px 8px rgba(0,0,0,0.12) !important;
+  cursor: grabbing;
+}
+.block.block-drag-clone .block-actions,
+.block.block-drag-clone .block-gap,
+.block.block-drag-clone .block-insert-popup {
+  display: none !important;
+}
+.block.block-drag-live-source,
+.block.block-drag-animating {
+  pointer-events: none;
+}
 .block-header { display: none; }
 .block-badge { display: none; }
 /* 드래그 핸들 — 숨김 (블록 자체 드래그로 대체) */
@@ -4744,9 +4811,17 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   font-weight: 700;
   cursor: pointer;
 }
+.speech-token.show-delete {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: #fff5f5;
+}
 .speech-token:hover {
   border-color: #cfcfcf;
   background: #f1f1f1;
+}
+.speech-token.show-delete:hover {
+  border-color: rgba(239, 68, 68, 0.6);
+  background: #fff0f0;
 }
 .speech-token.active {
   border-color: #111;
@@ -4763,6 +4838,23 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.speech-token-delete-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  margin-left: 1px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.speech-token.show-delete .speech-token-delete-btn {
+  display: inline-flex;
 }
 .speech-token-empty {
   font-size: 11px;
@@ -13065,7 +13157,8 @@ function mkTextBlockEl(b, cid, ctx = {}) {
     ));
   });
   el.addEventListener('dragstart', e => beginBlockDrag(e, b.id, cid, el));
-  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; scheduleBlockDropIndicator(el, e.clientY); });
+  el.addEventListener('pointerdown', e => beginBlockPointerDrag(e, b.id, cid, el));
+  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; scheduleBlockDropIndicator(el, e.clientX, e.clientY); });
   el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
   el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(b.id, cid, position); });
   // 판정 블록 등 헤더가 contenteditable이라 본문으로 드래그 시작이 안 되는 경우를 위해
@@ -15419,7 +15512,8 @@ function mkDividerEl(b, cid, ctx = {}) {
     ));
   });
   el.addEventListener('dragstart', e => beginBlockDrag(e, b.id, cid, el));
-  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; scheduleBlockDropIndicator(el, e.clientY); });
+  el.addEventListener('pointerdown', e => beginBlockPointerDrag(e, b.id, cid, el));
+  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; scheduleBlockDropIndicator(el, e.clientX, e.clientY); });
   el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
   el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(b.id, cid, position); });
   // 판정 블록 등 헤더가 contenteditable이라 본문으로 드래그 시작이 안 되는 경우를 위해
@@ -15798,7 +15892,8 @@ function mkBlockEl(b, cid, ctx = {}) {
     ));
   });
   el.addEventListener('dragstart', e => beginBlockDrag(e, b.id, cid, el));
-  el.addEventListener('dragover', e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; scheduleBlockDropIndicator(el, e.clientY); });
+  el.addEventListener('pointerdown', e => beginBlockPointerDrag(e, b.id, cid, el));
+  el.addEventListener('dragover', e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; scheduleBlockDropIndicator(el, e.clientX, e.clientY); });
   el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
   el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(b.id, cid, position); });
   // 판정 블록 등 헤더가 contenteditable이라 본문으로 드래그 시작이 안 되는 경우를 위해
@@ -15823,7 +15918,8 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
   el.addEventListener('dragstart', e => {
     beginBlockDrag(e, ending.id, cid, el);
   });
-  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; scheduleBlockDropIndicator(el, e.clientY); });
+  el.addEventListener('pointerdown', e => beginBlockPointerDrag(e, ending.id, cid, el));
+  el.addEventListener('dragover',  e => { if (!dragId) return; e.preventDefault(); e.stopPropagation(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; scheduleBlockDropIndicator(el, e.clientX, e.clientY); });
   el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clearBlockDropIndicator(el); });
   el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(ending.id, cid, position); });
   const collapsed = ending.collapsed ?? true;
@@ -16117,6 +16213,7 @@ function getSpeechTokenButtonsHtml(tokens, activeKey, onClickAction) {
       oncontextmenu="return openSpeechTokenContextMenu(event,this)">
       <span class="speech-token-dot" style="background:${esc(token.color || DEFAULT_SPEECH_COLOR)}"></span>
       <span class="speech-token-name">${esc(token.name)}</span>
+      <span class="speech-token-delete-btn" role="button" aria-label="화자 토큰 삭제" onclick="return deleteSpeechTokenFromButton(event,this)">삭제</span>
     </button>
   `).join('');
 }
@@ -16144,16 +16241,44 @@ function deleteScenarioSpeakerTokenByName(name) {
   removeSpeechTokenButtonsFromDom(tokenKey);
   persist();
 }
+function clearSpeechTokenDeleteButtons(exceptTokenEl) {
+  document.querySelectorAll('.speech-token.show-delete').forEach(tokenEl => {
+    if (exceptTokenEl && tokenEl === exceptTokenEl) return;
+    tokenEl.classList.remove('show-delete');
+  });
+}
+function showSpeechTokenDeleteButton(tokenEl) {
+  if (!tokenEl) return;
+  clearSpeechTokenDeleteButtons(tokenEl);
+  tokenEl.classList.add('show-delete');
+}
+function deleteSpeechTokenFromButton(event, deleteEl) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+  const tokenEl = deleteEl?.closest?.('.speech-token');
+  const name = tokenEl?.dataset?.name || '';
+  if (!name) return false;
+  deleteScenarioSpeakerTokenByName(name);
+  clearSpeechTokenDeleteButtons();
+  return false;
+}
 function openSpeechTokenContextMenu(event, tokenEl) {
   event.preventDefault();
   event.stopPropagation();
   const name = tokenEl?.dataset?.name || '';
   if (!name) return false;
-  tbShowCtxMenu(event.clientX, event.clientY, [
-    { icon: '✕', label: '화자 토큰 삭제', action: () => deleteScenarioSpeakerTokenByName(name), danger: true },
-  ]);
+  showSpeechTokenDeleteButton(tokenEl);
   return false;
 }
+
+document.addEventListener('pointerdown', event => {
+  const target = event.target;
+  if (target instanceof Element && target.closest('.speech-token-delete-btn')) return;
+  clearSpeechTokenDeleteButtons();
+}, true);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') clearSpeechTokenDeleteButtons();
+}, true);
 
 /**
  * (유틸) 하위 블록에서 특정 ID의 블록을 찾기 위한 깊이 우선 탐색(DFS) 함수
@@ -20107,6 +20232,10 @@ function copyNestedSpeech(blockId, itemId, btn) {
 
 // ─── DRAG & DROP ───
 let dragId = null, dragCid = null;
+let _blockPointerDragState = null;
+function supportsBlockPointerDrag() {
+  return typeof window !== 'undefined' && 'PointerEvent' in window;
+}
 function hasContentEditableDragSelection(target) {
   const node = target?.nodeType === Node.TEXT_NODE ? target.parentElement : target;
   const ce = node?.closest?.('[contenteditable="true"]');
@@ -20141,6 +20270,7 @@ function syncBlockDraggableState(root = document) {
 // 또한 본문 영역(#panel-body) 안에서 블록 바깥을 클릭하면 선택을 해제한다.
 document.addEventListener('mousedown', e => {
   if (e.button !== 0) return;
+  if (_blockPointerDragState) return;
   const block = e.target?.closest?.('.block');
   const panelBody = document.getElementById('panel-body');
 
@@ -20187,6 +20317,7 @@ document.addEventListener('mousedown', e => {
 
 document.addEventListener('mousedown', e => {
   if (e.button !== 0) return;
+  if (_blockPointerDragState) return;
 
   const panelBody = document.getElementById('panel-body');
   if (!panelBody || !panelBody.contains(e.target)) {
@@ -20328,7 +20459,7 @@ document.addEventListener('keydown', e => {
 }, true);
 function resetBlockDragState() {
   document.querySelectorAll('.block').forEach(el => {
-    el.classList.remove('dragging','drag-over','drag-over-before','drag-over-after');
+    el.classList.remove('dragging','drag-over','drag-over-before','drag-over-after','drag-over-inside');
     el.draggable = true;
   });
   document.querySelectorAll('.block-gap.gap-open').forEach(el => el.classList.remove('gap-open'));
@@ -20341,32 +20472,49 @@ function resetBlockDragState() {
 function getBlockDropPosition(e, el) {
   if (!e || !el?.getBoundingClientRect) return 'before';
   const rect = el.getBoundingClientRect();
+  const edgeY = Math.min(18, Math.max(7, rect.height * 0.28));
+  const nestX = rect.left + Math.min(80, Math.max(36, rect.width * 0.16));
+  const inMiddleBand = e.clientY >= rect.top + edgeY && e.clientY <= rect.bottom - edgeY;
+  if (inMiddleBand && e.clientX >= nestX && canNestDraggedBlockIntoTarget(el)) return 'inside';
   const midY = rect.top + rect.height / 2;
   return e.clientY > midY ? 'after' : 'before';
+}
+function canNestDraggedBlockIntoTarget(el) {
+  if (!dragId || !el?.dataset?.id) return false;
+  const targetId = el.dataset.id;
+  const targetCid = el.dataset.cid || dragCid;
+  if (!targetId || targetId === dragId || targetCid !== dragCid) return false;
+
+  const draggedEl = document.querySelector(
+    `.block[data-id="${CSS.escape(dragId)}"][data-cid="${CSS.escape(dragCid || 'blocks-container')}"]`
+  );
+  if (draggedEl && (draggedEl === el || draggedEl.contains(el))) return false;
+  return true;
 }
 function setBlockDropIndicator(el, position) {
   if (!el) return;
   el.classList.add('drag-over');
-  el.classList.toggle('drag-over-before', position !== 'after');
+  el.classList.toggle('drag-over-before', position === 'before');
   el.classList.toggle('drag-over-after', position === 'after');
+  el.classList.toggle('drag-over-inside', position === 'inside');
 }
 function clearBlockDropIndicator(el) {
   if (!el) return;
-  el.classList.remove('drag-over','drag-over-before','drag-over-after');
+  el.classList.remove('drag-over','drag-over-before','drag-over-after','drag-over-inside');
 }
 // dragover는 초당 수십 번 발생한다. 매번 getBoundingClientRect를 호출하면 레이아웃
 // thrash로 버벅인다. 프레임당 한 번만 위치를 계산해 인디케이터를 갱신한다.
-let _dropIndicatorRaf = null, _dropIndicatorEl = null, _dropIndicatorY = 0, _dropIndicatorPrev = null;
-function scheduleBlockDropIndicator(el, clientY) {
+let _dropIndicatorRaf = null, _dropIndicatorEl = null, _dropIndicatorX = 0, _dropIndicatorY = 0, _dropIndicatorPrev = null;
+function scheduleBlockDropIndicator(el, clientX, clientY) {
   _dropIndicatorEl = el;
+  _dropIndicatorX = clientX;
   _dropIndicatorY = clientY;
   if (_dropIndicatorRaf != null) return;
   _dropIndicatorRaf = requestAnimationFrame(() => {
     _dropIndicatorRaf = null;
     const target = _dropIndicatorEl;
     if (!target || !dragId) return;
-    const rect = target.getBoundingClientRect();
-    const position = _dropIndicatorY > rect.top + rect.height / 2 ? 'after' : 'before';
+    const position = getBlockDropPosition({ clientX: _dropIndicatorX, clientY: _dropIndicatorY }, target);
     if (_dropIndicatorPrev && _dropIndicatorPrev !== target) clearBlockDropIndicator(_dropIndicatorPrev);
     _dropIndicatorPrev = target;
     setBlockDropIndicator(target, position);
@@ -20378,6 +20526,10 @@ function cancelBlockDropIndicator() {
   _dropIndicatorPrev = null;
 }
 function beginBlockDrag(e, blockId, cid, el) {
+  if (_blockPointerDragState) {
+    e.preventDefault();
+    return false;
+  }
   e.stopPropagation();
   if (isBlockEditTarget(e.target)) {
     e.preventDefault();
@@ -20393,6 +20545,412 @@ function beginBlockDrag(e, blockId, cid, el) {
     e.dataTransfer.setData('text/plain', blockId);
   }
   return true;
+}
+function beginBlockPointerDrag(e, blockId, cid, el) {
+  if (!supportsBlockPointerDrag()) return;
+  if (_blockPointerDragState) return;
+  if (e.button !== 0 || !blockId || !el) return;
+  if (e.target?.closest?.('.block') !== el) return;
+  if (isBlockEditTarget(e.target)) return;
+  el.draggable = false;
+  e.target?.closest?.('.block-side-handle')?.setAttribute('draggable', 'false');
+
+  _blockPointerDragState = {
+    blockId,
+    cid,
+    el,
+    pointerId: e.pointerId,
+    startX: e.clientX,
+    startY: e.clientY,
+    clone: null,
+    dragging: false,
+    previewKey: '',
+    dropTarget: null,
+    indicatorEl: null,
+    gapEl: null,
+    sourceListEl: el.parentElement,
+    sourceParent: el.parentNode,
+    sourceNext: el.nextSibling,
+  };
+
+  window.addEventListener('pointermove', handleBlockPointerDragMove, true);
+  window.addEventListener('pointerup', handleBlockPointerDragEnd, true);
+  window.addEventListener('pointercancel', handleBlockPointerDragEnd, true);
+}
+function startBlockPointerLiveDrag(state, e) {
+  state.dragging = true;
+  dragId = state.blockId;
+  dragCid = state.cid;
+  clearBlockRangeSelection();
+  closeInsertPopup();
+  tbCloseCtxMenu();
+  document.body.classList.add('block-drag-active', 'block-pointer-dragging');
+  state.el.classList.add('dragging', 'block-drag-live-source');
+  state.el.draggable = false;
+
+  const rect = state.el.getBoundingClientRect();
+  const clone = state.el.cloneNode(true);
+  clone.classList.add('block-drag-clone');
+  clone.classList.remove('dragging', 'drag-over', 'drag-over-before', 'drag-over-after', 'drag-over-inside', 'selected');
+  clone.removeAttribute('id');
+  clone.querySelectorAll?.('[id]').forEach(node => node.removeAttribute('id'));
+
+  const sourceComputed = window.getComputedStyle(state.el);
+  const cloneStyle = clone.style;
+  cloneStyle.setProperty('position', 'fixed', 'important');
+  cloneStyle.setProperty('top', `${rect.top}px`, 'important');
+  cloneStyle.setProperty('left', `${rect.left}px`, 'important');
+  cloneStyle.setProperty('width', `${rect.width}px`, 'important');
+  cloneStyle.setProperty('height', `${rect.height}px`, 'important');
+  cloneStyle.setProperty('margin', '0', 'important');
+  cloneStyle.setProperty('z-index', '2147483647', 'important');
+  cloneStyle.setProperty('pointer-events', 'none', 'important');
+  cloneStyle.setProperty('visibility', 'visible', 'important');
+  cloneStyle.setProperty('opacity', '0.96', 'important');
+  cloneStyle.setProperty('font-family', sourceComputed.fontFamily, 'important');
+  cloneStyle.setProperty('font-size', sourceComputed.fontSize, 'important');
+  cloneStyle.setProperty('background-color', sourceComputed.backgroundColor || '#fff', 'important');
+  cloneStyle.setProperty('will-change', 'transform', 'important');
+  document.body.appendChild(clone);
+  state.clone = clone;
+  state.el.style.setProperty('visibility', 'hidden', 'important');
+  window.getSelection?.().removeAllRanges?.();
+}
+function getBlockPointerDragRoot(cid) {
+  return document.getElementById(cid === 'rb-blocks-container' ? 'rb-blocks-container' : 'blocks-container');
+}
+function getBlockPointerSortableEls(root, excludeEl = null) {
+  if (!(root instanceof HTMLElement)) return [];
+  return [...root.querySelectorAll('.block[data-id]')].filter(el =>
+    el instanceof HTMLElement
+    && el !== excludeEl
+    && !el.classList.contains('block-drag-clone')
+    && el.getClientRects().length > 0
+  );
+}
+function animateBlockPointerLiveReorder(root, excludeEl, mutate) {
+  if (!(root instanceof HTMLElement) || typeof mutate !== 'function') return;
+  const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce) { mutate(); return; }
+
+  const elsBefore = getBlockPointerSortableEls(root, excludeEl);
+  const firstRects = new Map(elsBefore.map(el => [el, el.getBoundingClientRect()]));
+  mutate();
+
+  elsBefore.forEach(el => {
+    const first = firstRects.get(el);
+    if (!first || !el.isConnected) return;
+    const last = el.getBoundingClientRect();
+    const dx = first.left - last.left;
+    const dy = first.top - last.top;
+    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+    const token = `${Date.now()}:${Math.random()}`;
+    el.dataset.blockPointerAnimationToken = token;
+    el.classList.add('block-drag-animating');
+    el.style.transition = 'none';
+    el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+    el.getBoundingClientRect();
+
+    requestAnimationFrame(() => {
+      if (el.dataset.blockPointerAnimationToken !== token) return;
+      el.style.transition = 'transform 250ms cubic-bezier(0.25, 1, 0.5, 1)';
+      el.style.transform = '';
+    });
+
+    setTimeout(() => {
+      if (el.dataset.blockPointerAnimationToken !== token) return;
+      el.classList.remove('block-drag-animating');
+      el.style.removeProperty('transition');
+      el.style.removeProperty('transform');
+      delete el.dataset.blockPointerAnimationToken;
+    }, 280);
+  });
+}
+function getBlockPointerDropTarget(state, e) {
+  const hit = document.elementFromPoint(e.clientX, e.clientY);
+  if (!hit) return null;
+
+  const gapEl = hit.closest?.('.block-gap[data-target-key]');
+  if (gapEl && gapEl.dataset.cid === state.cid) {
+    if (state.el.contains(gapEl)) return null;
+    if (shouldKeepBlockPointerInSourceList(state, e, gapEl.parentElement)) return null;
+    return {
+      kind: 'gap',
+      gapEl,
+      insertIdx: Number(gapEl.dataset.insertIdx) || 0,
+      targetKey: gapEl.dataset.targetKey || '',
+      key: `gap|${gapEl.dataset.targetKey || ''}|${gapEl.dataset.insertIdx || 0}`,
+    };
+  }
+
+  const targetEl = hit.closest?.('.block[data-id]');
+  if (!targetEl || targetEl === state.el || state.el.contains(targetEl)) return null;
+  const targetCid = targetEl.dataset.cid || state.cid;
+  if (targetCid !== state.cid) return null;
+  if (shouldKeepBlockPointerInSourceList(state, e, targetEl.parentElement)) return null;
+
+  const position = getBlockDropPosition({ clientX: e.clientX, clientY: e.clientY }, targetEl);
+  return {
+    kind: 'block',
+    targetEl,
+    targetId: targetEl.dataset.id,
+    targetCid,
+    position,
+    key: `block|${targetEl.dataset.id}|${position}`,
+  };
+}
+function shouldKeepBlockPointerInSourceList(state, e, candidateListEl) {
+  const sourceList = state?.sourceListEl;
+  if (!(sourceList instanceof HTMLElement)) return false;
+  if (!sourceList.classList.contains('block-children-wrap')) return false;
+  if (candidateListEl === sourceList || sourceList.contains(candidateListEl)) return false;
+
+  const rect = sourceList.getBoundingClientRect();
+  return e.clientX >= rect.left - 10;
+}
+function isPointerOverBlockPointerSource(state, e) {
+  if (!state?.el?.getBoundingClientRect) return false;
+  const rect = state.el.getBoundingClientRect();
+  return e.clientX >= rect.left
+    && e.clientX <= rect.right
+    && e.clientY >= rect.top
+    && e.clientY <= rect.bottom;
+}
+function isPointerOverBlockPointerRoot(state, e) {
+  const root = getBlockPointerDragRoot(state?.cid);
+  if (!root?.getBoundingClientRect) return false;
+  const rect = root.getBoundingClientRect();
+  return e.clientX >= rect.left
+    && e.clientX <= rect.right
+    && e.clientY >= rect.top
+    && e.clientY <= rect.bottom;
+}
+function clearBlockPointerIndicators(state) {
+  if (state?.indicatorEl) clearBlockDropIndicator(state.indicatorEl);
+  if (state?.gapEl) state.gapEl.classList.remove('gap-open');
+  state.indicatorEl = null;
+  state.gapEl = null;
+}
+function applyBlockPointerDropIndicator(state, target) {
+  if (!target) {
+    clearBlockPointerIndicators(state);
+    return;
+  }
+
+  if (target.kind === 'gap') {
+    if (state.indicatorEl) clearBlockDropIndicator(state.indicatorEl);
+    if (state.gapEl && state.gapEl !== target.gapEl) state.gapEl.classList.remove('gap-open');
+    target.gapEl.classList.add('gap-open');
+    state.gapEl = target.gapEl;
+    state.indicatorEl = null;
+    return;
+  }
+
+  if (state.gapEl) state.gapEl.classList.remove('gap-open');
+  if (state.indicatorEl && state.indicatorEl !== target.targetEl) clearBlockDropIndicator(state.indicatorEl);
+  setBlockDropIndicator(target.targetEl, target.position);
+  state.indicatorEl = target.targetEl;
+  state.gapEl = null;
+}
+function getBlockPointerChildWrap(targetEl, targetId) {
+  if (!targetEl || !targetId) return null;
+  return targetEl.querySelector(`.block-children-wrap[data-parent-id="${CSS.escape(targetId)}"]`);
+}
+function moveBlockPointerPreviewEl(state, target) {
+  if (!target) {
+    state.previewKey = '';
+    state.dropTarget = null;
+    clearBlockPointerIndicators(state);
+    return;
+  }
+  if (target.key === state.previewKey) return;
+  state.previewKey = target.key;
+  state.dropTarget = target;
+  applyBlockPointerDropIndicator(state, target);
+
+  const root = getBlockPointerDragRoot(state.cid);
+  animateBlockPointerLiveReorder(root, state.el, () => {
+    if (target.kind === 'gap') {
+      const parent = target.gapEl.parentElement;
+      if (parent) parent.insertBefore(state.el, target.gapEl.nextSibling);
+      return;
+    }
+
+    if (target.position === 'inside') {
+      const wrap = getBlockPointerChildWrap(target.targetEl, target.targetId);
+      if (!wrap) return;
+      const firstChildBlock = [...wrap.children].find(child => child instanceof HTMLElement && child.classList.contains('block'));
+      wrap.insertBefore(state.el, firstChildBlock || null);
+      return;
+    }
+
+    const parent = target.targetEl.parentElement;
+    if (!parent) return;
+    if (target.position === 'before') {
+      parent.insertBefore(state.el, target.targetEl);
+      return;
+    }
+
+    let ref = target.targetEl.nextSibling;
+    if (ref instanceof HTMLElement && ref.classList.contains('block-gap')) ref = ref.nextSibling;
+    parent.insertBefore(state.el, ref);
+  });
+}
+function moveBlockDataToPointerDrop(movedId, cid, dropTarget) {
+  if (!movedId || !dropTarget) return null;
+  let fromInfo = getBlockArrayInfo(movedId, cid);
+  if (!fromInfo) return null;
+
+  normalizeBlockTree(fromInfo.rootBlocks);
+  fromInfo = getBlockArrayInfo(movedId, cid);
+  if (!fromInfo) return null;
+
+  let targetArray = null;
+  let targetParent = null;
+  let insertIndex = 0;
+
+  if (dropTarget.kind === 'gap') {
+    const target = getBlockListByTargetKey(dropTarget.targetKey, cid);
+    if (!target || target.cid !== fromInfo.rootCid) return null;
+    targetArray = target.array;
+    targetParent = target.parent || null;
+    insertIndex = Math.max(0, Math.min(Number(dropTarget.insertIdx) || 0, targetArray.length));
+  } else if (dropTarget.kind === 'block' && dropTarget.position === 'inside') {
+    const target = getBlockListByTargetKey(makeChildBlockTargetKey(dropTarget.targetId, dropTarget.targetCid), cid);
+    if (!target || target.cid !== fromInfo.rootCid) return null;
+    targetArray = target.array;
+    targetParent = target.parent || null;
+    insertIndex = 0;
+  } else if (dropTarget.kind === 'block') {
+    const targetInfo = getBlockArrayInfo(dropTarget.targetId, dropTarget.targetCid);
+    if (!targetInfo || targetInfo.rootCid !== fromInfo.rootCid) return null;
+    if (isDescendantBlockId(fromInfo.block, dropTarget.targetId)) return null;
+    targetArray = targetInfo.array;
+    targetParent = targetInfo.parent || null;
+    insertIndex = targetInfo.index + (dropTarget.position === 'after' ? 1 : 0);
+  }
+
+  if (!targetArray) return null;
+  if (targetParent && (targetParent.id === movedId || isDescendantBlockId(fromInfo.block, targetParent.id))) return null;
+
+  const [item] = fromInfo.array.splice(fromInfo.index, 1);
+  if (!item) return null;
+  if (fromInfo.array === targetArray && fromInfo.index < insertIndex) insertIndex -= 1;
+  insertIndex = Math.max(0, Math.min(insertIndex, targetArray.length));
+  targetArray.splice(insertIndex, 0, item);
+
+  commitBlockTreeChange(`block:${movedId}:drop`, fromInfo.rootCid, { force: true });
+  return { rootCid: fromInfo.rootCid, movedId };
+}
+function restoreBlockPointerSourcePosition(state) {
+  if (!state?.sourceParent) return;
+  try {
+    state.sourceParent.insertBefore(state.el, state.sourceNext && state.sourceNext.isConnected ? state.sourceNext : null);
+  } catch (err) {}
+}
+function handleBlockPointerDragMove(e) {
+  const state = _blockPointerDragState;
+  if (!state || e.pointerId !== state.pointerId) return;
+
+  const distance = Math.hypot(e.clientX - state.startX, e.clientY - state.startY);
+  if (!state.dragging) {
+    if (distance < 5) return;
+    startBlockPointerLiveDrag(state, e);
+  }
+
+  e.preventDefault();
+  e.stopPropagation();
+  updateDragAutoScroll(e.clientY);
+
+  if (state.clone) {
+    const offsetX = e.clientX - state.startX;
+    const offsetY = e.clientY - state.startY;
+    state.clone.style.setProperty('transform', `translate3d(${offsetX}px, ${offsetY}px, 0)`, 'important');
+  }
+
+  let target = getBlockPointerDropTarget(state, e);
+  if (
+    !target
+    && state.dropTarget
+    && (isPointerOverBlockPointerSource(state, e) || isPointerOverBlockPointerRoot(state, e))
+  ) {
+    target = state.dropTarget;
+  }
+  moveBlockPointerPreviewEl(state, target);
+}
+function cleanupBlockPointerDragState(state) {
+  window.removeEventListener('pointermove', handleBlockPointerDragMove, true);
+  window.removeEventListener('pointerup', handleBlockPointerDragEnd, true);
+  window.removeEventListener('pointercancel', handleBlockPointerDragEnd, true);
+  clearBlockPointerIndicators(state);
+  document.querySelectorAll('.block-gap.gap-open').forEach(el => el.classList.remove('gap-open'));
+  document.body.classList.remove('block-drag-active', 'block-pointer-dragging');
+  dragId = null;
+  dragCid = null;
+  stopDragAutoScroll();
+  _blockPointerDragState = null;
+}
+function handleBlockPointerDragEnd(e) {
+  const state = _blockPointerDragState;
+  if (!state || e.pointerId !== state.pointerId) return;
+
+  cleanupBlockPointerDragState(state);
+
+  if (!state.dragging) {
+    if (state.clone) state.clone.remove();
+    state.el.style.removeProperty('visibility');
+    state.el.classList.remove('dragging', 'block-drag-live-source');
+    state.el.draggable = true;
+    state.el.querySelector(':scope > .block-side-handle')?.setAttribute('draggable', 'true');
+    return;
+  }
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const commitResult = moveBlockDataToPointerDrop(state.blockId, state.cid, state.dropTarget);
+  if (!commitResult) restoreBlockPointerSourcePosition(state);
+
+  state.el.style.removeProperty('visibility');
+
+  let dx = 0;
+  let dy = 0;
+  if (state.clone) {
+    const cloneRect = state.clone.getBoundingClientRect();
+    const elRect = state.el.getBoundingClientRect();
+    dx = cloneRect.left - elRect.left;
+    dy = cloneRect.top - elRect.top;
+    state.clone.remove();
+    state.clone = null;
+  }
+
+  const token = `${Date.now()}:${Math.random()}`;
+  state.el.dataset.blockPointerDropToken = token;
+  state.el.style.transition = 'none';
+  state.el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+  state.el.getBoundingClientRect();
+
+  requestAnimationFrame(() => {
+    if (state.el.dataset.blockPointerDropToken !== token) return;
+    state.el.style.transition = 'transform 200ms cubic-bezier(0.25, 1, 0.5, 1)';
+    state.el.style.transform = '';
+  });
+
+  setTimeout(() => {
+    if (state.el.dataset.blockPointerDropToken !== token) return;
+    state.el.classList.remove('dragging', 'block-drag-live-source');
+    state.el.style.removeProperty('transition');
+    state.el.style.removeProperty('transform');
+    delete state.el.dataset.blockPointerDropToken;
+    state.el.draggable = true;
+    state.el.querySelector(':scope > .block-side-handle')?.setAttribute('draggable', 'true');
+
+    if (commitResult) {
+      renderRootBlocksByCid(commitResult.rootCid);
+      focusBlockAfterRender(commitResult.movedId);
+    }
+  }, 220);
 }
 document.addEventListener('dragover', e => {
   if (!dragId) return;
@@ -20481,6 +21039,11 @@ function dropBlockAtTarget(insertIdx, targetKey) {
 }
 function dropBlock(targetId, targetCid, position = 'before') {
   if (!dragId || dragId === targetId || dragCid !== targetCid) return;
+  if (position === 'inside') {
+    dropBlockAtTarget(0, makeChildBlockTargetKey(targetId, targetCid));
+    return;
+  }
+
   let fromInfo = getBlockArrayInfo(dragId, dragCid);
   let targetInfo = getBlockArrayInfo(targetId, targetCid);
   if (!fromInfo || !targetInfo) return;
