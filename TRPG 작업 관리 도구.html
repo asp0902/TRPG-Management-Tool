@@ -8889,10 +8889,22 @@ async function flushPersist() {
 
 const HISTORY_LIMIT = 50;
 const HISTORY_MERGE_MS = 700;
+// 다음 편집 커밋을 새 실행취소 단계로 강제한다(어절 경계). 공백/Enter 입력 시 set.
+let _typingHistoryBoundary = false;
 const scenarioHistory = new Map();
 let historyApplying = false;
 const rulebookHistory = new Map();
 let rulebookHistoryApplying = false;
+// 본문/룰북 편집 중 공백·줄바꿈 입력 시 다음 커밋을 새 실행취소 단계로 끊는다(어절 단위 undo).
+document.addEventListener('beforeinput', e => {
+  const t = e.target;
+  if (!t || !t.isContentEditable) return;
+  if (!t.closest?.('#panel-body, #rb-chapter-content')) return;
+  const it = e.inputType || '';
+  if (e.data === ' ' || /\s/.test(e.data || '') || it === 'insertLineBreak' || it === 'insertParagraph') {
+    _typingHistoryBoundary = true;
+  }
+}, true);
 const dataSheetHistory = new Map();
 let dataSheetHistoryApplying = false;
 let _dsForceNextHistoryCommit = false;
@@ -9069,6 +9081,11 @@ function restoreHistoryFocusTarget(target) {
   }, 60);
 }
 function commitScenarioHistory(key = 'edit', options = {}) {
+  // 어절 경계: 직전에 공백/Enter가 입력됐으면 이 커밋을 새 실행취소 단계로 강제한다.
+  if (_typingHistoryBoundary && !historyApplying) {
+    options = { ...options, force: true };
+    _typingHistoryBoundary = false;
+  }
   if (currentPage === 'rulebook' && currentRulebookId && !historyApplying) {
     commitRulebookHistory(key, options);
     persist();
