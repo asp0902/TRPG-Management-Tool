@@ -4103,6 +4103,30 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   padding: 3px 4px 0 0;
   box-sizing: border-box;
 }
+.bib-item-callout .nested-callout > .block-children-wrap,
+.branch-inner-callout .nested-callout > .block-children-wrap {
+  --child-indent: 6px;
+
+  flex-basis: calc(100% - 12px);
+  width: calc(100% - 12px);
+  max-width: calc(100% - 12px);
+  margin: 6px;
+
+  padding-left: 0;
+  border-left: none;
+}
+.bib-item-callout .nested-callout > .block-children-wrap > .block.block-text.block-child,
+.branch-inner-callout .nested-callout > .block-children-wrap > .block.block-text.block-child {
+  min-height: 24px;
+  padding: 0 10px;
+}
+.bib-item-callout .nested-callout > .block-children-wrap > .block.block-text.block-child .block-text-ce,
+.branch-inner-callout .nested-callout > .block-children-wrap > .block.block-text.block-child .block-text-ce {
+  min-height: 24px;
+  line-height: 1.4;
+  padding: 3px 4px 0 0;
+  box-sizing: border-box;
+}
 
 /* 판정 결과 영역 안 */
 .roll-sub-body > .block-children-wrap,
@@ -11703,22 +11727,22 @@ function getCalloutContentLinesForGenericChildren(block) {
   const normalizer = getMainContentNormalizerForChildPromotion(block);
   const html = normalizer(block?.content || '') || '';
   if (!html) return [];
-  return splitHtmlLinesForChildPromotion(html);
+  return trimGenericTextLinesForChildInsert(splitHtmlLinesForChildPromotion(html));
 }
 
 function migrateLegacyCalloutRowsToGenericChildren(block) {
   if (!block || block.type !== 'callout') return false;
 
   const hasLegacyNested = Array.isArray(block.nestedCallouts) && block.nestedCallouts.length > 0;
-  if (!hasLegacyNested) return false;
+  const contentChildren = getCalloutContentLinesForGenericChildren(block)
+    .map(line => createGenericTextChildFromHtml(line, block));
+  if (!hasLegacyNested && contentChildren.length === 0) return false;
 
   const oldGenericChildren = Array.isArray(block.children)
     ? block.children.filter(Boolean)
     : [];
 
-  const legacyItems = typeof normalizeCalloutNestedItems === 'function'
-    ? normalizeCalloutNestedItems(block).slice()
-    : block.nestedCallouts.slice();
+  const legacyItems = Array.isArray(block.nestedCallouts) ? block.nestedCallouts.slice() : [];
 
   const slot = typeof getCalloutContentSlot === 'function'
     ? getCalloutContentSlot(block, legacyItems.length)
@@ -11736,10 +11760,12 @@ function migrateLegacyCalloutRowsToGenericChildren(block) {
 
   block.children = [
     ...beforeLegacy,
+    ...contentChildren,
     ...oldGenericChildren,
     ...afterLegacy,
   ];
 
+  if (contentChildren.length > 0) block.content = '';
   block.nestedCallouts = [];
   block.nestedContentSlot = 0;
 
@@ -12382,6 +12408,24 @@ function normalizeBranchBlock(block) {
     block.activeBranchId = '';
   }
   if (!Array.isArray(block.innerBlocks)) block.innerBlocks = [];
+  block.innerBlocks = block.innerBlocks.filter(Boolean).map(ib => {
+    if (!ib.id) ib.id = mkId();
+    if (!Array.isArray(ib.children)) ib.children = [];
+
+    if (isBranchInnerRollBlock(ib)) {
+      normalizeEmbeddedRollBlock(ib);
+    } else if (ib.type === 'callout') {
+      migrateLegacyCalloutRowsToGenericChildren(ib);
+      ib.children = expandGenericTextChildLines(ib.children);
+      ib.children = normalizeBlockTree(ib.children);
+    } else {
+      normalizeIbItems(ib);
+      ib.children = expandGenericTextChildLines(ib.children);
+      ib.children = normalizeBlockTree(ib.children);
+    }
+
+    return ib;
+  });
   return block;
 }
 function getBranchBlockById(blockId, cid = 'blocks-container') {
@@ -12579,7 +12623,9 @@ function getBibItemHtml(blockId, ibId, item, idx, total, cid) {
   }
   if (item.type === 'callout') {
     const ct = item.calloutType || 'info';
-    const rows = normalizeIbCalloutBodyOrder(item);
+    migrateLegacyIbCalloutRowsToGenericChildren(item);
+    const hasGenericChildren = Array.isArray(item.children) && item.children.length > 0;
+    const rows = hasGenericChildren ? [] : normalizeIbCalloutBodyOrder(item);
     return `<div class="bib-item bib-item-callout" data-item-id="${item.id}">
       <div class="nested-callout callout-${ct}" oncontextmenu="return openIbItemCalloutCtxMenu(event,'${blockId}','${ibId}','${item.id}','${cid}')">
         <div class="nested-callout-header">
@@ -12824,6 +12870,7 @@ function getBranchBlockHtml(block, cid) {
           }
           if (ib.type === 'callout') {
             const ct = ib.calloutType || 'info';
+            const hasGenericChildren = Array.isArray(ib.children) && ib.children.length > 0;
             return `
           <div class="branch-inner-block branch-inner-callout" data-ib-id="${ib.id}" data-ib-type="callout">
             <div class="nested-callout callout-${ct}">
@@ -12839,7 +12886,7 @@ function getBranchBlockHtml(block, cid) {
                 </span>
                 <button class="nested-callout-del" onclick="delBranchInnerBlock('${branchBlock.id}','${ib.id}','${cid}')" title="삭제">✕</button>
               </div>
-              <div class="nested-callout-content branch-inner-callout-content" contenteditable="true" data-ib-id="${ib.id}" data-field="content" oninput="updBranchInnerBlock('${branchBlock.id}','${ib.id}','content',this.innerHTML)" spellcheck="false"></div>
+              ${hasGenericChildren ? '' : `<div class="nested-callout-content branch-inner-callout-content" contenteditable="true" data-ib-id="${ib.id}" data-field="content" oninput="updBranchInnerBlock('${branchBlock.id}','${ib.id}','content',this.innerHTML)" spellcheck="false"></div>`}
             </div>
           </div>`;
           }
@@ -15144,19 +15191,40 @@ function mountRollResultBlockLists(blockEl, block, cid, depth = 0) {
   });
 }
 
-// 분기 내부블록(ib) 항목 밑에 generic 하위 블록(3차)을 렌더한다.
-// 항목 el에 직접 .block-children-wrap을 붙여 기존 generic 자식 머신을 재사용.
+// 분기 내부블록(ib)과 그 항목 밑에 generic 하위 블록(3차)을 렌더한다.
+// callout 계열은 .nested-callout 내부에 붙여 콜아웃 본문처럼 보이게 한다.
 function mountBibItemChildren(blockEl, branchBlock, cid, depth = 0) {
   if (!blockEl || branchBlock?.type !== 'branch') return;
   blockEl.querySelectorAll('.branch-inner-block[data-ib-id]').forEach(ibEl => {
     const ibId = ibEl.dataset.ibId;
+    const ib = (branchBlock.innerBlocks || []).find(x => x.id === ibId);
+    if (ib?.type === 'callout') {
+      if (!Array.isArray(ib.children)) ib.children = [];
+      const host = ibEl.querySelector(':scope > .nested-callout') || ibEl;
+      if (!host.querySelector(':scope > .block-children-wrap')) {
+        const wrap = document.createElement('div');
+        wrap.className = 'block-children-wrap';
+        wrap.dataset.parentId = ib.id;
+        wrap.dataset.mount = 'branch-inner-callout';
+        wrap.dataset.empty = ib.children.length === 0 ? '1' : '0';
+        renderBlockListInto(wrap, ib.children, {
+          cid,
+          targetKey: makeChildBlockTargetKey(ib.id, cid),
+          depth: (depth || 0) + 2,
+        });
+        host.appendChild(wrap);
+      }
+    }
     ibEl.querySelectorAll(':scope > .bib-items > .bib-item[data-item-id]').forEach(itemEl => {
       // 이미 자식 wrap이 붙은 항목은 건너뛴다 (중복 방지)
-      if (itemEl.querySelector(':scope > .block-children-wrap')) return;
       const itemId = itemEl.dataset.itemId;
       const item = getIbItemByIds(branchBlock.id, ibId, itemId);
       if (!item) return; // 중첩 분기의 ib는 여기서 못 찾음 → 해당 분기 자체 mount가 처리
       if (!Array.isArray(item.children)) item.children = [];
+      const host = item.type === 'callout'
+        ? (itemEl.querySelector(':scope > .nested-callout') || itemEl)
+        : itemEl;
+      if (host.querySelector(':scope > .block-children-wrap')) return;
       const wrap = document.createElement('div');
       wrap.className = 'block-children-wrap';
       wrap.dataset.parentId = item.id;
@@ -15167,7 +15235,7 @@ function mountBibItemChildren(blockEl, branchBlock, cid, depth = 0) {
         targetKey: makeChildBlockTargetKey(item.id, cid),
         depth: (depth || 0) + 2,
       });
-      itemEl.appendChild(wrap);
+      host.appendChild(wrap);
 
       // 판정 항목의 각 결과칸(성공/실패/기타) 밑 3차 하위 블록
       if (item.type === 'roll' && Array.isArray(item.rollResults)) {
@@ -17950,6 +18018,132 @@ function normalizeIbCalloutBodyOrder(item) {
   item.calloutBodyOrder = rows;
   return item.calloutBodyOrder;
 }
+function createIbCalloutTextChildFromRow(row, sourceItem = null) {
+  const child = createGenericTextChildFromHtml(row?.content || '', sourceItem);
+  child.id = row?.id || child.id;
+  return child;
+}
+function createIbCalloutRollChildFromLegacy(roll) {
+  if (!roll || typeof roll !== 'object') return null;
+  const child = {
+    ...createBlockData('roll'),
+    ...roll,
+    type: 'roll',
+    id: roll.id || mkId(),
+    target: roll.target || '',
+    content: roll.content || '',
+    css: typeof roll.css === 'string' ? roll.css : '',
+    children: Array.isArray(roll.children) ? roll.children : [],
+  };
+  if (Array.isArray(roll.rollResults)) child.rollResults = roll.rollResults;
+  return normalizeRollBlock(child);
+}
+function createIbCalloutNestedChildFromLegacy(nc) {
+  if (!nc || typeof nc !== 'object') return null;
+  return legacyCalloutItemToGenericChild({
+    ...nc,
+    type: 'callout',
+    id: nc.id || mkId(),
+    calloutType: nc.calloutType || 'info',
+    title: nc.title || '',
+    content: nc.content || '',
+    nestedCallouts: Array.isArray(nc.nestedCallouts) ? nc.nestedCallouts : [],
+  });
+}
+function migrateLegacyIbCalloutRowsToGenericChildren(item) {
+  if (!item || item.type !== 'callout') return false;
+
+  // 내용 있는 텍스트 행이 실제로 있을 때만 행을 사용한다. 빈 배열([])이면
+  // content를 줄 단위로 분해해 자식으로 옮긴다(레거시 콜아웃 content 유실 방지).
+  const hadTextRows = Array.isArray(item.calloutTextRows)
+    && item.calloutTextRows.some(r => hasNestedTextLineMeaningfulContent(r?.content || ''));
+  const hadContent = typeof item.content === 'string' && item.content.trim() !== '';
+  const hadRolls = Array.isArray(item.nestedRolls) && item.nestedRolls.length > 0;
+  const hadNestedCallouts = Array.isArray(item.nestedCallouts) && item.nestedCallouts.length > 0;
+  if (!hadTextRows && !hadContent && !hadRolls && !hadNestedCallouts) return false;
+
+  const textRows = hadTextRows
+    ? item.calloutTextRows.map(row => ({
+        id: row?.id || mkId(),
+        content: normalizeEditableHtml(row?.content || '') || '',
+      }))
+    : splitIbCalloutContentRows(item.content || '');
+  const nestedRolls = Array.isArray(item.nestedRolls) ? item.nestedRolls.filter(Boolean) : [];
+  const nestedCallouts = Array.isArray(item.nestedCallouts) ? item.nestedCallouts.filter(Boolean) : [];
+
+  const textById = new Map(textRows.map(row => [row.id, row]));
+  const rollById = new Map(nestedRolls.map(roll => {
+    if (!roll.id) roll.id = mkId();
+    return [roll.id, roll];
+  }));
+  const calloutById = new Map(nestedCallouts.map(nc => {
+    if (!nc.id) nc.id = mkId();
+    return [nc.id, nc];
+  }));
+
+  const promoted = [];
+  const seen = new Set();
+  const pushText = row => {
+    if (!row || seen.has(`text:${row.id}`)) return;
+    const hasText = hasNestedTextLineMeaningfulContent(row.content || '');
+    if (!hasText && (promoted.length || textRows.length > 1 || hadRolls || hadNestedCallouts)) {
+      seen.add(`text:${row.id}`);
+      return;
+    }
+    promoted.push(createIbCalloutTextChildFromRow(row, item));
+    seen.add(`text:${row.id}`);
+  };
+  const pushRoll = roll => {
+    if (!roll || seen.has(`roll:${roll.id}`)) return;
+    const child = createIbCalloutRollChildFromLegacy(roll);
+    if (child) promoted.push(child);
+    seen.add(`roll:${roll.id}`);
+  };
+  const pushCallout = nc => {
+    if (!nc || seen.has(`callout:${nc.id}`)) return;
+    const child = createIbCalloutNestedChildFromLegacy(nc);
+    if (child) promoted.push(child);
+    seen.add(`callout:${nc.id}`);
+  };
+
+  if (Array.isArray(item.calloutBodyOrder)) {
+    let expandedLegacyContent = false;
+    item.calloutBodyOrder.forEach(row => {
+      if (!row || typeof row !== 'object') return;
+      if (row.type === 'content') {
+        if (expandedLegacyContent) return;
+        textRows.forEach(pushText);
+        expandedLegacyContent = true;
+        return;
+      }
+      if (row.type === 'text') return pushText(textById.get(row.id));
+      if (row.type === 'roll') return pushRoll(rollById.get(row.id));
+      if (row.type === 'callout') return pushCallout(calloutById.get(row.id));
+    });
+  }
+
+  textRows.forEach(pushText);
+  nestedRolls.forEach(pushRoll);
+  nestedCallouts.forEach(pushCallout);
+
+  if (!promoted.length) return false;
+
+  const oldGenericChildren = Array.isArray(item.children)
+    ? item.children.filter(Boolean)
+    : [];
+  item.children = normalizeBlockTree([
+    ...promoted,
+    ...oldGenericChildren,
+  ]);
+
+  item.content = '';
+  item.calloutTextRows = [];
+  item.calloutBodyOrder = [];
+  item.nestedRolls = [];
+  item.nestedCallouts = [];
+
+  return true;
+}
 function getIbCalloutRollIndexById(item, rollId) {
   if (!item || item.type !== 'callout' || typeof rollId !== 'string') return -1;
   normalizeIbCalloutBodyOrder(item);
@@ -17965,9 +18159,10 @@ function normalizeIbItems(ib) {
   }
   ib.items = ib.items.filter(Boolean).map(item => {
     if (!item.id) item.id = mkId();
-    if (item.type === 'callout') normalizeIbCalloutBodyOrder(item);
-    if (item.type === 'roll') normalizeEmbeddedRollBlock(item);
     if (!Array.isArray(item.children)) item.children = [];
+    if (item.type === 'callout') migrateLegacyIbCalloutRowsToGenericChildren(item);
+    if (item.type === 'roll') normalizeEmbeddedRollBlock(item);
+    item.children = expandGenericTextChildLines(item.children);
     item.children = normalizeBlockTree(item.children);  // 3차 하위 블록
     return item;
   });
@@ -18049,16 +18244,13 @@ function addIbTextItem(blockId, ibId, cid, event = null) {
   focusIbItemAfterRender(item.id, blockId);
 }
 function addIbCalloutItem(blockId, ibId, cid, event = null) {
-  const textRow = createIbCalloutTextRow('');
   const item = {
     id: mkId(),
     type: 'callout',
     calloutType: 'info',
     title: '',
     content: '',
-    calloutTextRows: [textRow],
-    nestedRolls: [],
-    calloutBodyOrder: [{ type: 'text', id: textRow.id }]
+    children: [createBlockData('text')],
   };
   insertIbItemAt(blockId, ibId, item, cid, event);
   focusIbItemAfterRender(item.id, blockId);
@@ -18879,25 +19071,13 @@ function moveIbCalloutBodyRow(blockId, ibId, itemId, rowType, rowId, dir, cid) {
 function addIbCalloutRoll(blockId, ibId, itemId, cid) {
   const item = getIbItemByIds(blockId, ibId, itemId);
   if (!item || item.type !== 'callout') return;
-  if (!Array.isArray(item.nestedRolls)) item.nestedRolls = [];
-  const nr = {
-    id: mkId(), type: 'roll', target: '', content: '', css: '',
-    rollColorStart: ROLL_DEFAULT_START_COLOR,
-    rollColorEnd: ROLL_DEFAULT_END_COLOR,
-    rollResults: [
-      { id: mkId(), type: 'success', label: '성공', content: '', css: '' },
-      { id: mkId(), type: 'fail', label: '실패', content: '', css: '' },
-      { id: mkId(), type: 'other', label: '결과', content: '', css: '' },
-    ]
-  };
-  item.nestedRolls.push(nr);
-  normalizeIbCalloutBodyOrder(item);
+  if (!Array.isArray(item.children)) item.children = [];
+  const nr = createBlockData('roll');
+  item.children.push(nr);
+  item.children = normalizeBlockTree(item.children);
   persist();
   renderBlocks(cur().blocks, cid || 'blocks-container');
-  setTimeout(() => {
-    const ce = document.querySelector(`.bib-roll-target[data-item-id="${itemId}"][data-roll-id="${nr.id}"]`);
-    if (ce) ce.focus();
-  }, 60);
+  focusBlockAfterRender(nr.id);
 }
 function delIbCalloutRoll(blockId, ibId, itemId, rollId, cid) {
   const { item, rollIdx } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
@@ -18915,16 +19095,14 @@ function moveIbCalloutRoll(blockId, ibId, itemId, rollId, dir, cid) {
 function addIbNestedCallout(blockId, ibId, itemId, cid) {
   const item = getIbItemByIds(blockId, ibId, itemId);
   if (!item || item.type !== 'callout') return;
-  if (!Array.isArray(item.nestedCallouts)) item.nestedCallouts = [];
-  const nc = { id: mkId(), type: 'callout', calloutType: 'info', title: '', content: '', nestedCallouts: [] };
-  item.nestedCallouts.push(nc);
-  normalizeIbCalloutBodyOrder(item);
+  if (!Array.isArray(item.children)) item.children = [];
+  const nc = createBlockData('callout');
+  nc.children = [createBlockData('text')];
+  item.children.push(nc);
+  item.children = normalizeBlockTree(item.children);
   persist();
   renderBlocks(cur().blocks, cid || 'blocks-container');
-  setTimeout(() => {
-    const target = document.querySelector(`.nested-callout[data-sub-nc-id="${nc.id}"] .callout-title-inp`);
-    if (target) placeCaretAtEnd(target);
-  }, 60);
+  focusBlockAfterRender(nc.id);
 }
 function updIbCalloutRoll(blockId, ibId, itemId, rollId, field, val) {
   const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
@@ -19086,6 +19264,7 @@ function insertBranchInnerBlockAt(blockId, innerBlock, cid, insertAfterId = '') 
 }
 function addBranchInnerCalloutBlock(blockId, cid, insertAfterId = '') {
   const b = getBranchBlockById(blockId); if (!b) return;
+  const child = createBlockData('text');
   const ib = {
     id: mkId(),
     type: 'callout',
@@ -19093,12 +19272,10 @@ function addBranchInnerCalloutBlock(blockId, cid, insertAfterId = '') {
     title: '',
     content: '',
     calloutType: 'info',
+    children: [child],
   };
   insertBranchInnerBlockAt(blockId, ib, cid, insertAfterId);
-  setTimeout(() => {
-    const ce = document.querySelector(`.branch-inner-callout-content[data-ib-id="${ib.id}"]`);
-    if (ce) ce.focus();
-  }, 60);
+  focusBlockAfterRender(child.id);
 }
 function openBranchInnerBlockCtxMenu(e, blockId, ibId, cid) {
   e.preventDefault();
@@ -28232,20 +28409,22 @@ document.addEventListener('click', e => {
 // ═══════════════════════════════════════════════
 
 function normalizeRulebookEntry(rb) {
-  return {
+  const next = {
     id: rb.id || mkId(),
     title: rb.title || '',
     tags: Array.isArray(rb.tags) ? rb.tags : [],
     image: rb.image || '',
     memo: rb.memo || '',
     content: rb.content || '',
-    rbBlocks: Array.isArray(rb.rbBlocks) ? rb.rbBlocks : [],
+    rbBlocks: normalizeBlockTree(Array.isArray(rb.rbBlocks) ? rb.rbBlocks : []),
     chapters: Array.isArray(rb.chapters) ? rb.chapters : [],
     parentId: rb.parentId || null,
     createdAt: rb.createdAt || Date.now(),
     // 캐릭터 시트 템플릿 키. '' = 없음, 'inherit' = 부모 룰북 상속(서플리먼트 전용)
     sheetTemplateKey: rb.sheetTemplateKey || '',
   };
+  normalizeRbChapterEntries(next);
+  return next;
 }
 
 // ═══════════════════════════════════════════════
@@ -31598,6 +31777,7 @@ function normalizeRbChapterEntries(rb) {
   rb.chapters.forEach(function(c) {
     if (!c.id) c.id = mkId();
     if (!Array.isArray(c.blocks)) c.blocks = [];
+    c.blocks = normalizeBlockTree(c.blocks);
     c.parentId = c.parentId || '';
     c.targetBlockId = c.targetBlockId || '';
     c.targetChapterId = c.targetChapterId || '';
