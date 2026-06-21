@@ -4363,9 +4363,9 @@ body.block-pointer-dragging {
 .block-body { flex: 1; padding: 8px 12px; min-width: 0; }
 /* 우상단 플로팅 액션 */
 .block-actions {
-  position: absolute; top: 4px; right: 4px;
+  position: absolute; bottom: 100%; right: 4px; top: auto;
   display: flex; align-items: center; gap: 1px;
-  padding: 1px; z-index: 5;
+  padding: 1px 1px 3px; z-index: 6;
 }
 /* 자기 자신의 플로팅 메뉴 버튼만 숨김 (하위 블록의 메뉴는 영향 없음) */
 .block > .block-actions > .block-act { display: none; }
@@ -4375,15 +4375,9 @@ body.block-pointer-dragging {
   box-shadow: 0 1px 4px rgba(0,0,0,0.07);
 }
 .block:hover > .block-actions > .block-act { display: flex; }
-/* 플로팅 메뉴가 블록 내용을 가리지 않도록 최상위 블록(우측 ~96px 거터 존재)의 메뉴를
-   블록 오른쪽 바깥으로 빼고 세로 배치한다. roll은 overflow:hidden이라 제외(헤더 코너 유지).
-   메뉴는 DOM 상 블록의 자식이라 메뉴 위에서도 .block:hover가 유지된다. */
-#blocks-container > .block:not(.block-roll) > .block-actions {
-  top: 2px;
-  right: auto;
-  left: 100%;
-  flex-direction: column;
-  gap: 2px;
+/* roll 블록 자신의 메뉴는 overflow:hidden로 위쪽이 잘리므로 헤더 안 우상단에 유지한다. */
+.block.block-roll > .block-actions {
+  bottom: auto; top: 4px; right: 4px; padding: 1px;
 }
 .block-act {
   background: none; border: none; color: #bbb;
