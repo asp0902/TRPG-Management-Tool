@@ -4375,6 +4375,16 @@ body.block-pointer-dragging {
   box-shadow: 0 1px 4px rgba(0,0,0,0.07);
 }
 .block:hover > .block-actions > .block-act { display: flex; }
+/* 플로팅 메뉴가 블록 내용을 가리지 않도록 최상위 블록(우측 ~96px 거터 존재)의 메뉴를
+   블록 오른쪽 바깥으로 빼고 세로 배치한다. roll은 overflow:hidden이라 제외(헤더 코너 유지).
+   메뉴는 DOM 상 블록의 자식이라 메뉴 위에서도 .block:hover가 유지된다. */
+#blocks-container > .block:not(.block-roll) > .block-actions {
+  top: 2px;
+  right: auto;
+  left: 100%;
+  flex-direction: column;
+  gap: 2px;
+}
 .block-act {
   background: none; border: none; color: #bbb;
   cursor: pointer; padding: 3px 6px; border-radius: 3px;
