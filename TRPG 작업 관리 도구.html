@@ -70,9 +70,12 @@ body {
 #page-record {
   display: none; flex: 1; flex-direction: column; overflow: auto;
 }
-.record-inner { padding: 24px 28px; width: 100%; max-width: none; min-width: 0; }
+/* 우측 padding은 .record-inner가 아니라 각 영역이 직접 갖는다. 가로 스크롤 시
+   스크롤 컨테이너의 padding-right는 오버플로우 콘텐츠 뒤로 따라오지 않기 때문이다. */
+.record-inner { padding: 24px 0 24px 28px; width: 100%; max-width: none; min-width: 0; }
 .record-top {
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
+  padding-right: 28px;
 }
 .record-top-actions { display: flex; align-items: center; gap: 8px; }
 .record-heading {
@@ -496,7 +499,7 @@ tr.ct-row-end .ct-select:focus {
 .record-save-btn:hover { background: #333; }
 .record-list { display: block; min-width: 0; }
 .record-table-wrap {
-  width: max-content; min-width: 100%;
+  width: max-content; min-width: calc(100% - 28px); margin-right: 28px;
   border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; overflow: visible;
   box-shadow: 0 2px 10px rgba(17,17,17,0.03);
 }
