@@ -4363,9 +4363,9 @@ body.block-pointer-dragging {
 .block-body { flex: 1; padding: 8px 12px; min-width: 0; }
 /* 우상단 플로팅 액션 */
 .block-actions {
-  position: absolute; bottom: 100%; right: 4px; top: auto;
+  position: absolute; top: 4px; left: 100%; right: auto; bottom: auto;
   display: flex; align-items: center; gap: 1px;
-  padding: 1px 1px 3px; z-index: 6;
+  padding: 1px 4px; z-index: 6; white-space: nowrap;
 }
 /* 자기 자신의 플로팅 메뉴 버튼만 숨김 (하위 블록의 메뉴는 영향 없음) */
 .block > .block-actions > .block-act { display: none; }
@@ -4375,9 +4375,9 @@ body.block-pointer-dragging {
   box-shadow: 0 1px 4px rgba(0,0,0,0.07);
 }
 .block:hover > .block-actions > .block-act { display: flex; }
-/* roll 블록 자신의 메뉴는 overflow:hidden로 위쪽이 잘리므로 헤더 안 우상단에 유지한다. */
-.block.block-roll > .block-actions {
-  bottom: auto; top: 4px; right: 4px; padding: 1px;
+/* roll 블록 및 그 내부 블록 메뉴는 overflow:hidden로 우측 거터가 잘리므로 블록 안 우상단에 유지한다. */
+.block.block-roll .block-actions {
+  top: 4px; left: auto; right: 4px; bottom: auto; padding: 1px;
 }
 .block-act {
   background: none; border: none; color: #bbb;
