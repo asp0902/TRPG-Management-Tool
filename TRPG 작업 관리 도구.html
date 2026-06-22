@@ -496,6 +496,7 @@ tr.ct-row-end .ct-select:focus {
 .record-save-btn:hover { background: #333; }
 .record-list { display: block; min-width: 0; }
 .record-table-wrap {
+  width: max-content; min-width: 100%;
   border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; overflow: visible;
   box-shadow: 0 2px 10px rgba(17,17,17,0.03);
 }
@@ -10751,7 +10752,8 @@ function createCssMacroSidebarItem(itemData) {
 }
 function toggleRecordSidebarGroup(groupKey, event) {
   event?.stopPropagation?.();
-  recordSidebarGroupState[groupKey] = !recordSidebarGroupState[groupKey];
+  // 기본 접힘이므로 false(펼침)/true·미설정(접힘) 사이를 토글한다.
+  recordSidebarGroupState[groupKey] = (recordSidebarGroupState[groupKey] === false);
   renderList();
 }
 function selectRecordSidebarItem(recordId, options = {}) {
@@ -10827,7 +10829,8 @@ function createRecordSidebarDateGroup(dateKey, records) {
 }
 function createRecordSidebarGroup(groupKey, records) {
   const hasActive = records.some(record => record.id === currentRecordSidebarId);
-  const collapsed = !!recordSidebarGroupState[groupKey] && !hasActive;
+  // 월별 그룹은 기본 접힘. 명시적으로 펼친(false) 경우에만 펼친다. 활성 기록의 월은 자동 펼침.
+  const collapsed = recordSidebarGroupState[groupKey] !== false && !hasActive;
 
   const wrap = document.createElement('div');
   wrap.className = 'scenario-folder' + (collapsed ? ' collapsed' : '');
