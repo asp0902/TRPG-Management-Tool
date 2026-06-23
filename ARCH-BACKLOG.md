@@ -21,17 +21,28 @@
 |---|---|---|---|---|
 | ✅ 완료 (a280c81) | 엔딩 달성조건/보상/후일담 | ~~`.ending-css-panel` ×3~~ → `data-cmf-ending-field` | `toggleEndingCssPanel`(위임) | `ending.{condition,reward,aftermath}Css` |
 | ✅ 완료 (349ff31) | 시나리오 제목 | ~~`#info-title-css-panel`~~ → host(lazy mount) | `openInfoTitleCssPanel`(위임) | `info.titleCss` |
-| ⬜ | ib-콜아웃 nested roll 결과칸 | `.ib-roll-result-css-panel` (~12772) | `toggleIbCalloutRollResultCssPanel` / `applyIbCalloutRollResultCss` | `r.css` |
-| ⬜ | ib-콜아웃 nested roll | `.ib-roll-css-panel` (~12782) | `toggleIbCalloutRollCssPanel` / `applyIbCalloutRollCss` | `roll.css` |
-| ⬜ | branch-inner roll 결과칸 | `.btcp-textarea` (~12860) | `apply*` 재검색 | `r.css` |
-| ⬜ | branch-inner block | `.btcp-textarea` (~12877) | `apply*` 재검색 | `ib.css` |
-| ⬜ | branch-inner block(2번째 경로) | `.btcp-textarea` (~12923) | `apply*` 재검색 | `ib.css` |
-| ⚠️ 도달성 확인 필요 | 중첩 대사 | `.nested-speech-css-panel` (~19982) | `toggleNestedSpeechCssPanel` / `applyNestedSpeechCss` | `item.css` |
-| ⚠️ 도달성 확인 필요 | 중첩 텍스트 | `.nested-text-css-panel` (~20009) | `toggleNestedTextCssPanel` / `applyNestedTextCss` | `item.css` |
+| ✅ 완료 (6079532) | branch-inner 블록/판정/결과칸 ×3 | ~~`.branch-ib-css-panel` 등~~ → `data-cmf-branch-ib`·`data-cmf-branch-result` | `toggle*`(위임), `mountBibItemChildren`에서 mount | `ib.css`·`result.css` |
+| 💀 죽은 경로 | ib-콜아웃 nested roll/결과칸 | `.ib-roll-css-panel`·`.ib-roll-result-css-panel` (~12772/12782) | `getIbCalloutNestedRollHtml` | `roll.css`·`r.css` |
+| 💀 레거시 전용 | 중첩 대사/텍스트 | `.nested-speech-css-panel`·`.nested-text-css-panel` (~19982/20009) | `mkNestedSpeech/TextHtml` | `item.css` |
 
-> **중첩 대사/텍스트 주의:** callout이 `nestedCallouts`(레거시 아이템)와 generic children
-> **이중 시스템**으로 공존(렌더러 case 'callout' ~15770은 여전히 `normalizeCalloutNestedItems`
-> 사용). 이전 전 실제 콘텐츠에서 `.nested-speech-item`/`.nested-text-item`이 렌더되는지 먼저 확인.
+### 결론: 후보 1의 **live 패널은 전부 이전 완료**
+
+미이전 2건은 **도달 불가/레거시 전용**이라 마이그 가치 없음:
+
+- **ib-콜아웃 nested roll/결과칸** — `getBibItemHtml`(12603)이 콜아웃 항목 렌더 시 먼저
+  `migrateLegacyIbCalloutRowsToGenericChildren(item)`를 돌려 레거시 행을 generic children으로
+  변환한다. 그 결과 `hasGenericChildren`이면 `rows=[]`(12620) → `getIbCalloutNestedRollHtml`
+  (12640)과 그 안의 legacy 패널은 **호출되지 않는다**. 모든 렌더 경로가 migration을 먼저 타므로
+  실사용에서 미도달.
+- **중첩 대사/텍스트** (`.nested-speech-item`/`.nested-text-item`) — 생성 함수
+  `addNestedSpeech`/`addNestedText`(20002/20021)는 **정의만 있고 호출처 0**. 즉 새로 만들 수 없고,
+  callout은 이제 generic children으로 입력받는다. 이 패널은 **마이그 안 된 옛 데이터**에서만 렌더.
+
+> **후속 정리 후보(별도, 선택):** 위 죽은 경로/미호출 함수(`getIbCalloutNestedRollHtml`,
+> `applyIbCalloutRoll*Css`, `addNestedSpeech/Text`, `mkNestedSpeech/TextHtml`, 관련 legacy
+> CSS/closeAll 셀렉터)는 데드코드 제거 대상. 단 옛 데이터 렌더 영향이 있으니 마이그레이션
+> 보장(옛 nestedCallouts speech/text → generic children) 확인 후 제거할 것. churn 크니 후보 5/3과
+> 분리.
 
 > **검증 하네스 (프리뷰 대용, 동작 확인됨):** `playwright-core`(브라우저 다운로드 없이
 > 시스템 Chrome `C:\Program Files\Google\Chrome\Application\chrome.exe` 구동) + `pathToFileURL`
