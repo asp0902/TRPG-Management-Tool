@@ -54,8 +54,14 @@
 children 추가, 동작 검증), `getIbCalloutRoll`·`getIbCalloutRollById`(copy/macro 경로 22531/22791),
 `normalizeIbCalloutBodyOrder`·`getIbCalloutRollIndexById`.
 
-**잔여 tendril(미제거):** `openIbCalloutRollColorPicker`(18640)가 이제 고아(호출처 0). 자체
-색상피커 헬퍼 체인이 있을 수 있어 추적 보류 — 다음 정리 후보.
+**✅ tendril 제거 완료 (3e8b5e0):** `openIbCalloutRollColorPicker`(고아) + 공유 색상피커에 박혀
+있던 도달 불가 `'ib-callout-roll'` 분기 전부 제거(`getEmbeddedColorTargetBlock` 절,
+`cpPreviewCurrentColor`/`closeColorPanel`/`applyColorPanel`의 disjunct, ib-callout-roll commit
+분기 → live ib-roll/branch-inner-roll 본문으로 축약). live ib-roll·branch-inner-roll 색상피커가
+여전히 색상 적용/커밋함을 헤드리스로 검증. `'ib-callout-roll'` 참조 0.
+
+→ **ib-콜아웃 nested-roll 레거시 잔재 데드코드 정리 전부 완료.** 남은 후속은 중첩 대사/텍스트
+레거시 렌더 제거(옛 nestedCallouts→children 마이그레이션 선행 필요)뿐.
 
 **미제거(레거시 렌더 유지):** 중첩 대사/텍스트(`mkNestedSpeech/TextHtml`,
 `toggle/applyNestedSpeech·TextCss`)는 `normalizeCalloutNestedItems`가 speech/text를 보존해
