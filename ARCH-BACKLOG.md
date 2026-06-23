@@ -17,17 +17,26 @@
 
 아직 **인라인 `.btcp-textarea` + 개별 `apply*/toggle*` 핸들러**로 남은 얕은(shallow) 중복 패널:
 
-| 대상 | 패널 마크업 | 토글/적용 핸들러 | css 필드 |
-|---|---|---|---|
-| 시나리오 제목 | `#info-title-css-panel` (~7056) | `openInfoTitleCssPanel` / `applyInfoTitleCss` | scenario info title css |
-| ib-콜아웃 roll 결과칸 | `.ib-roll-result-css-panel` (~12772) | `toggleIbCalloutRollResultCssPanel` / `applyIbCalloutRollResultCss` | `r.css` |
-| ib-콜아웃 roll | `.ib-roll-css-panel` (~12782) | (toggle) / `applyIbCalloutRollCss` | `roll.css` |
-| branch-inner roll 결과칸 | `.btcp-textarea` (~12860) | `apply*` 재검색 | `r.css` |
-| branch-inner block | `.btcp-textarea` (~12877) | `apply*` 재검색 | `ib.css` |
-| branch-inner block(2번째 경로) | `.btcp-textarea` (~12923) | `apply*` 재검색 | `ib.css` |
-| 엔딩 달성조건/보상/후일담 | `.ending-css-panel` ×3 (16041/16062/16077) | `toggleEndingCssPanel` / `applyEndingCss` | `ending.conditionCss`·`rewardCss`·`aftermathCss` |
-| 중첩 대사 | `.nested-speech-css-panel` (~19982) | `toggleNestedSpeechCssPanel` / `applyNestedSpeechCss` | `item.css` |
-| 중첩 텍스트 | `.nested-text-css-panel` (~20009) | `toggleNestedTextCssPanel` / `applyNestedTextCss` | `item.css` |
+| 상태 | 대상 | 패널 마크업 | 토글/적용 핸들러 | css 필드 |
+|---|---|---|---|---|
+| ✅ 완료 (a280c81) | 엔딩 달성조건/보상/후일담 | ~~`.ending-css-panel` ×3~~ → `data-cmf-ending-field` | `toggleEndingCssPanel`(위임) | `ending.{condition,reward,aftermath}Css` |
+| ✅ 완료 (349ff31) | 시나리오 제목 | ~~`#info-title-css-panel`~~ → host(lazy mount) | `openInfoTitleCssPanel`(위임) | `info.titleCss` |
+| ⬜ | ib-콜아웃 nested roll 결과칸 | `.ib-roll-result-css-panel` (~12772) | `toggleIbCalloutRollResultCssPanel` / `applyIbCalloutRollResultCss` | `r.css` |
+| ⬜ | ib-콜아웃 nested roll | `.ib-roll-css-panel` (~12782) | `toggleIbCalloutRollCssPanel` / `applyIbCalloutRollCss` | `roll.css` |
+| ⬜ | branch-inner roll 결과칸 | `.btcp-textarea` (~12860) | `apply*` 재검색 | `r.css` |
+| ⬜ | branch-inner block | `.btcp-textarea` (~12877) | `apply*` 재검색 | `ib.css` |
+| ⬜ | branch-inner block(2번째 경로) | `.btcp-textarea` (~12923) | `apply*` 재검색 | `ib.css` |
+| ⚠️ 도달성 확인 필요 | 중첩 대사 | `.nested-speech-css-panel` (~19982) | `toggleNestedSpeechCssPanel` / `applyNestedSpeechCss` | `item.css` |
+| ⚠️ 도달성 확인 필요 | 중첩 텍스트 | `.nested-text-css-panel` (~20009) | `toggleNestedTextCssPanel` / `applyNestedTextCss` | `item.css` |
+
+> **중첩 대사/텍스트 주의:** callout이 `nestedCallouts`(레거시 아이템)와 generic children
+> **이중 시스템**으로 공존(렌더러 case 'callout' ~15770은 여전히 `normalizeCalloutNestedItems`
+> 사용). 이전 전 실제 콘텐츠에서 `.nested-speech-item`/`.nested-text-item`이 렌더되는지 먼저 확인.
+
+> **검증 하네스 (프리뷰 대용, 동작 확인됨):** `playwright-core`(브라우저 다운로드 없이
+> 시스템 Chrome `C:\Program Files\Google\Chrome\Application\chrome.exe` 구동) + `pathToFileURL`
+> 로 앱 로드 → 페이지 컨텍스트에서 `applyStatePayload`/`select`/`createBlockData`로 상태 구성 후
+> DOM·state 단언. 스크립트는 `%TEMP%\pw-verify\`. (엔딩·info-title 이전이 이걸로 검증됨.)
 
 **이전 레시피 (이미 마친 사이트와 동일):**
 1. 마크업의 `.btcp-textarea` 패널 → 빈 host `<div class="css-macro-field" data-cmf-...="${id}"></div>` 로 교체.
