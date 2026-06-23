@@ -38,11 +38,25 @@
   `addNestedSpeech`/`addNestedText`(20002/20021)는 **정의만 있고 호출처 0**. 즉 새로 만들 수 없고,
   callout은 이제 generic children으로 입력받는다. 이 패널은 **마이그 안 된 옛 데이터**에서만 렌더.
 
-> **후속 정리 후보(별도, 선택):** 위 죽은 경로/미호출 함수(`getIbCalloutNestedRollHtml`,
-> `applyIbCalloutRoll*Css`, `addNestedSpeech/Text`, `mkNestedSpeech/TextHtml`, 관련 legacy
-> CSS/closeAll 셀렉터)는 데드코드 제거 대상. 단 옛 데이터 렌더 영향이 있으니 마이그레이션
-> 보장(옛 nestedCallouts speech/text → generic children) 확인 후 제거할 것. churn 크니 후보 5/3과
-> 분리.
+### 데드코드 정리 진행 상황
+
+**✅ 제거 완료 (cfa9627):** `getIbCalloutNestedRollHtml` + 전용 CSS 핸들러 4개
+(`toggle/applyIbCalloutRollCss`, `toggle/applyIbCalloutRollResultCss`) + 미호출 생성자
+`addNestedSpeech`/`addNestedText` (~9.2KB). 도달 불가를 하네스로 실증 후 제거, 전체 패널
+스위트 회귀 통과.
+
+**⚠️ 남은 고아 (이번엔 미제거 — 체인 추적 필요):** `getIbCalloutNestedRollHtml` 제거로
+`openIbCalloutRollCtxMenu`·`openIbCalloutRollResultCtxMenu`가 호출처를 잃었고, 그에 딸린
+`moveIbCalloutRoll`·`delIbCalloutRoll`·`updIbCalloutRoll`·`updIbCalloutRollResult`·
+`delIbCalloutRollResult`·`editIbCalloutRollResultLabel`도 대부분 고아. **단 주의:**
+`addIbCalloutRoll`·`addIbNestedCallout`·`addIbCalloutRollResult`·`getIbCalloutRoll`은
+**여전히 live**(ib-콜아웃 항목 우클릭 메뉴 `openIbItemCalloutCtxMenu` ~18819, copy/macro 경로
+22531/22791에서 사용)이므로 제거 금지. 고아만 골라내려면 각 함수 참조를 1건씩 재확인할 것.
+
+**미제거(레거시 렌더 유지):** 중첩 대사/텍스트(`mkNestedSpeech/TextHtml`,
+`toggle/applyNestedSpeech·TextCss`)는 `normalizeCalloutNestedItems`가 speech/text를 보존해
+옛 `block.nestedCallouts` 데이터에서 **여전히 렌더**됨 → 데드 아님. 제거하려면 먼저 옛
+nestedCallouts speech/text를 generic children으로 옮기는 마이그레이션을 추가해야 함.
 
 > **검증 하네스 (프리뷰 대용, 동작 확인됨):** `playwright-core`(브라우저 다운로드 없이
 > 시스템 Chrome `C:\Program Files\Google\Chrome\Application\chrome.exe` 구동) + `pathToFileURL`
