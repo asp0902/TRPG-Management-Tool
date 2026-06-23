@@ -78,20 +78,26 @@ nestedCallouts speech/text를 generic children으로 옮기는 마이그레이�
 
 ---
 
-## 후보 5 — 빈 컨테이너 표시 `:has()` 규칙 통합
+## 후보 5 — 빈 컨테이너 표시 `:has()` 규칙 통합 (부분 완료)
 
-"CE는 비었지만 자식 블록이 있는" 컨테이너에서 빈 CE 줄을 죽이는 규칙이 컨텍스트별로 흩어짐:
+조사 결과 이 5개는 "한 패턴의 5개 복사본"이 아니라 **목적이 다른 3종**:
 
-- `.callout-body:has(...)` (3269–3270)
-- `.nested-callouts-wrap:not(:has(.nested-callout))` (3572)
-- `.block.block-text:has(> .block-text-ce:empty):has(> .block-children-wrap:not([data-empty="1"]))` (4212/4217/4226)
-- `.roll-result-blocks > .block.block-text.block-child:has(...)` (4531)
-- `.branch-inner-block .bib-item-text:has(> .bib-item-text-ce:empty + ...)` (5373)
+- **빈 CE+자식 → 에디터 접기**: `.block.block-text:has(...)` (4212, root+판정결과 자식 모두 커버)
+  / `.branch-inner-block .bib-item-text:has(...)` (5373, *다른 엘리먼트 구조* `.bib-item-text-ce`)
+- **판정결과 자식 padding 보정**: `.roll-result-blocks > .block.block-text.block-child:has(...)`
+  (4531 — 위 root 규칙의 컨텍스트 보충)
+- **간격 정리(접기 아님)**: `.callout-body:has(...)` 하단 padding(3269), 빈 `.nested-callouts-wrap` padding(3572)
 
-공통 패턴: `CE:empty` + `자식-wrap[data-empty!=1]`. 단일 유틸 셀렉터/속성(예: 렌더 시
-컨테이너에 `data-ce-empty-collapsed` 부여)로 모으면 중복 5곳 → 1곳. **위험:** 컨텍스트마다
-직계 구조가 미묘하게 달라(`>` 결합자, `+` 인접) 한 번에 합치면 특정 컨텍스트만 깨질 수 있다.
-컨텍스트별 회귀 육안 확인 필수.
+→ **단일 셀렉터로 병합 불가**(엘리먼트 클래스·결합자가 다름). 렌더 시 마커 클래스 부여 방식은
+JS가 빈/자식 상태를 추적·동기화해야 해 stale 버그 위험(우리가 계속 고쳐온 류) → 채택 안 함.
+
+**✅ 한 것 (48fee2d):** `.block.block-text:has(...)` 규칙이 긴 `:has()` 셀렉터를 3회 반복하던 것을
+**CSS 네이티브 중첩(`& > ...`)으로 1회**로 합쳐 단일 출처화 + 컨텍스트 상호참조 주석 추가.
+헤드리스 computed-style로 접기/펼치기 동작 검증(에러 0). 중첩은 Chrome 120+ 필요(`:has()`는 105+,
+사용자 Chrome 149).
+
+**남김(병합 안 함):** 위 사유로 4531·5373·3269·3572는 그대로 둠. `:has()` 선언적 접근이 옳음
+(자동 갱신). 더 손대면 fragility만 증가.
 
 ---
 
