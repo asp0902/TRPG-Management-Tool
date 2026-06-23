@@ -101,21 +101,37 @@ JS가 빈/자식 상태를 추적·동기화해야 해 stale 버그 위험(우�
 
 ---
 
-## 후보 3 — 블록 트리 접근자 `locate()` 이음새 정리
+## 후보 3 — 블록 트리 접근자 `locate()` 이음새 정리 (이미 통합됨)
 
-트리 탐색/배열 획득이 여러 접근자로 분산(약 51곳):
-`getBlockArrayInfo` · `findGenericBlockArrayInfo` · `getBlockListByTargetKey` ·
-`getBlockListByCid` · `getRootBlockListByCid`. 단일 `locate(target) → { array, index, parent, cid }`
-이음새로 수렴시키는 것이 목표. **가장 위험** — drag/drop, 정규화, 히스토리가 모두 의존.
-프리뷰 + 광범위 회귀 없이는 착수 비권장.
+조사 결과 **이음새는 이미 수렴되어 있음**. 트리 순회는 `findGenericBlockArrayInfo` **한 곳**뿐이고,
+그 위에 목적이 다른 두 래퍼가 있다:
+
+- `getBlockArrayInfo(blockId, cid)` — **id로** 블록 찾기 → `{array,index,block,parent,relation,rootCid,...}`
+- `getBlockListByTargetKey(targetKey, cid)` — **주소(root|children|rollResultBlocks)로** 배열 얻기
+
+둘 다 `getRootBlockListByCid`(scenario vs rulebook 챕터) 기반. 타입별 getter
+(`getBranch/Roll/Ending/CalloutBlockById`)는 전부 `getGenericBlockById`(→`getBlockArrayInfo`)에 **위임**,
+변형 함수(`moveBlock`·`delBlock`·`duplicateBlock`·`dropBlock`·`dropBlockAtTarget`)는 전부 접근자 사용.
+**자체 순회/중복 없음** → 합칠 대상이 없다.
+
+- 백로그가 적었던 `getBlockListByCid`는 **존재하지 않는 함수**(추정 오기).
+- "~51곳"은 중복 구현이 아니라 정상적인 API 호출자들.
+- 두 래퍼는 입력(id vs 주소)·답(블록 위치 vs 컨테이너 배열)이 달라 단일 `locate()`로 합치면
+  서로 다른 질의를 뒤섞어 명료성↓·위험↑. **병합 비권장.**
+
+**✅ 한 것 (312d03d):** 유일한 실제 정리 — `getEndingBlockById`의 죽은 fallback 제거
+(`getGenericBlockById` 전체 트리 검색의 부분집합 + rb cid에서 잘못된 컨텍스트 반환 가능). 회귀 검증 통과.
 
 ---
 
-## 진행 순서 (권장)
+## 진행 순서 (권장) — 모두 처리됨
 
-1. **후보 1** — 패널 단위로 1개씩 이전 → 매번 검증/커밋(작은 단위, 롤백 쉬움).
-2. **후보 5** — 컨텍스트별 회귀 확인하며 통합.
-3. **후보 3** — 마지막. 프리뷰+회귀 충분할 때만.
+1. ✅ **후보 1** — live 패널 전부 이전(엔딩·info-title·branch-inner). 죽은 패널은 제외/일부 제거.
+2. ✅ **후보 5** — 빈-CE 접기 규칙 CSS 중첩 단일화(나머지는 목적이 달라 분리 유지).
+3. ✅ **후보 3** — 이미 통합 상태 확인 + 죽은 fallback 제거.
+
+**남은 선택적 후속:** ib-콜아웃 ctx 메뉴 고아 체인 정리(참조 1건씩 추적), 중첩 대사/텍스트
+레거시 렌더 제거(옛 nestedCallouts→children 마이그레이션 선행 필요).
 
 > 제약(코덱스 핸드오프 누적): 무관한 untracked `.claude/*` 되돌리지 말 것 ·
 > 광범위 포맷팅/리팩터 churn 피할 것 · 검증 끝난 것만 커밋 · 한국어 간결(caveman).
