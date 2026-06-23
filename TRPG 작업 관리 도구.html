@@ -497,9 +497,11 @@ tr.ct-row-end .ct-select:focus {
   padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit;
 }
 .record-save-btn:hover { background: #333; }
-.record-list { display: block; min-width: 0; }
+/* 콘텐츠 폭(max-content)으로 커지며 자체 padding-right를 가져, 가로 스크롤 끝에서도
+   28px 여백이 보인다(요소 자신의 padding은 스크롤 범위에 포함됨). */
+.record-list { display: block; width: max-content; min-width: 100%; padding-right: 28px; box-sizing: border-box; }
 .record-table-wrap {
-  width: max-content; min-width: calc(100% - 28px); margin-right: 28px;
+  width: max-content; min-width: 100%;
   border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; overflow: visible;
   box-shadow: 0 2px 10px rgba(17,17,17,0.03);
 }
