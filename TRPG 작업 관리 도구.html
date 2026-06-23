@@ -12833,14 +12833,7 @@ function getBranchBlockHtml(block, cid) {
                   </div>
                 </div>
                 <div class="bib-roll-result-ce" contenteditable="true" data-ib-id="${ib.id}" data-bib-result-idx="${ri}" data-ph="내용을 입력하세요" oninput="updBranchIbRollResult('${branchBlock.id}','${ib.id}',${ri},this.innerHTML)" oncontextmenu="return openBranchIbRollResultCtxMenu(event,'${branchBlock.id}','${ib.id}',${ri},'${cid}')" spellcheck="false"></div>
-                <div class="branch-ib-roll-result-css-panel" style="display:none">
-                  <div class="btcp-label">수정 CSS 매크로</div>
-                  <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(r.css||'')}</textarea>
-                  <div class="btcp-footer">
-                    <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyBranchIbRollResultCss('${branchBlock.id}','${ib.id}',${ri},this,true)">서식 제거</button>
-                    <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyBranchIbRollResultCss('${branchBlock.id}','${ib.id}',${ri},this,false)">적용</button>
-                  </div>
-                </div>
+                <div class="css-macro-field" data-cmf-branch-result="${r.id}"></div>
               </div>`).join('')}
             </div>
             <div class="branch-inner-block-actions">
@@ -12850,14 +12843,7 @@ function getBranchBlockHtml(block, cid) {
               <span class="branch-inner-block-act branch-inner-css-badge ${ib.css ? 'active' : ''}" title="CSS 서식 편집" onmousedown="event.preventDefault()" onclick="toggleBranchIbCssPanel('${branchBlock.id}','${ib.id}',this)">✦</span>
               <button class="branch-inner-block-act del" title="삭제" onmousedown="event.preventDefault()" onclick="delBranchInnerBlock('${branchBlock.id}','${ib.id}','${cid}')">✕</button>
             </div>
-            <div class="branch-inner-roll-css-panel" data-ib-id="${ib.id}" style="display:none">
-              <div class="btcp-label">수정 CSS 매크로</div>
-              <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(ib.css||'')}</textarea>
-              <div class="btcp-footer">
-                <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyBranchIbCss('${branchBlock.id}','${ib.id}',this,true)">서식 제거</button>
-                <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyBranchIbCss('${branchBlock.id}','${ib.id}',this,false)">적용</button>
-              </div>
-            </div>
+            <div class="css-macro-field" data-cmf-branch-ib="${ib.id}"></div>
           </div>`;
           }
           if (ib.type === 'callout') {
@@ -12896,14 +12882,7 @@ function getBranchBlockHtml(block, cid) {
               <span class="branch-inner-block-act branch-inner-css-badge ${ib.css ? 'active' : ''}" title="CSS 서식 편집" onmousedown="event.preventDefault()" onclick="toggleBranchIbCssPanel('${branchBlock.id}','${ib.id}',this)">✦</span>
               <button class="branch-inner-block-act del" title="삭제" onmousedown="event.preventDefault()" onclick="delBranchInnerBlock('${branchBlock.id}','${ib.id}','${cid}')">✕</button>
             </div>
-            <div class="branch-ib-css-panel" data-ib-id="${ib.id}" style="display:none">
-              <div class="btcp-label">수정 CSS 매크로</div>
-              <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(ib.css||'')}</textarea>
-              <div class="btcp-footer">
-                <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyBranchIbCss('${branchBlock.id}','${ib.id}',this,true)">서식 제거</button>
-                <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyBranchIbCss('${branchBlock.id}','${ib.id}',this,false)">적용</button>
-              </div>
-            </div>
+            <div class="css-macro-field" data-cmf-branch-ib="${ib.id}"></div>
           </div>`;
         }).join('')}
       </div>
@@ -15190,6 +15169,30 @@ function mountBibItemChildren(blockEl, branchBlock, cid, depth = 0) {
   blockEl.querySelectorAll('.branch-inner-block[data-ib-id]').forEach(ibEl => {
     const ibId = ibEl.dataset.ibId;
     const ib = (branchBlock.innerBlocks || []).find(x => x.id === ibId);
+    // 분기 내부 블록(일반/판정) 자신의 CSS 매크로 필드 (cssMacroField로 이전)
+    if (ib) {
+      const ibCssHost = ibEl.querySelector(':scope > .css-macro-field[data-cmf-branch-ib]');
+      if (ibCssHost) {
+        cssMacroField.mount(ibCssHost, {
+          get: () => (getBranchBlockById(branchBlock.id)?.innerBlocks || []).find(x => x.id === ibId)?.css || '',
+          set: v => { const ib2 = (getBranchBlockById(branchBlock.id)?.innerBlocks || []).find(x => x.id === ibId); if (ib2) ib2.css = v; },
+          save: () => commitScenarioHistory(`branch:${branchBlock.id}:${ibId}:css`, { force: true }),
+          badge: ibEl.querySelector(':scope > .branch-inner-block-actions .branch-inner-css-badge'),
+        });
+      }
+      // 분기 내부 "판정" 블록의 각 결과칸 CSS 매크로 필드
+      ibEl.querySelectorAll(':scope > .bib-roll-results > .bib-roll-result[data-bib-result-id]').forEach(resEl => {
+        const rid = resEl.dataset.bibResultId;
+        const rHost = resEl.querySelector(':scope > .css-macro-field[data-cmf-branch-result]');
+        if (!rHost) return;
+        cssMacroField.mount(rHost, {
+          get: () => (getBranchBlockById(branchBlock.id)?.innerBlocks || []).find(x => x.id === ibId)?.rollResults?.find(r => r.id === rid)?.css || '',
+          set: v => { const r = (getBranchBlockById(branchBlock.id)?.innerBlocks || []).find(x => x.id === ibId)?.rollResults?.find(x => x.id === rid); if (r) r.css = v; },
+          save: () => commitScenarioHistory(`branch:${branchBlock.id}:${ibId}:result:${rid}:css`, { force: true }),
+          badge: resEl.querySelector('.branch-inner-css-badge'),
+        });
+      });
+    }
     if (ib?.type === 'callout') {
       if (!Array.isArray(ib.children)) ib.children = [];
       const host = ibEl.querySelector(':scope > .nested-callout') || ibEl;
@@ -19469,29 +19472,9 @@ function setBranchInnerCalloutType(blockId, ibId, selectEl) {
   if (icon) icon.innerHTML = getCalloutTypeIconSvg(type);
 }
 function toggleBranchIbCssPanel(blockId, ibId, badgeEl) {
-  const panel = badgeEl.closest('.branch-inner-block').querySelector('.branch-ib-css-panel, .branch-inner-roll-css-panel');
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  document.querySelectorAll('.roll-result-css-panel, .branch-ib-css-panel, .branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, .ib-roll-css-panel, .ib-roll-result-css-panel').forEach(p => { p.style.display = 'none'; });
-  if (!isOpen) {
-    panel.style.display = 'flex';
-    ensureCssMacroPickerButtonInCssPanel(panel);
-    const ta = panel.querySelector('.btcp-textarea');
-    btcpAutoResize(ta); ta.focus();
-  }
-}
-function applyBranchIbCss(blockId, ibId, btn, remove) {
-  const b = getBranchBlockById(blockId); if (!b) return;
-  const ib = (b.innerBlocks || []).find(x => x.id === ibId); if (!ib) return;
-  const panel = btn.closest('.branch-ib-css-panel, .branch-inner-roll-css-panel');
-  const ta = panel?.querySelector('.btcp-textarea');
-  const val = remove ? '' : (ta?.value || '').trim();
-  if (remove && ta) ta.value = '';
-  ib.css = val;
-  const badge = panel.closest('.branch-inner-block').querySelector('.branch-inner-css-badge');
-  if (badge) badge.classList.toggle('active', !!val);
-  panel.style.display = 'none';
-  commitScenarioHistory(`branch:${blockId}:${ibId}:css`, { force: true });
+  // deep module로 위임 — .branch-inner-block 직계의 host 토글
+  const host = badgeEl.closest('.branch-inner-block')?.querySelector(':scope > .css-macro-field[data-cmf-branch-ib]');
+  if (host) cssMacroField.toggle(host);
 }
 function getBranchIbRollResult(blockId, ibId, resultIdx) {
   const b = getBranchBlockById(blockId); if (!b) return { block: null, innerBlock: null, result: null };
@@ -19573,30 +19556,9 @@ function copyBranchIbRollResult(blockId, ibId, resultIdx, btn) {
   });
 }
 function toggleBranchIbRollResultCssPanel(blockId, ibId, resultIdx, badgeEl) {
-  const panel = badgeEl.closest('.bib-roll-result').querySelector('.branch-ib-roll-result-css-panel');
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  document.querySelectorAll('.roll-result-css-panel, .branch-ib-css-panel, .branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, .ib-roll-css-panel, .ib-roll-result-css-panel').forEach(p => { p.style.display = 'none'; });
-  if (!isOpen) {
-    panel.style.display = 'flex';
-    ensureCssMacroPickerButtonInCssPanel(panel);
-    const ta = panel.querySelector('.btcp-textarea');
-    btcpAutoResize(ta);
-    ta.focus();
-  }
-}
-function applyBranchIbRollResultCss(blockId, ibId, resultIdx, btn, remove) {
-  const { result } = getBranchIbRollResult(blockId, ibId, resultIdx);
-  if (!result) return;
-  const panel = btn.closest('.branch-ib-roll-result-css-panel');
-  const ta = panel.querySelector('.btcp-textarea');
-  const val = remove ? '' : ta.value.trim();
-  if (remove) ta.value = '';
-  result.css = val;
-  const badge = panel.closest('.bib-roll-result').querySelector('.branch-inner-css-badge');
-  if (badge) badge.classList.toggle('active', !!val);
-  panel.style.display = 'none';
-  commitScenarioHistory(`branch:${blockId}:${ibId}:result:${resultIdx}:css`, { force: true });
+  // deep module로 위임 — .bib-roll-result 직계의 host 토글
+  const host = badgeEl.closest('.bib-roll-result')?.querySelector(':scope > .css-macro-field[data-cmf-branch-result]');
+  if (host) cssMacroField.toggle(host);
 }
 function copyBranchInnerBlock(blockId, ibId, btn) {
   const b = getBranchBlockById(blockId); if (!b) return;
