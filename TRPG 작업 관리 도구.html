@@ -18666,20 +18666,6 @@ function buildIbRollCtxMenu(blockId, ibId, itemId, cid) {
     { icon: '−', label: '기타 추가', color: getRollResultTypeMeta('other').color, action: () => addIbRollResult(blockId, ibId, itemId, 'other', cid) },
   ];
 }
-function buildIbCalloutRollCtxMenu(blockId, ibId, itemId, rollId, cid) {
-  const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  if (!roll) return [];
-  const previewSelector = `.bib-item-callout[data-item-id="${itemId}"] .nested-callout-roll-wrap[data-roll-id="${roll.id}"] .bib-sub-block-roll`;
-  return [
-    { icon: `<span style="display:inline-block;width:10px;height:10px;border-radius:999px;background:${roll.rollColorStart || '#0dd4d9'};border:1px solid rgba(0,0,0,0.18);vertical-align:middle;flex-shrink:0"></span>`, label: '시작 색상 변경', action: () => openIbCalloutRollColorPicker(blockId, ibId, itemId, roll.id, 'rollColorStart', cid, document.querySelector(previewSelector)) },
-    { icon: `<span style="display:inline-block;width:10px;height:10px;border-radius:999px;background:${roll.rollColorEnd || '#fb8d5c'};border:1px solid rgba(0,0,0,0.18);vertical-align:middle;flex-shrink:0"></span>`, label: '끝 색상 변경', action: () => openIbCalloutRollColorPicker(blockId, ibId, itemId, roll.id, 'rollColorEnd', cid, document.querySelector(previewSelector)) },
-    { sep: true },
-    { heading: '결과 타입 추가' },
-    { icon: '✓', label: '성공 추가', color: getRollResultTypeMeta('success').color, action: () => addIbCalloutRollResult(blockId, ibId, itemId, roll.id, 'success', cid) },
-    { icon: '×', label: '실패 추가', color: getRollResultTypeMeta('fail').color, action: () => addIbCalloutRollResult(blockId, ibId, itemId, roll.id, 'fail', cid) },
-    { icon: '−', label: '기타 추가', color: getRollResultTypeMeta('other').color, action: () => addIbCalloutRollResult(blockId, ibId, itemId, roll.id, 'other', cid) },
-  ];
-}
 function openIbRollItemCtxMenu(e, blockId, ibId, itemId, cid) {
   e.preventDefault();
   e.stopPropagation();
@@ -18971,19 +18957,6 @@ function getIbCalloutRoll(blockId, ibId, itemId, rollRef) {
 function getIbCalloutRollById(blockId, ibId, itemId, rollId) {
   return getIbCalloutRoll(blockId, ibId, itemId, rollId);
 }
-function moveIbCalloutBodyRow(blockId, ibId, itemId, rowType, rowId, dir, cid) {
-  const item = getIbItemByIds(blockId, ibId, itemId);
-  if (!item || item.type !== 'callout') return false;
-  const rows = normalizeIbCalloutBodyOrder(item);
-  const idx = rows.findIndex(row => row.type === rowType && row.id === rowId);
-  if (idx < 0) return false;
-  const nextIdx = dir === 'up' ? idx - 1 : dir === 'down' ? idx + 1 : -1;
-  if (nextIdx < 0 || nextIdx >= rows.length) return false;
-  [rows[idx], rows[nextIdx]] = [rows[nextIdx], rows[idx]];
-  persist();
-  renderBlocks(cur().blocks, cid || 'blocks-container');
-  return true;
-}
 function addIbCalloutRoll(blockId, ibId, itemId, cid) {
   const item = getIbItemByIds(blockId, ibId, itemId);
   if (!item || item.type !== 'callout') return;
@@ -18994,19 +18967,6 @@ function addIbCalloutRoll(blockId, ibId, itemId, cid) {
   persist();
   renderBlocks(cur().blocks, cid || 'blocks-container');
   focusBlockAfterRender(nr.id);
-}
-function delIbCalloutRoll(blockId, ibId, itemId, rollId, cid) {
-  const { item, rollIdx } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  if (!item || rollIdx < 0 || !Array.isArray(item.nestedRolls)) return;
-  item.nestedRolls.splice(rollIdx, 1);
-  normalizeIbCalloutBodyOrder(item);
-  persist();
-  renderBlocks(cur().blocks, cid || 'blocks-container');
-}
-function moveIbCalloutRoll(blockId, ibId, itemId, rollId, dir, cid) {
-  const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  if (!roll) return;
-  moveIbCalloutBodyRow(blockId, ibId, itemId, 'roll', roll.id, dir, cid);
 }
 function addIbNestedCallout(blockId, ibId, itemId, cid) {
   const item = getIbItemByIds(blockId, ibId, itemId);
@@ -19019,114 +18979,6 @@ function addIbNestedCallout(blockId, ibId, itemId, cid) {
   persist();
   renderBlocks(cur().blocks, cid || 'blocks-container');
   focusBlockAfterRender(nc.id);
-}
-function updIbCalloutRoll(blockId, ibId, itemId, rollId, field, val) {
-  const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  if (!roll) return;
-  roll[field] = val;
-}
-function addIbCalloutRollResult(blockId, ibId, itemId, rollId, type, cid) {
-  const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  if (!roll) return;
-  roll.rollResults.push({ id: mkId(), type, label: getRollResultTypeMeta(type).label, content: '', css: '' });
-  persist();
-  renderBlocks(cur().blocks, cid || 'blocks-container');
-}
-function delIbCalloutRollResult(blockId, ibId, itemId, rollId, ri, cid) {
-  const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  if (!roll || !Array.isArray(roll.rollResults)) return;
-  roll.rollResults.splice(ri, 1);
-  persist();
-  renderBlocks(cur().blocks, cid || 'blocks-container');
-}
-function updIbCalloutRollResult(blockId, ibId, itemId, rollId, ri, val) {
-  const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  if (!roll || !roll.rollResults?.[ri]) return;
-  roll.rollResults[ri].content = normalizeEditableHtml(val);
-}
-function editIbCalloutRollResultLabel(blockId, ibId, itemId, rollId, ri, el, cid) {
-  const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  const result = roll?.rollResults?.[ri] || null;
-  if (!result || !el || el.dataset.editing === 'true') return;
-  if ((cid || 'blocks-container') === 'blocks-container') selectBlock(blockId);
-  const fallback = getRollResultTypeMeta(result.type).label;
-  const originalText = (el.textContent || (result.label || '') || fallback).replace(/\s+/g, ' ').trim() || fallback;
-  const finish = (cancel = false) => {
-    if (el.dataset.editing !== 'true') return;
-    const nextText = cancel ? originalText : ((el.textContent || '').replace(/\s+/g, ' ').trim() || fallback);
-    const nextStoredValue = nextText === fallback ? '' : nextText;
-    const prevStoredValue = typeof result.label === 'string' ? result.label : '';
-    el.textContent = nextText;
-    el.removeAttribute('contenteditable');
-    el.dataset.editing = 'false';
-    el.classList.remove('editing');
-    el.removeEventListener('keydown', onKeyDown);
-    el.removeEventListener('blur', onBlur);
-    if (!cancel && prevStoredValue !== nextStoredValue) { result.label = nextStoredValue; persist(); }
-  };
-  const onKeyDown = event => {
-    if (event.key === 'Enter') { event.preventDefault(); el.blur(); return; }
-    if (event.key === 'Escape') { event.preventDefault(); finish(true); el.blur(); }
-  };
-  const onBlur = () => finish(false);
-  el.dataset.editing = 'true';
-  el.setAttribute('contenteditable', 'true');
-  el.spellcheck = false;
-  el.classList.add('editing');
-  el.addEventListener('keydown', onKeyDown);
-  el.addEventListener('blur', onBlur);
-  lastFocusedTA = el;
-  el.focus();
-  setTimeout(() => selectEditableContents(el), 0);
-}
-function openIbCalloutRollCtxMenu(e, blockId, ibId, itemId, rollId, cid) {
-  e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation?.();
-  if ((cid || 'blocks-container') === 'blocks-container') selectBlock(blockId);
-  const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  if (!roll) return false;
-  const items = [
-    { icon: '↑', label: '위로 이동', action: () => moveIbCalloutRoll(blockId, ibId, itemId, roll.id, 'up', cid) },
-    { icon: '↓', label: '아래로 이동', action: () => moveIbCalloutRoll(blockId, ibId, itemId, roll.id, 'down', cid) },
-    { sep: true },
-    ...buildIbCalloutRollCtxMenu(blockId, ibId, itemId, roll.id, cid),
-    { sep: true },
-    { icon: '✕', label: '판정 삭제', action: () => delIbCalloutRoll(blockId, ibId, itemId, roll.id, cid), danger: true },
-  ];
-  tbShowCtxMenu(e.clientX, e.clientY, items);
-  return false;
-}
-function openIbCalloutRollResultCtxMenu(e, blockId, ibId, itemId, rollId, ri, cid) {
-  const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  if (!roll || !roll.rollResults?.[ri]) return true;
-  e.preventDefault(); e.stopPropagation();
-  const result = roll.rollResults[ri];
-  const typeItems = [
-    { type: 'success', icon: '✓', label: '성공' },
-    { type: 'fail', icon: '×', label: '실패' },
-    { type: 'other', icon: '−', label: '기타' },
-  ].map(typeItem => ({
-    icon: typeItem.icon,
-    label: typeItem.label + (result.type === typeItem.type ? ' ✓' : ''),
-    color: getRollResultTypeMeta(typeItem.type).color,
-    action: () => {
-      if (result.type !== typeItem.type) {
-        const prevDefault = getRollResultTypeMeta(result.type).label;
-        const hasCustomLabel = !!result.label.trim() && result.label.trim() !== prevDefault;
-        result.type = typeItem.type;
-        if (!hasCustomLabel) result.label = '';
-        persist();
-        renderBlocks(cur().blocks, cid || 'blocks-container');
-      }
-    }
-  }));
-  const items = [
-    { heading: '타입 변경' },
-    ...typeItems,
-    { sep: true },
-    { icon: '✕', label: '결과 삭제', action: () => delIbCalloutRollResult(blockId, ibId, itemId, roll.id, ri, cid), danger: true },
-  ];
-  tbShowCtxMenu(e.clientX, e.clientY, items);
-  return false;
 }
 function insertBranchInnerBlockAt(blockId, innerBlock, cid, insertAfterId = '') {
   const b = getBranchBlockById(blockId); if (!b) return null;
