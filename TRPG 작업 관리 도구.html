@@ -7053,14 +7053,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
                 <div class="info-title-preview" id="i-title-preview" style="display:none" onclick="focusInfoTitleInput()" oncontextmenu="return openTitleCssCtxMenu(event)" title="클릭하여 편집"></div>
                 <span class="info-title-css-badge" id="i-title-css-badge" title="CSS 서식 적용됨 (클릭하여 편집)" style="display:none" onclick="openInfoTitleCssPanel()">✦</span>
               </div>
-              <div class="info-title-css-panel" id="info-title-css-panel">
-                <div class="btcp-label">수정 CSS 매크로</div>
-                <textarea class="btcp-textarea" id="info-title-css-ta" placeholder="font-weight:bold; color:#cc0000;" spellcheck="false" oninput="btcpAutoResize(this)"></textarea>
-                <div class="btcp-footer">
-                  <button class="btcp-remove" type="button" onmousedown="event.preventDefault()" onclick="applyInfoTitleCss(true)">서식 제거</button>
-                  <button class="btcp-apply" type="button" onmousedown="event.preventDefault()" onclick="applyInfoTitleCss(false)">적용</button>
-                </div>
-              </div>
+              <div class="info-title-css-panel css-macro-field" id="info-title-css-panel"></div>
               <input class="info-subtitle-input" id="i-subtitle" placeholder="부제" oninput="syncInfo()">
               <input class="info-subtitle-input" id="i-writer" placeholder="라이터" oninput="syncInfo()" style="margin-top:4px">
             </div>
@@ -11052,10 +11045,8 @@ function loadInfo(s) {
   const ph = document.getElementById('card-placeholder');
   if (s.info.sessionCard) { img.src = s.info.sessionCard; img.style.display=''; ph.style.display='none'; }
   else { img.style.display='none'; ph.style.display=''; }
-  const titleCssTa = document.getElementById('info-title-css-ta');
   const titleCssPanel = document.getElementById('info-title-css-panel');
-  if (titleCssTa) titleCssTa.value = s.info?.titleCss || '';
-  if (titleCssPanel) titleCssPanel.classList.remove('open');
+  if (titleCssPanel) { titleCssPanel.classList.remove('open'); if (titleCssPanel._cmf) cssMacroField.sync(titleCssPanel); }
   updateInfoTitlePreview();
   updateInfoGridByRule();
   if (repairedAny) persist();
@@ -11212,34 +11203,21 @@ function openTitleCssCtxMenu(e) {
   tbShowCtxMenu(e.clientX, e.clientY, items);
   return false;
 }
-function openInfoTitleCssPanel() {
-  const panel = document.getElementById('info-title-css-panel');
-  const ta = document.getElementById('info-title-css-ta');
-  if (!panel || !ta) return;
-  const s = cur(); if (!s) return;
-  const isOpen = panel.classList.contains('open');
-  if (!isOpen) {
-    ta.value = s.info?.titleCss || '';
-    panel.classList.add('open');
-    requestAnimationFrame(() => { btcpAutoResize(ta); ta.focus(); });
-  } else {
-    panel.classList.remove('open');
-  }
+function ensureInfoTitleCssMounted() {
+  const host = document.getElementById('info-title-css-panel');
+  if (!host || host._cmf) return host;
+  cssMacroField.mount(host, {
+    get: () => cur()?.info?.titleCss || '',
+    set: v => { const s = cur(); if (!s) return; if (!s.info) s.info = {}; s.info.titleCss = v; },
+    save: () => { persist(); updateInfoTitlePreview(); updateBodyTitlePreview(); },
+    badge: document.getElementById('i-title-css-badge'),
+  });
+  return host;
 }
-function applyInfoTitleCss(remove) {
-  const s = cur(); if (!s) return;
-  if (!s.info) s.info = {};
-  if (remove) {
-    s.info.titleCss = '';
-  } else {
-    const ta = document.getElementById('info-title-css-ta');
-    s.info.titleCss = ta ? ta.value.trim() : '';
-  }
-  persist();
-  updateInfoTitlePreview();
-  updateBodyTitlePreview();
-  const panel = document.getElementById('info-title-css-panel');
-  if (panel) panel.classList.remove('open');
+function openInfoTitleCssPanel() {
+  if (!cur()) return;
+  const host = ensureInfoTitleCssMounted();
+  if (host) cssMacroField.toggle(host);
 }
 function syncInfo(options = {}) {
   const s = cur(); if (!s) return;
