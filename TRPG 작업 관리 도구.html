@@ -18637,22 +18637,6 @@ function openIbRollColorPicker(blockId, ibId, itemId, key, cid, preview) {
   };
   cpOpenPanel(key, item[key], { centered: true });
 }
-function openIbCalloutRollColorPicker(blockId, ibId, itemId, rollId, key, cid, preview) {
-  const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  if (!roll) return;
-  cpTarget = {
-    type: 'ib-callout-roll',
-    blockId,
-    ibId,
-    itemId,
-    rollId,
-    key,
-    cid,
-    preview,
-    originalColor: roll[key],
-  };
-  cpOpenPanel(key, roll[key], { centered: true });
-}
 function buildIbRollCtxMenu(blockId, ibId, itemId, cid) {
   const { item } = getIbRollItem(blockId, ibId, itemId);
   if (!item) return [];
@@ -22379,9 +22363,6 @@ function getEmbeddedColorTargetBlock(target = cpTarget) {
   if (target.type === 'ib-roll') {
     return getIbRollItem(target.blockId, target.ibId, target.itemId).item || null;
   }
-  if (target.type === 'ib-callout-roll') {
-    return getIbCalloutRoll(target.blockId, target.ibId, target.itemId, target.rollId || target.nrIdx).roll || null;
-  }
   if (target.type === 'branch-inner-roll') {
     const block = getBranchBlockById(target.blockId);
     const innerBlock = (block?.innerBlocks || []).find(item => item.id === target.ibId) || null;
@@ -22405,7 +22386,7 @@ function cpPreviewCurrentColor() {
     applyRollPreviewColors({ ...block, [cpTarget.key]: cpGetCurrentColor() }, cpTarget.preview);
     return;
   }
-  if (cpTarget.type === 'ib-roll' || cpTarget.type === 'ib-callout-roll' || cpTarget.type === 'branch-inner-roll') {
+  if (cpTarget.type === 'ib-roll' || cpTarget.type === 'branch-inner-roll') {
     const block = getEmbeddedColorTargetBlock(cpTarget);
     if (!block) return;
     applyRollPreviewColors({ ...block, [cpTarget.key]: cpGetCurrentColor() }, cpTarget.preview);
@@ -22502,7 +22483,7 @@ function closeColorPanel(options = {}) {
       if (cpTarget.type === 'roll') applyRollPreviewColors(block, cpTarget.preview);
     }
   }
-  if ((cpTarget?.type === 'ib-roll' || cpTarget?.type === 'ib-callout-roll' || cpTarget?.type === 'branch-inner-roll') && !apply) {
+  if ((cpTarget?.type === 'ib-roll' || cpTarget?.type === 'branch-inner-roll') && !apply) {
     const block = getEmbeddedColorTargetBlock(cpTarget);
     if (block) applyRollPreviewColors(block, cpTarget.preview);
   }
@@ -22531,18 +22512,14 @@ function applyColorPanel() {
     document.getElementById('cp-native').value = '#000000';
     return;
   }
-  if (cpTarget?.type === 'ib-roll' || cpTarget?.type === 'ib-callout-roll' || cpTarget?.type === 'branch-inner-roll') {
+  if (cpTarget?.type === 'ib-roll' || cpTarget?.type === 'branch-inner-roll') {
     const block = getEmbeddedColorTargetBlock(cpTarget);
     if (block) {
       block[cpTarget.key] = color;
       applyRollPreviewColors(block, cpTarget.preview);
-      if (cpTarget.type === 'ib-callout-roll') {
-        commitScenarioHistory(`ib-callout-roll-color:${cpTarget.blockId}:${cpTarget.itemId}:${cpTarget.rollId || cpTarget.nrIdx}:${cpTarget.key}`, { force: true });
-      } else {
-        const keyPrefix = cpTarget.type === 'ib-roll' ? 'ib-roll-color' : 'branch-roll-color';
-        const targetId = cpTarget.type === 'ib-roll' ? cpTarget.itemId : cpTarget.ibId;
-        commitScenarioHistory(`${keyPrefix}:${cpTarget.blockId}:${targetId}:${cpTarget.key}`, { force: true });
-      }
+      const keyPrefix = cpTarget.type === 'ib-roll' ? 'ib-roll-color' : 'branch-roll-color';
+      const targetId = cpTarget.type === 'ib-roll' ? cpTarget.itemId : cpTarget.ibId;
+      commitScenarioHistory(`${keyPrefix}:${cpTarget.blockId}:${targetId}:${cpTarget.key}`, { force: true });
     }
     closeColorPanel({ apply: true });
     document.getElementById('cp-native').value = '#000000';
