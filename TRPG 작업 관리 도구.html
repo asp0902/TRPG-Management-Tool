@@ -16037,14 +16037,7 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
             <span class="ending-css-badge ${ending.conditionCss ? 'active' : ''}" title="CSS 서식 편집" onmousedown="event.preventDefault()" onclick="event.stopPropagation();toggleEndingCssPanel('${ending.id}','condition',this)">✦</span>
           </div>
           <div class="block-ce" contenteditable="true" data-field="condition" data-ph="엔딩 달성 조건" oninput="updEnding('${ending.id}','condition',this.innerHTML,'${cid}')" oncontextmenu="return openEndingFieldCtxMenu(event,'${ending.id}','condition','${cid}')" spellcheck="false"></div>
-          <div class="ending-css-panel">
-            <div class="btcp-label">수정 CSS 매크로</div>
-            <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;" oninput="btcpAutoResize(this)">${esc(ending.conditionCss||'')}</textarea>
-            <div class="btcp-footer">
-              <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyEndingCss('${ending.id}','condition',this,true,'${cid}')">서식 제거</button>
-              <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyEndingCss('${ending.id}','condition',this,false,'${cid}')">적용</button>
-            </div>
-          </div>
+          <div class="css-macro-field" data-cmf-ending-field="condition"></div>
         </div>
         <div class="ending-field ending-content-field">
           <div class="ending-field-label-row">
@@ -16058,14 +16051,7 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
             <span class="ending-css-badge ${ending.rewardCss ? 'active' : ''}" title="CSS 서식 편집" onmousedown="event.preventDefault()" onclick="event.stopPropagation();toggleEndingCssPanel('${ending.id}','reward',this)">✦</span>
           </div>
           <div class="block-ce" contenteditable="true" data-field="reward" data-ph="보상 내용" oninput="updEnding('${ending.id}','reward',this.innerHTML,'${cid}')" oncontextmenu="return openEndingFieldCtxMenu(event,'${ending.id}','reward','${cid}')" spellcheck="false"></div>
-          <div class="ending-css-panel">
-            <div class="btcp-label">수정 CSS 매크로</div>
-            <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;" oninput="btcpAutoResize(this)">${esc(ending.rewardCss||'')}</textarea>
-            <div class="btcp-footer">
-              <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyEndingCss('${ending.id}','reward',this,true,'${cid}')">서식 제거</button>
-              <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyEndingCss('${ending.id}','reward',this,false,'${cid}')">적용</button>
-            </div>
-          </div>
+          <div class="css-macro-field" data-cmf-ending-field="reward"></div>
         </div>
         <div class="ending-field">
           <div class="ending-field-label-row">
@@ -16073,19 +16059,23 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
             <span class="ending-css-badge ${ending.aftermathCss ? 'active' : ''}" title="CSS 서식 편집" onmousedown="event.preventDefault()" onclick="event.stopPropagation();toggleEndingCssPanel('${ending.id}','aftermath',this)">✦</span>
           </div>
           <div class="block-ce" contenteditable="true" data-field="aftermath" data-ph="후일담" oninput="updEnding('${ending.id}','aftermath',this.innerHTML,'${cid}')" oncontextmenu="return openEndingFieldCtxMenu(event,'${ending.id}','aftermath','${cid}')" spellcheck="false"></div>
-          <div class="ending-css-panel">
-            <div class="btcp-label">수정 CSS 매크로</div>
-            <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;" oninput="btcpAutoResize(this)">${esc(ending.aftermathCss||'')}</textarea>
-            <div class="btcp-footer">
-              <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyEndingCss('${ending.id}','aftermath',this,true,'${cid}')">서식 제거</button>
-              <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyEndingCss('${ending.id}','aftermath',this,false,'${cid}')">적용</button>
-            </div>
-          </div>
+          <div class="css-macro-field" data-cmf-ending-field="aftermath"></div>
         </div>
       </div>
     </div>
     <div class="block-actions"></div>`;
   populateCE(el, ending);
+  // CSS 매크로 필드 (deep module) — 달성조건/보상/후일담 각 필드
+  el.querySelectorAll('.ending-field > .css-macro-field[data-cmf-ending-field]').forEach(host => {
+    const field = host.dataset.cmfEndingField;
+    const badge = host.closest('.ending-field')?.querySelector('.ending-css-badge');
+    cssMacroField.mount(host, {
+      get: () => (getEndingBlockById(ending.id, cid)?.[field + 'Css']) || '',
+      set: v => { const en = getEndingBlockById(ending.id, cid); if (en) en[field + 'Css'] = v; },
+      save: () => commitBlockTreeChange(`ending:${ending.id}:${field}Css`, cid, { force: true }),
+      badge,
+    });
+  });
   const actionsDiv = el.querySelector('.block-actions');
   if (actionsDiv) {
     const delBtn = document.createElement('button');
@@ -17256,30 +17246,9 @@ function openEndingFieldCtxMenu(e, endingId, field, cid = 'blocks-container') {
   return false;
 }
 function toggleEndingCssPanel(endingId, field, badgeEl) {
-  const panel = badgeEl.closest('.ending-field').querySelector('.ending-css-panel');
-  if (!panel) return;
-  const isOpen = panel.style.display === 'flex';
-  document.querySelectorAll('.roll-result-css-panel, .ending-css-panel, .branch-ib-css-panel, .branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, .ib-roll-css-panel, .ib-roll-result-css-panel').forEach(p => { p.style.display = 'none'; });
-  if (!isOpen) {
-    panel.style.display = 'flex';
-    ensureCssMacroPickerButtonInCssPanel(panel);
-    const ta = panel.querySelector('.btcp-textarea');
-    btcpAutoResize(ta);
-    ta.focus();
-  }
-}
-function applyEndingCss(endingId, field, btn, remove, cid = 'blocks-container') {
-  const ending = getEndingBlockById(endingId, cid);
-  if (!ending) return;
-  const panel = btn.closest('.ending-css-panel');
-  const ta = panel.querySelector('.btcp-textarea');
-  const val = remove ? '' : ta.value.trim();
-  if (remove) ta.value = '';
-  ending[field + 'Css'] = val;
-  const badge = panel.closest('.ending-field').querySelector('.ending-css-badge');
-  if (badge) badge.classList.toggle('active', !!val);
-  panel.style.display = 'none';
-  commitBlockTreeChange(`ending:${endingId}:${field}Css`, cid, { force: true });
+  // deep module로 위임 — 각 .ending-field의 .css-macro-field host를 토글
+  const host = badgeEl.closest('.ending-field')?.querySelector('.css-macro-field');
+  if (host) cssMacroField.toggle(host);
 }
 function updBranch(blockId, branchId, key, val) {
   const s = cur(); if (!s) return;
