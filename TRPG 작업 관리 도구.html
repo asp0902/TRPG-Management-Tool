@@ -12636,8 +12636,9 @@ function getBibItemHtml(blockId, ibId, item, idx, total, cid) {
             const nc = (item.nestedCallouts || []).find(n => n.id === row.id);
             return nc ? mkSubNestedCalloutHtml(blockId, item.id, nc, rowIdx, rows.length) : '';
           }
-          const roll = (item.nestedRolls || []).find(nr => nr.id === row.id);
-          return roll ? getIbCalloutNestedRollHtml(blockId, ibId, item.id, roll, row.id, rowIdx, rows.length, cid) : '';
+          // row.type === 'roll' 은 도달 불가: migrateLegacyIbCalloutRowsToGenericChildren가
+          // 렌더 전 nestedRolls를 generic children으로 옮기고 비운다.
+          return '';
         }).join('')}
       </div>
     </div>`;
@@ -12718,55 +12719,6 @@ function getBibItemHtml(blockId, ibId, item, idx, total, cid) {
     </div>`;
   }
   return '';
-}
-function getIbCalloutNestedRollHtml(blockId, ibId, itemId, roll, rollId, orderIdx, totalRows, cid) {
-  if (!roll) return '';
-  normalizeEmbeddedRollBlock(roll);
-  const canUp = orderIdx > 0, canDown = orderIdx < totalRows - 1;
-  const clsMap = { success: 'bib-sub-success', fail: 'bib-sub-fail', other: 'bib-sub-other' };
-  const rr = roll.rollResults;
-  return `<div class="nested-callout-roll-wrap" data-roll-id="${rollId}" data-row-idx="${orderIdx}">
-    <div class="bib-sub-block bib-sub-block-roll" oncontextmenu="return openIbCalloutRollCtxMenu(event,'${blockId}','${ibId}','${itemId}','${rollId}','${cid}')" style="--roll-start:${esc(roll.rollColorStart)};--roll-end:${esc(roll.rollColorEnd)};">
-      <div class="bib-roll-header" style="--roll-start:${esc(roll.rollColorStart)};--roll-end:${esc(roll.rollColorEnd)};">
-        <div class="bib-roll-target" contenteditable="true" data-ib-id="${ibId}" data-item-id="${itemId}" data-roll-id="${rollId}" data-nr-field="target" data-ph="판정 대상" oninput="updIbCalloutRoll('${blockId}','${ibId}','${itemId}','${rollId}','target',this.innerHTML)" spellcheck="false"></div>
-        <div class="bib-roll-skill" contenteditable="true" data-ib-id="${ibId}" data-item-id="${itemId}" data-roll-id="${rollId}" data-nr-field="content" data-ph="판정 기능치" oninput="updIbCalloutRoll('${blockId}','${ibId}','${itemId}','${rollId}','content',this.innerHTML)" spellcheck="false"></div>
-      </div>
-      <div class="bib-item-roll-floating-actions">
-        <button class="branch-inner-block-act" title="위로 이동" onmousedown="event.preventDefault()" onclick="moveIbCalloutRoll('${blockId}','${ibId}','${itemId}','${rollId}','up','${cid}')" ${canUp?'':'disabled'}>↑</button>
-        <button class="branch-inner-block-act" title="아래로 이동" onmousedown="event.preventDefault()" onclick="moveIbCalloutRoll('${blockId}','${ibId}','${itemId}','${rollId}','down','${cid}')" ${canDown?'':'disabled'}>↓</button>
-        <span class="branch-inner-block-act branch-inner-css-badge ${roll.css ? 'active' : ''}" title="CSS 서식 편집" onmousedown="event.preventDefault()" onclick="toggleIbCalloutRollCssPanel('${blockId}','${ibId}','${itemId}','${rollId}',this)">✦</span>
-        <button class="branch-inner-block-act del" title="삭제" onmousedown="event.preventDefault()" onclick="delIbCalloutRoll('${blockId}','${ibId}','${itemId}','${rollId}','${cid}')">✕</button>
-      </div>
-      <div class="bib-roll-results">
-        ${rr.map((r, ri) => `<div class="bib-roll-result ${clsMap[r.type]||'bib-sub-other'}" data-nr-result-id="${r.id}">
-          <div class="bib-roll-result-head">
-            <div class="bib-roll-result-label" onclick="event.stopPropagation();editIbCalloutRollResultLabel('${blockId}','${ibId}','${itemId}','${rollId}',${ri},this,'${cid}')">${esc((r.label||'').trim()||getRollResultTypeMeta(r.type).label)}</div>
-            <div class="bib-roll-result-actions">
-              <span class="branch-inner-block-act branch-inner-css-badge ${r.css ? 'active' : ''}" title="CSS 서식 편집" onmousedown="event.preventDefault()" onclick="event.stopPropagation();toggleIbCalloutRollResultCssPanel('${blockId}','${ibId}','${itemId}','${rollId}',${ri},this)">✦</span>
-              <button type="button" class="bib-roll-result-del" onmousedown="event.preventDefault()" onclick="event.stopPropagation();delIbCalloutRollResult('${blockId}','${ibId}','${itemId}','${rollId}',${ri},'${cid}')" title="삭제">✕</button>
-            </div>
-          </div>
-          <div class="bib-roll-result-ce" contenteditable="true" data-ib-id="${ibId}" data-item-id="${itemId}" data-roll-id="${rollId}" data-nr-ri="${ri}" data-ph="내용을 입력하세요" oninput="updIbCalloutRollResult('${blockId}','${ibId}','${itemId}','${rollId}',${ri},this.innerHTML)" oncontextmenu="return openIbCalloutRollResultCtxMenu(event,'${blockId}','${ibId}','${itemId}','${rollId}',${ri},'${cid}')" spellcheck="false"></div>
-          <div class="ib-roll-result-css-panel" style="display:none">
-            <div class="btcp-label">수정 CSS 매크로</div>
-            <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(r.css||'')}</textarea>
-            <div class="btcp-footer">
-              <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyIbCalloutRollResultCss('${blockId}','${ibId}','${itemId}','${rollId}',${ri},this,true)">서식 제거</button>
-              <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyIbCalloutRollResultCss('${blockId}','${ibId}','${itemId}','${rollId}',${ri},this,false)">적용</button>
-            </div>
-          </div>
-        </div>`).join('')}
-      </div>
-      <div class="ib-roll-css-panel" style="display:none">
-        <div class="btcp-label">수정 CSS 매크로</div>
-        <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(roll.css||'')}</textarea>
-        <div class="btcp-footer">
-          <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyIbCalloutRollCss('${blockId}','${ibId}','${itemId}','${rollId}',this,true)">서식 제거</button>
-          <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyIbCalloutRollCss('${blockId}','${ibId}','${itemId}','${rollId}',this,false)">적용</button>
-        </div>
-      </div>
-    </div>
-  </div>`;
 }
 function getBranchBlockHtml(block, cid) {
   const branchBlock = normalizeBranchBlock(block);
@@ -19127,47 +19079,6 @@ function editIbCalloutRollResultLabel(blockId, ibId, itemId, rollId, ri, el, cid
   el.focus();
   setTimeout(() => selectEditableContents(el), 0);
 }
-function toggleIbCalloutRollCssPanel(blockId, ibId, itemId, rollId, badgeEl) {
-  const panel = badgeEl.closest('.bib-sub-block-roll')?.querySelector('.ib-roll-css-panel');
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  document.querySelectorAll('.roll-result-css-panel, .branch-ib-css-panel, .branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, .ib-roll-css-panel, .ib-roll-result-css-panel').forEach(p => { p.style.display = 'none'; });
-  if (!isOpen) { panel.style.display = 'flex'; ensureCssMacroPickerButtonInCssPanel(panel); const ta = panel.querySelector('.btcp-textarea'); btcpAutoResize(ta); ta.focus(); }
-}
-function applyIbCalloutRollCss(blockId, ibId, itemId, rollId, btn, remove) {
-  const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  if (!roll) return;
-  const panel = btn.closest('.ib-roll-css-panel');
-  const ta = panel?.querySelector('.btcp-textarea');
-  const val = remove ? '' : (ta?.value || '').trim();
-  if (remove && ta) ta.value = '';
-  roll.css = val;
-  const badge = panel?.closest('.bib-sub-block-roll')?.querySelector('.branch-inner-css-badge');
-  if (badge) badge.classList.toggle('active', !!val);
-  if (panel) panel.style.display = 'none';
-  persist();
-}
-function toggleIbCalloutRollResultCssPanel(blockId, ibId, itemId, rollId, ri, badgeEl) {
-  const panel = badgeEl.closest('.bib-roll-result')?.querySelector('.ib-roll-result-css-panel');
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  document.querySelectorAll('.roll-result-css-panel, .branch-ib-css-panel, .branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, .ib-roll-css-panel, .ib-roll-result-css-panel').forEach(p => { p.style.display = 'none'; });
-  if (!isOpen) { panel.style.display = 'flex'; ensureCssMacroPickerButtonInCssPanel(panel); const ta = panel.querySelector('.btcp-textarea'); btcpAutoResize(ta); ta.focus(); }
-}
-function applyIbCalloutRollResultCss(blockId, ibId, itemId, rollId, ri, btn, remove) {
-  const { roll } = getIbCalloutRoll(blockId, ibId, itemId, rollId);
-  if (!roll || !roll.rollResults?.[ri]) return;
-  const result = roll.rollResults[ri];
-  const panel = btn.closest('.ib-roll-result-css-panel');
-  const ta = panel?.querySelector('.btcp-textarea');
-  const val = remove ? '' : (ta?.value || '').trim();
-  if (remove && ta) ta.value = '';
-  result.css = val;
-  const badge = panel?.closest('.bib-roll-result')?.querySelector('.branch-inner-css-badge');
-  if (badge) badge.classList.toggle('active', !!val);
-  if (panel) panel.style.display = 'none';
-  persist();
-}
 function openIbCalloutRollCtxMenu(e, blockId, ibId, itemId, rollId, cid) {
   e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation?.();
   if ((cid || 'blocks-container') === 'blocks-container') selectBlock(blockId);
@@ -19998,42 +19909,6 @@ function addSubNestedCallout(blockId, ncId) {
   commitScenarioHistory(`subnc:${blockId}:${ncId}:${sub.id}:add`, { force: true });
   renderBlocks(cur().blocks, 'blocks-container');
   focusNestedCalloutAfterRender(blockId, ncId, sub.id);
-}
-function addNestedSpeech(blockId) {
-  const b = getCalloutBlockById(blockId); if (!b) return;
-  const arr = normalizeCalloutNestedItems(b);
-  const prevLength = arr.length;
-  const prevSlot = getCalloutContentSlot(b, prevLength);
-  const item = {
-    id: mkId(),
-    type: 'speech',
-    speaker: DEFAULT_SPEAKER_NAME,
-    speakerColor: DEFAULT_SPEECH_COLOR,
-    content: '',
-    css: '',
-  };
-  arr.push(item);
-  if (prevSlot === prevLength) b.nestedContentSlot = prevSlot + 1;
-  commitScenarioHistory(`nested:${blockId}:${item.id}:speech-add`, { force: true });
-  renderBlocks(cur().blocks, 'blocks-container');
-  focusNestedCalloutAfterRender(blockId, item.id);
-}
-function addNestedText(blockId) {
-  const b = getCalloutBlockById(blockId); if (!b) return;
-  const arr = normalizeCalloutNestedItems(b);
-  const prevLength = arr.length;
-  const prevSlot = getCalloutContentSlot(b, prevLength);
-  const item = {
-    id: mkId(),
-    type: 'text',
-    content: '',
-    css: '',
-  };
-  arr.push(item);
-  if (prevSlot === prevLength) b.nestedContentSlot = prevSlot + 1;
-  commitScenarioHistory(`nested:${blockId}:${item.id}:text-add`, { force: true });
-  renderBlocks(cur().blocks, 'blocks-container');
-  focusNestedCalloutAfterRender(blockId, item.id);
 }
 function updCalloutBody(blockId, val, cid) {
   const b = getCalloutBlockById(blockId, cid || 'blocks-container');
