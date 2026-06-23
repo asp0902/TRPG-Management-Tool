@@ -17142,10 +17142,10 @@ function upd(id, key, val, cid = 'blocks-container', options = {}) {
   }
 }
 function getEndingBlockById(endingId, cid = 'blocks-container') {
+  // getGenericBlockById가 해당 cid의 전체 트리를 훑으므로 별도 flat-root 재검색은 불필요.
+  // (옛 fallback은 cur().blocks만 봐서 rb 컨텍스트에선 오히려 잘못된 블록을 줄 수 있었다.)
   const block = getGenericBlockById(endingId, cid);
-  if (block?.type === 'ending') return block;
-  const s = cur();
-  return s?.blocks?.find(x => x?.id === endingId && x.type === 'ending') || null;
+  return block?.type === 'ending' ? block : null;
 }
 function updEnding(id, key, val, cid = 'blocks-container') {
   const e = getEndingBlockById(id, cid);
