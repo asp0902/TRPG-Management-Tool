@@ -45,13 +45,17 @@
 `addNestedSpeech`/`addNestedText` (~9.2KB). 도달 불가를 하네스로 실증 후 제거, 전체 패널
 스위트 회귀 통과.
 
-**⚠️ 남은 고아 (이번엔 미제거 — 체인 추적 필요):** `getIbCalloutNestedRollHtml` 제거로
-`openIbCalloutRollCtxMenu`·`openIbCalloutRollResultCtxMenu`가 호출처를 잃었고, 그에 딸린
-`moveIbCalloutRoll`·`delIbCalloutRoll`·`updIbCalloutRoll`·`updIbCalloutRollResult`·
-`delIbCalloutRollResult`·`editIbCalloutRollResultLabel`도 대부분 고아. **단 주의:**
-`addIbCalloutRoll`·`addIbNestedCallout`·`addIbCalloutRollResult`·`getIbCalloutRoll`은
-**여전히 live**(ib-콜아웃 항목 우클릭 메뉴 `openIbItemCalloutCtxMenu` ~18819, copy/macro 경로
-22531/22791에서 사용)이므로 제거 금지. 고아만 골라내려면 각 함수 참조를 1건씩 재확인할 것.
+**✅ 고아 체인 제거 완료 (03a8be7, ~7.9KB):** `getIbCalloutNestedRollHtml` 제거로 호출처를 잃은
+닫힌 죽은 집합 11개 제거 — `openIbCalloutRoll[Result]CtxMenu`·`buildIbCalloutRollCtxMenu`·
+`moveIbCalloutRoll`·`moveIbCalloutBodyRow`·`delIbCalloutRoll`·`delIbCalloutRollResult`·
+`updIbCalloutRoll`·`updIbCalloutRollResult`·`addIbCalloutRollResult`·`editIbCalloutRollResultLabel`.
+각 함수가 집합 내부/이미 삭제된 코드에서만 참조됨을 1건씩 확인 후 제거(헤드리스 회귀 통과).
+**보존:** `addIbCalloutRoll`·`addIbNestedCallout`(live — `openIbItemCalloutCtxMenu`에서 generic
+children 추가, 동작 검증), `getIbCalloutRoll`·`getIbCalloutRollById`(copy/macro 경로 22531/22791),
+`normalizeIbCalloutBodyOrder`·`getIbCalloutRollIndexById`.
+
+**잔여 tendril(미제거):** `openIbCalloutRollColorPicker`(18640)가 이제 고아(호출처 0). 자체
+색상피커 헬퍼 체인이 있을 수 있어 추적 보류 — 다음 정리 후보.
 
 **미제거(레거시 렌더 유지):** 중첩 대사/텍스트(`mkNestedSpeech/TextHtml`,
 `toggle/applyNestedSpeech·TextCss`)는 `normalizeCalloutNestedItems`가 speech/text를 보존해
