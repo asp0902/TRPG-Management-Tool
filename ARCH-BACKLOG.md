@@ -60,8 +60,8 @@ children 추가, 동작 검증), `getIbCalloutRoll`·`getIbCalloutRollById`(copy
 분기 → live ib-roll/branch-inner-roll 본문으로 축약). live ib-roll·branch-inner-roll 색상피커가
 여전히 색상 적용/커밋함을 헤드리스로 검증. `'ib-callout-roll'` 참조 0.
 
-→ **ib-콜아웃 nested-roll 레거시 잔재 데드코드 정리 전부 완료.** 남은 후속은 중첩 대사/텍스트
-레거시 렌더 제거(옛 nestedCallouts→children 마이그레이션 선행 필요)뿐.
+→ **ib-콜아웃 nested-roll 레거시 잔재 데드코드 정리 전부 완료.** 중첩 대사/텍스트 레거시 렌더 제거도
+**완료**(아래 "데드코드 정리 진행 상황" S1~S4 참조).
 
 **중첩 대사/텍스트 — 재조사: 이미 도달 불가(위험한 마이그 불필요).** 처음엔 레거시 렌더로 판단했으나,
 `normalizeBlockTree`가 매 렌더마다 **모든 콜아웃**에 `migrateLegacyCalloutRowsToGenericChildren`를
@@ -71,13 +71,23 @@ children 추가, 동작 검증), `getIbCalloutRoll`·`getIbCalloutRollById`(copy
 헤드리스 실증: 옛 nestedCallouts(speech/text/callout) 로드 → `.nested-speech-item`/`.nested-text-item`
 0개, children 4개로 이전(내용·화자 보존). **즉 이중 시스템 위험은 이미 해소됨 — 새 마이그 불필요.**
 
-**남은 것 = 순수 데드코드(대형 cascade) 제거 (선택, 별도 작업 권장):**
-`mkNestedCalloutItemHtml`·`mkNestedSpeech/TextHtml`·`mkNestedCalloutHtml`·`mkSubNestedCalloutHtml` +
-그 핸들러(`add/del/move/copyNested*`, `*SubNestedCallout`, `toggle/applyNestedSpeech·TextCss`) +
-루트 콜아웃 렌더의 nestedCallouts 루프(15729-15740) 단순화 + `.nested-speech-item`/`.nested-text-item`
-CSS. `normalizeCalloutNestedItems`는 15729·22624에서 아직 호출되니 호출부까지 정리 필요.
-**15개+ 함수가 얽힌 큰 제거**라 한 세션에서 끊기면 dangling ref 위험 → 전용 세션에서 진행 권장.
-기능적 이득은 없음(무해한 죽은 코드), 파일 크기/복잡도 축소가 목적.
+**✅ 제거 완료 (S1 f01331a, S2 dee852a, S3 ef18324, S4 14ff5d4 — main 머지 d5808da):**
+4개 vertical slice로 분할 제거.
+- **S1** 루트 콜아웃 렌더의 nestedCallouts 루프(15729-15740)를 단일 content slot 렌더로 단순화 +
+  죽은 `populateCE`의 `[data-nc-id]` 경로 제거(유일한 live 진입점 차단 = keystone).
+- **S2** 고아 렌더러 5개(`mkNestedCalloutItemHtml`·`mkNestedSpeech/TextHtml`·`mkNestedCalloutHtml`·
+  `mkSubNestedCalloutHtml`) + 도달 불가 ib-콜아웃 legacy callout-row 분기 제거.
+- **S3** 고아 핸들러 **34개**(`add/del/move/copy/updNested*`, `*SubNestedCallout`,
+  `toggle/applyNestedSpeech·TextCss`, ctx 메뉴, ncSpeech 토큰 클러스터) + `normalizeCalloutNestedItems`
+  와 그 죽은 헬퍼(`moveCalloutBodyLinesToNestedItems`·`expandNestedTextItemLines`·
+  `buildNestedTextItemsFromLines`) 제거. 반복 zero-ref prune + 닫힌-cycle 검증으로 죽음 실증.
+- **S4** `.nested-speech-*`/`.nested-text-*`/`.nested-callouts-wrap` CSS + live JS 셀렉터 문자열의
+  죽은 토큰 제거.
+**보존(live):** `migrateLegacyCalloutRowsToGenericChildren`·`legacyCalloutItemToGenericChild`·
+`splitNestedTextContentLines`·`createIbCalloutNestedChildFromLegacy`·`addIbNestedCallout`·
+`.nested-callout`/`.nested-callout-header`/`.nested-callout-content`·`.callout-content-ce`.
+각 슬라이스 parse-clean + 제거 이름 grep 0 + 하네스 전수 `ERRORS []`로 검증 후 커밋.
+기능적 이득은 없음(무해한 죽은 코드였음), 파일 크기/복잡도 축소가 목적.
 
 > **검증 하네스 (프리뷰 대용, 동작 확인됨):** `playwright-core`(브라우저 다운로드 없이
 > 시스템 Chrome `C:\Program Files\Google\Chrome\Application\chrome.exe` 구동) + `pathToFileURL`
@@ -107,7 +117,8 @@ CSS. `normalizeCalloutNestedItems`는 15729·22624에서 아직 호출되니 호
   / `.branch-inner-block .bib-item-text:has(...)` (5373, *다른 엘리먼트 구조* `.bib-item-text-ce`)
 - **판정결과 자식 padding 보정**: `.roll-result-blocks > .block.block-text.block-child:has(...)`
   (4531 — 위 root 규칙의 컨텍스트 보충)
-- **간격 정리(접기 아님)**: `.callout-body:has(...)` 하단 padding(3269), 빈 `.nested-callouts-wrap` padding(3572)
+- **간격 정리(접기 아님)**: `.callout-body:has(...)` 하단 padding(3269). (빈 `.nested-callouts-wrap`
+  padding 규칙은 중첩-콜아웃 데드코드 제거 S4에서 삭제됨.)
 
 → **단일 셀렉터로 병합 불가**(엘리먼트 클래스·결합자가 다름). 렌더 시 마커 클래스 부여 방식은
 JS가 빈/자식 상태를 추적·동기화해야 해 stale 버그 위험(우리가 계속 고쳐온 류) → 채택 안 함.
@@ -117,8 +128,9 @@ JS가 빈/자식 상태를 추적·동기화해야 해 stale 버그 위험(우�
 헤드리스 computed-style로 접기/펼치기 동작 검증(에러 0). 중첩은 Chrome 120+ 필요(`:has()`는 105+,
 사용자 Chrome 149).
 
-**남김(병합 안 함):** 위 사유로 4531·5373·3269·3572는 그대로 둠. `:has()` 선언적 접근이 옳음
-(자동 갱신). 더 손대면 fragility만 증가.
+**남김(병합 안 함):** 위 사유로 4531·5373·3269는 그대로 둠(3572 `.nested-callouts-wrap` 규칙은 S4에서
+삭제, 3269는 S4에서 죽은 item 셀렉터만 트리밍하고 `.nested-callout` live 부분 유지). `:has()` 선언적
+접근이 옳음(자동 갱신). 더 손대면 fragility만 증가.
 
 ---
 
@@ -151,8 +163,8 @@ JS가 빈/자식 상태를 추적·동기화해야 해 stale 버그 위험(우�
 2. ✅ **후보 5** — 빈-CE 접기 규칙 CSS 중첩 단일화(나머지는 목적이 달라 분리 유지).
 3. ✅ **후보 3** — 이미 통합 상태 확인 + 죽은 fallback 제거.
 
-**남은 선택적 후속:** ib-콜아웃 ctx 메뉴 고아 체인 정리(참조 1건씩 추적), 중첩 대사/텍스트
-레거시 렌더 제거(옛 nestedCallouts→children 마이그레이션 선행 필요).
+**선택적 후속도 완료:** ib-콜아웃 ctx 메뉴 고아 체인 정리(03a8be7), 중첩 대사/텍스트 레거시 렌더
+제거(S1~S4, main 머지 d5808da). → **백로그 전 항목 처리 완료.**
 
 > 제약(코덱스 핸드오프 누적): 무관한 untracked `.claude/*` 되돌리지 말 것 ·
 > 광범위 포맷팅/리팩터 churn 피할 것 · 검증 끝난 것만 커밋 · 한국어 간결(caveman).
