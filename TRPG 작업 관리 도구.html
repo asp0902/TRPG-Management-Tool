@@ -21505,6 +21505,9 @@ function switchTab(tab) {
     updateBodyHeader();
   } else {
     setTocPanelOpen(false);
+    // INFO 패널이 숨겨진 채 loadInfo가 돌면 제목 textarea의 autoResize가 height 0으로 잡혀
+    // 탭 진입 시 제목이 늦게 보인다. 진입 시점에 다시 동기화/리사이즈한다.
+    updateInfoTitlePreview();
   }
   if (currentPage === 'script' && cur()) saveLastScriptView(tab);
 }
