@@ -14923,6 +14923,9 @@ function normalizeRollResult(result) {
     next.blocks = [mkRollResultChild('text', legacyContent)];
   }
   next.blocks = next.blocks.map(normalizeRollResultChild);
+  // body/children과 동일하게 여러 줄 텍스트를 줄(어절 아님, 줄 단위) 블록으로 분리해
+  // "문장 하나 = 기본 블록 하나"가 되게 한다.
+  next.blocks = expandGenericTextChildLines(next.blocks);
   next.blocks = normalizeBlockTree(next.blocks);
 
   if (!next.blocks.length) {
