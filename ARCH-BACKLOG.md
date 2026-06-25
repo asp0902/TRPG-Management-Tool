@@ -63,10 +63,21 @@ children 추가, 동작 검증), `getIbCalloutRoll`·`getIbCalloutRollById`(copy
 → **ib-콜아웃 nested-roll 레거시 잔재 데드코드 정리 전부 완료.** 남은 후속은 중첩 대사/텍스트
 레거시 렌더 제거(옛 nestedCallouts→children 마이그레이션 선행 필요)뿐.
 
-**미제거(레거시 렌더 유지):** 중첩 대사/텍스트(`mkNestedSpeech/TextHtml`,
-`toggle/applyNestedSpeech·TextCss`)는 `normalizeCalloutNestedItems`가 speech/text를 보존해
-옛 `block.nestedCallouts` 데이터에서 **여전히 렌더**됨 → 데드 아님. 제거하려면 먼저 옛
-nestedCallouts speech/text를 generic children으로 옮기는 마이그레이션을 추가해야 함.
+**중첩 대사/텍스트 — 재조사: 이미 도달 불가(위험한 마이그 불필요).** 처음엔 레거시 렌더로 판단했으나,
+`normalizeBlockTree`가 매 렌더마다 **모든 콜아웃**에 `migrateLegacyCalloutRowsToGenericChildren`를
+호출(11885-86)해 `block.nestedCallouts`(speech/text/callout)를 **무손실로 `children`에 옮기고
+`nestedCallouts=[]`로 비운다.** 따라서 루트 콜아웃 렌더의 `normalizeCalloutNestedItems`(15729)는
+항상 빈 배열을 받아 `mkNestedCalloutItemHtml`/`mkNestedSpeech·TextHtml`이 **실행되지 않는다**.
+헤드리스 실증: 옛 nestedCallouts(speech/text/callout) 로드 → `.nested-speech-item`/`.nested-text-item`
+0개, children 4개로 이전(내용·화자 보존). **즉 이중 시스템 위험은 이미 해소됨 — 새 마이그 불필요.**
+
+**남은 것 = 순수 데드코드(대형 cascade) 제거 (선택, 별도 작업 권장):**
+`mkNestedCalloutItemHtml`·`mkNestedSpeech/TextHtml`·`mkNestedCalloutHtml`·`mkSubNestedCalloutHtml` +
+그 핸들러(`add/del/move/copyNested*`, `*SubNestedCallout`, `toggle/applyNestedSpeech·TextCss`) +
+루트 콜아웃 렌더의 nestedCallouts 루프(15729-15740) 단순화 + `.nested-speech-item`/`.nested-text-item`
+CSS. `normalizeCalloutNestedItems`는 15729·22624에서 아직 호출되니 호출부까지 정리 필요.
+**15개+ 함수가 얽힌 큰 제거**라 한 세션에서 끊기면 dangling ref 위험 → 전용 세션에서 진행 권장.
+기능적 이득은 없음(무해한 죽은 코드), 파일 크기/복잡도 축소가 목적.
 
 > **검증 하네스 (프리뷰 대용, 동작 확인됨):** `playwright-core`(브라우저 다운로드 없이
 > 시스템 Chrome `C:\Program Files\Google\Chrome\Application\chrome.exe` 구동) + `pathToFileURL`
