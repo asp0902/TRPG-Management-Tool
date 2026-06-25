@@ -3266,8 +3266,8 @@ body.is-block-range-selecting * {
 /* ─── NEW BLOCK TYPES ─── */
 .label-pill { display: inline-block; color: #fff; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 .callout-body { border-radius: 7px; overflow: visible; width: 100%; display: flow-root; padding-bottom: 0; }
-.callout-body:has(> :is(.nested-callout, .nested-speech-item, .nested-text-item):last-child),
-.callout-body:has(> :is(.nested-callout, .nested-speech-item, .nested-text-item) + .callout-content-ce.collapsed:last-child) {
+.callout-body:has(> .nested-callout:last-child),
+.callout-body:has(> .nested-callout + .callout-content-ce.collapsed:last-child) {
   padding-bottom: 0;
 }
 .callout-info  { background: #f0fdf4; border-left: 3px solid #22c55e; --callout-accent: #22c55e; }
@@ -3337,160 +3337,6 @@ body.is-block-range-selecting * {
 .callout-content-ce:empty::before { content: attr(data-ph); color: #bbb; pointer-events: none; display: block; }
 .callout-body > .nested-callout {
   margin: 10px 12px;
-}
-.callout-body > .nested-speech-item {
-  margin: 6px 10px;
-  padding: 5px 12px;
-  background: rgba(255,255,255,0.8);
-  border-radius: 8px;
-}
-.callout-body > .callout-header + .nested-speech-item,
-.callout-body > .callout-content-ce + .nested-speech-item,
-.callout-body > .nested-callout + .nested-speech-item,
-.callout-body > .nested-speech-item + .nested-callout {
-  margin-top: 5px;
-}
-.callout-body > .callout-header + .nested-speech-item,
-.callout-body > .callout-content-ce + .nested-speech-item {
-  margin-top: 0;
-}
-.callout-body > .nested-text-item {
-  margin-left: 0;
-  margin-right: 0;
-}
-.callout-body > .callout-header + .nested-text-item,
-.callout-body > .callout-content-ce + .nested-text-item {
-  margin-top: 0;
-}
-.callout-body > .nested-callout + .nested-text-item,
-.callout-body > .nested-speech-item + .nested-text-item,
-.callout-body > .nested-text-item + .nested-text-item {
-  margin-top: 0;
-}
-.callout-body > .nested-text-item + .nested-callout,
-.callout-body > .nested-text-item + .nested-speech-item {
-  margin-top: 5px;
-}
-.nested-speech-item {
-  padding: 6px 12px 6px 0;
-  overflow: visible;
-  position: relative;
-}
-.nested-speech-item .speech-row {
-  align-items: center;
-  overflow: visible;
-}
-.nested-speech-item .nested-speech-ce {
-  flex: 1;
-}
-.nested-text-item {
-  padding: 6px 12px 6px 12px;
-  overflow: visible;
-  position: relative;
-}
-.nested-text-item + .nested-text-item {
-  padding-top: 0;
-}
-.nested-text-item .nested-text-row {
-  display: flex;
-  align-items: flex-start;
-  overflow: visible;
-}
-.nested-text-item .nested-text-ce {
-  flex: 1;
-  min-height: 21.5px;
-  height: auto;
-  font-size: 14px;
-}
-.nested-speech-floating-actions {
-  position: absolute;
-  top: -10px;
-  right: 0;
-  display: none;
-  align-items: center;
-  gap: 2px;
-  background: #fff;
-  border: 1px solid #e4e4e4;
-  border-radius: 5px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-  padding: 2px 3px;
-  z-index: 30;
-}
-.nested-speech-item:hover .nested-speech-floating-actions,
-.nested-speech-item:focus-within .nested-speech-floating-actions {
-  display: flex;
-}
-.nested-text-floating-actions {
-  position: absolute;
-  top: -10px;
-  right: 0;
-  display: none;
-  align-items: center;
-  gap: 2px;
-  background: #fff;
-  border: 1px solid #e4e4e4;
-  border-radius: 5px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-  padding: 2px 3px;
-  z-index: 30;
-}
-.nested-text-item:hover .nested-text-floating-actions,
-.nested-text-item:focus-within .nested-text-floating-actions {
-  display: flex;
-}
-.nested-speech-act {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #bbb;
-  padding: 2px 4px;
-  border-radius: 3px;
-  font-size: 12px;
-  line-height: 1;
-  transition: color 0.1s, background 0.1s;
-}
-.nested-speech-act:hover {
-  color: #333;
-  background: rgba(0,0,0,0.04);
-}
-.nested-speech-act:disabled,
-.nested-speech-act:disabled:hover {
-  color: #d6d6d6;
-  cursor: default;
-  background: transparent;
-}
-.nested-speech-act.del:hover { color: #ef4444; background: rgba(239,68,68,0.08); }
-.nested-speech-css-badge.active { color: #1a1a1a; }
-.nested-text-css-badge.active { color: #1a1a1a; }
-.nested-speech-css-panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  width: min(320px, calc(100vw - 48px));
-  padding: 8px 10px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 10px 26px rgba(15,23,42,0.16);
-  display: none;
-  flex-direction: column;
-  gap: 6px;
-  z-index: 35;
-}
-.nested-text-css-panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  width: min(320px, calc(100vw - 48px));
-  padding: 8px 10px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 10px 26px rgba(15,23,42,0.16);
-  display: none;
-  flex-direction: column;
-  gap: 6px;
-  z-index: 35;
 }
 .block-ce :is(p, div),
 .callout-content-ce :is(p, div),
@@ -3568,8 +3414,6 @@ body.is-block-range-selecting * {
   margin-left: auto;
 }
 /* 중첩 콜아웃 */
-.nested-callouts-wrap { display: flex; flex-direction: column; gap: 5px; padding: 0; }
-.nested-callouts-wrap:not(:has(.nested-callout)) { padding: 0; }
 .nested-callout { border-radius: 5px; overflow: hidden; }
 .nested-callout-header {
   display: flex; align-items: center; gap: 6px;
@@ -9848,7 +9692,7 @@ function isBlockRangeStartTarget(target) {
 
   if (el.closest?.(
     'button, select, input, textarea, a, ' +
-    '.block-actions, .branch-inner-block-actions, .nested-speech-floating-actions, .nested-text-floating-actions, ' +
+    '.block-actions, .branch-inner-block-actions, ' +
     '.tb-ctx-menu, .cp-panel, .link-insert-dialog, .block-insert-popup, .speech-edit-popup'
   )) {
     return false;
@@ -9984,10 +9828,10 @@ function isBlockRangeClipboardField(el, blockEl) {
   if (!isBlockRangeVisibleElement(el)) return false;
   if (el.matches('input[type="hidden"], input[type="color"]')) return false;
   if (el.closest?.(
-    '.block-actions, .branch-inner-block-actions, .nested-speech-floating-actions, .nested-text-floating-actions, ' +
+    '.block-actions, .branch-inner-block-actions, ' +
     '.roll-result-block-actions, .speech-edit-popup, .block-text-css-panel, .roll-result-css-panel, ' +
     '.branch-ib-css-panel, .branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, ' +
-    '.ib-roll-css-panel, .ib-roll-result-css-panel, .nested-speech-css-panel, .nested-text-css-panel'
+    '.ib-roll-css-panel, .ib-roll-result-css-panel'
   )) {
     return false;
   }
@@ -14517,8 +14361,7 @@ function tbUnwrapVariation(root, variation) {
 const cssMacroField = (() => {
   const LEGACY = '.block-text-css-panel.open, .roll-result-css-panel, .ending-css-panel, '
     + '.ib-roll-css-panel, .ib-roll-result-css-panel, .branch-ib-css-panel, '
-    + '.branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, '
-    + '.nested-text-css-panel, .nested-speech-css-panel';
+    + '.branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel';
   function resolveMacro(opts) {
     return opts.macro ? (typeof opts.macro === 'function' ? (opts.macro() || '') : opts.macro) : '';
   }
@@ -18507,7 +18350,7 @@ function applyIbRollCss(blockId, ibId, itemId, btn, remove) {
   const val = remove ? '' : (ta?.value || '').trim();
   if (remove && ta) ta.value = '';
   item.css = val;
-  const badge = panel?.closest('.bib-sub-block-roll')?.querySelector('.nested-text-css-badge, .branch-inner-css-badge');
+  const badge = panel?.closest('.bib-sub-block-roll')?.querySelector('.branch-inner-css-badge');
   if (badge) badge.classList.toggle('active', !!val);
   if (panel) panel.style.display = 'none';
   persist();
@@ -21929,7 +21772,7 @@ document.addEventListener('mousedown', function(e) {
 // ─── CE 콘텐츠 채우기 ───
 function setEditableHtml(target, html) {
   if (!target) return;
-  const shouldPreserveBlankLines = target.matches?.('.callout-content-ce, .nested-callout-content, .nested-text-ce');
+  const shouldPreserveBlankLines = target.matches?.('.callout-content-ce, .nested-callout-content');
   target.innerHTML = shouldPreserveBlankLines
     ? (normalizeCalloutEditableHtml(html || '') || '')
     : (normalizeEditableHtml(html || '') || '');
