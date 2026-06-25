@@ -15726,17 +15726,7 @@ function mkBlockEl(b, cid, ctx = {}) {
     case 'callout': {
       const ct = b.calloutType || 'info';
       const ctMap = CALLOUT_TYPE_LABELS;
-      const nestedCallouts = normalizeCalloutNestedItems(b);
-      const contentSlot = getCalloutContentSlot(b, nestedCallouts.length);
-      const hasCalloutText = hasCalloutBodyText(b.content || '');
       const contentHtml = `<div class="callout-content-ce block-ce" contenteditable="true" data-field="content" data-ph="내용을 입력하세요" oninput="updCalloutBody('${b.id}',this.innerHTML,'${cid}')" spellcheck="false"></div>`;
-      const calloutChildren = [];
-      for (let i = 0; i <= nestedCallouts.length; i += 1) {
-        if (i === contentSlot) calloutChildren.push(contentHtml);
-        if (i < nestedCallouts.length) {
-          calloutChildren.push(mkNestedCalloutItemHtml(b.id, nestedCallouts[i], i, nestedCallouts.length, contentSlot, hasCalloutText));
-        }
-      }
       bodyHtml = `
         <div class="callout-body callout-${ct}">
           <div class="callout-header">
@@ -15749,7 +15739,7 @@ function mkBlockEl(b, cid, ctx = {}) {
             <input class="callout-title-inp" data-field="title" placeholder="" value="${esc(b.title||'')}"
               oninput="upd('${b.id}','title',this.value,'${cid}')">
           </div>
-          ${calloutChildren.join('')}
+          ${contentHtml}
         </div>`;
       break;
     }
@@ -22618,17 +22608,6 @@ function populateCE(el, data) {
   el.querySelectorAll('[contenteditable][data-branch-id]').forEach(ce => {
     const br = (data.branches || []).find(x => x.id === ce.dataset.branchId);
     if (br) setEditableHtml(ce, br[ce.dataset.field] || '');
-    ce.addEventListener('keydown', ceAltEnter);
-  });
-  el.querySelectorAll('[contenteditable][data-nc-id]:not([data-sub-nc-id])').forEach(ce => {
-    const nc = normalizeCalloutNestedItems(data).find(x => x.id === ce.dataset.ncId);
-    if (nc) setEditableHtml(ce, nc[ce.dataset.field] || '');
-    ce.addEventListener('keydown', ceAltEnter);
-  });
-  el.querySelectorAll('[contenteditable][data-nc-id][data-sub-nc-id]').forEach(ce => {
-    const nc = (data.nestedCallouts || []).find(x => x.id === ce.dataset.ncId);
-    const sub = (nc?.nestedCallouts || []).find(x => x.id === ce.dataset.subNcId);
-    if (sub) setEditableHtml(ce, sub[ce.dataset.field] || '');
     ce.addEventListener('keydown', ceAltEnter);
   });
   el.querySelectorAll('[contenteditable][data-ib-id][data-item-id]').forEach(ce => {
