@@ -11400,15 +11400,6 @@ function setCalloutType(blockId, selectEl, cid) {
   if (icon) icon.innerHTML = getCalloutTypeIconSvg(type);
 }
 
-function setNestedCalloutType(blockId, ncId, selectEl) {
-  const type = selectEl.value;
-  updNestedCallout(blockId, ncId, 'calloutType', type);
-  const wrap = selectEl.closest('.nested-callout');
-  if (!wrap) return;
-  wrap.className = 'nested-callout callout-' + type;
-  const icon = wrap.querySelector('.callout-type-icon');
-  if (icon) icon.innerHTML = getCalloutTypeIconSvg(type);
-}
 
 function normalizeColumnBlock(block) {
   if (!block || block.type !== 'column') return;
@@ -16350,14 +16341,6 @@ function getSpeechTokenListHtml(blockId) {
 /**
  * 2. nested speech용
  */
-function getNestedSpeechTokenListHtml(blockId, itemId) {
-  const s = cur();
-  const block = getNestedCalloutItemById(blockId, itemId) || findBlockByIdDeep(s?.blocks, itemId);
-  const activeKey = getSpeakerTokenKey(block?.speaker || '');
-  const tokens = getScenarioSpeakerTokens(s);
-  
-  return getSpeechTokenButtonsHtml(tokens, activeKey, `ncSpeechApplyToken('${blockId}','${itemId}',this)`);
-}
 
 /**
  * 3. bib-item-speech용
@@ -16394,11 +16377,6 @@ function speechRefreshTokens(blockId) {
 
 // 2. callout 내부 nested speech용
 // 부모 callout blockId와 하위 대사 itemId를 함께 넘겨 저장 위치를 특정한다.
-function nestedSpeechRefreshTokens(blockId, itemId) {
-  const list = document.getElementById('ncstl-' + itemId);
-  if (!list) return;
-  list.innerHTML = getNestedSpeechTokenListHtml(blockId, itemId);
-}
 
 // 3. branch / inner block 내부 bib-item-speech용
 // branch blockId, inner block ibId, itemId를 함께 넘겨 저장 위치를 특정한다.
@@ -16453,12 +16431,6 @@ function applyTokenDataToUI(prefix, itemId, tokenEl) {
 /**
  * 1. callout 내부 nested speech용 토큰 적용 함수
  */
-function ncSpeechApplyToken(blockId, itemId, tokenEl) {
-  // 접두사 'ncs'를 넘겨 UI를 업데이트하고 성공 시 적용 함수 호출
-  if (applyTokenDataToUI('ncs', itemId, tokenEl)) {
-    ncSpeechApply(blockId, itemId);
-  }
-}
 
 /**
  * 2. branch / inner block 내부 bib-item-speech용 토큰 적용 함수
@@ -19362,61 +19334,6 @@ function delBranch(blockId, branchId, cid) {
 }
 
 // ─── NESTED CALLOUT ───
-function normalizeCalloutNestedItems(block) {
-  if (!block) return [];
-  if (!Array.isArray(block.nestedCallouts)) {
-    block.nestedCallouts = [];
-  }
-  let changed = false;
-  const movedBody = moveCalloutBodyLinesToNestedItems(block);
-  if (movedBody) changed = true;
-  const originalSlot = getCalloutContentSlot(block, block.nestedCallouts.length);
-  let adjustedSlot = originalSlot;
-  block.nestedCallouts = block.nestedCallouts.map(item => {
-    if (!item || typeof item !== 'object') {
-      return { id: mkId(), type: 'callout', calloutType: 'info', title: '', content: '', nestedCallouts: [] };
-    }
-    if (item.type === 'speech') {
-      return {
-        ...item,
-        type: 'speech',
-        speaker: item.speaker || DEFAULT_SPEAKER_NAME,
-        speakerColor: item.speakerColor || DEFAULT_SPEECH_COLOR,
-        content: item.content || '',
-        css: typeof item.css === 'string' ? item.css : '',
-      };
-    }
-    if (item.type === 'text') {
-      return {
-        ...item,
-        type: 'text',
-        content: item.content || '',
-        css: typeof item.css === 'string' ? item.css : '',
-      };
-    }
-    return {
-      ...item,
-      type: 'callout',
-      calloutType: item.calloutType || 'info',
-      title: item.title || '',
-      content: item.content || '',
-      nestedCallouts: Array.isArray(item.nestedCallouts) ? item.nestedCallouts : [],
-    };
-  }).flatMap((item, idx) => {
-    if (item?.type !== 'text') return [item];
-    const splitItems = expandNestedTextItemLines(item);
-    if (splitItems.length > 1) {
-      changed = true;
-      if (idx < adjustedSlot) adjustedSlot += splitItems.length - 1;
-    }
-    return splitItems;
-  });
-  if (changed) {
-    block.nestedContentSlot = adjustedSlot;
-    persist();
-  }
-  return block.nestedCallouts;
-}
 function hasNestedTextLineMeaningfulContent(html) {
   const normalized = normalizeEditableHtml(html || '') || '';
   if (!normalized) return false;
@@ -19464,44 +19381,6 @@ function splitNestedTextContentLines(content) {
   if (!lines.length) lines.push('');
   return lines;
 }
-function buildNestedTextItemsFromLines(lines) {
-  return lines.map(line => ({
-    id: mkId(),
-    type: 'text',
-    content: line,
-    css: '',
-  }));
-}
-function expandNestedTextItemLines(item) {
-  const lines = splitNestedTextContentLines(item?.content || '');
-  if (lines.length <= 1) {
-    return [{
-      ...item,
-      type: 'text',
-      content: lines[0] ?? '',
-      css: typeof item?.css === 'string' ? item.css : '',
-    }];
-  }
-  return lines.map((line, index) => ({
-    ...item,
-    id: index === 0 ? item.id : mkId(),
-    type: 'text',
-    content: line,
-    css: typeof item?.css === 'string' ? item.css : '',
-  }));
-}
-function moveCalloutBodyLinesToNestedItems(block) {
-  if (!block) return null;
-  if (!Array.isArray(block.nestedCallouts)) block.nestedCallouts = [];
-  const lines = splitNestedTextContentLines(block.content || '');
-  if (lines.length <= 1) return null;
-  const slot = getCalloutContentSlot(block, block.nestedCallouts.length);
-  const items = buildNestedTextItemsFromLines(lines);
-  block.nestedCallouts.splice(slot, 0, ...items);
-  block.content = '';
-  block.nestedContentSlot = slot + items.length;
-  return { items, slot };
-}
 function getCalloutContentSlot(block, nestedCount = 0) {
   const max = Math.max(0, Number(nestedCount) || 0);
   const raw = Number.parseInt(block?.nestedContentSlot, 10);
@@ -19518,107 +19397,9 @@ function hasCalloutBodyText(html) {
     .trim();
   return !!plain;
 }
-function focusNestedCalloutAfterRender(blockId, ncId, subId = '') {
-  setTimeout(() => {
-    const blockEl = document.querySelector(`.block[data-id="${blockId}"]`);
-    if (!blockEl) return;
-    selectBlock(blockId);
-    const selector = subId
-      ? `.nested-callout[data-sub-nc-id="${subId}"] .callout-title-inp, .nested-callout[data-sub-nc-id="${subId}"] .nested-callout-content`
-      : `[data-nc-id="${ncId}"]:not([data-sub-nc-id]) .callout-title-inp, [data-nc-id="${ncId}"]:not([data-sub-nc-id]) .nested-callout-content, [data-nc-id="${ncId}"]:not([data-sub-nc-id]) .speech-name-inp, [data-nc-id="${ncId}"]:not([data-sub-nc-id]) .nested-speech-ce, [data-nc-id="${ncId}"]:not([data-sub-nc-id]) .nested-text-ce`;
-    const target = blockEl.querySelector(selector);
-    if (!target) return;
-    target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    placeCaretAtEnd(target);
-  }, 60);
-}
 function getCalloutBlockById(blockId, cid = 'blocks-container') {
   const block = getGenericBlockById(blockId, cid);
   return block?.type === 'callout' ? block : null;
-}
-function getNestedCalloutItemById(blockId, itemId) {
-  const b = getCalloutBlockById(blockId); if (!b) return null;
-  const arr = normalizeCalloutNestedItems(b);
-  return arr.find(x => x.id === itemId) || null;
-}
-function moveNestedCallout(blockId, ncId, dir) {
-  const b = getCalloutBlockById(blockId); if (!b) return;
-  const arr = normalizeCalloutNestedItems(b);
-  const idx = arr.findIndex(x => x.id === ncId); if (idx < 0) return;
-  const contentSlot = getCalloutContentSlot(b, arr.length);
-  const hasText = hasCalloutBodyText(b.content || '');
-  if (dir === 'up') {
-    if (hasText && contentSlot === idx) {
-      b.nestedContentSlot = idx + 1;
-    } else {
-      const toIdx = idx - 1;
-      if (toIdx < 0) return;
-      [arr[idx], arr[toIdx]] = [arr[toIdx], arr[idx]];
-    }
-  } else {
-    if (hasText && contentSlot === idx + 1) {
-      b.nestedContentSlot = idx;
-    } else {
-      const toIdx = idx + 1;
-      if (toIdx >= arr.length) return;
-      [arr[idx], arr[toIdx]] = [arr[toIdx], arr[idx]];
-    }
-  }
-  commitScenarioHistory(`nested:${blockId}:${ncId}:move:${dir}`, { force: true });
-  renderBlocks(cur().blocks, 'blocks-container');
-  focusNestedCalloutAfterRender(blockId, ncId);
-}
-function moveSubNestedCallout(blockId, ncId, subId, dir) {
-  const b = getCalloutBlockById(blockId); if (!b) return;
-  const nc = (b.nestedCallouts || []).find(x => x.id === ncId); if (!nc) return;
-  const arr = nc.nestedCallouts || [];
-  const idx = arr.findIndex(x => x.id === subId); if (idx < 0) return;
-  const toIdx = dir === 'up' ? idx - 1 : idx + 1;
-  if (toIdx < 0 || toIdx >= arr.length) return;
-  [arr[idx], arr[toIdx]] = [arr[toIdx], arr[idx]];
-  commitScenarioHistory(`subnc:${blockId}:${ncId}:${subId}:move:${dir}`, { force: true });
-  renderBlocks(cur().blocks, 'blocks-container');
-  focusNestedCalloutAfterRender(blockId, ncId, subId);
-}
-function openNestedCalloutCtxMenu(e, blockId, ncId) {
-  e.preventDefault(); e.stopPropagation();
-  const variationItems = tbGetVariationCtxItems(e);
-  const items = [
-    ...variationItems,
-    ...(variationItems.length ? [{ sep: true }] : []),
-    { icon: '＋', label: '하위 콜아웃 추가', action: () => addSubNestedCallout(blockId, ncId) },
-    { sep: true },
-    { icon: '↑', label: '위로 이동', action: () => moveNestedCallout(blockId, ncId, 'up') },
-    { icon: '↓', label: '아래로 이동', action: () => moveNestedCallout(blockId, ncId, 'down') },
-    { sep: true },
-    { icon: '✕', label: '삭제', color: '#ef4444', action: () => delNestedCallout(blockId, ncId) },
-  ];
-  tbShowCtxMenu(e.clientX, e.clientY, items);
-  return false;
-}
-function openSubNestedCalloutCtxMenu(e, blockId, ncId, subId) {
-  e.preventDefault(); e.stopPropagation();
-  const variationItems = tbGetVariationCtxItems(e);
-  const items = [
-    ...variationItems,
-    ...(variationItems.length ? [{ sep: true }] : []),
-    { icon: '↑', label: '위로 이동', action: () => moveSubNestedCallout(blockId, ncId, subId, 'up') },
-    { icon: '↓', label: '아래로 이동', action: () => moveSubNestedCallout(blockId, ncId, subId, 'down') },
-    { sep: true },
-    { icon: '✕', label: '삭제', color: '#ef4444', action: () => delSubNestedCallout(blockId, ncId, subId) },
-  ];
-  tbShowCtxMenu(e.clientX, e.clientY, items);
-  return false;
-}
-function addSubNestedCallout(blockId, ncId) {
-  const b = getCalloutBlockById(blockId); if (!b) return;
-  const nc = (normalizeCalloutNestedItems(b) || []).find(x => x.id === ncId); if (!nc) return;
-  if (!nc.nestedCallouts) nc.nestedCallouts = [];
-  const sub = { id: mkId(), calloutType: 'info', title: '', content: '' };
-  nc.nestedCallouts.push(sub);
-  commitScenarioHistory(`subnc:${blockId}:${ncId}:${sub.id}:add`, { force: true });
-  renderBlocks(cur().blocks, 'blocks-container');
-  focusNestedCalloutAfterRender(blockId, ncId, sub.id);
 }
 function updCalloutBody(blockId, val, cid) {
   const b = getCalloutBlockById(blockId, cid || 'blocks-container');
@@ -19626,310 +19407,10 @@ function updCalloutBody(blockId, val, cid) {
   b.content = normalizeCalloutEditableHtml(val);
   commitScenarioHistory(`block:${blockId}:content`);
 }
-function delSubNestedCallout(blockId, ncId, subId) {
-  const b = getCalloutBlockById(blockId); if (!b) return;
-  const nc = (normalizeCalloutNestedItems(b) || []).find(x => x.id === ncId); if (!nc) return;
-  nc.nestedCallouts = (nc.nestedCallouts || []).filter(x => x.id !== subId);
-  commitScenarioHistory(`subnc:${blockId}:${ncId}:${subId}:del`, { force: true });
-  renderBlocks(cur().blocks, 'blocks-container');
-  focusNestedCalloutAfterRender(blockId, ncId);
-}
-function updSubNestedCallout(blockId, ncId, subId, key, val) {
-  const b = getCalloutBlockById(blockId); if (!b) return;
-  const nc = (normalizeCalloutNestedItems(b) || []).find(x => x.id === ncId); if (!nc) return;
-  const sub = (nc.nestedCallouts || []).find(x => x.id === subId);
-  if (sub) {
-    sub[key] = key === 'content' ? normalizeCalloutEditableHtml(val) : normalizeEditableHtml(val);
-    commitScenarioHistory(`subnc:${blockId}:${ncId}:${subId}:${key}`);
-  }
-}
-function setSubNestedCalloutType(blockId, ncId, subId, selectEl) {
-  const type = selectEl.value;
-  updSubNestedCallout(blockId, ncId, subId, 'calloutType', type);
-  const wrap = selectEl.closest('.nested-callout[data-sub-nc-id]');
-  if (!wrap) return;
-  wrap.className = `nested-callout callout-${type}`;
-  const icon = wrap.querySelector('.callout-type-icon');
-  if (icon) icon.innerHTML = getCalloutTypeIconSvg(type);
-}
-function addNestedCallout(blockId) {
-  const b = getCalloutBlockById(blockId); if (!b) return;
-  const arr = normalizeCalloutNestedItems(b);
-  const prevLength = arr.length;
-  const prevSlot = getCalloutContentSlot(b, prevLength);
-  const nc = { id: mkId(), type: 'callout', calloutType: 'info', title: '', content: '', nestedCallouts: [] };
-  arr.push(nc);
-  if (prevSlot === prevLength) b.nestedContentSlot = prevSlot + 1;
-  commitScenarioHistory(`nested:${blockId}:${nc.id}:add`, { force: true });
-  renderBlocks(cur().blocks, 'blocks-container');
-  setTimeout(() => {
-    const cce = document.querySelector(`.block[data-id="${blockId}"] .callout-content-ce`);
-    if (cce && !cce.textContent.trim() && !cce.innerHTML.replace(/<br\s*\/?>/gi,'').trim()) {
-      cce.classList.add('collapsed');
-    }
-  }, 60);
-  focusNestedCalloutAfterRender(blockId, nc.id);
-}
-function delNestedCallout(blockId, ncId) {
-  const b = getCalloutBlockById(blockId); if (!b) return;
-  const arr = normalizeCalloutNestedItems(b);
-  const idx = arr.findIndex(x => x.id === ncId);
-  if (idx < 0) return;
-  const contentSlot = getCalloutContentSlot(b, arr.length);
-  if (contentSlot > idx) b.nestedContentSlot = contentSlot - 1;
-  b.nestedCallouts = arr.filter(x => x.id !== ncId);
-  commitScenarioHistory(`nested:${blockId}:${ncId}:delete`, { force: true });
-  renderBlocks(cur().blocks, 'blocks-container');
-  focusBlockAfterRender(blockId);
-}
-function updNestedCallout(blockId, ncId, key, val) {
-  const b = getCalloutBlockById(blockId); if (!b) return;
-  const nc = normalizeCalloutNestedItems(b).find(x => x.id === ncId);
-  if (nc) {
-    nc[key] = key === 'content' ? normalizeCalloutEditableHtml(val) : normalizeEditableHtml(val);
-    commitScenarioHistory(`nested:${blockId}:${ncId}:${key}`);
-  }
-}
-function updNestedSpeech(blockId, itemId, key, val) {
-  const item = getNestedCalloutItemById(blockId, itemId);
-  if (!item || item.type !== 'speech') return;
-  item[key] = normalizeEditableHtml(val);
-  commitScenarioHistory(`nested:${blockId}:${itemId}:${key}`);
-}
-function updNestedText(blockId, itemId, key, val) {
-  const b = getCalloutBlockById(blockId); if (!b) return;
-  const arr = normalizeCalloutNestedItems(b);
-  const idx = arr.findIndex(x => x.id === itemId);
-  const item = idx >= 0 ? arr[idx] : null;
-  if (!item || item.type !== 'text') return;
-  item[key] = key === 'content' ? normalizeCalloutEditableHtml(val) : normalizeEditableHtml(val);
-  if (key === 'content') {
-    const splitItems = expandNestedTextItemLines(item);
-    if (splitItems.length > 1) {
-      const contentSlot = getCalloutContentSlot(b, arr.length);
-      if (idx < contentSlot) b.nestedContentSlot = contentSlot + splitItems.length - 1;
-      arr.splice(idx, 1, ...splitItems);
-      commitScenarioHistory(`nested:${blockId}:${itemId}:${key}:split`, { force: true });
-      renderBlocks(cur().blocks, 'blocks-container');
-      focusNestedCalloutAfterRender(blockId, splitItems[splitItems.length - 1].id);
-      return;
-    }
-  }
-  commitScenarioHistory(`nested:${blockId}:${itemId}:${key}`);
-}
 
-function splitNestedSpeechItem(blockId, itemId, ce) {
-  const b = getCalloutBlockById(blockId); if (!b) return false;
-  const arr = normalizeCalloutNestedItems(b);
-  const idx = arr.findIndex(x => x.id === itemId);
-  const item = idx >= 0 ? arr[idx] : null;
-  if (!item || item.type !== 'speech') return false;
 
-  const { beforeHtml, afterHtml } = getEditableSplitHtmlAtSelection(ce);
-  item.content = beforeHtml;
-  const newItem = {
-    id: mkId(),
-    type: 'speech',
-    speaker: item.speaker || DEFAULT_SPEAKER_NAME,
-    speakerColor: item.speakerColor || DEFAULT_SPEECH_COLOR,
-    content: afterHtml,
-    css: '',
-  };
-  const contentSlot = getCalloutContentSlot(b, arr.length);
-  if (idx < contentSlot) b.nestedContentSlot = contentSlot + 1;
-  arr.splice(idx + 1, 0, newItem);
-  commitScenarioHistory(`nested:${blockId}:${itemId}:speech-split`, { force: true });
-  renderRootBlocksByCid('blocks-container');
-  focusEditableAtStartAfterRender(`.nested-speech-ce[data-nc-id="${newItem.id}"]`, blockId);
-  return true;
-}
 
-function handleNestedItemKeydown(e, blockId, itemId) {
-  if (e.isComposing || e.keyCode === 229) return;
-  if (e.key === 'Enter' && e.shiftKey) {
-    e.preventDefault();
-    document.execCommand('insertLineBreak');
-    return;
-  }
-  if (e.key === 'Enter' && e.altKey) {
-    e.preventDefault();
-    return;
-  }
-  if (e.key === 'Enter' && !e.altKey) {
-    const item = getNestedCalloutItemById(blockId, itemId);
-    if (item?.type === 'speech') {
-      e.preventDefault();
-      e.stopImmediatePropagation?.();
-      splitNestedSpeechItem(blockId, itemId, e.currentTarget);
-      return;
-    }
-  }
-  if (e.key === 'Backspace') {
-    const ce = e.currentTarget;
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && sel.isCollapsed) {
-      const range = sel.getRangeAt(0);
-      const preRange = document.createRange();
-      preRange.selectNodeContents(ce);
-      preRange.setEnd(range.startContainer, range.startOffset);
-      if (preRange.toString().length === 0) {
-        if (mergeNestedItemBackward(blockId, itemId)) {
-          e.preventDefault();
-        }
-      }
-    }
-  }
-}
 
-function mergeNestedItemBackward(blockId, itemId) {
-  const b = getCalloutBlockById(blockId); if (!b || !b.nestedCallouts) return false;
-  const arr = b.nestedCallouts;
-  const idx = arr.findIndex(x => x.id === itemId);
-  if (idx <= 0) return false;
-  const prev = arr[idx - 1];
-  const curr = arr[idx];
-  prev.content = mergeRollResultTextContent(prev.content || '', curr.content || '');
-  arr.splice(idx, 1);
-  if (typeof b.nestedContentSlot === 'number' && b.nestedContentSlot >= idx) b.nestedContentSlot = Math.max(0, b.nestedContentSlot - 1);
-  commitScenarioHistory(`nested:${blockId}:merge`, { force: true });
-  persist();
-  renderRootBlocksByCid('blocks-container');
-  setTimeout(() => {
-    const blockEl = document.querySelector(`.block[data-id="${blockId}"]`);
-    const targetCe = blockEl?.querySelector(`[data-nc-id="${prev.id}"] [contenteditable="true"]`);
-    if (targetCe) placeCaretAtEnd(targetCe);
-  }, 60);
-  return true;
-}
-
-function toggleNestedTextCssPanel(blockId, itemId, badgeEl) {
-  const panel = badgeEl.closest('.nested-text-item')?.querySelector('.nested-text-css-panel');
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  document.querySelectorAll('.roll-result-css-panel, .branch-ib-css-panel, .branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, .ib-roll-css-panel, .ib-roll-result-css-panel, .nested-speech-css-panel, .nested-text-css-panel').forEach(p => {
-    p.style.display = 'none';
-  });
-  if (!isOpen) {
-    panel.style.display = 'flex';
-    ensureCssMacroPickerButtonInCssPanel(panel);
-    const ta = panel.querySelector('.btcp-textarea');
-    btcpAutoResize(ta);
-    ta.focus();
-  }
-}
-function applyNestedTextCss(blockId, itemId, btn, remove) {
-  const item = getNestedCalloutItemById(blockId, itemId);
-  if (!item || item.type !== 'text') return;
-  const panel = btn.closest('.nested-text-css-panel');
-  const ta = panel?.querySelector('.btcp-textarea');
-  const val = remove ? '' : (ta?.value || '').trim();
-  if (remove && ta) ta.value = '';
-  item.css = val;
-  const badge = panel?.closest('.nested-text-item')?.querySelector('.nested-text-css-badge');
-  if (badge) badge.classList.toggle('active', !!val);
-  if (panel) panel.style.display = 'none';
-  commitScenarioHistory(`nested:${blockId}:${itemId}:css`, { force: true });
-}
-function copyNestedText(blockId, itemId, btn) {
-  const item = getNestedCalloutItemById(blockId, itemId);
-  if (!item || item.type !== 'text') return;
-  const ce = document.querySelector(`.nested-text-ce[data-nc-id="${itemId}"]`);
-  const text = getCopyTextOrCssMacro(item.css, ce, item.content || '');
-  navigator.clipboard.writeText(text).then(() => {
-    const orig = btn.textContent;
-    btn.textContent = '✓';
-    setTimeout(() => { btn.textContent = orig; }, 1200);
-  });
-}
-function ncSpeechTogglePopup(blockId, itemId) {
-  const popup = document.getElementById('ncsep-' + itemId);
-  if (!popup) return;
-  const isOpen = popup.classList.contains('open');
-  const anchor = document.getElementById('ncsbw-' + itemId);
-  if (isOpen) {
-    closeSpeechPopup(popup);
-    return;
-  }
-  closeAllSpeechPopups();
-  
-  if (!isOpen) {
-    nestedSpeechRefreshTokens(blockId, itemId); 
-    
-    openSpeechPopupAtAnchor(popup, anchor);
-    document.getElementById('ncsni-' + itemId)?.focus();
-    const native = document.getElementById('ncsnc-' + itemId);
-    const swatch = document.getElementById('ncscs-' + itemId);
-    if (native && swatch) {
-      native.oninput = () => { swatch.style.background = native.value; };
-    }
-    setTimeout(() => {
-      const close = evt => {
-        if (!popup.contains(evt.target) && !anchor?.contains(evt.target)) {
-          closeSpeechPopup(popup);
-          document.removeEventListener('mousedown', close);
-        }
-      };
-      document.addEventListener('mousedown', close);
-    }, 0);
-  }
-}
-function ncSpeechApply(blockId, itemId) {
-  const popup = document.getElementById('ncsep-' + itemId);
-  const inp = document.getElementById('ncsni-' + itemId);
-  const native = document.getElementById('ncsnc-' + itemId);
-  const badge = document.querySelector(`#ncsbw-${itemId} .speech-badge`);
-  const item = getNestedCalloutItemById(blockId, itemId);
-  if (!inp || !badge || !item || item.type !== 'speech') return;
-  const name = inp.value.trim() || DEFAULT_SPEAKER_NAME;
-  const color = native?.value || badge.style.background || DEFAULT_SPEECH_COLOR;
-  badge.textContent = name;
-  badge.style.background = color;
-  item.speaker = name;
-  item.speakerColor = color;
-  registerScenarioSpeakerToken(name, color, cur());
-  persist();
-  nestedSpeechRefreshTokens(blockId, itemId); 
-  closeSpeechPopup(popup);
-}
-function toggleNestedSpeechCssPanel(blockId, itemId, badgeEl) {
-  const panel = badgeEl.closest('.nested-speech-item')?.querySelector('.nested-speech-css-panel');
-  if (!panel) return;
-  const isOpen = panel.style.display !== 'none';
-  document.querySelectorAll('.roll-result-css-panel, .branch-ib-css-panel, .branch-inner-roll-css-panel, .branch-ib-roll-result-css-panel, .ib-roll-css-panel, .ib-roll-result-css-panel, .nested-speech-css-panel').forEach(p => {
-    p.style.display = 'none';
-  });
-  if (!isOpen) {
-    panel.style.display = 'flex';
-    ensureCssMacroPickerButtonInCssPanel(panel);
-    const ta = panel.querySelector('.btcp-textarea');
-    btcpAutoResize(ta);
-    ta.focus();
-  }
-}
-function applyNestedSpeechCss(blockId, itemId, btn, remove) {
-  const item = getNestedCalloutItemById(blockId, itemId);
-  if (!item || item.type !== 'speech') return;
-  const panel = btn.closest('.nested-speech-css-panel');
-  const ta = panel?.querySelector('.btcp-textarea');
-  const val = remove ? '' : (ta?.value || '').trim();
-  if (remove && ta) ta.value = '';
-  item.css = val;
-  const badge = panel?.closest('.nested-speech-item')?.querySelector('.nested-speech-css-badge');
-  if (badge) badge.classList.toggle('active', !!val);
-  if (panel) panel.style.display = 'none';
-  commitScenarioHistory(`nested:${blockId}:${itemId}:css`, { force: true });
-}
-function copyNestedSpeech(blockId, itemId, btn) {
-  const item = getNestedCalloutItemById(blockId, itemId);
-  if (!item || item.type !== 'speech') return;
-  const ce = document.querySelector(`.nested-speech-ce[data-nc-id="${itemId}"]`);
-  const text = getCopyTextOrCssMacro(item.css, ce, item.content || '');
-  navigator.clipboard.writeText(text).then(() => {
-    const orig = btn.textContent;
-    btn.textContent = '✓';
-    setTimeout(() => { btn.textContent = orig; }, 1200);
-  });
-}
 
 // ─── DRAG & DROP ───
 let dragId = null, dragCid = null;
