@@ -4107,9 +4107,9 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 }
 /* 콜아웃 내부 자식 블록의 액션 메뉴는 우측 거터(left:100%) 대신 블록 안 우상단에 둔다.
    좁은 콜아웃/분기 안에서 우측 거터가 overflow로 잘리던 문제 해소(판정 블록과 동일 방식). */
-.callout-body > .block-children-wrap > .block.block-child > .block-actions,
-.bib-item-callout .nested-callout > .block-children-wrap > .block.block-child > .block-actions,
-.branch-inner-callout .nested-callout > .block-children-wrap > .block.block-child > .block-actions {
+/* 모든 콜아웃 컨테이너(.callout-body=루트/generic, .nested-callout=분기 bib/내부) 공통.
+   조상 한정(.bib-item-callout 등) 없이도 매칭되게 일반화. */
+:is(.callout-body, .nested-callout) > .block-children-wrap > .block.block-child > .block-actions {
   left: auto;
   right: 4px;
   top: 4px;
@@ -4117,9 +4117,7 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 }
 /* 콜아웃 내부 판정(roll) 자식 블록도 좌우 10px inset(텍스트와 맞춤). roll은 overflow:hidden +
    둥근 그라데이션이라 padding은 흰 틈을 만들므로 margin으로 블록 전체를 들인다. */
-.callout-body > .block-children-wrap > .block.block-roll.block-child,
-.bib-item-callout .nested-callout > .block-children-wrap > .block.block-roll.block-child,
-.branch-inner-callout .nested-callout > .block-children-wrap > .block.block-roll.block-child {
+:is(.callout-body, .nested-callout) > .block-children-wrap > .block.block-roll.block-child {
   width: calc(100% - 20px);
   max-width: calc(100% - 20px);
   margin-left: 10px;
