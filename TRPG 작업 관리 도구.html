@@ -12652,12 +12652,9 @@ function getBibItemHtml(blockId, ibId, item, idx, total, cid) {
           if (row.type === 'text') {
             return `<div class="nested-callout-content" contenteditable="true" data-ib-id="${ibId}" data-item-id="${item.id}" data-callout-text-id="${row.id}" oninput="updIbCalloutTextRow('${blockId}','${ibId}','${item.id}','${row.id}',this.innerHTML)" onkeydown="handleIbCalloutTextRowKeydown(event,'${blockId}','${ibId}','${item.id}','${row.id}','${cid}')" spellcheck="false"></div>`;
           }
-          if (row.type === 'callout') {
-            const nc = (item.nestedCallouts || []).find(n => n.id === row.id);
-            return nc ? mkSubNestedCalloutHtml(blockId, item.id, nc, rowIdx, rows.length) : '';
-          }
-          // row.type === 'roll' 은 도달 불가: migrateLegacyIbCalloutRowsToGenericChildren가
-          // 렌더 전 nestedRolls를 generic children으로 옮기고 비운다.
+          // row.type === 'callout' / 'roll' 은 도달 불가:
+          // migrateLegacyIbCalloutRowsToGenericChildren가 렌더 전 nestedCallouts /
+          // nestedRolls를 generic children으로 옮기고 비운다 (rows는 항상 []).
           return '';
         }).join('')}
       </div>
@@ -19582,142 +19579,6 @@ function moveSubNestedCallout(blockId, ncId, subId, dir) {
   commitScenarioHistory(`subnc:${blockId}:${ncId}:${subId}:move:${dir}`, { force: true });
   renderBlocks(cur().blocks, 'blocks-container');
   focusNestedCalloutAfterRender(blockId, ncId, subId);
-}
-function mkSubNestedCalloutHtml(blockId, ncId, sub, idx = 0, total = 1) {
-  const ct = sub.calloutType || 'info';
-  const ctMap = CALLOUT_TYPE_LABELS;
-  return `<div class="nested-callout callout-${ct}" data-nc-id="${ncId}" data-sub-nc-id="${sub.id}"
-    oncontextmenu="return openSubNestedCalloutCtxMenu(event,'${blockId}','${ncId}','${sub.id}')">
-    <div class="nested-callout-header">
-      <span class="callout-drag-handle" title="드래그하여 순서 변경">⋮⋮</span>
-      <span class="callout-type-icon" aria-hidden="true">${getCalloutTypeIconSvg(ct)}</span>
-      <select class="callout-type-select"
-        onchange="setSubNestedCalloutType('${blockId}','${ncId}','${sub.id}',this)">
-        ${Object.entries(ctMap).map(([v,l]) => `<option value="${v}"${ct===v?' selected':''}>${l}</option>`).join('')}
-      </select>
-      <input class="callout-title-inp" placeholder="" value="${esc(sub.title||'')}"
-        oninput="updSubNestedCallout('${blockId}','${ncId}','${sub.id}','title',this.value)">
-    </div>
-    <div class="nested-callout-content" contenteditable="true"
-      data-nc-id="${ncId}" data-sub-nc-id="${sub.id}" data-field="content"
-      oninput="updSubNestedCallout('${blockId}','${ncId}','${sub.id}','content',this.innerHTML)"></div>
-  </div>`;
-}
-function mkNestedSpeechHtml(blockId, item, idx = 0, total = 1, contentSlot = 0, hasCalloutText = false) {
-  const speaker = item.speaker || DEFAULT_SPEAKER_NAME;
-  const speakerColor = item.speakerColor || DEFAULT_SPEECH_COLOR;
-  const canMoveUp = idx > 0 || (hasCalloutText && contentSlot === idx);
-  const canMoveDown = idx < total - 1 || (hasCalloutText && contentSlot === idx + 1);
-  const hasCss = !!(item.css || '').trim();
-  return `<div class="nested-speech-item" data-nc-id="${item.id}">
-    <div class="speech-row">
-      <div class="speech-badge-wrap" id="ncsbw-${item.id}">
-        <span class="speech-badge" style="background:${esc(speakerColor)}"
-          onclick="ncSpeechTogglePopup('${blockId}','${item.id}')">${esc(speaker)}</span>
-        <input type="color" class="speech-color-native" id="ncsnc-${item.id}" value="${esc(speakerColor)}">
-        <div class="speech-edit-popup" id="ncsep-${item.id}">
-          <div class="speech-edit-row">
-            <span class="speech-edit-label">이름</span>
-            <input class="speech-name-inp" id="ncsni-${item.id}" value="${esc(speaker)}" placeholder="화자명"
-              onkeydown="if(event.key==='Enter')ncSpeechApply('${blockId}','${item.id}')">
-          </div>
-          <div class="speech-edit-row">
-            <span class="speech-edit-label">색상</span>
-            <div class="speech-color-swatch" id="ncscs-${item.id}" style="background:${esc(speakerColor)}"
-              onclick="document.getElementById('ncsnc-${item.id}').click()" title="색상 선택"></div>
-          </div>
-          
-          <div class="speech-token-wrap">
-            <div class="speech-token-label">화자 토큰</div>
-            <div class="speech-token-list" id="ncstl-${item.id}">${getNestedSpeechTokenListHtml(blockId, item.id)}</div>
-          </div>
-          
-          <button class="speech-edit-apply" onmousedown="event.preventDefault()"
-            onclick="ncSpeechApply('${blockId}','${item.id}')">적용</button>
-        </div>
-      </div>
-      <div class="block-ce nested-speech-ce" contenteditable="true" data-nc-id="${item.id}" data-field="content" data-ph="대사 내용을 입력하세요"
-        oninput="updNestedSpeech('${blockId}','${item.id}','content',this.innerHTML)"
-        onkeydown="handleNestedItemKeydown(event, '${blockId}', '${item.id}')" spellcheck="false"></div>
-    </div>
-    <div class="nested-speech-floating-actions">
-      <button class="nested-speech-act" title="위로 이동" onmousedown="event.preventDefault()" onclick="moveNestedCallout('${blockId}','${item.id}','up')" ${canMoveUp ? '' : 'disabled'}>↑</button>
-      <button class="nested-speech-act" title="아래로 이동" onmousedown="event.preventDefault()" onclick="moveNestedCallout('${blockId}','${item.id}','down')" ${canMoveDown ? '' : 'disabled'}>↓</button>
-      <button class="nested-speech-act" title="복사" onmousedown="event.preventDefault()" onclick="copyNestedSpeech('${blockId}','${item.id}',this)">⧉</button>
-      <span class="nested-speech-act nested-speech-css-badge ${hasCss ? 'active' : ''}" title="CSS 서식 편집" onmousedown="event.preventDefault()" onclick="toggleNestedSpeechCssPanel('${blockId}','${item.id}',this)">✦</span>
-      <button class="nested-speech-act del" onclick="delNestedCallout('${blockId}','${item.id}')" title="삭제">✕</button>
-    </div>
-    <div class="nested-speech-css-panel" style="display:none">
-      <div class="btcp-label">수정 CSS 매크로</div>
-      <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(item.css || '')}</textarea>
-      <div class="btcp-footer">
-        <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyNestedSpeechCss('${blockId}','${item.id}',this,true)">서식 제거</button>
-        <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyNestedSpeechCss('${blockId}','${item.id}',this,false)">적용</button>
-      </div>
-    </div>
-  </div>`;
-}
-function mkNestedTextHtml(blockId, item, idx = 0, total = 1, contentSlot = 0, hasCalloutText = false) {
-  const canMoveUp = idx > 0 || (hasCalloutText && contentSlot === idx);
-  const canMoveDown = idx < total - 1 || (hasCalloutText && contentSlot === idx + 1);
-  const hasCss = !!(item.css || '').trim();
-  return `<div class="nested-text-item" data-nc-id="${item.id}">
-    <div class="nested-text-row">
-      <div class="block-ce nested-text-ce" contenteditable="true" data-nc-id="${item.id}" data-field="content"
-        oninput="updNestedText('${blockId}','${item.id}','content',this.innerHTML)"
-        onkeydown="handleNestedItemKeydown(event, '${blockId}', '${item.id}')" spellcheck="false"></div>
-    </div>
-    <div class="nested-text-floating-actions">
-      <button class="nested-speech-act" title="위로 이동" onmousedown="event.preventDefault()" onclick="moveNestedCallout('${blockId}','${item.id}','up')" ${canMoveUp ? '' : 'disabled'}>↑</button>
-      <button class="nested-speech-act" title="아래로 이동" onmousedown="event.preventDefault()" onclick="moveNestedCallout('${blockId}','${item.id}','down')" ${canMoveDown ? '' : 'disabled'}>↓</button>
-      <button class="nested-speech-act" title="복사" onmousedown="event.preventDefault()" onclick="copyNestedText('${blockId}','${item.id}',this)">⧉</button>
-      <span class="nested-speech-act nested-text-css-badge ${hasCss ? 'active' : ''}" title="CSS 서식 편집" onmousedown="event.preventDefault()" onclick="toggleNestedTextCssPanel('${blockId}','${item.id}',this)">✦</span>
-      <button class="nested-speech-act del" onclick="delNestedCallout('${blockId}','${item.id}')" title="삭제">✕</button>
-    </div>
-    <div class="nested-text-css-panel" style="display:none">
-      <div class="btcp-label">수정 CSS 매크로</div>
-      <textarea class="btcp-textarea" spellcheck="false" placeholder="font-weight:bold; color:#cc0000;">${esc(item.css || '')}</textarea>
-      <div class="btcp-footer">
-        <button class="btcp-remove" onmousedown="event.preventDefault()" onclick="applyNestedTextCss('${blockId}','${item.id}',this,true)">서식 제거</button>
-        <button class="btcp-apply" onmousedown="event.preventDefault()" onclick="applyNestedTextCss('${blockId}','${item.id}',this,false)">적용</button>
-      </div>
-    </div>
-  </div>`;
-}
-function mkNestedCalloutItemHtml(blockId, item, idx = 0, total = 1, contentSlot = 0, hasCalloutText = false) {
-  if (item?.type === 'text') {
-    return mkNestedTextHtml(blockId, item, idx, total, contentSlot, hasCalloutText);
-  }
-  if (item?.type === 'speech') {
-    return mkNestedSpeechHtml(blockId, item, idx, total, contentSlot, hasCalloutText);
-  }
-  return mkNestedCalloutHtml(blockId, item, idx, total, contentSlot, hasCalloutText);
-}
-function mkNestedCalloutHtml(blockId, nc, idx = 0, total = 1, contentSlot = 0, hasCalloutText = false) {
-  const ct = nc.calloutType || 'info';
-  const ctMap = CALLOUT_TYPE_LABELS;
-  const subs = nc.nestedCallouts || [];
-  const canMoveUp = idx > 0 || (hasCalloutText && contentSlot === idx);
-  const canMoveDown = idx < total - 1 || (hasCalloutText && contentSlot === idx + 1);
-  return `<div class="nested-callout callout-${ct}" data-nc-id="${nc.id}"
-    oncontextmenu="return openNestedCalloutCtxMenu(event,'${blockId}','${nc.id}')">
-    <div class="nested-callout-header">
-      <span class="callout-drag-handle" title="드래그하여 순서 변경">⋮⋮</span>
-      <span class="callout-type-icon" aria-hidden="true">${getCalloutTypeIconSvg(ct)}</span>
-      <select class="callout-type-select"
-        onchange="setNestedCalloutType('${blockId}','${nc.id}',this)">
-        ${Object.entries(ctMap).map(([v,l]) => `<option value="${v}"${ct===v?' selected':''}>${l}</option>`).join('')}
-      </select>
-      <input class="callout-title-inp" placeholder="" value="${esc(nc.title||'')}"
-        oninput="updNestedCallout('${blockId}','${nc.id}','title',this.value)">
-    </div>
-    <div class="nested-callout-content" contenteditable="true"
-      data-nc-id="${nc.id}" data-field="content"
-      oninput="updNestedCallout('${blockId}','${nc.id}','content',this.innerHTML)"></div>
-    <div class="nested-callouts-wrap" id="snc-${nc.id}">
-      ${subs.map((sub, subIdx, arr) => mkSubNestedCalloutHtml(blockId, nc.id, sub, subIdx, arr.length)).join('')}
-    </div>
-  </div>`;
 }
 function openNestedCalloutCtxMenu(e, blockId, ncId) {
   e.preventDefault(); e.stopPropagation();
