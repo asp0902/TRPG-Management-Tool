@@ -8916,6 +8916,26 @@ function placeCaretAtEnd(el) {
     el.setSelectionRange(pos, pos);
   }
 }
+// 재렌더 직후 블록 입력칸으로 커서를 옮긴다.
+// renderBlocks/renderRootBlocksByCid는 동기라 새 엘리먼트가 이미 있으므로 지연시키지 않는다.
+// (예전엔 setTimeout 60ms를 뒀는데, 줄을 넘길 때 체감되던 지연이 대부분 그 60ms였다.)
+function focusBlockEditableAfterRender(blockId, selector, caret = 'start') {
+  const el = document.querySelector(`.block[data-id="${blockId}"]`);
+  const ce = el?.querySelector(selector);
+  if (!ce) return null;
+  if (caret === 'end') {
+    placeCaretAtEnd(ce);
+    return ce;
+  }
+  ce.focus();
+  const range = document.createRange();
+  range.setStart(ce, 0);
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+  return ce;
+}
 function moveBibRollHeaderFocus(currentEl, reverse = false) {
   if (!currentEl?.matches?.('.bib-roll-target[contenteditable="true"], .bib-roll-skill[contenteditable="true"]')) return false;
   const header = currentEl.closest('.bib-roll-header');
@@ -12944,18 +12964,7 @@ function mkTextBlockEl(b, cid, ctx = {}) {
       renderRootBlocksByCid(info.rootCid);
 
       // 새 블록 CE에 포커스, 커서 맨 앞
-      setTimeout(() => {
-        const newEl = document.querySelector(`.block[data-id="${nb.id}"]`);
-        const newCe = newEl?.querySelector('.block-text-ce');
-        if (!newCe) return;
-        newCe.focus();
-        const r = document.createRange();
-        r.setStart(newCe, 0);
-        r.collapse(true);
-        const nextSel = window.getSelection();
-        nextSel.removeAllRanges();
-        nextSel.addRange(r);
-      }, 60);
+      focusBlockEditableAfterRender(nb.id, '.block-text-ce', 'start');
     } else if (e.key === 'Backspace') {
       const sel2 = window.getSelection();
       const atStart = sel2 && sel2.rangeCount > 0 &&
@@ -12984,13 +12993,7 @@ function mkTextBlockEl(b, cid, ctx = {}) {
           commitBlockTreeChange(`blocks:${b.id}:merge`, info.rootCid, { force: true });
           renderRootBlocksByCid(info.rootCid);
 
-          setTimeout(() => {
-            const prevBlockEl = document.querySelector(`.block[data-id="${prevId}"]`);
-            const prevCeAfterRender = prevBlockEl?.querySelector('.block-text-ce');
-            if (!prevCeAfterRender) return;
-            prevCeAfterRender.focus();
-            placeCaretAtEnd(prevCeAfterRender);
-          }, 60);
+          focusBlockEditableAfterRender(prevId, '.block-text-ce', 'end');
         }
       }
     }
@@ -15964,18 +15967,7 @@ function speechCeKeydown(e, blockId, cid, ce) {
     renderRootBlocksByCid(info.rootCid);
 
     // 새 블록 CE 포커스
-    setTimeout(() => {
-      const newEl = document.querySelector(`.block[data-id="${nb.id}"]`);
-      const newCe = newEl?.querySelector('.block-ce[contenteditable]');
-      if (!newCe) return;
-      newCe.focus();
-      const r = document.createRange();
-      r.setStart(newCe, 0);
-      r.collapse(true);
-      const nextSel = window.getSelection();
-      nextSel.removeAllRanges();
-      nextSel.addRange(r);
-    }, 60);
+    focusBlockEditableAfterRender(nb.id, '.block-ce[contenteditable]', 'start');
   }
 }
 
