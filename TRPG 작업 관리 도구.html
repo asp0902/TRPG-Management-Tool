@@ -22166,6 +22166,9 @@ function shouldUseNativeHistoryShortcut(e) {
   const recordModal = document.getElementById('record-form-modal');
   if (recordModal?.classList.contains('open') && target.closest('#record-form-modal')) return true;
   if (target.classList?.contains('btcp-textarea') || target.classList?.contains('btcp-macro-ta')) return true;
+  // 메모 팝업·룰북 인라인 메모는 시나리오/룰북 히스토리에 들어가지 않는 독립 편집기다.
+  // 가로채면 네이티브 실행취소가 막힌 채 시나리오/룰북이 대신 되돌아가 메모가 통째로 사라진다.
+  if (target.closest('.memo-popup, #rb-inline-note-editor')) return true;
   if (currentPage !== 'css-macro') return false;
   return !!target.closest('#css-macro-search, #css-dict-form-name, #css-dict-form-content');
 }
