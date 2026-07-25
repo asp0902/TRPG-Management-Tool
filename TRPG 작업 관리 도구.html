@@ -8825,6 +8825,9 @@ function showEmptyState() {
 }
 function renderCurrentScenarioView(tab) {
   const s = cur();
+  // 이 함수는 state가 교체된 뒤의 재렌더 지점(실행취소 스냅샷 적용·시나리오 전환)이므로
+  // 메모 UI도 여기서 함께 맞춘다. 빈 상태로 가는 경우에도 남은 팝업을 정리해야 한다.
+  syncMemoUiToScenario();
   if (!s) {
     showEmptyState();
     renderList();
@@ -20921,6 +20924,22 @@ function deleteScenarioMemo(memoId, ev) {
   const existing = document.getElementById('memo-pop-' + memoId);
   if (existing) existing.remove();
 }
+// 메모 목록과 열려 있는 팝업을 현재 시나리오 상태에 맞춘다.
+// 메모는 state가 통째로 교체되는 경로(실행취소·시나리오 전환)를 거쳐도 팝업이 DOM에 남는데,
+// 그 팝업은 saveMemoPop이 memoId를 못 찾아 조기 반환하므로 입력이 조용히 버려진다.
+function syncMemoUiToScenario() {
+  renderMemoPanel();
+  const memos = getMemos();
+  document.querySelectorAll('.memo-popup').forEach(pop => {
+    const memo = memos.find(m => m.id === pop.dataset.memoId);
+    if (!memo) { pop.remove(); return; }
+    const titleEl = document.getElementById('memo-pop-title-' + memo.id);
+    const bodyEl = document.getElementById('memo-pop-body-' + memo.id);
+    // 같은 값을 다시 써도 캐럿이 처음으로 튀므로 달라진 경우에만 반영한다.
+    if (titleEl && titleEl.value !== (memo.title || '')) titleEl.value = memo.title || '';
+    if (bodyEl && bodyEl.innerHTML !== (memo.body || '')) bodyEl.innerHTML = memo.body || '';
+  });
+}
 function renderMemoPanel() {
   const list = document.getElementById('memo-list'); if (!list) return;
   const memos = getMemos();
@@ -21062,6 +21081,7 @@ function openMemoPop(memoId) {
   const div = document.createElement('div');
   div.className = 'memo-popup';
   div.id = popId;
+  div.dataset.memoId = memoId;
   div.style.top = (120 + Math.random() * 60) + 'px';
   div.style.left = (300 + Math.random() * 80) + 'px';
   div.style.zIndex = getNextMemoZ();
