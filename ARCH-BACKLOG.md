@@ -89,6 +89,17 @@ children 추가, 동작 검증), `getIbCalloutRoll`·`getIbCalloutRollById`(copy
 각 슬라이스 parse-clean + 제거 이름 grep 0 + 하네스 전수 `ERRORS []`로 검증 후 커밋.
 기능적 이득은 없음(무해한 죽은 코드였음), 파일 크기/복잡도 축소가 목적.
 
+**⚠️ 콜아웃 타이핑 스냅샷 증식 버그 수정 (2026-07).** "매 렌더마다 마이그"가 실제로는
+**매 블록 조회마다**(`getRootBlockListByCid`→`normalizeBlockTree`, 키 입력당 1회) + **매 persist
+플러시마다**(`makeStatePayload`→`normalizeSidebarState`→`normalizeScenarioRecord`, 라이브 객체 변형)
+돌고 있었다. 콜아웃 CE는 `updCalloutBody`로 여전히 `content`에 쓰므로, 타이핑 중 매 승격 시점의
+content 스냅샷이 새 text child로 쌓여 "키 입력 이력이 줄줄이 남는" 증상 발생.
+수정: content→children 승격을 `opts.promoteLegacyContent`로 게이팅(callout·ending·toggle 공통,
+`normalizeBlockTree(blocks, opts)`로 스레딩). true인 곳 = 렌더 경계(`renderBlocks`/
+`renderBlockListInto`/`loadBody`)와 로드 경계(`applyStatePayload`)뿐. 조회·persist 경로는 기본 false.
+`nestedCallouts` 행 마이그는 종전대로 무조건 수행(레거시 전용 데이터라 증식 불가).
+불변식: **라이브 편집 중인 필드를 변형하는 정규화는 DOM을 다시 그리는 경계에서만 실행한다.**
+
 > **검증 하네스 (프리뷰 대용, 동작 확인됨):** `playwright-core`(브라우저 다운로드 없이
 > 시스템 Chrome `C:\Program Files\Google\Chrome\Application\chrome.exe` 구동) + `pathToFileURL`
 > 로 앱 로드 → 페이지 컨텍스트에서 `applyStatePayload`/`select`/`createBlockData`로 상태 구성 후
