@@ -8126,7 +8126,91 @@ const SHEET_TEMPLATES = {
         { name: '', desc: '' },
       ]},
     ]
-  },  numenera: {
+  },
+  insane: {
+    key: 'insane', label: 'inSANe', version: 1,
+    sections: [
+      { id: 'basic', label: '기본 정보', columns: 4, fields: [
+        { id: 'charName', label: '캐릭터명', type: 'text', syncTarget: 'name' },
+        { id: 'playerName', label: '플레이어', type: 'text' },
+        { id: 'age', label: '나이', type: 'text' },
+        { id: 'gender', label: '성별', type: 'text' },
+        { id: 'occupation', label: '직업', type: 'text' },
+        { id: 'fear', label: '공포심', type: 'select', options: ['', '폭력', '정서', '지각', '기술', '지식', '괴이'], tooltip: '공포심으로 지정한 분야입니다.' },
+        { id: 'curiosity', label: '호기심', type: 'select', options: ['', '폭력', '정서', '지각', '기술', '지식', '괴이'], tooltip: '시나리오에서 지정되는 분야입니다.' },
+        { id: 'merit', label: '공적점', type: 'number' },
+        { id: 'catchphrase', label: '캐치프레이즈', type: 'textarea', keepGridWidth: true, autoGrow: true, colSpan: 2, syncTarget: 'memo' },
+        { id: 'setting', label: '외견 / 설정', type: 'textarea', keepGridWidth: true, autoGrow: true, colSpan: 2 },
+      ]},
+      { id: 'life', label: '생명력', tooltip: '피해를 받은 만큼 왼쪽부터 체크합니다.', columns: 3, fields: [
+        { id: 'lp1', label: '1', type: 'checkbox' },
+        { id: 'lp2', label: '2', type: 'checkbox' },
+        { id: 'lp3', label: '3', type: 'checkbox' },
+        { id: 'lp4', label: '4', type: 'checkbox' },
+        { id: 'lp5', label: '5', type: 'checkbox' },
+        { id: 'lp6', label: '6', type: 'checkbox' },
+      ]},
+      { id: 'missionSecret', label: '사명 / 비밀', columns: 2, fields: [
+        { id: 'mission', label: '사명', type: 'textarea', keepGridWidth: true, autoGrow: true },
+        { id: 'secret', label: '비밀', type: 'textarea', keepGridWidth: true, autoGrow: true },
+      ]},
+      { id: 'specialties', label: '특기', repeatable: true, fields: [
+        { id: 'field', label: '분야', type: 'select', options: ['폭력', '정서', '지각', '기술', '지식', '괴이'] },
+        { id: 'name', label: '특기', type: 'text' },
+        { id: 'isFear', label: '공포심', type: 'checkbox' },
+        { id: 'note', label: '비고', type: 'text' },
+      ], defaultRows: [
+        { field: '폭력', name: '', isFear: false, note: '' },
+        { field: '정서', name: '', isFear: false, note: '' },
+        { field: '지각', name: '', isFear: false, note: '' },
+        { field: '기술', name: '', isFear: false, note: '' },
+        { field: '지식', name: '', isFear: false, note: '' },
+        { field: '괴이', name: '', isFear: false, note: '' },
+      ]},
+      { id: 'abilities', label: '어빌리티', repeatable: true, fields: [
+        { id: 'name', label: '이름', type: 'text' },
+        { id: 'type', label: '타입', type: 'select', options: ['공격', '서포트', '장비'] },
+        { id: 'specialty', label: '지정특기', type: 'text' },
+        { id: 'effect', label: '효과', type: 'text' },
+      ], defaultRows: [
+        { name: '', type: '공격', specialty: '', effect: '' },
+        { name: '', type: '서포트', specialty: '', effect: '' },
+        { name: '', type: '장비', specialty: '', effect: '' },
+      ]},
+      { id: 'items', label: '아이템', columns: 3, fields: [
+        { id: 'gun', label: '총', type: 'number' },
+        { id: 'charm', label: '부적', type: 'number' },
+        { id: 'painkiller', label: '진통제', type: 'number' },
+      ]},
+      { id: 'emotions', label: '감정', repeatable: true, fields: [
+        { id: 'target', label: '대상', type: 'text' },
+        { id: 'emotion', label: '감정', type: 'text' },
+        { id: 'positive', label: '플러스', type: 'checkbox' },
+        { id: 'negative', label: '마이너스', type: 'checkbox' },
+      ], defaultRows: [
+        { target: '', emotion: '', positive: false, negative: false },
+        { target: '', emotion: '', positive: false, negative: false },
+        { target: '', emotion: '', positive: false, negative: false },
+      ]},
+      { id: 'madness', label: '광기', repeatable: true, fields: [
+        { id: 'name', label: '광기', type: 'text' },
+        { id: 'trigger', label: '트리거 조건', type: 'text' },
+        { id: 'revealed', label: '발현', type: 'checkbox' },
+        { id: 'effect', label: '효과', type: 'text' },
+      ], defaultRows: [
+        { name: '', trigger: '', revealed: false, effect: '' },
+        { name: '', trigger: '', revealed: false, effect: '' },
+        { name: '', trigger: '', revealed: false, effect: '' },
+      ]},
+      { id: 'flashback', label: '플래시백', fields: [
+        { id: 'flashback', label: '', type: 'textarea' },
+      ]},
+      { id: 'notes', label: '메모', fields: [
+        { id: 'notes', label: '', type: 'textarea' },
+      ]},
+    ]
+  },
+  numenera: {
 
     key: 'numenera', label: '누메네라', version: 1,
     sections: [
@@ -27618,6 +27702,7 @@ const RB_SHEET_TEMPLATE_OPTION_LABELS = {
   dnd5e: 'D&D 5판',
   arianrhod2e: '아리안로드 2E (Arianrhod)',
   unsungduet: '언성 듀엣 (UNSUNG DUET)',
+  insane: 'inSANe (인세인)',
   numenera: '누메네라 (Numenera)',
 };
 
@@ -31794,6 +31879,11 @@ const _SHEET_KEY_ALIASES = {
     'unsungduet', 'unsung', 'ud',
     '언성듀엣', '언성',
     'アンサングデュエット', 'アンサング・デュエット',
+  ],
+  insane: [
+    'insane',                     // "inSANe" → insane
+    '인세인', '인세인trpg',
+    'インセイン',
   ],
 };
 
