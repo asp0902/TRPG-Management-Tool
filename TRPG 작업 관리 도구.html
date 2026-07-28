@@ -12342,10 +12342,14 @@ function mkGapEl(cid, insertIdx, prevBlock, nextBlock, targetKey = makeRootBlock
   gap.dataset.cid = cid;
   gap.dataset.targetKey = targetKey;
   gap.innerHTML = `<div class="block-gap-line"></div><button class="block-gap-btn" title="블록 추가">+</button>`;
+  // 삽입 위치는 캡처값이 아니라 그때그때 dataset에서 읽는다.
+  // 블록을 증분 삽입하면 뒤쪽 갭들의 인덱스가 밀리는데, renumberBlockGapIndices가
+  // dataset만 고쳐도 핸들러가 따라오도록 하기 위한 것이다.
+  const gapIdx = () => Number(gap.dataset.insertIdx) || 0;
   gap.querySelector('.block-gap-btn').addEventListener('mousedown', e => e.preventDefault());
   gap.querySelector('.block-gap-btn').addEventListener('click', e => {
     e.stopPropagation();
-    openInsertPopup(e.currentTarget, cid, insertIdx, targetKey);
+    openInsertPopup(e.currentTarget, cid, gapIdx(), targetKey);
   });
   gap.addEventListener('dragover', e => {
     if (!dragId) return;
@@ -12363,22 +12367,53 @@ function mkGapEl(cid, insertIdx, prevBlock, nextBlock, targetKey = makeRootBlock
     e.preventDefault();
     e.stopPropagation();
     gap.classList.remove('gap-open');
-    dropBlockAtTarget(insertIdx, targetKey);
+    dropBlockAtTarget(gapIdx(), targetKey);
   });
   gap.addEventListener('contextmenu', e => {
     e.preventDefault();
     e.stopPropagation();
     if (_blockClipboard) {
       tbShowCtxMenu(e.clientX, e.clientY, [
-        { icon: '<i class="fa-solid fa-paste"></i>', label: '여기에 붙여넣기', action: () => pasteBlock(insertIdx, targetKey) },
+        { icon: '<i class="fa-solid fa-paste"></i>', label: '여기에 붙여넣기', action: () => pasteBlock(gapIdx(), targetKey) },
         { sep: true },
-        { icon: '＋', label: '새 블록 추가', action: () => openInsertPopupAtPoint(e.clientX, e.clientY, cid, insertIdx, targetKey) },
+        { icon: '＋', label: '새 블록 추가', action: () => openInsertPopupAtPoint(e.clientX, e.clientY, cid, gapIdx(), targetKey) },
       ]);
     } else {
-      openInsertPopupAtPoint(e.clientX, e.clientY, cid, insertIdx, targetKey);
+      openInsertPopupAtPoint(e.clientX, e.clientY, cid, gapIdx(), targetKey);
     }
   });
   return gap;
+}
+
+// 갭의 삽입 인덱스를 형제 중 앞선 .block 개수로 다시 매긴다.
+// 포인터 드래그 드롭이 dataset.insertIdx를 읽으므로 증분 삽입 뒤 반드시 맞춰줘야 한다.
+function renumberBlockGapIndices(parent) {
+  if (!parent) return;
+  let idx = 0;
+  for (const node of parent.children) {
+    if (node.classList?.contains('block-gap')) node.dataset.insertIdx = String(idx);
+    else if (node.classList?.contains('block')) idx += 1;
+  }
+}
+
+// 엔터로 블록을 나눌 때 목록 전체를 다시 그리지 않고 새 블록만 DOM에 끼워 넣는다.
+// 목록이 길수록 전체 재렌더 비용이 커지므로(600블록에서 250ms 이상) 이 경로가 필요하다.
+// 구조가 예상과 다르면 false를 돌려 호출부가 전체 렌더로 되돌아가게 한다.
+function insertBlockElementAfter(currentEl, prevBlock, newBlock, cid, ctx = {}) {
+  const parent = currentEl?.parentElement;
+  const nextGap = currentEl?.nextElementSibling;
+  if (!parent || !newBlock) return false;
+  if (!nextGap || !nextGap.classList.contains('block-gap')) return false;
+  // 목차에 실리는 종류가 새로 생기면 목차도 다시 그려야 하므로 전체 렌더에 맡긴다.
+  if (['intro', 'chapter', 'branch', 'roll', 'ending'].includes(newBlock.type)) return false;
+  const targetKey = ctx.targetKey || nextGap.dataset.targetKey || '';
+  if (!targetKey) return false;
+  const depth = Number(ctx.depth ?? currentEl.dataset.depth) || 0;
+  const el = mkBlockEl(newBlock, cid, { depth, targetKey });
+  parent.insertBefore(el, nextGap);
+  parent.insertBefore(mkGapEl(cid, 0, prevBlock, newBlock, targetKey), el);
+  renumberBlockGapIndices(parent);
+  return true;
 }
 function renderEndings(endings, cid) {
   const c = document.getElementById(cid); c.innerHTML = '';
@@ -12947,6 +12982,7 @@ function mkTextBlockEl(b, cid, ctx = {}) {
   el.className = 'block block-text';
   if ((ctx.depth || 0) > 0) el.classList.add('block-child');
   el.dataset.id = b.id; el.dataset.cid = cid;
+  el.dataset.depth = String(ctx.depth || 0);
   el.draggable = true;
 
   // 드래그 핸들
@@ -13093,7 +13129,10 @@ function mkTextBlockEl(b, cid, ctx = {}) {
       info.array.splice(info.index + 1, 0, nb);
 
       commitBlockTreeChange(`blocks:${b.id}:split`, info.rootCid, { force: true });
-      renderRootBlocksByCid(info.rootCid);
+      // 새 블록만 끼워 넣는다. 목록이 길면 전체 재렌더가 엔터 체감 지연의 대부분을 차지한다.
+      if (!insertBlockElementAfter(el, b, nb, cid, ctx)) {
+        renderRootBlocksByCid(info.rootCid);
+      }
 
       // 새 블록 CE에 포커스, 커서 맨 앞
       focusBlockEditableAfterRender(nb.id, '.block-text-ce', 'start');
@@ -15585,6 +15624,7 @@ function mkBlockEl(b, cid, ctx = {}) {
     el.style.borderColor = chBg;
   }
   el.dataset.id = b.id; el.dataset.cid = cid;
+  el.dataset.depth = String(ctx.depth || 0);
   el.draggable = true;
 
   let bodyHtml = '';
@@ -16096,7 +16136,9 @@ function speechCeKeydown(e, blockId, cid, ce) {
     info.array.splice(info.index + 1, 0, nb);
 
     commitBlockTreeChange(`speech:${blockId}:split`, info.rootCid, { force: true });
-    renderRootBlocksByCid(info.rootCid);
+    if (!insertBlockElementAfter(ce.closest('.block'), orig, nb, cid)) {
+      renderRootBlocksByCid(info.rootCid);
+    }
 
     // 새 블록 CE 포커스
     focusBlockEditableAfterRender(nb.id, '.block-ce[contenteditable]', 'start');
