@@ -6585,6 +6585,15 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-repeat-add-btn { border: 1px dashed #d0d0d0; border-radius: 6px; background: none; padding: 5px 12px; font-size: 12px; color: #888; cursor: pointer; font-family: inherit; width: 100%; text-align: center; }
 .sh-repeat-add-btn:hover { border-color: #999; color: #111; background: #fafafa; }
 /* ── Numenera Pools ───────────────────────────────────────── */
+/* inSANe 기본 정보 — 인적사항 한 줄, 생명력/이성치 체크박스 한 줄 */
+.sh-insane-basic { display: flex; flex-direction: column; gap: 10px; }
+.sh-insane-basic .ib-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.sh-insane-basic .ib-field { flex: 1 1 110px; min-width: 0; }
+.sh-insane-basic .ib-field-chk { flex: 0 0 auto; }
+.sh-insane-basic .ib-field-narrow { flex: 0 0 90px; }
+.sh-insane-basic .ib-chk-group { display: flex; gap: 4px; align-items: center; padding: 3px 0; }
+.sh-insane-basic .ib-chk { display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 9px; color: #aaa; cursor: pointer; }
+.sh-insane-basic .ib-chk input { margin: 0; cursor: pointer; }
 .sh-numenera-pools { display: grid; grid-template-columns: auto repeat(3, 1fr); border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
 .sh-numenera-pools .np-header { background: #f4f4f4; font-weight: 700; font-size: 11px; text-align: center; padding: 6px 4px; border-bottom: 1px solid #ddd; letter-spacing: 0.02em; }
 .sh-numenera-pools .np-header:first-child { background: transparent; border-right: 1px solid #eee; }
@@ -8130,25 +8139,34 @@ const SHEET_TEMPLATES = {
   insane: {
     key: 'insane', label: 'inSANe', version: 1,
     sections: [
-      { id: 'basic', label: '기본 정보', columns: 4, fields: [
-        { id: 'charName', label: '캐릭터명', type: 'text', syncTarget: 'name' },
+      // 윗줄에 인적사항 5칸, 아랫줄에 생명력/이성치 체크박스와 공적점·Etc를 두는 전용 레이아웃.
+      // 체크박스 6개를 한 칸 안에 묶어야 해서 범용 그리드 대신 customType을 쓴다.
+      { id: 'basic', label: '기본 정보', customType: 'insane-basic', fields: [
         { id: 'playerName', label: '플레이어', type: 'text' },
-        { id: 'age', label: '나이', type: 'text' },
+        { id: 'charName', label: '캐릭터명', type: 'text', syncTarget: 'name' },
         { id: 'gender', label: '성별', type: 'text' },
+        { id: 'age', label: '연령', type: 'text' },
         { id: 'occupation', label: '직업', type: 'text' },
-        { id: 'fear', label: '공포심', type: 'select', options: ['', '폭력', '정서', '지각', '기술', '지식', '괴이'], tooltip: '공포심으로 지정한 분야입니다.' },
-        { id: 'curiosity', label: '호기심', type: 'select', options: ['', '폭력', '정서', '지각', '기술', '지식', '괴이'], tooltip: '시나리오에서 지정되는 분야입니다.' },
-        { id: 'merit', label: '공적점', type: 'number' },
-        { id: 'catchphrase', label: '캐치프레이즈', type: 'textarea', keepGridWidth: true, autoGrow: true, colSpan: 2, syncTarget: 'memo' },
-        { id: 'setting', label: '외견 / 설정', type: 'textarea', keepGridWidth: true, autoGrow: true, colSpan: 2 },
-      ]},
-      { id: 'life', label: '생명력', tooltip: '피해를 받은 만큼 왼쪽부터 체크합니다.', columns: 3, fields: [
         { id: 'lp1', label: '1', type: 'checkbox' },
         { id: 'lp2', label: '2', type: 'checkbox' },
         { id: 'lp3', label: '3', type: 'checkbox' },
         { id: 'lp4', label: '4', type: 'checkbox' },
         { id: 'lp5', label: '5', type: 'checkbox' },
         { id: 'lp6', label: '6', type: 'checkbox' },
+        { id: 'sn1', label: '1', type: 'checkbox' },
+        { id: 'sn2', label: '2', type: 'checkbox' },
+        { id: 'sn3', label: '3', type: 'checkbox' },
+        { id: 'sn4', label: '4', type: 'checkbox' },
+        { id: 'sn5', label: '5', type: 'checkbox' },
+        { id: 'sn6', label: '6', type: 'checkbox' },
+        { id: 'merit', label: '공적점', type: 'number' },
+        { id: 'etc', label: 'Etc', type: 'text' },
+      ]},
+      { id: 'profile', label: '캐릭터 설정', columns: 4, fields: [
+        { id: 'fear', label: '공포심', type: 'select', options: ['', '폭력', '정서', '지각', '기술', '지식', '괴이'], tooltip: '공포심으로 지정한 분야입니다.' },
+        { id: 'curiosity', label: '호기심', type: 'select', options: ['', '폭력', '정서', '지각', '기술', '지식', '괴이'], tooltip: '시나리오에서 지정되는 분야입니다.' },
+        { id: 'catchphrase', label: '캐치프레이즈', type: 'textarea', keepGridWidth: true, autoGrow: true, colSpan: 2, syncTarget: 'memo' },
+        { id: 'setting', label: '외견 / 설정', type: 'textarea', keepGridWidth: true, autoGrow: true, colSpan: 4 },
       ]},
       { id: 'missionSecret', label: '사명 / 비밀', columns: 2, fields: [
         { id: 'mission', label: '사명', type: 'textarea', keepGridWidth: true, autoGrow: true },
@@ -33233,6 +33251,10 @@ function renderCharacterSheet(chId) {
       var sectionData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
       return renderNumeneraPoolsSection(sec, sectionData, chId, sheetId);
     }
+    if (sec.customType === 'insane-basic') {
+      var sectionData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
+      return renderInsaneBasicSection(sec, sectionData, chId, sheetId);
+    }
     if (tpl.key === 'arianrhod2e' && sec.id === 'skills' && sec.repeatable) {
       var skRows = Array.isArray(sheetData[sec.id]) ? sheetData[sec.id] : [];
       return renderArianrhod2eSkillsSection(sec, skRows, chId, sheetId);
@@ -35755,6 +35777,51 @@ function renderNumeneraPoolsSection(sec, sectionData, chId, sheetId) {
   }).join('');
   return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'
     + '<div class="sh-section-body"><div class="sh-numenera-pools">' + headerCells + bodyCells + '</div></div></div>';
+}
+
+// inSANe 기본 정보: 윗줄 인적사항 5칸 / 아랫줄 생명력·이성치 체크박스 + 공적점 + Etc
+function renderInsaneBasicSection(sec, sectionData, chId, sheetId) {
+  sectionData = (sectionData && typeof sectionData === 'object' && !Array.isArray(sectionData)) ? sectionData : {};
+  var saveExpr = function(fieldId, valueExpr) {
+    return 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ','
+      + JSON.stringify(sec.id) + ',' + JSON.stringify(fieldId) + ',' + valueExpr + ')';
+  };
+  var textField = function(fieldId, label, inputType, extraClass) {
+    var val = sectionData[fieldId] !== undefined ? String(sectionData[fieldId]) : '';
+    return '<div class="sh-field ib-field' + (extraClass ? ' ' + extraClass : '') + '">'
+      + '<label class="sh-field-label">' + esc(label) + '</label>'
+      + '<input class="sh-field-input" type="' + (inputType || 'text') + '" value="' + esc(val) + '"'
+      + ' oninput="' + esc(saveExpr(fieldId, 'this.value')) + '">'
+      + '</div>';
+  };
+  var checkGroup = function(label, prefix, count) {
+    var boxes = '';
+    for (var i = 1; i <= count; i++) {
+      var fieldId = prefix + i;
+      boxes += '<label class="ib-chk">'
+        + '<input type="checkbox"' + (sectionData[fieldId] ? ' checked' : '')
+        + ' onchange="' + esc(saveExpr(fieldId, 'this.checked')) + '">'
+        + '<span>' + i + '</span></label>';
+    }
+    return '<div class="sh-field ib-field ib-field-chk">'
+      + '<label class="sh-field-label">' + esc(label) + '</label>'
+      + '<div class="ib-chk-group">' + boxes + '</div>'
+      + '</div>';
+  };
+  var topRow = textField('playerName', '플레이어')
+    + textField('charName', '캐릭터명')
+    + textField('gender', '성별')
+    + textField('age', '연령')
+    + textField('occupation', '직업');
+  var bottomRow = checkGroup('생명력', 'lp', 6)
+    + checkGroup('이성치', 'sn', 6)
+    + textField('merit', '공적점', 'number', 'ib-field-narrow')
+    + textField('etc', 'Etc');
+  return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'
+    + '<div class="sh-section-body"><div class="sh-insane-basic">'
+    + '<div class="ib-row">' + topRow + '</div>'
+    + '<div class="ib-row">' + bottomRow + '</div>'
+    + '</div></div></div>';
 }
 
 // 주사위 공식 평가 (예: "3D6*5", "(2D6+6)*5")
