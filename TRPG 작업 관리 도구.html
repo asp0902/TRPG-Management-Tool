@@ -9197,6 +9197,14 @@ function applyScenarioHistorySnapshot(snapshot, focusTarget) {
     state.scenarios[scenarioIndex] = JSON.parse(snapshot);
     renderCurrentScenarioView(focusTarget?.tab || getActiveTab());
     persist();
+    // 렌더 중 정규화가 상태를 조금 손보면 스냅샷 문자열이 저장된 것과 달라진다.
+    // 그대로 두면 다음 undo/redo의 pending 검사가 이를 새 편집으로 오인해
+    // 앞쪽 기록을 잘라내 버린다(다시 실행이 먹지 않던 원인). 항목을 현재 상태로 맞춘다.
+    const history = scenarioHistory.get(currentId);
+    if (history && history.stack.length) {
+      const normalized = snapshotScenario(currentId);
+      if (normalized != null) history.stack[history.index] = normalized;
+    }
   } finally {
     historyApplying = false;
   }
@@ -18465,7 +18473,11 @@ function updIbItem(blockId, ibId, itemId, field, val) {
 function updIbItemHtml(blockId, ibId, itemId, field, val) {
   const ib = getIbByIds(blockId, ibId); if (!ib) return;
   const item = (ib.items || []).find(x => x.id === itemId);
-  if (item) item[field] = normalizeEditableHtml(val);
+  if (!item) return;
+  item[field] = normalizeEditableHtml(val);
+  // 루트 블록의 upd()와 같이 입력마다 커밋한다. 이게 없으면 입력 내용이 히스토리에도
+  // 저장소에도 남지 않아, 실행취소 단위가 어긋나고 저장 전 새로고침 시 유실된다.
+  commitScenarioHistory(`branch:${blockId}:${ibId}:item:${itemId}:${field}`);
 }
 function getIbRollItem(blockId, ibId, itemId) {
   const ib = getIbByIds(blockId, ibId); if (!ib) return { innerBlock: null, item: null };
