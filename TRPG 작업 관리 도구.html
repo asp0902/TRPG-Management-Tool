@@ -32576,6 +32576,11 @@ function _ar2eMeasureInputWidth(el) {
   var total = Math.ceil(textW) + padL + padR + bL + bR + 4;
   return Math.max(min, Math.min(640, total));
 }
+// 입력값 길이에 맞춰 폭을 늘리되 data-minpx 아래로는 줄이지 않음
+function ds_ar2eSkillAutoWidth(el) {
+  if (!el || !el.style) return;
+  el.style.width = _ar2eMeasureInputWidth(el) + 'px';
+}
 // 같은 필드(열)끼리 가장 긴 텍스트에 맞춰 폭을 일괄 통일
 function _ar2eSkillColumns(scope) {
   var listEl = null;
