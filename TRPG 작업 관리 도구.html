@@ -3918,10 +3918,10 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   min-height: 24px;
   padding-left: 0;
 }
+/* 자식 텍스트도 루트와 같은 본문 지표를 쓴다. 예전엔 min-height 22 + 위아래 패딩 0이라
+   블록(24px) 안에서 글자가 위로 붙었다(위 -0.5 / 아래 4.5). 블록 높이는 24px로 동일하다. */
 .block-children-wrap > .block.block-text.block-child .block-text-ce {
-  min-height: 22px;
-  padding-top: 0;
-  padding-bottom: 0;
+  min-height: 24px;
 }
 .block-children-wrap > .block.block-callout.block-child {
   width: calc(100% - 10px);
@@ -4039,11 +4039,8 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   --child-indent: 6px;
   margin-top: 4px;
 }
-/* 토글 내부 기본(text) 블록 — 상하 여백 2px */
-.toggle-content-wrap .block-children-wrap .block.block-text > .block-text-ce {
-  padding-top: 2px;
-  padding-bottom: 2px;
-}
+/* 토글 내부 기본(text) 블록도 본문 기본 상하 여백을 그대로 쓴다.
+   상하 2px로 두면 24px 블록 안에서 글자가 위로 1px 치우친다(위 1 / 아래 3). */
 .toggle-content-wrap > .block-children-wrap > .block.block-text > .block-text-ce {
   padding-left: 4px;
 }
@@ -4072,6 +4069,13 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 
   padding-left: 0;
   border-left: none;
+}
+/* 위 셀렉터가 .block-children-wrap[data-empty="1"]의 margin-top:0 보다 구체적이라,
+   자식이 없어도 2px가 남아 블록이 본문칸보다 2px 커졌고 텍스트가 그만큼 위로 치우쳐 보였다.
+   빈 경우에는 여백을 없애 본문이 블록 안에서 세로 가운데에 오게 한다. */
+.block.block-text > .block-children-wrap[data-empty="1"],
+.block.block-divider > .block-children-wrap[data-empty="1"] {
+  margin-top: 0;
 }
 /* 빈 텍스트 CE인데 자식 블록이 있는 텍스트 블록: 에디터 크롬을 접고 자식이 폭을 차지한다.
    이 셀렉터 하나가 root 텍스트와 판정 결과칸 자식(.block-child)을 모두 커버한다.
