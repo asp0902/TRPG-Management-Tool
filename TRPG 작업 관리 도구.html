@@ -6588,12 +6588,26 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 /* inSANe 기본 정보 — 인적사항 한 줄, 생명력/이성치 체크박스 한 줄 */
 .sh-insane-basic { display: flex; flex-direction: column; gap: 10px; }
 .sh-insane-basic .ib-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
-.sh-insane-basic .ib-field { flex: 1 1 110px; min-width: 0; }
+.sh-insane-basic .ib-field { flex: 1 1 80px; min-width: 0; }
 .sh-insane-basic .ib-field-chk { flex: 0 0 auto; }
 .sh-insane-basic .ib-field-narrow { flex: 0 0 90px; }
 .sh-insane-basic .ib-chk-group { display: flex; gap: 4px; align-items: center; padding: 3px 0; }
-.sh-insane-basic .ib-chk { display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 9px; color: #aaa; cursor: pointer; }
+.sh-insane-basic .ib-chk { display: flex; align-items: center; cursor: pointer; }
 .sh-insane-basic .ib-chk input { margin: 0; cursor: pointer; }
+/* inSANe 특기표 — 행번호 + 6분야 */
+.sh-insane-specialties { display: grid; grid-template-columns: 34px repeat(6, minmax(0, 1fr)); gap: 3px; }
+.sh-insane-specialties .isp-cell { min-width: 0; font-size: 11px; }
+.sh-insane-specialties .isp-head { background: #2f2f2f; color: #fff; font-weight: 700; text-align: center; padding: 5px 4px; border-radius: 4px; }
+.sh-insane-specialties .isp-rownum { background: #6b6b6b; color: #fff; font-weight: 700; text-align: center; padding: 5px 2px; border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.sh-insane-specialties .isp-skill { display: flex; align-items: center; gap: 5px; padding: 4px 6px; border: 1px solid #e4e4e4; border-radius: 4px; background: #fff; cursor: pointer; }
+.sh-insane-specialties .isp-skill:hover { border-color: #bbb; }
+.sh-insane-specialties .isp-skill input { margin: 0; flex-shrink: 0; cursor: pointer; }
+.sh-insane-specialties .isp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-insane-specialties .isp-skill.is-fear .isp-name { color: #dc2626; font-weight: 700; }
+.isp-foot { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px; }
+.isp-foot .isp-foot-field { flex: 0 0 130px; }
+.isp-foot .isp-foot-field.is-wide { flex: 1 1 200px; }
+.isp-foot .isp-foot-field.is-narrow { flex: 0 0 100px; }
 .sh-numenera-pools { display: grid; grid-template-columns: auto repeat(3, 1fr); border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
 .sh-numenera-pools .np-header { background: #f4f4f4; font-weight: 700; font-size: 11px; text-align: center; padding: 6px 4px; border-bottom: 1px solid #ddd; letter-spacing: 0.02em; }
 .sh-numenera-pools .np-header:first-child { background: transparent; border-right: 1px solid #eee; }
@@ -8137,7 +8151,7 @@ const SHEET_TEMPLATES = {
     ]
   },
   insane: {
-    key: 'insane', label: 'inSANe', version: 1,
+    key: 'insane', label: 'inSANe', version: 2,
     sections: [
       // 윗줄에 인적사항 5칸, 아랫줄에 생명력/이성치 체크박스와 공적점·Etc를 두는 전용 레이아웃.
       // 체크박스 6개를 한 칸 안에 묶어야 해서 범용 그리드 대신 customType을 쓴다.
@@ -8162,55 +8176,19 @@ const SHEET_TEMPLATES = {
         { id: 'merit', label: '공적점', type: 'number' },
         { id: 'etc', label: 'Etc', type: 'text' },
       ]},
-      { id: 'profile', label: '캐릭터 설정', columns: 4, fields: [
-        { id: 'fear', label: '공포심', type: 'select', options: ['', '폭력', '정서', '지각', '기술', '지식', '괴이'], tooltip: '공포심으로 지정한 분야입니다.' },
-        { id: 'curiosity', label: '호기심', type: 'select', options: ['', '폭력', '정서', '지각', '기술', '지식', '괴이'], tooltip: '시나리오에서 지정되는 분야입니다.' },
-        { id: 'catchphrase', label: '캐치프레이즈', type: 'textarea', keepGridWidth: true, autoGrow: true, colSpan: 2, syncTarget: 'memo' },
-        { id: 'setting', label: '외견 / 설정', type: 'textarea', keepGridWidth: true, autoGrow: true, colSpan: 4 },
-      ]},
-      { id: 'missionSecret', label: '사명 / 비밀', columns: 2, fields: [
-        { id: 'mission', label: '사명', type: 'textarea', keepGridWidth: true, autoGrow: true },
-        { id: 'secret', label: '비밀', type: 'textarea', keepGridWidth: true, autoGrow: true },
-      ]},
-      { id: 'specialties', label: '특기', repeatable: true, fields: [
-        { id: 'field', label: '분야', type: 'select', options: ['폭력', '정서', '지각', '기술', '지식', '괴이'] },
-        { id: 'name', label: '특기', type: 'text' },
-        { id: 'isFear', label: '공포심', type: 'checkbox' },
-        { id: 'note', label: '비고', type: 'text' },
-      ], defaultRows: [
-        { field: '폭력', name: '', isFear: false, note: '' },
-        { field: '정서', name: '', isFear: false, note: '' },
-        { field: '지각', name: '', isFear: false, note: '' },
-        { field: '기술', name: '', isFear: false, note: '' },
-        { field: '지식', name: '', isFear: false, note: '' },
-        { field: '괴이', name: '', isFear: false, note: '' },
-      ]},
-      { id: 'abilities', label: '어빌리티', repeatable: true, fields: [
-        { id: 'name', label: '이름', type: 'text' },
-        { id: 'type', label: '타입', type: 'select', options: ['공격', '서포트', '장비'] },
-        { id: 'specialty', label: '지정특기', type: 'text' },
-        { id: 'effect', label: '효과', type: 'text' },
-      ], defaultRows: [
-        { name: '', type: '공격', specialty: '', effect: '' },
-        { name: '', type: '서포트', specialty: '', effect: '' },
-        { name: '', type: '장비', specialty: '', effect: '' },
-      ]},
       { id: 'items', label: '아이템', columns: 3, fields: [
-        { id: 'gun', label: '총', type: 'number' },
-        { id: 'charm', label: '부적', type: 'number' },
         { id: 'painkiller', label: '진통제', type: 'number' },
+        { id: 'weapon', label: '무기', type: 'number' },
+        { id: 'charm', label: '부적', type: 'number' },
+        { id: 'net', label: '그물망 발사기', type: 'number' },
+        { id: 'memoryErase', label: 'B급 기억소거', type: 'number' },
+        { id: 'detonator', label: '기폭장치', type: 'number' },
       ]},
-      { id: 'emotions', label: '감정', repeatable: true, fields: [
-        { id: 'target', label: '대상', type: 'text' },
-        { id: 'emotion', label: '감정', type: 'text' },
-        { id: 'positive', label: '플러스', type: 'checkbox' },
-        { id: 'negative', label: '마이너스', type: 'checkbox' },
-      ], defaultRows: [
-        { target: '', emotion: '', positive: false, negative: false },
-        { target: '', emotion: '', positive: false, negative: false },
-        { target: '', emotion: '', positive: false, negative: false },
+      { id: 'madnessState', label: '광기', columns: 2, fields: [
+        { id: 'current', label: '현재화한 광기', type: 'number' },
+        { id: 'delirium', label: '착란', type: 'checkbox' },
       ]},
-      { id: 'madness', label: '광기', repeatable: true, fields: [
+      { id: 'madness', label: '광기 목록', repeatable: true, fields: [
         { id: 'name', label: '광기', type: 'text' },
         { id: 'trigger', label: '트리거 조건', type: 'text' },
         { id: 'revealed', label: '발현', type: 'checkbox' },
@@ -8220,8 +8198,44 @@ const SHEET_TEMPLATES = {
         { name: '', trigger: '', revealed: false, effect: '' },
         { name: '', trigger: '', revealed: false, effect: '' },
       ]},
+      // 6분야 × 11행 특기표. 습득 여부만 체크하고 아래에 호기심·공포심·수정치를 둔다.
+      { id: 'specialties', label: '특기', customType: 'insane-specialties', fields: [
+        { id: 'curiosity', label: '호기심', type: 'select', options: ['', '1.폭력', '2.정서', '3.지각', '4.기술', '5.지식', '6.괴이'] },
+        { id: 'fear', label: '공포심', type: 'text' },
+        { id: 'modifier', label: '전체 수정치', type: 'number' },
+      ]},
+      { id: 'abilities', label: '어빌리티 리스트', repeatable: true, fields: [
+        { id: 'name', label: '어빌리티', type: 'text' },
+        { id: 'type', label: '타입', type: 'select', options: ['공격', '서포트', '장비'] },
+        { id: 'specialty', label: '지정특기', type: 'text' },
+        { id: 'effect', label: '효과', type: 'text' },
+      ], defaultRows: [
+        { name: '', type: '공격', specialty: '', effect: '' },
+        { name: '', type: '서포트', specialty: '', effect: '' },
+        { name: '', type: '장비', specialty: '', effect: '' },
+      ]},
+      { id: 'relations', label: '관계 목록', repeatable: true, fields: [
+        { id: 'person', label: '인물', type: 'text' },
+        { id: 'shelter', label: '거처', type: 'checkbox' },
+        { id: 'emotion', label: '감정', type: 'text' },
+      ], defaultRows: [
+        { person: '', shelter: false, emotion: '' },
+        { person: '', shelter: false, emotion: '' },
+        { person: '', shelter: false, emotion: '' },
+        { person: '', shelter: false, emotion: '' },
+        { person: '', shelter: false, emotion: '' },
+        { person: '', shelter: false, emotion: '' },
+      ]},
+      { id: 'profile', label: '캐릭터 설정', columns: 2, fields: [
+        { id: 'catchphrase', label: '캐치프레이즈', type: 'textarea', keepGridWidth: true, autoGrow: true, syncTarget: 'memo' },
+        { id: 'setting', label: '외견 / 설정', type: 'textarea', keepGridWidth: true, autoGrow: true },
+      ]},
       { id: 'flashback', label: '플래시백', fields: [
         { id: 'flashback', label: '', type: 'textarea' },
+      ]},
+      { id: 'missionSecret', label: '사명 / 비밀', columns: 2, fields: [
+        { id: 'mission', label: '사명', type: 'textarea', keepGridWidth: true, autoGrow: true },
+        { id: 'secret', label: '비밀', type: 'textarea', keepGridWidth: true, autoGrow: true },
       ]},
       { id: 'notes', label: '메모', fields: [
         { id: 'notes', label: '', type: 'textarea' },
@@ -33255,6 +33269,10 @@ function renderCharacterSheet(chId) {
       var sectionData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
       return renderInsaneBasicSection(sec, sectionData, chId, sheetId);
     }
+    if (sec.customType === 'insane-specialties') {
+      var sectionData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
+      return renderInsaneSpecialtiesSection(sec, sectionData, chId, sheetId);
+    }
     if (tpl.key === 'arianrhod2e' && sec.id === 'skills' && sec.repeatable) {
       var skRows = Array.isArray(sheetData[sec.id]) ? sheetData[sec.id] : [];
       return renderArianrhod2eSkillsSection(sec, skRows, chId, sheetId);
@@ -35779,9 +35797,66 @@ function renderNumeneraPoolsSection(sec, sectionData, chId, sheetId) {
     + '<div class="sh-section-body"><div class="sh-numenera-pools">' + headerCells + bodyCells + '</div></div></div>';
 }
 
+// inSANe 특기표 — 롤20 시트와 같은 6분야 × 11행 구성. 행 번호는 2~12.
+const INSANE_SPECIALTY_COLUMNS = [
+  { key: 'vio', label: '1.폭력', names: ['소각', '고문', '포박', '협박', '파괴', '구타', '절단', '찌르기', '사격', '전쟁', '매장'] },
+  { key: 'emo', label: '2.정서', names: ['연심', '기쁨', '걱정', '부끄러움', '웃음', '인내', '놀람', '노여움', '원한', '슬픔', '친애'] },
+  { key: 'per', label: '3.지각', names: ['고통', '관능', '촉감', '냄새', '맛', '소리', '풍경', '추적', '예술', '제육감', '그늘'] },
+  { key: 'tec', label: '4.기술', names: ['분해', '전자기기', '정리', '약품', '효율', '미디어', '카메라', '탈것', '기계', '함정', '병기'] },
+  { key: 'kno', label: '5.지식', names: ['물리학', '수학', '화학', '생물학', '의학', '교양', '인류학', '역사', '민속학', '고고학', '천문학'] },
+  { key: 'occ', label: '6.괴이', names: ['시간', '혼돈', '심해', '죽음', '영혼', '마술', '암흑', '종말', '꿈', '지저', '우주'] },
+];
+function renderInsaneSpecialtiesSection(sec, sectionData, chId, sheetId) {
+  sectionData = (sectionData && typeof sectionData === 'object' && !Array.isArray(sectionData)) ? sectionData : {};
+  var saveExpr = function(fieldId, valueExpr) {
+    return 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ','
+      + JSON.stringify(sec.id) + ',' + JSON.stringify(fieldId) + ',' + valueExpr + ')';
+  };
+  var head = '<div class="isp-cell isp-corner"></div>'
+    + INSANE_SPECIALTY_COLUMNS.map(function(col) {
+        return '<div class="isp-cell isp-head">' + esc(col.label) + '</div>';
+      }).join('');
+  var body = '';
+  for (var row = 0; row < 11; row++) {
+    body += '<div class="isp-cell isp-rownum">' + (row + 2) + '</div>';
+    body += INSANE_SPECIALTY_COLUMNS.map(function(col) {
+      var fieldId = col.key + (row + 2);
+      var name = col.names[row];
+      var isFear = String(sectionData.fear || '').trim() === name;
+      return '<label class="isp-cell isp-skill' + (isFear ? ' is-fear' : '') + '">'
+        + '<input type="checkbox"' + (sectionData[fieldId] ? ' checked' : '')
+        + ' onchange="' + esc(saveExpr(fieldId, 'this.checked')) + '">'
+        + '<span class="isp-name">' + esc(name) + '</span></label>';
+    }).join('');
+  }
+  var curiosityOpts = (sec.fields.find(function(f) { return f.id === 'curiosity'; }) || {}).options || [];
+  var curVal = sectionData.curiosity !== undefined ? String(sectionData.curiosity) : '';
+  var footer = '<div class="sh-field isp-foot-field">'
+      + '<label class="sh-field-label">호기심</label>'
+      + '<select class="sh-field-input" onchange="' + esc(saveExpr('curiosity', 'this.value')) + '">'
+      + curiosityOpts.map(function(o) {
+          return '<option value="' + esc(o) + '"' + (o === curVal ? ' selected' : '') + '>' + esc(o || '—') + '</option>';
+        }).join('')
+      + '</select></div>'
+    + '<div class="sh-field isp-foot-field is-wide">'
+      + '<label class="sh-field-label">공포심</label>'
+      + '<input class="sh-field-input" type="text" value="' + esc(String(sectionData.fear || '')) + '"'
+      + ' oninput="' + esc(saveExpr('fear', 'this.value')) + '"></div>'
+    + '<div class="sh-field isp-foot-field is-narrow">'
+      + '<label class="sh-field-label">전체 수정치</label>'
+      + '<input class="sh-field-input" type="number" value="' + esc(String(sectionData.modifier !== undefined ? sectionData.modifier : '')) + '"'
+      + ' oninput="' + esc(saveExpr('modifier', 'this.value')) + '"></div>';
+  return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'
+    + '<div class="sh-section-body">'
+    + '<div class="sh-insane-specialties">' + head + body + '</div>'
+    + '<div class="isp-foot">' + footer + '</div>'
+    + '</div></div>';
+}
+
 // inSANe 기본 정보: 윗줄 인적사항 5칸 / 아랫줄 생명력·이성치 체크박스 + 공적점 + Etc
 function renderInsaneBasicSection(sec, sectionData, chId, sheetId) {
   sectionData = (sectionData && typeof sectionData === 'object' && !Array.isArray(sectionData)) ? sectionData : {};
+  var ch = state.characters.find(function(c) { return c.id === chId; }) || {};
   var saveExpr = function(fieldId, valueExpr) {
     return 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ','
       + JSON.stringify(sec.id) + ',' + JSON.stringify(fieldId) + ',' + valueExpr + ')';
@@ -35800,8 +35875,7 @@ function renderInsaneBasicSection(sec, sectionData, chId, sheetId) {
       var fieldId = prefix + i;
       boxes += '<label class="ib-chk">'
         + '<input type="checkbox"' + (sectionData[fieldId] ? ' checked' : '')
-        + ' onchange="' + esc(saveExpr(fieldId, 'this.checked')) + '">'
-        + '<span>' + i + '</span></label>';
+        + ' onchange="' + esc(saveExpr(fieldId, 'this.checked')) + '"></label>';
     }
     return '<div class="sh-field ib-field ib-field-chk">'
       + '<label class="sh-field-label">' + esc(label) + '</label>'
@@ -35817,11 +35891,16 @@ function renderInsaneBasicSection(sec, sectionData, chId, sheetId) {
     + checkGroup('이성치', 'sn', 6)
     + textField('merit', '공적점', 'number', 'ib-field-narrow')
     + textField('etc', 'Etc');
+  var characterImage = String(ch.image || '').trim();
+  var portraitHtml = characterImage
+    ? '<div class="ch-sheet-basic-portrait"><img src="' + esc(characterImage) + '" alt="' + esc(ch.name || '캐릭터 이미지') + '" onload="fitCharacterPortrait(this)" onerror="this.parentElement.textContent=\'NO IMAGE\'"></div>'
+    : '<div class="ch-sheet-basic-portrait">NO IMAGE</div>';
   return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'
-    + '<div class="sh-section-body"><div class="sh-insane-basic">'
+    + '<div class="sh-section-body"><div class="ch-sheet-basic-wrap">' + portraitHtml
+    + '<div class="ch-sheet-basic-fields"><div class="sh-insane-basic">'
     + '<div class="ib-row">' + topRow + '</div>'
     + '<div class="ib-row">' + bottomRow + '</div>'
-    + '</div></div></div>';
+    + '</div></div></div></div></div>';
 }
 
 // 주사위 공식 평가 (예: "3D6*5", "(2D6+6)*5")
