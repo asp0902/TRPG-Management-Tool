@@ -3925,9 +3925,12 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 .block-children-wrap > .block.block-text.block-child .block-text-ce {
   min-height: 24px;
 }
+/* 자식 영역은 왼쪽으로만 --child-indent 만큼 들여쓰기되어 오른쪽에는 대응 여백이 없다.
+   콜아웃은 테두리가 있어 그 차이가 그대로 드러나므로, 폭에서 들여쓰기만큼 더 빼
+   부모 기준 좌우 여백이 같아 보이게 한다. */
 .block-children-wrap > .block.block-callout.block-child {
-  width: calc(100% - 10px);
-  max-width: calc(100% - 10px);
+  width: calc(100% - 10px - var(--child-indent));
+  max-width: calc(100% - 10px - var(--child-indent));
   margin: 5px !important;
   box-sizing: border-box;
 }
