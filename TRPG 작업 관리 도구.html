@@ -18243,20 +18243,37 @@ function getEditableSplitHtmlAtSelection(ce, normalizer = normalizeEditableHtml)
   };
 }
 
+// 렌더는 동기이므로 지연 없이 바로 커서를 옮긴다(예전 setTimeout 60ms가 체감 지연의 일부였다).
 function focusEditableAtStartAfterRender(selector, blockId = '') {
-  setTimeout(() => {
-    if (blockId) selectBlock(blockId);
-    const target = document.querySelector(selector);
-    if (!target) return;
-    target.focus();
-    const range = document.createRange();
-    range.selectNodeContents(target);
-    range.collapse(true);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-    target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, 60);
+  if (blockId) selectBlock(blockId);
+  const target = document.querySelector(selector);
+  if (!target) return;
+  target.focus();
+  const range = document.createRange();
+  range.selectNodeContents(target);
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+  target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// 블록 하나만 다시 그려 제자리에 교체한다. 갭 개수가 그대로라 인덱스는 손댈 필요가 없다.
+// 분기점 내부 편집처럼 한 블록 안에서만 바뀌는 경우, 목록 전체를 다시 그리지 않기 위한 것이다.
+function rerenderBlockElement(blockId, cid = 'blocks-container') {
+  const oldEl = document.querySelector(`.block[data-id="${blockId}"][data-cid="${cid}"]`);
+  if (!oldEl) return false;
+  const nextGap = oldEl.nextElementSibling;
+  const targetKey = (nextGap && nextGap.classList.contains('block-gap') ? nextGap.dataset.targetKey : '') || '';
+  if (!targetKey) return false;
+  const info = getBlockArrayInfo(blockId, cid);
+  if (!info?.block) return false;
+  const depth = Number(oldEl.dataset.depth) || 0;
+  const fresh = info.block.type === 'ending'
+    ? mkEndingEl(info.block, cid, { depth, targetKey })
+    : mkBlockEl(info.block, cid, { depth, targetKey });
+  oldEl.replaceWith(fresh);
+  return true;
 }
 
 // 대사 CE에서 Enter → 현재 줄을 분리해 새 대사 아이템으로 추가 (줄 단위 이동 전제)
@@ -18287,7 +18304,10 @@ function handleIbTextCeEnter(e, blockId, ibId, itemId, cid) {
     const newItem = { id: mkId(), type: 'text', content: afterHtml };
     arr.splice(itemIdx + 1, 0, newItem);
     commitScenarioHistory(`branch:${blockId}:${ibId}:item:${newItem.id}:split`, { force: true });
-    renderBlocks(cur().blocks, cid || 'blocks-container');
+    // 바뀐 건 이 분기 블록 안뿐이므로 그 블록만 다시 그린다.
+    if (!rerenderBlockElement(blockId, cid || 'blocks-container')) {
+      renderBlocks(cur().blocks, cid || 'blocks-container');
+    }
     focusEditableAtStartAfterRender(`.bib-item-text-ce[data-item-id="${newItem.id}"]`, blockId);
     return;
   }
@@ -18317,9 +18337,11 @@ function handleIbTextCeEnter(e, blockId, ibId, itemId, cid) {
     prev.content = prevHtml + curHtml;
     arr.splice(itemIdx, 1);
     commitScenarioHistory(`branch:${blockId}:${ibId}:item:${itemId}:merge`, { force: true });
-    renderBlocks(cur().blocks, cid || 'blocks-container');
+    if (!rerenderBlockElement(blockId, cid || 'blocks-container')) {
+      renderBlocks(cur().blocks, cid || 'blocks-container');
+    }
 
-    setTimeout(() => {
+    (() => {
       if (blockId) selectBlock(blockId);
       const target = document.querySelector(`.bib-item-text-ce[data-item-id="${prev.id}"]`);
       if (!target) return;
@@ -18349,7 +18371,7 @@ function handleIbTextCeEnter(e, blockId, ibId, itemId, cid) {
       s?.removeAllRanges();
       s?.addRange(r);
       target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 60);
+    })();
   }
 }
 
@@ -18394,7 +18416,9 @@ function handleSpeechCeEnter(e, blockId, ibId, itemId, cid) {
   };
   arr.splice(itemIdx + 1, 0, newItem);
   persist();
-  renderBlocks(cur().blocks, cid || 'blocks-container');
+  if (!rerenderBlockElement(blockId, cid || 'blocks-container')) {
+    renderBlocks(cur().blocks, cid || 'blocks-container');
+  }
   focusEditableAtStartAfterRender(`.bib-item-speech-ce[data-item-id="${newItem.id}"]`, blockId);
 }
 function moveIbItem(blockId, ibId, itemId, dir, cid) {
