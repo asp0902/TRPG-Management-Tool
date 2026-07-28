@@ -5818,6 +5818,12 @@ body.block-pointer-dragging {
   cursor: grab; user-select: none; flex-shrink: 0;
   opacity: 0; transition: opacity 0.12s, color 0.12s;
 }
+/* 본문 CE의 기본 flex-basis는 100%라, 폭 16px인 위 핸들이 같은 줄에 들어가지 못하고
+   윗줄로 밀려 빈 줄이 하나 더 생긴다(블록 높이 26px → 42.5px). 핸들 폭만큼 빼서 한 줄에 둔다. */
+#rb-blocks-container .block.block-text > .block-text-ce {
+  flex-basis: calc(100% - 16px);
+  width: auto;
+}
 #rb-blocks-container .block.block-text:hover > .block-text-handle { opacity: 1; }
 #rb-blocks-container .block.block-text > .block-text-handle:hover { color: #555; }
 #rb-blocks-container .block.block-text > .block-text-handle:active { cursor: grabbing; }
