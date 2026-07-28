@@ -3011,7 +3011,9 @@ body.is-block-range-selecting * {
   flex: 1 1 100%; min-width: 0; width: 100%; max-width: 100%; min-height: 24px; outline: none;
   font-size: 14px; line-height: 1.4; color: #222;
   background: transparent; word-break: break-word; overflow-wrap: break-word;
-  font-family: inherit; padding: 3px 4px 0 0;
+  /* 상하 패딩은 대칭이어야 한다. 위 3 / 아래 0이면 min-height 여유가 없는 큰 글자
+     (제목1·제목2 등)에서 글자가 아래로 붙는다. */
+  font-family: inherit; padding: 2px 4px 2px 0;
 }
 .block-text-ce [data-text-css-preview="1"] {
   box-sizing: border-box;
@@ -3972,7 +3974,7 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 .callout-body > .block-children-wrap > .block.block-text.block-child .block-text-ce {
   min-height: 24px;
   line-height: 1.4;
-  padding: 3px 2px 0 0;
+  padding: 2px 2px 2px 0;
   box-sizing: border-box;
 }
 .bib-item-callout .nested-callout > .block-children-wrap,
@@ -3996,7 +3998,7 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 .branch-inner-callout .nested-callout > .block-children-wrap > .block.block-text.block-child .block-text-ce {
   min-height: 24px;
   line-height: 1.4;
-  padding: 3px 4px 0 0;
+  padding: 2px 4px 2px 0;
   box-sizing: border-box;
 }
 
@@ -22212,8 +22214,27 @@ function tbBlockType(val) {
   if (!val) return;
   if (isCE()) { document.execCommand('formatBlock', false, val); }
   else { const css = BLOCK_TYPE_CSS[val]; if (css) tbWrap(css); }
-  setTimeout(() => { document.getElementById('tb-block-type').value = ''; }, 0);
+  // 적용 후 빈 값으로 되돌리지 않고 현재 서식을 그대로 표시한다.
+  setTimeout(tbSyncBlockTypeSelect, 0);
 }
+// 캐럿이 놓인 곳의 문단 서식(h1~h4 / p)을 알아낸다. 감싸는 요소가 없으면 '단락'('').
+function tbGetCurrentBlockFormat() {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return '';
+  const node = sel.getRangeAt(0).startContainer;
+  const el = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+  const ce = el?.closest?.('[contenteditable="true"]');
+  if (!ce) return '';
+  const fmt = el.closest('h1,h2,h3,h4,p');
+  return fmt && ce.contains(fmt) ? fmt.tagName.toLowerCase() : '';
+}
+function tbSyncBlockTypeSelect() {
+  const select = document.getElementById('tb-block-type');
+  if (!select || document.activeElement === select) return;
+  const val = tbGetCurrentBlockFormat();
+  if (select.value !== val) select.value = val;
+}
+document.addEventListener('selectionchange', tbSyncBlockTypeSelect);
 let _savedFormatSel = null;
 let savedFormatTarget = null;
 
