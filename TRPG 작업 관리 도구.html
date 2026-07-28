@@ -5081,7 +5081,8 @@ body.block-pointer-dragging {
   display: flex;
   flex-direction: column;
   min-height: 24px;
-  gap: 4px;
+  /* 항목 사이 여백. 각 항목에도 상하 패딩이 있어 4px면 줄 간격이 본문보다 넓어진다. */
+  gap: 2px;
   padding: 4px 0 6px;
 }
 .bib-item {
@@ -5091,7 +5092,7 @@ body.block-pointer-dragging {
 .bib-item-text {
   display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 4px; row-gap: 0;
   width: 100%; min-width: 0; box-sizing: border-box;
-  padding: 3px 10px;
+  padding: 2px 10px;
 }
 .bib-item-speech {
   display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 6px; row-gap: 0;
@@ -5197,8 +5198,8 @@ body.block-pointer-dragging {
 .bib-item-btn.del:hover { color: #ef4444; }
 .bib-item-btn:disabled { color: #e8e8e8; cursor: default; pointer-events: none; }
 .bib-item-text-ce {
-  flex: 1 1 100%; min-width: 0; width: 100%; max-width: 100%; min-height: 22px; outline: none;
-  font-size: 13px; line-height: 1.65; color: #222;
+  flex: 1 1 100%; min-width: 0; width: 100%; max-width: 100%; min-height: 20px; outline: none;
+  font-size: 13px; line-height: 1.5; color: #222;
   font-family: inherit; white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;
 }
 .bib-item-text-ce:empty::before { content: attr(data-ph); color: #ccc; pointer-events: none; display: block; }
