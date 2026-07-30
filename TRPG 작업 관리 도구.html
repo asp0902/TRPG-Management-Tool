@@ -3488,6 +3488,7 @@ body.is-block-range-selecting * {
 .column-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .column-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .column-cell {
+  position: relative;
   /* 기본 텍스트 한 줄에 맞춘 높이 */
   min-height: 0;
   border: 1px dashed #d1d5db;
@@ -3506,6 +3507,15 @@ body.is-block-range-selecting * {
   word-break: break-word;
 }
 [contenteditable="true"] img { max-width: 100%; height: auto; vertical-align: top; }
+.column-cell-img-btn {
+  position: absolute; top: 3px; right: 4px;
+  font-size: 11px; line-height: 1; cursor: pointer;
+  padding: 2px 4px; border-radius: 4px; background: rgba(255,255,255,0.9);
+  opacity: 0; transition: opacity 0.12s;
+}
+.column-cell:hover .column-cell-img-btn,
+.column-cell:focus-within .column-cell-img-btn { opacity: 1; }
+.column-cell-img-btn:hover { background: #fff; }
 .column-cell-ce:empty::before {
   content: attr(data-ph);
   color: #9ca3af;
@@ -11482,6 +11492,9 @@ function getColumnBlockHtml(blockId, cid, block) {
         data-column-idx="${idx}"
         data-ph="내용을 입력하세요..."
         oninput="updColumn('${blockId}',${idx},this.innerHTML,'${cid}')"></div>
+      <label class="column-cell-img-btn" title="이 단에 이미지 넣기">🖼
+        <input type="file" accept="image/*" hidden onchange="pickColumnCellImage(event,'${blockId}',${idx})">
+      </label>
     </div>
   `).join('');
   return `
@@ -16171,13 +16184,26 @@ function insertImageFileIntoEditable(ce, file) {
   if (!ce || !file || !/^image\//.test(file.type)) return false;
   const reader = new FileReader();
   reader.onload = ev => {
-    ce.focus();
+    // 버튼으로 넣는 경우엔 편집칸에 캐럿이 없으므로 끝에 만들어 준다.
+    const sel = window.getSelection();
+    const inside = sel && sel.rangeCount > 0 && ce.contains(sel.getRangeAt(0).startContainer);
+    if (inside) ce.focus();
+    else placeCaretAtEnd(ce);
     document.execCommand('insertHTML', false,
       `<img src="${escapeLinkAttr(String(ev.target.result || ''))}" style="max-width:100%;border-radius:4px;">`);
     ce.dispatchEvent(new Event('input', { bubbles: true }));
   };
   reader.readAsDataURL(file);
   return true;
+}
+// 단 나누기 셀 전용 이미지 넣기. 셀 자체가 편집칸이라 이미지가 그 단 안에 들어간다
+// (이미지 블록을 자식으로 붙이면 단 바깥 아래에 생긴다).
+function pickColumnCellImage(e, blockId, idx) {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  if (!file) return;
+  const ce = document.querySelector(`.block[data-id="${blockId}"] .column-cell-ce[data-column-idx="${idx}"]`);
+  insertImageFileIntoEditable(ce, file);
 }
 function getImageFileFromTransfer(dt) {
   const items = dt?.items ? [...dt.items] : [];
