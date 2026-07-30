@@ -3473,6 +3473,8 @@ body.is-block-range-selecting * {
 .column-grid {
   display: grid;
   gap: 12px;
+  /* 위 블록과 2px밖에 안 떨어져 붙어 보였다 */
+  margin: 6px 0;
 }
 .column-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .column-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
