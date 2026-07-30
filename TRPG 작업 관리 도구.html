@@ -3505,6 +3505,7 @@ body.is-block-range-selecting * {
   white-space: pre-wrap;
   word-break: break-word;
 }
+[contenteditable="true"] img { max-width: 100%; height: auto; vertical-align: top; }
 .column-cell-ce:empty::before {
   content: attr(data-ph);
   color: #9ca3af;
@@ -14789,7 +14790,9 @@ function normalizeEditableHtml(value) {
     .replace(/\u200b/g, '')
     .replace(/&nbsp;|\u00a0/gi, ' ')
     .replace(/<br\s*\/?>/gi, '')
-    .replace(/<\/?(div|p|span|font|b|strong|i|em|u|s)[^>]*>/gi, '')
+    // 태그 이름 뒤에 경계를 요구해야 한다. 없으면 i가 <img>, b가 <blockquote>,
+    // s가 <sub>/<sup>/<strike>의 앞부분에 걸려 내용 있는 태그까지 지워진다.
+    .replace(/<\/?(?:div|p|span|font|b|strong|i|em|u|s)(?=[\s/>])[^>]*>/gi, '')
     .trim();
   return normalized ? sanitized : '';
 }
@@ -16161,6 +16164,41 @@ function renderImgPreview(input) {
     preview.innerHTML = `<img src="${esc(url)}" style="max-width:100%;max-height:200px;border-radius:4px;margin-top:4px;">`;
   else if (preview) preview.innerHTML = '';
 }
+// 편집칸에 이미지 파일을 붙여넣기/끌어놓기로 넣는다. 단 나누기 셀처럼 하위 블록을
+// 붙일 수 없는 칸에도 이미지를 넣기 위한 것. data: URL이라 저장에 함께 실린다.
+// ponytail: 큰 이미지는 파일이 커지니 이미지 블록 + 외부 URL 권장.
+function insertImageFileIntoEditable(ce, file) {
+  if (!ce || !file || !/^image\//.test(file.type)) return false;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    ce.focus();
+    document.execCommand('insertHTML', false,
+      `<img src="${escapeLinkAttr(String(ev.target.result || ''))}" style="max-width:100%;border-radius:4px;">`);
+    ce.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  reader.readAsDataURL(file);
+  return true;
+}
+function getImageFileFromTransfer(dt) {
+  const items = dt?.items ? [...dt.items] : [];
+  const item = items.find(i => i.kind === 'file' && /^image\//.test(i.type));
+  if (item) return item.getAsFile();
+  const files = dt?.files ? [...dt.files] : [];
+  return files.find(f => /^image\//.test(f.type)) || null;
+}
+document.addEventListener('paste', e => {
+  const ce = e.target?.closest?.('[contenteditable="true"]');
+  if (!ce) return;
+  const file = getImageFileFromTransfer(e.clipboardData);
+  if (file && insertImageFileIntoEditable(ce, file)) e.preventDefault();
+});
+document.addEventListener('drop', e => {
+  const ce = e.target?.closest?.('[contenteditable="true"]');
+  if (!ce) return;
+  const file = getImageFileFromTransfer(e.dataTransfer);
+  if (file && insertImageFileIntoEditable(ce, file)) { e.preventDefault(); e.stopPropagation(); }
+}, true);
+
 // 로컬 파일은 URL이 없으므로 data: URL로 담는다(세션 카드 업로드와 같은 방식).
 // ponytail: 시트/시나리오와 함께 base64로 저장되니 큰 이미지는 외부 URL 권장.
 function pickImageBlockFile(e, blockId, cid) {
