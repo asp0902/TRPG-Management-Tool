@@ -4354,7 +4354,7 @@ body.block-pointer-dragging {
   content: attr(data-ph); color: rgba(255,255,255,0.78); pointer-events: none; display: block;
   -webkit-text-fill-color: initial;
 }
-.roll-subs { display: flex; flex-direction: column; gap: 6px; padding: 8px 12px 10px; }
+.roll-subs { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px 10px; }
 .roll-sub { border-radius: 5px; padding: 8px 10px; }
 .roll-sub-head {
   display: flex; align-items: center; justify-content: flex-start; gap: 8px;
@@ -4565,14 +4565,16 @@ body.block-pointer-dragging {
   flex-direction: column;
   gap: 6px;
 }
+/* 라벨 색은 자기 헤더에만 적용한다. 자손 셀렉터로 두면 실패 결과칸 안에 중첩된
+   성공 판정의 라벨까지 실패 색으로 덮인다(뒤에 선언된 규칙이 이김). */
 .sub-success { background: #eff6ff; }
-.sub-success .roll-sub-label { color: #2563eb; background: rgba(37,99,235,0.08); }
+.sub-success > .roll-sub-head .roll-sub-label { color: #2563eb; background: rgba(37,99,235,0.08); }
 .sub-fail { background: #fef2f2; }
-.sub-fail .roll-sub-label { color: #dc2626; background: rgba(220,38,38,0.08); }
+.sub-fail > .roll-sub-head .roll-sub-label { color: #dc2626; background: rgba(220,38,38,0.08); }
 .sub-other { background: #f3f4f6; }
-.sub-other .roll-sub-label { color: #6b7280; background: rgba(107,114,128,0.1); }
+.sub-other > .roll-sub-head .roll-sub-label { color: #6b7280; background: rgba(107,114,128,0.1); }
 .sub-common { background: #f3f4f6; }
-.sub-common .roll-sub-label { color: #6b7280; background: rgba(107,114,128,0.1); }
+.sub-common > .roll-sub-head .roll-sub-label { color: #6b7280; background: rgba(107,114,128,0.1); }
 .sub-ce {
   min-height: 20px; outline: none; font-size: 12px; line-height: 1.6; color: #333;
   font-family: inherit; white-space: pre-wrap; word-break: break-word; padding-left: 5px;
@@ -19522,9 +19524,10 @@ function hasContentEditableDragSelection(target) {
 function isBlockEditTarget(target) {
   const node = target?.nodeType === Node.TEXT_NODE ? target.parentElement : target;
   if (!node) return false;
-  // 분기 항목 본문은 closest('.block')이 분기 블록이라, 텍스트를 끌어 선택하면
-  // 분기 블록 전체가 드래그된다. 항목 이동은 ↑↓ 버튼과 블록 좌측 그립으로 한다.
-  return !!node.closest?.('input, textarea, select, button, a, .block-actions, .branch-inner-block-actions, .bib-item-text-ce, .bib-item-speech-ce, .branch-inner-block-ce');
+  // 편집칸 안에서 시작한 드래그는 글자 선택이다. contenteditable 전체를 대상으로
+  // 잡아야 판정 결과칸·분기 항목 등 종류별로 빠뜨리지 않는다.
+  // 블록 이동은 좌측 그립과 ↑↓ 버튼으로 한다.
+  return !!node.closest?.('input, textarea, select, button, a, [contenteditable="true"], .block-actions, .branch-inner-block-actions');
 }
 function syncBlockDraggableState(root = document) {
   root.querySelectorAll?.('.block').forEach(el => {
