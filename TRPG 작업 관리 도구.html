@@ -3270,6 +3270,8 @@ body.is-block-range-selecting * {
 /* 노란 배경은 좌측 3px 강조 테두리 뒤부터 칠해진다. 이웃 카드 블록의 칠해지는 영역
    (1px 테두리 안쪽)과 끝을 맞추려 왼쪽으로 2px 당기고 폭을 1px 늘린다. */
 .callout-body { border-radius: 7px; overflow: visible; width: calc(100% + 1px); margin-left: -2px; display: flow-root; padding-bottom: 0; }
+/* 자식 콜아웃은 옆에 비교할 카드 블록이 없으니 자식 영역 폭을 그대로 채운다 */
+.block-child > .block-body > .callout-body { width: 100%; margin-left: 0; }
 .callout-body:has(> .nested-callout:last-child),
 .callout-body:has(> .nested-callout + .callout-content-ce.collapsed:last-child) {
   padding-bottom: 0;
@@ -3935,10 +3937,11 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 /* 자식 영역은 왼쪽으로만 --child-indent 만큼 들여쓰기되어 오른쪽에는 대응 여백이 없다.
    콜아웃은 테두리가 있어 그 차이가 그대로 드러나므로, 폭에서 들여쓰기만큼 더 빼
    부모 기준 좌우 여백이 같아 보이게 한다. */
+/* 자식 콜아웃은 자식 영역 폭을 그대로 채운다 (좌우 여백은 자식 영역이 이미 갖고 있음) */
 .block-children-wrap > .block.block-callout.block-child {
-  width: calc(100% - 10px - var(--child-indent));
-  max-width: calc(100% - 10px - var(--child-indent));
-  margin: 5px !important;
+  width: 100%;
+  max-width: 100%;
+  margin: 5px 0 !important;
   box-sizing: border-box;
 }
 
