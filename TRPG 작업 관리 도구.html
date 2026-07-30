@@ -3488,17 +3488,18 @@ body.is-block-range-selecting * {
 .column-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .column-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .column-cell {
-  min-height: 56px;
+  /* 기본 텍스트 한 줄에 맞춘 높이 */
+  min-height: 0;
   border: 1px dashed #d1d5db;
   border-radius: 8px;
   background: #f3f4f6;
-  padding: 12px 14px;
+  padding: 6px 10px;
 }
 .column-cell-ce {
-  min-height: 28px;
+  min-height: 20px;
   outline: none;
-  font-size: 13px;
-  line-height: 1.65;
+  font-size: 14px;
+  line-height: 1.4;
   color: #374151;
   font-family: inherit;
   white-space: pre-wrap;
