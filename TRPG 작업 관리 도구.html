@@ -6816,10 +6816,10 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
       </div>
       <div class="tb-sep"></div>
       <!-- 정렬 -->
-      <button class="tb-btn" id="tb-align-left-btn" onclick="isCE()?document.execCommand('justifyLeft'):tbWrap('display:block;text-align:left')" title="왼쪽 정렬"><i class="fa-solid fa-align-left"></i></button>
-      <button class="tb-btn" id="tb-align-center-btn" onclick="isCE()?document.execCommand('justifyCenter'):tbWrap('display:block;text-align:center')" title="가운데 정렬"><i class="fa-solid fa-align-center"></i></button>
-      <button class="tb-btn" id="tb-align-right-btn" onclick="isCE()?document.execCommand('justifyRight'):tbWrap('display:block;text-align:right')" title="오른쪽 정렬"><i class="fa-solid fa-align-right"></i></button>
-      <button class="tb-btn" id="tb-align-justify-btn" onclick="isCE()?document.execCommand('justifyFull'):tbWrap('display:block;text-align:justify')" title="양쪽 정렬"><i class="fa-solid fa-align-justify"></i></button>
+      <button class="tb-btn" id="tb-align-left-btn" onclick="isCE()?tbAlignCE('left'):tbWrap('display:block;text-align:left')" title="왼쪽 정렬"><i class="fa-solid fa-align-left"></i></button>
+      <button class="tb-btn" id="tb-align-center-btn" onclick="isCE()?tbAlignCE('center'):tbWrap('display:block;text-align:center')" title="가운데 정렬"><i class="fa-solid fa-align-center"></i></button>
+      <button class="tb-btn" id="tb-align-right-btn" onclick="isCE()?tbAlignCE('right'):tbWrap('display:block;text-align:right')" title="오른쪽 정렬"><i class="fa-solid fa-align-right"></i></button>
+      <button class="tb-btn" id="tb-align-justify-btn" onclick="isCE()?tbAlignCE('justify'):tbWrap('display:block;text-align:justify')" title="양쪽 정렬"><i class="fa-solid fa-align-justify"></i></button>
       <div class="tb-sep"></div>
       <!-- 글머리 기호 / 번호 목록 / 들여쓰기 / 내어쓰기 -->
       <button class="tb-btn" id="tb-list-ul-btn" onclick="tbInsertBullet()" title="글머리 기호"><i class="fa-solid fa-list-ul"></i></button>
@@ -22307,6 +22307,32 @@ document.addEventListener('keydown', e => {
   e.preventDefault();
   _bnPlaceCaret(all[nextIdx], isUp);
 });
+
+// 정렬은 execCommand 대신 블록 요소의 text-align으로 준다.
+// justifyCenter는 여러 줄을 선택한 경우 h1 안에 div를 끼워 넣고 그 안 span에
+// font-size:14px를 박아 제목 크기를 덮어써 버린다.
+function tbAlignCE(value) {
+  const ce = lastFocusedTA;
+  if (!ce || ce.contentEditable !== 'true') return;
+  const BLOCKS = 'h1,h2,h3,h4,p,li,blockquote,div';
+  const sel = window.getSelection();
+  const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+  const targets = new Set();
+  if (range) {
+    const blockOf = (node) => {
+      const el = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+      const b = el?.closest?.(BLOCKS);
+      return b && b !== ce && ce.contains(b) ? b : null;
+    };
+    [blockOf(range.startContainer), blockOf(range.endContainer)].forEach(b => b && targets.add(b));
+    ce.querySelectorAll(BLOCKS).forEach(b => {
+      try { if (range.intersectsNode(b)) targets.add(b); } catch (e) {}
+    });
+  }
+  if (!targets.size) targets.add(ce);
+  targets.forEach(el => { el.style.textAlign = value; });
+  ce.dispatchEvent(new Event('input', { bubbles: true }));
+}
 
 // ─── 선택 텍스트를 Roll20 CSS 매크로로 감싸기 ───
 function tbWrap(css) {
