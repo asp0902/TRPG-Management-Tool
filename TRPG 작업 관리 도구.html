@@ -19522,7 +19522,9 @@ function hasContentEditableDragSelection(target) {
 function isBlockEditTarget(target) {
   const node = target?.nodeType === Node.TEXT_NODE ? target.parentElement : target;
   if (!node) return false;
-  return !!node.closest?.('input, textarea, select, button, a, .block-actions, .branch-inner-block-actions');
+  // 분기 항목 본문은 closest('.block')이 분기 블록이라, 텍스트를 끌어 선택하면
+  // 분기 블록 전체가 드래그된다. 항목 이동은 ↑↓ 버튼과 블록 좌측 그립으로 한다.
+  return !!node.closest?.('input, textarea, select, button, a, .block-actions, .branch-inner-block-actions, .bib-item-text-ce, .bib-item-speech-ce, .branch-inner-block-ce');
 }
 function syncBlockDraggableState(root = document) {
   root.querySelectorAll?.('.block').forEach(el => {
