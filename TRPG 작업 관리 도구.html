@@ -3507,15 +3507,6 @@ body.is-block-range-selecting * {
   word-break: break-word;
 }
 [contenteditable="true"] img { max-width: 100%; height: auto; vertical-align: top; }
-.column-cell-img-btn {
-  position: absolute; top: 3px; right: 4px;
-  font-size: 11px; line-height: 1; cursor: pointer;
-  padding: 2px 4px; border-radius: 4px; background: rgba(255,255,255,0.9);
-  opacity: 0; transition: opacity 0.12s;
-}
-.column-cell:hover .column-cell-img-btn,
-.column-cell:focus-within .column-cell-img-btn { opacity: 1; }
-.column-cell-img-btn:hover { background: #fff; }
 .column-cell-ce:empty::before {
   content: attr(data-ph);
   color: #9ca3af;
@@ -11492,9 +11483,6 @@ function getColumnBlockHtml(blockId, cid, block) {
         data-column-idx="${idx}"
         data-ph="내용을 입력하세요..."
         oninput="updColumn('${blockId}',${idx},this.innerHTML,'${cid}')"></div>
-      <label class="column-cell-img-btn" title="이 단에 이미지 넣기">🖼
-        <input type="file" accept="image/*" hidden onchange="pickColumnCellImage(event,'${blockId}',${idx})">
-      </label>
     </div>
   `).join('');
   return `
@@ -14048,6 +14036,8 @@ function insertChildBlockFromContext(parentBlock, parentEl, typeId, cid = 'block
 
 function makeChildInsertCtxItem(parentBlock, parentEl, cid = 'blocks-container', ctxEvent = null) {
   const insertContext = captureChildInsertContext(parentEl, ctxEvent);
+  // 단 나누기 셀에서 부른 경우, 이미지는 자식 블록(단 바깥)이 아니라 그 셀 안에 넣는다.
+  const cell = ctxEvent?.target?.closest?.('.column-cell-ce');
   return {
     icon: '＋',
     label: '하위 블록 추가',
@@ -14057,10 +14047,22 @@ function makeChildInsertCtxItem(parentBlock, parentEl, cid = 'blocks-container',
         icon: BIP_ICONS[t.id] || '?',
         label: t.label,
         action: () => {
+          if (cell && t.id === 'image') { promptImageFileInto(cell); return; }
           insertChildBlockFromContext(parentBlock, parentEl, t.id, cid, insertContext);
         }
       }))
   };
+}
+// 파일 선택창을 띄워 고른 이미지를 편집칸 안에 넣는다.
+function promptImageFileInto(ce) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = () => {
+    const file = input.files?.[0];
+    if (file) insertImageFileIntoEditable(ce, file);
+  };
+  input.click();
 }
 
 // 플로팅 액션 영역(블록 우상단)에 "하위 블록 추가" ＋ 버튼을 다는 헬퍼.
@@ -16195,15 +16197,6 @@ function insertImageFileIntoEditable(ce, file) {
   };
   reader.readAsDataURL(file);
   return true;
-}
-// 단 나누기 셀 전용 이미지 넣기. 셀 자체가 편집칸이라 이미지가 그 단 안에 들어간다
-// (이미지 블록을 자식으로 붙이면 단 바깥 아래에 생긴다).
-function pickColumnCellImage(e, blockId, idx) {
-  const file = e.target.files?.[0];
-  e.target.value = '';
-  if (!file) return;
-  const ce = document.querySelector(`.block[data-id="${blockId}"] .column-cell-ce[data-column-idx="${idx}"]`);
-  insertImageFileIntoEditable(ce, file);
 }
 function getImageFileFromTransfer(dt) {
   const items = dt?.items ? [...dt.items] : [];
