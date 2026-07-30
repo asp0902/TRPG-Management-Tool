@@ -3267,8 +3267,9 @@ body.is-block-range-selecting * {
 
 /* ─── NEW BLOCK TYPES ─── */
 .label-pill { display: inline-block; color: #fff; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
-/* 이웃 카드 블록과 좌우 끝을 맞추려 좌 3px / 우 6px 확장 */
-.callout-body { border-radius: 7px; overflow: visible; width: calc(100% + 9px); margin: 0 -6px 0 -3px; display: flow-root; padding-bottom: 0; }
+/* 노란 배경은 좌측 3px 강조 테두리 뒤부터 칠해진다. 이웃 카드 블록의 칠해지는 영역
+   (1px 테두리 안쪽)과 끝을 맞추려 왼쪽으로 2px 당기고 폭을 1px 늘린다. */
+.callout-body { border-radius: 7px; overflow: visible; width: calc(100% + 1px); margin-left: -2px; display: flow-root; padding-bottom: 0; }
 .callout-body:has(> .nested-callout:last-child),
 .callout-body:has(> .nested-callout + .callout-content-ce.collapsed:last-child) {
   padding-bottom: 0;
