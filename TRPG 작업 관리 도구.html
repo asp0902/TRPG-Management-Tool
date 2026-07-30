@@ -22462,9 +22462,32 @@ function tbRedo() {
 }
 
 const BLOCK_TYPE_CSS = { h1:'font-size:24px;font-weight:bold', h2:'font-size:20px;font-weight:bold', h3:'font-size:16px;font-weight:bold', h4:'font-size:14px;font-weight:600' };
+// 제목으로 바꿀 때 안쪽에 박힌 inline font-size는 지운다.
+// 남겨두면 제목 크기보다 우선해서 제목 유형이 안 먹은 것처럼 보인다
+// (예전 execCommand 정렬이 span에 font-size:14px를 심어둔 경우).
+function tbStripInlineFontSize(root) {
+  if (!root) return;
+  root.querySelectorAll('[style*="font-size"]').forEach(el => {
+    el.style.removeProperty('font-size');
+    if (!el.getAttribute('style')) el.removeAttribute('style');
+  });
+}
 function tbBlockType(val) {
   if (!val) return;
-  if (isCE()) { document.execCommand('formatBlock', false, val); }
+  if (isCE()) {
+    document.execCommand('formatBlock', false, val);
+    if (/^h[1-4]$/i.test(val)) {
+      const ce = lastFocusedTA;
+      const sel = window.getSelection();
+      const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+      ce?.querySelectorAll('h1,h2,h3,h4').forEach(h => {
+        let hit = !range;
+        try { hit = hit || range.intersectsNode(h); } catch (e) { hit = true; }
+        if (hit) tbStripInlineFontSize(h);
+      });
+      ce?.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
   else { const css = BLOCK_TYPE_CSS[val]; if (css) tbWrap(css); }
   // 적용 후 빈 값으로 되돌리지 않고 현재 서식을 그대로 표시한다.
   setTimeout(tbSyncBlockTypeSelect, 0);
