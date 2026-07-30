@@ -5095,7 +5095,16 @@ body.block-pointer-dragging {
 .bib-item-text {
   display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 4px; row-gap: 0;
   width: 100%; min-width: 0; box-sizing: border-box;
-  padding: 2px 10px;
+  padding: 2px 14px;
+}
+/* 분기 항목 안의 콜아웃은 자식 들여쓰기·좌우 여백을 없애 본문 글자와 같은 선에 맞춘다 */
+.bib-item-text > .block-children-wrap {
+  margin-left: 0;
+  flex-basis: 100%; width: 100%; max-width: 100%;
+}
+.bib-item-text > .block-children-wrap > .block.block-callout.block-child {
+  margin-left: 0 !important; margin-right: 0 !important;
+  width: 100%; max-width: 100%;
 }
 .bib-item-speech {
   display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 6px; row-gap: 0;
