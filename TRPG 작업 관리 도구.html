@@ -3478,7 +3478,7 @@ body.is-block-range-selecting * {
 }
 /* 하위 블록: 좌우 10px inset은 block-body가 맡는다 (같은 콜아웃 안 기본 블록과 동일) */
 .block-child .column-grid { margin: 12px 0; }
-.block-child .block-body:has(> .column-grid) { padding: 0 9px; } /* 블록 테두리 1px 포함해 10px */
+.block-child .block-body:has(> .column-grid) { padding: 0 4px; } /* 테두리 1px 포함해 5px, 기본 블록과 동일 */
 .column-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .column-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .column-cell {
@@ -3945,10 +3945,10 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   --child-indent: 6px;
 
   /* 콜아웃 좌측 테두리에 붙지 않도록 안쪽 여백을 준다 */
-  flex-basis: calc(100% - 16px);
-  width: calc(100% - 16px);
-  max-width: calc(100% - 16px);
-  margin: 10px 2px 10px 14px;
+  flex-basis: calc(100% - 11px);
+  width: calc(100% - 11px);
+  max-width: calc(100% - 11px);
+  margin: 10px 2px 10px 9px;
 
   padding-left: 0;
   border-left: none;
@@ -3958,7 +3958,7 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
    (우측 padding 때문에 글자 하나 들어갈 공간을 남기고 줄바뀜하던 문제 해소). */
 .callout-body > .block-children-wrap > .block.block-text.block-child {
   min-height: 24px;
-  padding: 0 10px; /* 좌우 10px inset (중첩 콜아웃과 통일) */
+  padding: 0 5px; /* 좌우 5px inset */
 }
 /* 콜아웃 내부 자식 블록의 액션 메뉴는 우측 거터(left:100%) 대신 블록 안 우상단에 둔다.
    좁은 콜아웃/분기 안에서 우측 거터가 overflow로 잘리던 문제 해소(판정 블록과 동일 방식). */
