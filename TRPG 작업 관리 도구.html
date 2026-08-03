@@ -4647,7 +4647,10 @@ body.block-pointer-dragging {
 }
 
 /* Divider — block-text 레이아웃 재사용 */
-.block.block-text.block-divider { padding-right: 10px; }
+/* 비어 있는 .block-children-wrap이 두 번째 flex 줄을 만들어, align-content:stretch가
+   블록의 남는 높이를 두 줄에 나눠 주는 바람에 구분선이 위로 치우쳤다(위 1.5 / 아래 4.5).
+   center로 두면 남는 높이가 줄 바깥으로 가서 구분선이 세로 가운데에 온다. */
+.block.block-text.block-divider { padding-right: 10px; align-content: center; }
 .block.block-text.block-divider:hover { background: transparent; }
 .block.block-text.block-divider.selected { background: #d5d5d5; }
 .divider-preview {
@@ -11903,6 +11906,12 @@ function normalizeEndingContentChildren(ending, opts = {}) {
     ];
     ending.content = '';
     if (contentCss) ending.contentCss = '';
+  }
+
+  // 엔딩의 '내용'칸은 children을 그대로 렌더한다(mount: ending-content).
+  // 자식이 하나도 없으면 입력할 편집칸 자체가 없어 타이핑이 안 되므로, 토글과 같게 빈 줄을 하나 둔다.
+  if (ending.children.length === 0) {
+    ending.children.push(createBlockData('text'));
   }
 
   return ending;
