@@ -3320,17 +3320,35 @@ body.is-block-range-selecting * {
 }
 .callout-type-select {
   border: none; outline: none; background: transparent;
-  font-size: 13px; font-weight: 700; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
   color: var(--callout-accent, #444); flex-shrink: 0;
-  /* 헤더 gap 6px는 박스 기준이라 눈에 보이는 여백은 글리프 side bearing만큼 달라진다.
-     핸들→아이콘 잉크 간격 9.5px를 기준으로 나머지 둘을 맞춘 값:
-       아이콘 우측 여백 2.17 + '기' 좌측 여백 4.83 → 6 - 3.5 + 7 = 9.5
-       글자 끝 → 화살표는 UA가 20px를 잡아 3.5px뿐이라 6px를 더 준다. */
-  margin-left: -8.25px; /* 아이콘→이름 잉크 간격 9.5의 절반인 4.75px */
-  padding: 0 6px 0 0;
+  display: inline-flex; align-items: center;
+  /* 헤더 gap 6px는 박스 기준, 눈에 보이는 건 잉크 기준이라 글리프 여백만큼 어긋난다.
+     아래 값들은 렌더된 픽셀을 재서 맞춘 것 — 핸들→아이콘 9.5px 기준으로
+     아이콘→이름은 그 절반인 4.75px, 이름→캐럿은 9.5px. */
+  margin-left: -3.93px;
+  padding: 0;
+  gap: 8.93px;
 }
-/* 닫혀 있는 값은 테마색 그대로. 펼친 드롭다운 목록만 검정 + 가운데 정렬. */
-.callout-type-select option { color: #000; text-align: center; }
+.callout-type-name {
+  position: relative; top: -1px; /* 글리프 잉크가 버튼 세로중심보다 1px 아래 */
+}
+.callout-type-caret {
+  width: 9px; height: 9px; flex-shrink: 0;
+  display: inline-flex; align-items: center;
+  position: relative; top: -0.5px;
+}
+.callout-type-caret svg {
+  width: 100%; height: 100%; display: block;
+  fill: none; stroke: currentColor;
+  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+}
+/* 펼친 목록 — 글자 검정 + 가운데 정렬. 아이콘 칸이 있으면 가운데가 어긋나므로 없앤다. */
+.callout-type-menu { min-width: 84px; }
+.callout-type-menu .tb-ctx-item { justify-content: center; gap: 0; }
+.callout-type-menu .tb-ctx-main { justify-content: center; gap: 0; }
+.callout-type-menu .tb-ctx-icon { display: none; }
+.callout-type-menu .tb-ctx-label { color: #000; }
 .callout-title-inp {
   flex: 1; border: none; outline: none; background: transparent;
   font-size: 14px; font-weight: 600; color: #222;
@@ -11481,6 +11499,34 @@ function getCalloutTypeIconSvg(type) {
   }
 }
 
+// 카테고리 드롭다운. 네이티브 <select>는 펼친 목록을 브라우저가 OS 레이어에 그려서
+// 글자 정렬을 CSS로 잡을 수 없었다(살짝 오른쪽으로 치우쳐 보이던 원인). 앱 메뉴로 대체.
+// 트리거를 <button>으로 두면 value/closest를 그대로 쓸 수 있어
+// set*CalloutType(…, selectEl) 시그니처 4곳을 손대지 않아도 된다.
+function calloutTypeTriggerHtml(type, onPick) {
+  const t = CALLOUT_TYPE_LABELS[type] ? type : 'basic';
+  return `<button class="callout-type-select" type="button" value="${t}"
+    onmousedown="event.preventDefault();event.stopPropagation()" onclick="openCalloutTypeMenu(event,this,${onPick})"
+    ><span class="callout-type-name">${CALLOUT_TYPE_LABELS[t]}</span><span class="callout-type-caret" aria-hidden="true"><svg viewBox="0 0 10 6"><path d="M1 1L5 5L9 1"></path></svg></span></button>`;
+}
+function openCalloutTypeMenu(e, btn, apply) {
+  e.preventDefault();
+  e.stopPropagation();
+  // 같은 버튼을 다시 누르면 닫기 — 네이티브 select와 같은 토글감.
+  // (버튼 mousedown이 전파를 막아서 바깥클릭 핸들러가 먼저 닫지 않는다)
+  if (_ctxMenu && _ctxMenu.__calloutTypeBtn === btn) { tbCloseCtxMenu(); return; }
+  const r = btn.getBoundingClientRect();
+  tbShowCtxMenu(r.left, r.bottom + 2, Object.entries(CALLOUT_TYPE_LABELS).map(([v, label]) => ({
+    label,
+    action: () => {
+      btn.value = v;
+      btn.querySelector('.callout-type-name').textContent = label;
+      apply(btn);
+    },
+  })), { menuClass: 'callout-type-menu' });
+  if (_ctxMenu) _ctxMenu.__calloutTypeBtn = btn;
+}
+
 function setCalloutType(blockId, selectEl, cid) {
   const type = selectEl.value;
   upd(blockId, 'calloutType', type, cid);
@@ -12741,9 +12787,7 @@ function getBibSubBlockHtml(branchBlockId, ibId, sub, si, total, cid) {
       <div class="nested-callout callout-${ct}">
         <div class="nested-callout-header">
           <span class="callout-type-icon" aria-hidden="true">${getCalloutTypeIconSvg(ct)}</span>
-          <select class="callout-type-select" onchange="setBibSubCalloutType('${branchBlockId}','${ibId}','${sub.id}',this)">
-            ${Object.entries(CALLOUT_TYPE_LABELS).map(([v,l]) => `<option value="${v}"${ct===v?' selected':''}>${l}</option>`).join('')}
-          </select>
+          ${calloutTypeTriggerHtml(ct, `el=>setBibSubCalloutType('${branchBlockId}','${ibId}','${sub.id}',el)`)}
           <input class="callout-title-inp" placeholder="" value="${esc(sub.title||'')}" oninput="updBibSubBlock('${branchBlockId}','${ibId}','${sub.id}','title',this.value)" spellcheck="false">
           <div class="bib-sb-actions">
             <button class="bib-sb-act" title="위로" onmousedown="event.preventDefault()" onclick="moveBibSubBlock('${branchBlockId}','${ibId}','${sub.id}','up','${cid}')" ${canUp?'':'disabled'}>↑</button>
@@ -12779,9 +12823,7 @@ function getBibItemHtml(blockId, ibId, item, idx, total, cid) {
       <div class="nested-callout callout-${ct}" oncontextmenu="return openIbItemCalloutCtxMenu(event,'${blockId}','${ibId}','${item.id}','${cid}')">
         <div class="nested-callout-header">
           <span class="callout-type-icon" aria-hidden="true">${getCalloutTypeIconSvg(ct)}</span>
-          <select class="callout-type-select" onchange="setIbItemCalloutType('${blockId}','${ibId}','${item.id}',this)">
-            ${Object.entries(CALLOUT_TYPE_LABELS).map(([v,l]) => `<option value="${v}"${ct===v?' selected':''}>${l}</option>`).join('')}
-          </select>
+          ${calloutTypeTriggerHtml(ct, `el=>setIbItemCalloutType('${blockId}','${ibId}','${item.id}',el)`)}
           <input class="callout-title-inp" placeholder="" value="${esc(item.title||'')}" oninput="updIbItem('${blockId}','${ibId}','${item.id}','title',this.value)" spellcheck="false">
           ${ctrlHtml}
         </div>
@@ -12960,9 +13002,7 @@ function getBranchBlockHtml(block, cid) {
             <div class="nested-callout callout-${ct}">
               <div class="nested-callout-header">
                 <span class="callout-type-icon" aria-hidden="true">${getCalloutTypeIconSvg(ct)}</span>
-                <select class="callout-type-select" onchange="setBranchInnerCalloutType('${branchBlock.id}','${ib.id}',this)">
-                  ${Object.entries(CALLOUT_TYPE_LABELS).map(([v,l]) => `<option value="${v}"${ct===v?' selected':''}>${l}</option>`).join('')}
-                </select>
+                ${calloutTypeTriggerHtml(ct, `el=>setBranchInnerCalloutType('${branchBlock.id}','${ib.id}',el)`)}
                 <input class="callout-title-inp" placeholder="" value="${esc(ib.title || '')}" oninput="updBranchInnerBlock('${branchBlock.id}','${ib.id}','title',this.value)" spellcheck="false">
                 <span class="branch-inner-callout-head-actions">
                   <button class="branch-inner-block-act" title="위로 이동" onmousedown="event.preventDefault()" onclick="moveBranchInnerBlock('${branchBlock.id}','${ib.id}','up','${cid}')" ${canMoveUp ? '' : 'disabled'}>↑</button>
@@ -13425,6 +13465,7 @@ function tbShowCtxMenu(x, y, items, opts = {}) {
     });
   };
 
+  if (opts.menuClass) menu.classList.add(opts.menuClass);
   appendCtxItems(menu, items);
   document.body.appendChild(menu);
   _ctxMenu = menu;
@@ -15853,10 +15894,7 @@ function mkBlockEl(b, cid, ctx = {}) {
           <div class="callout-header">
             <span class="callout-drag-handle" title="드래그하여 순서 변경">⋮⋮</span>
             <span class="callout-type-icon" aria-hidden="true">${getCalloutTypeIconSvg(ct)}</span>
-            <select class="callout-type-select"
-              onchange="setCalloutType('${b.id}',this,'${cid}')">
-              ${Object.entries(ctMap).map(([v,l]) => `<option value="${v}"${ct===v?' selected':''}>${l}</option>`).join('')}
-            </select>
+            ${calloutTypeTriggerHtml(ct, `el=>setCalloutType('${b.id}',el,'${cid}')`)}
             <input class="callout-title-inp" data-field="title" placeholder="" value="${esc(b.title||'')}"
               oninput="upd('${b.id}','title',this.value,'${cid}')">
           </div>
