@@ -3299,6 +3299,9 @@ body.is-block-range-selecting * {
 .callout-drag-handle {
   cursor: grab; color: rgba(0,0,0,0.2); font-size: 12px;
   user-select: none; flex-shrink: 0; line-height: 1;
+  /* 박스는 이미 가운데인데 ⋮⋮ 글리프의 잉크가 em 박스 안에서 1.25px 아래에 그려진다.
+     글자 페인트가 정수 px로 스냅되어 -1.25든 -1.5든 실제로는 1px만 올라간다. */
+  position: relative; top: -1px;
 }
 .callout-drag-handle:active { cursor: grabbing; }
 .callout-type-icon {
@@ -3318,8 +3321,13 @@ body.is-block-range-selecting * {
 .callout-type-select {
   border: none; outline: none; background: transparent;
   font-size: 13px; font-weight: 700; cursor: pointer;
-  color: var(--callout-accent, #444); padding: 0; flex-shrink: 0;
-  margin-left: -1px; /* 헤더 gap 6px - 1px: 아이콘에 한 칸 더 붙인다 */
+  color: var(--callout-accent, #444); flex-shrink: 0;
+  /* 헤더 gap 6px는 박스 기준이라 눈에 보이는 여백은 글리프 side bearing만큼 달라진다.
+     핸들→아이콘 잉크 간격 9.5px를 기준으로 나머지 둘을 맞춘 값:
+       아이콘 우측 여백 2.17 + '기' 좌측 여백 4.83 → 6 - 3.5 + 7 = 9.5
+       글자 끝 → 화살표는 UA가 20px를 잡아 3.5px뿐이라 6px를 더 준다. */
+  margin-left: -3.5px;
+  padding: 0 6px 0 0;
 }
 /* 닫혀 있는 값은 테마색 그대로. 펼친 드롭다운 목록만 검정 + 가운데 정렬. */
 .callout-type-select option { color: #000; text-align: center; }
