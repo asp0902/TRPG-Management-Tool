@@ -3033,6 +3033,7 @@ body.is-block-range-selecting * {
   text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
 }
 [contenteditable] a:hover { opacity: 0.7; }
+.callout-basic { --callout-link-color: #374151; }
 .callout-info  { --callout-link-color: #16a34a; }
 .callout-warn  { --callout-link-color: #b45309; }
 .callout-error { --callout-link-color: #b91c1c; }
@@ -3267,7 +3268,6 @@ body.is-block-range-selecting * {
 .btcp-remove:hover { background: #fff; color: #000; }
 
 /* ─── NEW BLOCK TYPES ─── */
-.label-pill { display: inline-block; color: #fff; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 /* 노란 배경은 좌측 3px 강조 테두리 뒤부터 칠해진다. 이웃 카드 블록의 칠해지는 영역
    (1px 테두리 안쪽)과 끝을 맞추려 왼쪽으로 2px 당기고 폭을 1px 늘린다. */
 .callout-body { border-radius: 7px; overflow: visible; width: calc(100% + 1px); margin-left: -2px; display: flow-root; padding-bottom: 0; }
@@ -3277,6 +3277,7 @@ body.is-block-range-selecting * {
 .callout-body:has(> .nested-callout + .callout-content-ce.collapsed:last-child) {
   padding-bottom: 0;
 }
+.callout-basic { background: #ffffff; border-left: 3px solid #d4d4d4; --callout-accent: #737373; }
 .callout-info  { background: #f0fdf4; border-left: 3px solid #22c55e; --callout-accent: #22c55e; }
 .callout-warn  { background: #fffbeb; border-left: 3px solid #f59e0b; --callout-accent: #f59e0b; }
 .callout-error { background: #fef2f2; border-left: 3px solid #ef4444; --callout-accent: #ef4444; }
@@ -3314,11 +3315,15 @@ body.is-block-range-selecting * {
   fill: none; stroke: #fff;
   stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
 }
+/* 글자색은 테마색을 따르지 않고 항상 검정. 열린 목록의 <option>도 select에서 색을 물려받으므로
+   여기서 검정으로 고정하면 목록까지 같이 검정이 된다. */
 .callout-type-select {
   border: none; outline: none; background: transparent;
   font-size: 13px; font-weight: 700; cursor: pointer;
-  color: var(--callout-accent, #444); padding: 0; flex-shrink: 0;
+  color: #000; padding: 0; flex-shrink: 0;
+  text-align: center; text-align-last: center;
 }
+.callout-type-select option { color: #000; text-align: center; }
 .callout-title-inp {
   flex: 1; border: none; outline: none; background: transparent;
   font-size: 14px; font-weight: 600; color: #222;
@@ -4464,10 +4469,6 @@ body.block-pointer-dragging {
   font-size: 14px;
   padding-left: 0;
 }
-.roll-result-block.rrb-gm {
-  background: transparent;
-  border-color: transparent;
-}
 .rrb-speech-name {
   flex: 0 0 auto;
   min-width: 52px;
@@ -4488,13 +4489,6 @@ body.block-pointer-dragging {
   color: rgba(255,255,255,0.74);
   pointer-events: none;
   display: block;
-}
-.rrb-gm-label {
-  margin-bottom: 4px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #a16207;
-  letter-spacing: 0.04em;
 }
 .rrb-ce {
   min-height: 20px;
@@ -7147,9 +7141,6 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
       <button class="rp-item" onclick="addBlock('toggle')" title="토글 추가">
         <div class="rp-icon"><i class="fa-solid fa-chevron-right"></i></div>
       </button>
-      <button class="rp-item" onclick="addBlock('label')" title="라벨 추가">
-        <div class="rp-icon"><i class="fa-solid fa-tag"></i></div>
-      </button>
       <button class="rp-item" onclick="addBlock('callout')" title="콜아웃 추가">
         <div class="rp-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
       </button>
@@ -7849,11 +7840,9 @@ const BTYPES = [
   { id:'text',    label:'기본 블록',  color:'#374151' },
   { id:'intro',   label:'인트로',     color:'#111111' },
   { id:'speech',  label:'대사',       color:'#0369a1' },
-  { id:'gm',      label:'GM 정보',    color:'#92400e' },
   { id:'roll',    label:'판정',       color:'#1d4ed8' },
   { id:'branch',  label:'분기점',     color:'#be185d' },
   { id:'toggle',  label:'토글',       color:'#6d28d9' },
-  { id:'label',   label:'라벨',       color:'#0891b2' },
   { id:'chapter', label:'제목',       color:'#0f172a' },
   { id:'callout', label:'콜아웃',     color:'#b45309' },
   { id:'column',  label:'단 나누기',  color:'#64748b' },
@@ -11443,10 +11432,16 @@ function focusBodyTitleInput() {
 
 // ─── RENDER ───
 function bdef(typeId) { return BTYPES.find(t => t.id === typeId) || { label: typeId, color: '#aaa' }; }
-const CALLOUT_TYPE_LABELS = { info:'정보', warn:'주의', error:'경고', note:'메모', other:'기타' };
+const CALLOUT_TYPE_LABELS = { basic:'기본', info:'정보', warn:'주의', error:'경고', note:'메모', other:'기타' };
 
 function getCalloutTypeIconSvg(type) {
   switch (type) {
+    case 'basic':
+      return `<svg viewBox="0 0 16 16" aria-hidden="true">
+        <rect x="2.6" y="3.6" width="10.8" height="1.6" rx="0.8"></rect>
+        <rect x="2.6" y="7.2" width="10.8" height="1.6" rx="0.8"></rect>
+        <rect x="2.6" y="10.8" width="7.2" height="1.6" rx="0.8"></rect>
+      </svg>`;
     case 'warn':
       return `<svg viewBox="0 0 16 16" aria-hidden="true">
         <path d="M8 1.8L14.3 13H1.7L8 1.8Z"></path>
@@ -11694,7 +11689,6 @@ function splitMainContentLinesForChildPromotion(block) {
 function getPromotedChildTypeForParent(block) {
   if (!block) return 'text';
   if (block.type === 'speech') return 'speech';
-  if (block.type === 'gm') return 'gm';
   return 'text';
 }
 
@@ -11726,7 +11720,7 @@ function hasPromotableMainContentHtml(html = '') {
 function canPromoteMainContentToGenericChildren(block) {
   if (!block || typeof block !== 'object') return false;
   if (!Array.isArray(block.children) || block.children.length === 0) return false;
-  if (['ending', 'branch', 'roll', 'chapter', 'divider', 'image', 'label', 'intro', 'column'].includes(block.type)) {
+  if (['ending', 'branch', 'roll', 'chapter', 'divider', 'image', 'intro', 'column'].includes(block.type)) {
     return false;
   }
   return hasPromotableMainContentHtml(block.content || '');
@@ -11974,6 +11968,9 @@ function normalizeBlockTree(blocks, opts = {}) {
   blocks.forEach(block => {
     if (!block || typeof block !== 'object') return;
     if (!block.id) block.id = mkId();
+    // 삭제된 유형(GM 정보 / 라벨). BTYPES에 없으면 유형 배지가 'gm'/'label'로 깨지므로
+    // 예전 저장본은 기본 블록으로 내린다. content는 그대로 살아남는다.
+    if (block.type === 'gm' || block.type === 'label') block.type = 'text';
     if (!Array.isArray(block.children)) block.children = [];
     if (block.type === 'callout') {
       migrateLegacyCalloutRowsToGenericChildren(block, opts);
@@ -15200,15 +15197,6 @@ function getRollResultBlockHtml(blockId, resultId, child, cid, childIdx, totalCo
       ${actions}
     </div>`;
   }
-  if (child.type === 'gm') {
-    return `<div class="roll-result-block rrb-gm" data-roll-child-id="${child.id}">
-      <div class="rrb-gm-label">GM 노트</div>
-      <div class="rrb-ce" id="${contentId}" contenteditable="true"
-        data-roll-result-id="${resultId}" data-roll-child-id="${child.id}" data-roll-child-field="content" data-ph="GM 노트를 입력하세요..."
-        oninput="updRollResultChild('${blockId}','${resultId}','${child.id}','content',this.innerHTML)" spellcheck="false"></div>
-      ${actions}
-    </div>`;
-  }
   return `<div class="roll-result-block rrb-text" data-roll-child-id="${child.id}">
     <div class="rrb-ce" id="${contentId}" contenteditable="true"
       data-roll-result-id="${resultId}" data-roll-child-id="${child.id}" data-roll-child-field="content" data-ph="내용을 입력하세요..."
@@ -15849,18 +15837,6 @@ function mkBlockEl(b, cid, ctx = {}) {
         </div>
         <div class="img-preview">${isRenderableImageSrc(b.content) ? `<img src="${esc(b.content)}" style="max-width:100%;max-height:200px;border-radius:4px;margin-top:4px;">` : ''}</div>`;
       break;
-    case 'label': {
-      const lc = b.color || '#0891b2';
-      bodyHtml = `
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <input class="block-inp" style="flex:1;margin:0" placeholder="라벨 텍스트" value="${esc(b.content||'')}"
-            oninput="upd('${b.id}','content',this.value,'${cid}');this.closest('.block-body').querySelector('.label-pill').textContent=this.value||'라벨'">
-          <input type="color" value="${esc(lc)}" style="width:26px;height:22px;border:1px solid #e4e4e4;border-radius:4px;padding:2px;cursor:pointer;flex-shrink:0"
-            onchange="upd('${b.id}','color',this.value,'${cid}');this.closest('.block-body').querySelector('.label-pill').style.background=this.value">
-        </div>
-        <span class="label-pill" style="background:${esc(lc)}">${esc(b.content||'라벨')}</span>`;
-      break;
-    }
     case 'callout': {
       const ct = b.calloutType || 'info';
       const ctMap = CALLOUT_TYPE_LABELS;
@@ -15889,7 +15865,7 @@ function mkBlockEl(b, cid, ctx = {}) {
       </div>`;
       break;
     default: {
-      const ph = { gm:'GM 전용 노트', text:'내용을 입력하세요', investigate:'조사 내용', handout:'핸드아웃 내용', event:'이벤트 내용', bgm:'BGM / SE 정보', variation:'개변 내용', other:'기타 내용', info:'정보 내용' };
+      const ph = { text:'내용을 입력하세요', investigate:'조사 내용', handout:'핸드아웃 내용', event:'이벤트 내용', bgm:'BGM / SE 정보', variation:'개변 내용', other:'기타 내용', info:'정보 내용' };
       bodyHtml = `<div class="block-ce" contenteditable="true" data-field="content" data-ph="${ph[b.type]||'내용'}" oninput="upd('${b.id}','content',this.innerHTML,'${cid}')"></div>`;
     }
   }
@@ -17699,11 +17675,9 @@ const BIP_ICONS = {
   text:    '<i class="fa-solid fa-bars"></i>',
   intro:   '<i class="fa-solid fa-play"></i>',
   speech:  '<i class="fa-solid fa-message"></i>',
-  gm:      '<i class="fa-solid fa-note-sticky"></i>',
   roll:    '<i class="fa-solid fa-dice"></i>',
   branch:  '<i class="fa-solid fa-code-branch"></i>',
   toggle:  '<i class="fa-solid fa-chevron-right"></i>',
-  label:   '<i class="fa-solid fa-tag"></i>',
   chapter: '<i class="fa-solid fa-heading"></i>',
   callout: '<i class="fa-solid fa-circle-exclamation"></i>',
   column:  '<i class="fa-solid fa-table-columns"></i>',
