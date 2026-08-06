@@ -5580,6 +5580,22 @@ body.block-pointer-dragging {
 .block.block-ending .ending-content-blocks-host > .block-children-wrap > .block.block-text > .block-text-ce:empty::before {
   color: #666;
 }
+/* 내용칸 자식 블록의 플로팅 메뉴는 기본값(left:100%)이면 우측 거터로 나가는데,
+   .ending-fields가 overflow:hidden이라 카드 끝에서 잘린다(115px 중 12px만 보임).
+   판정 블록과 같게 블록 안 우상단에 두고, 어두운 카드에 맞춰 색을 바꾼다. */
+.block.block-ending .ending-content-blocks-host .block-actions {
+  top: 2px; left: auto; right: 2px; bottom: auto; padding: 1px;
+}
+.block.block-ending .ending-content-blocks-host .block:hover > .block-actions {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: none;
+}
+.block.block-ending .ending-content-blocks-host .block-act { color: #777; }
+.block.block-ending .ending-content-blocks-host .block-act:hover {
+  color: #ddd; background: rgba(255,255,255,0.08);
+}
+.block.block-ending .ending-content-blocks-host .block-act.del:hover { color: #ef4444; }
 .block.block-ending > .block-body > .ending-fields > .ending-field > .block-ce a,
 .block.block-ending > .block-body > .ending-fields > .ending-field > .block-ce a:visited,
 .block.block-ending .ending-content-blocks-host > .block-children-wrap > .block.block-text > .block-text-ce a,
