@@ -5483,11 +5483,17 @@ body.block-pointer-dragging {
   overflow: visible;
 }
 .block.block-ending:hover { box-shadow: none !important; }
+/* 제목 띠의 세로 여백은 헤더가 전부 갖는다.
+   .block-body의 상하 패딩 8px는 위쪽만 제목 띠 안에 들어가고 아래쪽은 구분선 바깥이라,
+   펼쳤을 때 제목이 위 17 / 아래 9로 아래쪽에 치우쳤다. */
+.block.block-ending > .block-body { padding: 0 12px; }
 .ending-header {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; cursor: pointer; user-select: none;
+  padding: 12px; cursor: pointer; user-select: none;
   border-bottom: 1px solid transparent; transition: border-color 0.15s;
 }
+/* 접힌 상태는 구분선이 없어 블록 전체가 제목 띠 — 원래 높이(56px)를 그대로 유지한다. */
+.ending-header:not(.open) { padding: 16px 12px; }
 .ending-header.open { border-bottom-color: #333; }
 .ending-toggle-icon {
   font-size: 10px; color: #666; flex-shrink: 0; transition: transform 0.15s;
@@ -5501,7 +5507,8 @@ body.block-pointer-dragging {
 .ending-name-inp::placeholder { color: #555; font-weight: 400; }
 .ending-fields {
   display: grid; grid-template-columns: 1fr; gap: 20px;
-  padding: 12px 12px 10px;
+  /* 아래 18px = 원래 fields 10px + .block-body가 갖고 있던 8px */
+  padding: 12px 12px 18px;
   overflow: hidden; transition: max-height 0.2s ease;
 }
 .ending-fields.collapsed { display: none; }
