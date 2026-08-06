@@ -3205,7 +3205,7 @@ body.is-block-range-selecting * {
 .tbvp-textarea {
   width: 100%; min-height: 36px; border: 1px solid #e4e4e4; border-radius: 5px;
   padding: 6px 8px; font: inherit; color: #222;
-  outline: none; resize: none; overflow: hidden; line-height: 1.6;
+  outline: none; resize: none; overflow: hidden; line-height: 1.55;
   background: #fff;
 }
 .tbvp-textarea:focus { border-color: #111; }
@@ -5513,7 +5513,9 @@ body.block-pointer-dragging {
 }
 .ending-fields.collapsed { display: none; }
 .ending-field { display: flex; flex-direction: column; gap: 3px; }
-.ending-field label {
+/* 후손 선택자면 내용칸 하위 블록이 쓰는 <label>(개변 패널의 .tbvp-field, 이미지 파일 버튼 등)까지
+   10px/700으로 물들어 그 안의 font:inherit이 깨진다. 필드 제목 줄로만 한정한다. */
+.ending-field > .ending-field-label-row > label {
   font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.06em; color: #999;
 }
