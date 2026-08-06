@@ -3315,14 +3315,13 @@ body.is-block-range-selecting * {
   fill: none; stroke: #fff;
   stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
 }
-/* 글자색은 테마색을 따르지 않고 항상 검정. 열린 목록의 <option>도 select에서 색을 물려받으므로
-   여기서 검정으로 고정하면 목록까지 같이 검정이 된다. */
 .callout-type-select {
   border: none; outline: none; background: transparent;
   font-size: 13px; font-weight: 700; cursor: pointer;
-  color: #000; padding: 0; flex-shrink: 0;
-  text-align: center; text-align-last: center;
+  color: var(--callout-accent, #444); padding: 0; flex-shrink: 0;
+  margin-left: -1px; /* 헤더 gap 6px - 1px: 아이콘에 한 칸 더 붙인다 */
 }
+/* 닫혀 있는 값은 테마색 그대로. 펼친 드롭다운 목록만 검정 + 가운데 정렬. */
 .callout-type-select option { color: #000; text-align: center; }
 .callout-title-inp {
   flex: 1; border: none; outline: none; background: transparent;
@@ -11556,7 +11555,7 @@ function createBlockData(typeId) {
     common: '',
     branches: [],
     color: '#0891b2',
-    calloutType: 'info',
+    calloutType: 'basic',
     css: '',
     children: [],
   };
@@ -17876,7 +17875,7 @@ function addBibSubBlock(blockId, ibId, type, cid) {
       { id: mkId(), type: 'other',   label: '결과', content: '', css: '' },
     ]
   } : {
-    id: mkId(), type: 'callout', calloutType: 'info', title: '', content: ''
+    id: mkId(), type: 'callout', calloutType: 'basic', title: '', content: ''
   };
   ib.subBlocks.push(sub);
   persist();
@@ -18318,7 +18317,7 @@ function addIbCalloutItem(blockId, ibId, cid, event = null) {
   const item = {
     id: mkId(),
     type: 'callout',
-    calloutType: 'info',
+    calloutType: 'basic',
     title: '',
     content: '',
     children: [createBlockData('text')],
@@ -19165,7 +19164,7 @@ function addBranchInnerCalloutBlock(blockId, cid, insertAfterId = '') {
     label: `콜아웃 ${((b.innerBlocks || []).filter(x => x.type === 'callout').length) + 1}`,
     title: '',
     content: '',
-    calloutType: 'info',
+    calloutType: 'basic',
     children: [child],
   };
   insertBranchInnerBlockAt(blockId, ib, cid, insertAfterId);
