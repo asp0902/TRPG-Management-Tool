@@ -3370,7 +3370,7 @@ body.is-block-range-selecting * {
 }
 .callout-type-dropdown-label {
   position: relative;
-  left: -5px;
+  left: 0;
 }
 .callout-title-inp {
   flex: 1; border: none; outline: none; background: transparent;
@@ -11557,7 +11557,7 @@ function openCalloutTypeMenu(e, btn, apply) {
   menu.__calloutTypeBtn = btn;
   menu.style.left = `${left}px`;
   menu.style.top = `${bottom}px`;
-  menu.style.width = `${right - left + 1}px`;
+  menu.style.width = `${right - left - 2}px`;
   Object.entries(CALLOUT_TYPE_LABELS).forEach(([v, label]) => {
     const row = document.createElement('div');
     row.className = 'callout-type-dropdown-item';
@@ -11576,6 +11576,10 @@ function openCalloutTypeMenu(e, btn, apply) {
   });
   menu.onmousedown = ev => ev.stopPropagation();
   document.body.appendChild(menu);
+  const menuBottom = menu.getBoundingClientRect().bottom;
+  if (menuBottom > window.innerHeight - 8) {
+    menu.style.top = `${Math.max(8, r.top - menu.offsetHeight)}px`;
+  }
   _calloutTypeDropdown = menu;
   _calloutTypeDropdownCloseHandler = ev => {
     if (ev.target !== menu && ev.target !== btn && !menu.contains(ev.target) && !btn.contains(ev.target)) closeCalloutTypeDropdown();
