@@ -3346,7 +3346,8 @@ body.is-block-range-selecting * {
 .callout-type-native-select {
   position: fixed;
   z-index: 12000;
-  width: 84px;
+  opacity: 0;
+  pointer-events: none;
   text-align-last: center;
 }
 .callout-type-native-select option { text-align: center; }
@@ -11525,11 +11526,19 @@ function openCalloutTypeMenu(e, btn, apply) {
   tbCloseCtxMenu();
 
   const r = btn.getBoundingClientRect();
+  const icon = btn.parentElement?.querySelector('.callout-type-icon');
+  const ir = icon?.getBoundingClientRect();
+  const left = ir ? Math.min(ir.left, r.left) : r.left;
+  const top = ir ? Math.min(ir.top, r.top) : r.top;
+  const right = ir ? Math.max(ir.right, r.right) : r.right;
+  const bottom = ir ? Math.max(ir.bottom, r.bottom) : r.bottom;
   const select = document.createElement('select');
   select.className = 'tb-select callout-type-native-select';
   select.__calloutTypeBtn = btn;
-  select.style.left = `${r.left}px`;
-  select.style.top = `${r.top}px`;
+  select.style.left = `${left}px`;
+  select.style.top = `${top}px`;
+  select.style.width = `${right - left}px`;
+  select.style.height = `${bottom - top}px`;
   select.innerHTML = Object.entries(CALLOUT_TYPE_LABELS)
     .map(([v, label]) => `<option value="${v}"${v === btn.value ? ' selected' : ''}>${label}</option>`)
     .join('');
