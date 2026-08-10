@@ -11537,7 +11537,7 @@ function openCalloutTypeMenu(e, btn, apply) {
   select.__calloutTypeBtn = btn;
   select.style.left = `${left}px`;
   select.style.top = `${top}px`;
-  select.style.width = `${right - left}px`;
+  select.style.width = `${right - left + 1}px`;
   select.style.height = `${bottom - top}px`;
   select.innerHTML = Object.entries(CALLOUT_TYPE_LABELS)
     .map(([v, label]) => `<option value="${v}"${v === btn.value ? ' selected' : ''}>${label}</option>`)
