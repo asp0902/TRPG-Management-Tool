@@ -3319,11 +3319,37 @@ body.is-block-range-selecting * {
   stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round;
 }
 .callout-type-select {
-  width: 64px;
-  color: var(--callout-accent, #444);
-  font-weight: 700;
+  border: none; outline: none; background: transparent;
+  font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+  color: var(--callout-accent, #444); flex-shrink: 0;
+  display: inline-flex; align-items: center;
+  /* 헤더 gap 6px는 박스 기준, 눈에 보이는 건 잉크 기준이라 글리프 여백만큼 어긋난다.
+     아래 값들은 렌더된 픽셀을 재서 맞춘 것 — 핸들→아이콘 9.5px 기준으로
+     아이콘→이름은 그 절반인 4.75px, 이름→캐럿은 9.5px. */
+  margin-left: -3.93px;
+  padding: 0;
+  gap: 8.93px;
+}
+.callout-type-name {
+  position: relative; top: -1px; /* 글리프 잉크가 버튼 세로중심보다 1px 아래 */
+}
+.callout-type-caret {
+  width: 9px; height: 9px; flex-shrink: 0;
+  display: inline-flex; align-items: center;
+  position: relative; top: -0.5px;
+}
+.callout-type-caret svg {
+  width: 100%; height: 100%; display: block;
+  fill: none; stroke: currentColor;
+  stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+}
+.callout-type-native-select {
+  position: fixed;
+  z-index: 12000;
+  width: 84px;
   text-align-last: center;
 }
+.callout-type-native-select option { text-align: center; }
 .callout-title-inp {
   flex: 1; border: none; outline: none; background: transparent;
   font-size: 14px; font-weight: 600; color: #222;
@@ -3431,6 +3457,7 @@ body.is-block-range-selecting * {
   display: flex; align-items: center; gap: 6px;
   padding: 6px 12px; border-bottom: 1px solid rgba(0,0,0,0.06);
 }
+.nested-callout-header .callout-type-select { font-size: 13px; }
 .nested-callout-header .callout-title-inp { font-size: 14px; margin-left: 8px; }
 .nested-callout-head-actions {
   display: inline-flex;
@@ -11473,12 +11500,56 @@ function getCalloutTypeIconSvg(type) {
   }
 }
 
+// 트리거는 기존 버튼을 유지하고, 펼친 선택기만 임시 native <select>를 띄운다.
 function calloutTypeTriggerHtml(type, onPick) {
   const t = CALLOUT_TYPE_LABELS[type] ? type : 'basic';
-  const options = Object.entries(CALLOUT_TYPE_LABELS)
-    .map(([v, label]) => `<option value="${v}"${v === t ? ' selected' : ''}>${label}</option>`)
+  return `<button class="callout-type-select" type="button" value="${t}"
+    onmousedown="event.preventDefault();event.stopPropagation()" onclick="openCalloutTypeMenu(event,this,${onPick})"
+    ><span class="callout-type-name">${CALLOUT_TYPE_LABELS[t]}</span><span class="callout-type-caret" aria-hidden="true"><svg viewBox="0 0 10 6"><path d="M1 1L5 5L9 1"></path></svg></span></button>`;
+}
+let _calloutTypeNativeSelect = null;
+let _calloutTypeNativeCloseHandler = null;
+function closeCalloutTypeNativeSelect() {
+  if (_calloutTypeNativeSelect) _calloutTypeNativeSelect.remove();
+  _calloutTypeNativeSelect = null;
+  if (_calloutTypeNativeCloseHandler) {
+    document.removeEventListener('mousedown', _calloutTypeNativeCloseHandler);
+    _calloutTypeNativeCloseHandler = null;
+  }
+}
+function openCalloutTypeMenu(e, btn, apply) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (_calloutTypeNativeSelect?.__calloutTypeBtn === btn) { closeCalloutTypeNativeSelect(); return; }
+  closeCalloutTypeNativeSelect();
+  tbCloseCtxMenu();
+
+  const r = btn.getBoundingClientRect();
+  const select = document.createElement('select');
+  select.className = 'tb-select callout-type-native-select';
+  select.__calloutTypeBtn = btn;
+  select.style.left = `${r.left}px`;
+  select.style.top = `${r.bottom + 2}px`;
+  select.innerHTML = Object.entries(CALLOUT_TYPE_LABELS)
+    .map(([v, label]) => `<option value="${v}"${v === btn.value ? ' selected' : ''}>${label}</option>`)
     .join('');
-  return `<select class="tb-select callout-type-select" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" onchange="(${onPick})(this)" title="콜아웃 카테고리">${options}</select>`;
+  select.onmousedown = ev => ev.stopPropagation();
+  select.onclick = ev => ev.stopPropagation();
+  select.onkeydown = ev => { if (ev.key === 'Escape') closeCalloutTypeNativeSelect(); };
+  select.onchange = () => {
+    btn.value = select.value;
+    btn.querySelector('.callout-type-name').textContent = CALLOUT_TYPE_LABELS[select.value];
+    apply(btn);
+    closeCalloutTypeNativeSelect();
+  };
+  document.body.appendChild(select);
+  _calloutTypeNativeSelect = select;
+  _calloutTypeNativeCloseHandler = ev => {
+    if (ev.target !== select && ev.target !== btn && !btn.contains(ev.target)) closeCalloutTypeNativeSelect();
+  };
+  setTimeout(() => document.addEventListener('mousedown', _calloutTypeNativeCloseHandler), 0);
+  select.focus();
+  try { select.showPicker?.(); } catch (_) {}
 }
 
 function setCalloutType(blockId, selectEl, cid) {
