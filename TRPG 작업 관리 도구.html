@@ -3343,14 +3343,35 @@ body.is-block-range-selecting * {
   fill: none; stroke: currentColor;
   stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
 }
-.callout-type-native-select {
+.callout-type-dropdown {
   position: fixed;
   z-index: 12000;
-  opacity: 0;
-  pointer-events: none;
-  text-align-last: center;
+  background: #fff;
+  border: 1px solid #777;
+  color: #222;
+  font-family: inherit;
+  font-size: 13px;
+  overflow: hidden;
+  box-sizing: border-box;
 }
-.callout-type-native-select option { text-align: center; text-indent: -2px; }
+.callout-type-dropdown-item {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+}
+.callout-type-dropdown-item:hover { background: #f3f4f6; }
+.callout-type-dropdown-item.is-selected {
+  background: #1f6fd6;
+  color: #fff;
+  font-weight: 700;
+}
+.callout-type-dropdown-label {
+  position: relative;
+  left: -5px;
+}
 .callout-title-inp {
   flex: 1; border: none; outline: none; background: transparent;
   font-size: 14px; font-weight: 600; color: #222;
@@ -11501,64 +11522,65 @@ function getCalloutTypeIconSvg(type) {
   }
 }
 
-// 트리거는 기존 버튼을 유지하고, 펼친 선택기만 임시 native <select>를 띄운다.
+// 트리거는 기존 버튼을 유지하고, 펼친 목록만 select처럼 보이는 제어 가능한 메뉴로 띄운다.
 function calloutTypeTriggerHtml(type, onPick) {
   const t = CALLOUT_TYPE_LABELS[type] ? type : 'basic';
   return `<button class="callout-type-select" type="button" value="${t}"
     onmousedown="event.preventDefault();event.stopPropagation()" onclick="openCalloutTypeMenu(event,this,${onPick})"
     ><span class="callout-type-name">${CALLOUT_TYPE_LABELS[t]}</span><span class="callout-type-caret" aria-hidden="true"><svg viewBox="0 0 10 6"><path d="M1 1L5 5L9 1"></path></svg></span></button>`;
 }
-let _calloutTypeNativeSelect = null;
-let _calloutTypeNativeCloseHandler = null;
-function closeCalloutTypeNativeSelect() {
-  if (_calloutTypeNativeSelect) _calloutTypeNativeSelect.remove();
-  _calloutTypeNativeSelect = null;
-  if (_calloutTypeNativeCloseHandler) {
-    document.removeEventListener('mousedown', _calloutTypeNativeCloseHandler);
-    _calloutTypeNativeCloseHandler = null;
+let _calloutTypeDropdown = null;
+let _calloutTypeDropdownCloseHandler = null;
+function closeCalloutTypeDropdown() {
+  if (_calloutTypeDropdown) _calloutTypeDropdown.remove();
+  _calloutTypeDropdown = null;
+  if (_calloutTypeDropdownCloseHandler) {
+    document.removeEventListener('mousedown', _calloutTypeDropdownCloseHandler);
+    _calloutTypeDropdownCloseHandler = null;
   }
 }
 function openCalloutTypeMenu(e, btn, apply) {
   e.preventDefault();
   e.stopPropagation();
-  if (_calloutTypeNativeSelect?.__calloutTypeBtn === btn) { closeCalloutTypeNativeSelect(); return; }
-  closeCalloutTypeNativeSelect();
+  if (_calloutTypeDropdown?.__calloutTypeBtn === btn) { closeCalloutTypeDropdown(); return; }
+  closeCalloutTypeDropdown();
   tbCloseCtxMenu();
 
   const r = btn.getBoundingClientRect();
   const icon = btn.parentElement?.querySelector('.callout-type-icon');
   const ir = icon?.getBoundingClientRect();
   const left = ir ? Math.min(ir.left, r.left) : r.left;
-  const top = ir ? Math.min(ir.top, r.top) : r.top;
   const right = ir ? Math.max(ir.right, r.right) : r.right;
   const bottom = ir ? Math.max(ir.bottom, r.bottom) : r.bottom;
-  const select = document.createElement('select');
-  select.className = 'tb-select callout-type-native-select';
-  select.__calloutTypeBtn = btn;
-  select.style.left = `${left}px`;
-  select.style.top = `${top}px`;
-  select.style.width = `${right - left + 1}px`;
-  select.style.height = `${bottom - top}px`;
-  select.innerHTML = Object.entries(CALLOUT_TYPE_LABELS)
-    .map(([v, label]) => `<option value="${v}"${v === btn.value ? ' selected' : ''}>${label}</option>`)
-    .join('');
-  select.onmousedown = ev => ev.stopPropagation();
-  select.onclick = ev => ev.stopPropagation();
-  select.onkeydown = ev => { if (ev.key === 'Escape') closeCalloutTypeNativeSelect(); };
-  select.onchange = () => {
-    btn.value = select.value;
-    btn.querySelector('.callout-type-name').textContent = CALLOUT_TYPE_LABELS[select.value];
-    apply(btn);
-    closeCalloutTypeNativeSelect();
+  const menu = document.createElement('div');
+  menu.className = 'callout-type-dropdown';
+  menu.__calloutTypeBtn = btn;
+  menu.style.left = `${left}px`;
+  menu.style.top = `${bottom}px`;
+  menu.style.width = `${right - left + 1}px`;
+  Object.entries(CALLOUT_TYPE_LABELS).forEach(([v, label]) => {
+    const row = document.createElement('div');
+    row.className = 'callout-type-dropdown-item';
+    if (v === btn.value) row.classList.add('is-selected');
+    row.dataset.value = v;
+    row.innerHTML = `<span class="callout-type-dropdown-label">${label}</span>`;
+    row.onmousedown = ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      btn.value = v;
+      btn.querySelector('.callout-type-name').textContent = label;
+      apply(btn);
+      closeCalloutTypeDropdown();
+    };
+    menu.appendChild(row);
+  });
+  menu.onmousedown = ev => ev.stopPropagation();
+  document.body.appendChild(menu);
+  _calloutTypeDropdown = menu;
+  _calloutTypeDropdownCloseHandler = ev => {
+    if (ev.target !== menu && ev.target !== btn && !menu.contains(ev.target) && !btn.contains(ev.target)) closeCalloutTypeDropdown();
   };
-  document.body.appendChild(select);
-  _calloutTypeNativeSelect = select;
-  _calloutTypeNativeCloseHandler = ev => {
-    if (ev.target !== select && ev.target !== btn && !btn.contains(ev.target)) closeCalloutTypeNativeSelect();
-  };
-  setTimeout(() => document.addEventListener('mousedown', _calloutTypeNativeCloseHandler), 0);
-  select.focus();
-  try { select.showPicker?.(); } catch (_) {}
+  setTimeout(() => document.addEventListener('mousedown', _calloutTypeDropdownCloseHandler), 0);
 }
 
 function setCalloutType(blockId, selectEl, cid) {
@@ -13391,10 +13413,11 @@ function tbCloseCtxMenu() {
 function closeOpenContextMenusOnEscape(e) {
   if (e.key !== 'Escape') return;
   const dsMenu = document.getElementById('ds-ctx-menu');
-  const hasOpenContextMenu = !!_ctxMenu || !!(dsMenu && dsMenu.classList.contains('open'));
+  const hasOpenContextMenu = !!_ctxMenu || !!_calloutTypeDropdown || !!(dsMenu && dsMenu.classList.contains('open'));
   if (!hasOpenContextMenu) return;
 
   tbCloseCtxMenu();
+  closeCalloutTypeDropdown();
   if (typeof _dsHideContextMenu === 'function') _dsHideContextMenu();
   e.preventDefault();
   e.stopPropagation();
