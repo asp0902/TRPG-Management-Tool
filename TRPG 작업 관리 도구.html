@@ -5721,12 +5721,17 @@ body.block-pointer-dragging {
 }
 
 /* ─── SCROLLBAR ─── */
-::-webkit-scrollbar { width: 5px; }
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: #76767f transparent;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #aaa; }
-/* 스크립트 본문은 크롬 기본 두께(15px) */
-#content::-webkit-scrollbar { width: 15px; }
+::-webkit-scrollbar-thumb { background: transparent; border-radius: 999px; }
+*:hover::-webkit-scrollbar-thumb { background: #76767f; }
 
 /* ─── RULEBOOK PAGE ─── */
 .rulebook-wrap { flex: 1; display: flex; flex-direction: column; padding: 24px 28px; gap: 16px; max-width: 900px; margin: 0 auto; width: 100%; }
