@@ -5721,15 +5721,14 @@ body.block-pointer-dragging {
 }
 
 /* ─── SCROLLBAR ─── */
-* {
-  scrollbar-width: auto;
-}
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: transparent; border-radius: 999px; }
 *:hover::-webkit-scrollbar-thumb { background: #76767f; }
 #content::-webkit-scrollbar,
 .rb-chapter-content::-webkit-scrollbar { width: 8px; height: 0; }
+#content::-webkit-scrollbar-thumb:horizontal,
+.rb-chapter-content::-webkit-scrollbar-thumb:horizontal { background: transparent; }
 
 /* ─── RULEBOOK PAGE ─── */
 .rulebook-wrap { flex: 1; display: flex; flex-direction: column; padding: 24px 28px; gap: 16px; max-width: 900px; margin: 0 auto; width: 100%; }
