@@ -4317,7 +4317,7 @@ body.block-pointer-dragging {
 .block-body { flex: 1; padding: 8px 12px; min-width: 0; }
 /* 우상단 플로팅 액션 */
 .block-actions {
-  position: absolute; top: 4px; left: 100%; right: auto; bottom: auto;
+  position: absolute; top: 4px; left: auto; right: 4px; bottom: auto;
   display: flex; align-items: center; gap: 1px;
   padding: 1px 4px; z-index: 6; white-space: nowrap;
 }
@@ -5721,6 +5721,13 @@ body.block-pointer-dragging {
 }
 
 /* ─── SCROLLBAR ─── */
+* {
+  scrollbar-width: auto;
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: #76767f transparent;
+}
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: transparent; border-radius: 999px; }
