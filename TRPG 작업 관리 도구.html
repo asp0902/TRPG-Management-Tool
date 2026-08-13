@@ -2704,7 +2704,7 @@ tr.ct-row-end .ct-select:focus {
 }
 .toc-item {
   display: flex; align-items: center; gap: 6px;
-  padding: 4px 14px; cursor: pointer; border-radius: 0;
+  padding: 4px 14px 4px calc(14px + var(--toc-indent, 0px)); cursor: pointer; border-radius: 0;
   font-size: 12px; color: #444; line-height: 1.4;
   transition: background 0.1s, color 0.1s;
   text-decoration: none; border: none; background: none;
@@ -8719,7 +8719,12 @@ function normalizeScenarioRecord(input = {}, opts = {}) {
   next.speakerTokens = Array.isArray(input?.speakerTokens) ? input.speakerTokens : [];
   next.speakerTokenHiddenKeys = Array.isArray(input?.speakerTokenHiddenKeys) ? input.speakerTokenHiddenKeys : [];
   next.memos = Array.isArray(input?.memos) ? input.memos : [];
-  next.tocOrder = Array.isArray(input?.tocOrder) ? input.tocOrder.filter(id => typeof id === 'string') : [];
+  next.tocRanks = input?.tocRanks && typeof input.tocRanks === 'object' && !Array.isArray(input.tocRanks)
+    ? Object.fromEntries(Object.entries(input.tocRanks)
+      .filter(([id, rank]) => typeof id === 'string' && Number.isFinite(Number(rank)))
+      .map(([id, rank]) => [id, Math.max(0, Math.min(3, Math.round(Number(rank))))]))
+    : {};
+  delete next.tocOrder;
   next.folderId = typeof input?.folderId === 'string' ? input.folderId : '';
   normalizeScenarioBlocksForStorage(next, opts);
   return next;
@@ -12521,51 +12526,36 @@ function appendGenericChildren(el, block, cid, depth = 0) {
 }
 
 const SCRIPT_TOC_TYPES = ['intro', 'chapter', 'branch', 'roll', 'ending'];
+const SCRIPT_TOC_MAX_RANK = 3;
 
 function getScriptTocItems(blocks) {
   return (blocks || []).filter(b => SCRIPT_TOC_TYPES.includes(b.type));
 }
 
-function getScriptTocOrderIds(s, items) {
-  const ids = new Set((items || []).map(b => b.id));
-  const stored = Array.isArray(s?.tocOrder) ? s.tocOrder.filter(id => ids.has(id)) : [];
-  const seen = new Set(stored);
-  return stored.concat((items || []).map(b => b.id).filter(id => !seen.has(id)));
+function getScriptTocRank(blockId, s = cur()) {
+  const rank = Number(s?.tocRanks?.[blockId]);
+  return Number.isFinite(rank) ? Math.max(0, Math.min(SCRIPT_TOC_MAX_RANK, Math.round(rank))) : 0;
 }
 
-function getScriptTocOrderedItems(blocks, s = cur()) {
-  const items = getScriptTocItems(blocks);
-  const byId = new Map(items.map(b => [b.id, b]));
-  return getScriptTocOrderIds(s, items).map(id => byId.get(id)).filter(Boolean);
-}
-
-function moveScriptTocItem(blockId, toIndex) {
+function setScriptTocRank(blockId, rank) {
   const s = cur();
-  if (!s) return;
-  const items = getScriptTocItems(s.blocks);
-  const order = getScriptTocOrderIds(s, items);
-  const from = order.indexOf(blockId);
-  if (from < 0) return;
-  const to = Math.max(0, Math.min(Number(toIndex) || 0, order.length - 1));
-  if (to === from) return;
-  const [id] = order.splice(from, 1);
-  order.splice(to, 0, id);
-  s.tocOrder = order;
-  commitScenarioHistory(`toc:${blockId}:move`, { force: true });
+  if (!s || !getScriptTocItems(s.blocks).some(b => b.id === blockId)) return;
+  const nextRank = Math.max(0, Math.min(SCRIPT_TOC_MAX_RANK, Math.round(Number(rank) || 0)));
+  const ranks = s.tocRanks && typeof s.tocRanks === 'object' && !Array.isArray(s.tocRanks) ? { ...s.tocRanks } : {};
+  if (nextRank === 0) delete ranks[blockId];
+  else ranks[blockId] = nextRank;
+  s.tocRanks = ranks;
+  delete s.tocOrder;
+  commitScenarioHistory(`toc:${blockId}:rank`, { force: true });
   renderToc(s.blocks);
 }
 
 function promptScriptTocRank(blockId) {
-  const s = cur();
-  if (!s) return;
-  const items = getScriptTocOrderedItems(s.blocks, s);
-  const index = items.findIndex(b => b.id === blockId);
-  if (index < 0) return;
-  const input = prompt(`이 목차 항목의 순번을 입력하세요. (1-${items.length})`, String(index + 1));
+  const input = prompt(`이 목차 항목의 단계를 입력하세요. (0-${SCRIPT_TOC_MAX_RANK})`, String(getScriptTocRank(blockId)));
   if (input == null) return;
   const rank = Number(input);
   if (!Number.isFinite(rank)) return;
-  moveScriptTocItem(blockId, rank - 1);
+  setScriptTocRank(blockId, rank);
 }
 
 function openScriptTocItemMenu(e, blockId) {
@@ -12573,17 +12563,15 @@ function openScriptTocItemMenu(e, blockId) {
   e.stopPropagation();
   const s = cur();
   if (!s) return false;
-  const items = getScriptTocOrderedItems(s.blocks, s);
-  const index = items.findIndex(b => b.id === blockId);
-  if (index < 0) return false;
+  if (!getScriptTocItems(s.blocks).some(b => b.id === blockId)) return false;
+  const rank = getScriptTocRank(blockId, s);
   tbShowCtxMenu(e.clientX, e.clientY, [
-    { icon: '↑', label: '위로 이동', disabled: index <= 0, action: () => moveScriptTocItem(blockId, index - 1) },
-    { icon: '↓', label: '아래로 이동', disabled: index >= items.length - 1, action: () => moveScriptTocItem(blockId, index + 1) },
+    { icon: '↤', label: '상위 단계로', disabled: rank <= 0, action: () => setScriptTocRank(blockId, rank - 1) },
+    { icon: '↦', label: '하위 단계로', disabled: rank >= SCRIPT_TOC_MAX_RANK, action: () => setScriptTocRank(blockId, rank + 1) },
     { sep: true },
-    { icon: '⇞', label: '맨 위로 이동', disabled: index <= 0, action: () => moveScriptTocItem(blockId, 0) },
-    { icon: '⇟', label: '맨 아래로 이동', disabled: index >= items.length - 1, action: () => moveScriptTocItem(blockId, items.length - 1) },
-    { sep: true },
-    { icon: '#', label: '순번 입력', action: () => promptScriptTocRank(blockId) },
+    { icon: '0', label: '상위 항목', disabled: rank === 0, action: () => setScriptTocRank(blockId, 0) },
+    { icon: '1', label: '하위 항목', disabled: rank === 1, action: () => setScriptTocRank(blockId, 1) },
+    { icon: '#', label: '단계 입력', action: () => promptScriptTocRank(blockId) },
   ]);
   return false;
 }
@@ -12591,7 +12579,7 @@ function openScriptTocItemMenu(e, blockId) {
 function renderToc(blocks) {
   const list = document.getElementById('toc-list');
   if (!list) return;
-  const items = getScriptTocOrderedItems(blocks);
+  const items = getScriptTocItems(blocks);
   if (!items.length) {
     list.innerHTML = '<div class="toc-empty">목차 항목 없음</div>';
     return;
@@ -12605,7 +12593,8 @@ function renderToc(blocks) {
     else if (b.type === 'branch') label = extractBlockPlainText(b.content, '').trim().slice(0, 24) || '분기점';
     else if (b.type === 'roll') label = [getRollTargetText(b), getRollSkillText(b)].filter(Boolean).join(' ') || '판정';
     else if (b.type === 'ending') label = b.name || '엔딩';
-    return `<button class="toc-item" onclick="tocScrollTo('${b.id}')" oncontextmenu="return openScriptTocItemMenu(event,'${b.id}')">
+    const rank = getScriptTocRank(b.id);
+    return `<button class="toc-item" style="--toc-indent:${rank * 16}px" onclick="tocScrollTo('${b.id}')" oncontextmenu="return openScriptTocItemMenu(event,'${b.id}')">
       <span class="toc-badge ${badgeClass[b.type]}">${badgeLabel[b.type]}</span>
       <span class="toc-label" title="${esc(label)}">${esc(label)}</span>
     </button>`;
