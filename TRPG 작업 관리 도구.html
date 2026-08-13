@@ -9167,9 +9167,14 @@ function captureHistoryFocusTarget() {
     className
   };
 }
+function focusWithoutScroll(el) {
+  if (!el?.focus) return;
+  try { el.focus({ preventScroll: true }); }
+  catch { el.focus(); }
+}
 function placeCaretAtEnd(el) {
   if (!el) return;
-  el.focus();
+  focusWithoutScroll(el);
   lastFocusedTA = el;
   if (el.contentEditable === 'true') {
     const sel = window.getSelection();
@@ -9197,7 +9202,7 @@ function focusBlockEditableAfterRender(blockId, selector, caret = 'start') {
     placeCaretAtEnd(ce);
     return ce;
   }
-  ce.focus();
+  focusWithoutScroll(ce);
   const range = document.createRange();
   range.setStart(ce, 0);
   range.collapse(true);
@@ -17771,7 +17776,7 @@ function focusBlockAfterRender(id) {
     el.scrollIntoView({ behavior:'smooth', block:'center' });
     const focusable = el.querySelector('.block-text-ce, .block-ce[contenteditable], textarea, input, [contenteditable="true"]');
     if (!focusable) return;
-    focusable.focus();
+    focusWithoutScroll(focusable);
     if (focusable.contentEditable === 'true') {
       const sel = window.getSelection();
       if (!sel) return;
@@ -18062,7 +18067,7 @@ function insertBlockAt(typeId, insertIdx, targetKey) {
     const el = document.querySelector(`.block[data-id="${b.id}"]`);
     if (!el) return;
     el.scrollIntoView({ behavior:'smooth', block:'center' });
-    (el.querySelector('[contenteditable]') || el.querySelector('textarea,input'))?.focus();
+    focusWithoutScroll(el.querySelector('[contenteditable]') || el.querySelector('textarea,input'));
   }, 60);
 }
 function addBlock(typeId) {
@@ -18538,7 +18543,6 @@ function focusIbItemAfterRender(itemId, blockId = '') {
 
     if (!target) return;
 
-    target.focus();
     placeCaretAtEnd(target);
     target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, 60);
@@ -18632,7 +18636,7 @@ function focusEditableAtStartAfterRender(selector, blockId = '') {
   if (blockId) selectBlock(blockId);
   const target = document.querySelector(selector);
   if (!target) return;
-  target.focus();
+  focusWithoutScroll(target);
   const range = document.createRange();
   range.selectNodeContents(target);
   range.collapse(true);
@@ -18729,7 +18733,7 @@ function handleIbTextCeEnter(e, blockId, ibId, itemId, cid) {
       if (blockId) selectBlock(blockId);
       const target = document.querySelector(`.bib-item-text-ce[data-item-id="${prev.id}"]`);
       if (!target) return;
-      target.focus();
+      focusWithoutScroll(target);
       const r = document.createRange();
       r.selectNodeContents(target);
       const tmp = document.createElement('div');
@@ -22637,7 +22641,7 @@ function _bnIsCaretAtLastLine(ce) {
   return lastRect.bottom - caretRect.bottom < 4;
 }
 function _bnPlaceCaret(el, atEnd) {
-  el.focus();
+  focusWithoutScroll(el);
   const range = document.createRange();
   range.selectNodeContents(el);
   range.collapse(!atEnd);
@@ -23765,20 +23769,20 @@ function closeLinkInsertDialog(options = {}) {
 
   if (restoreFocus && state) {
     if (state.editable?.isConnected && state.range && tbRangeInsideRoot(state.range, state.editable)) {
-      state.editable.focus();
+      focusWithoutScroll(state.editable);
       const sel = window.getSelection();
       if (sel) {
         sel.removeAllRanges();
         sel.addRange(state.range);
       }
     } else if (state.ta?.isConnected) {
-      state.ta.focus();
+      focusWithoutScroll(state.ta);
       if (typeof state.ta.setSelectionRange === 'function') {
         const pos = Number.isInteger(state.end) ? state.end : state.ta.value.length;
         state.ta.setSelectionRange(pos, pos);
       }
     } else if (state.editable?.isConnected) {
-      state.editable.focus();
+      focusWithoutScroll(state.editable);
     }
   }
 
@@ -23802,14 +23806,14 @@ function applyLinkInsertDialog() {
     state.targetEl.setAttribute('href', url);
     state.targetEl.setAttribute('target', '_blank');
     state.targetEl.setAttribute('rel', 'noopener noreferrer');
-    editable?.focus();
+    focusWithoutScroll(editable);
     editable?.dispatchEvent(new Event('input', { bubbles: true }));
     closeLinkInsertDialog({ restoreFocus: false });
     return;
   }
 
   if (state.editable?.isConnected && state.range && tbRangeInsideRoot(state.range, state.editable)) {
-    state.editable.focus();
+    focusWithoutScroll(state.editable);
 
     const sel = window.getSelection();
     if (sel) {
@@ -23833,7 +23837,7 @@ function applyLinkInsertDialog() {
 
   if (state.ta?.isConnected && Number.isInteger(state.start) && Number.isInteger(state.end)) {
     const ta = state.ta;
-    ta.focus();
+    focusWithoutScroll(ta);
 
     const selectedText = state.selectedText || url;
     const link = `[${selectedText}](${url})`;
