@@ -8719,6 +8719,7 @@ function normalizeScenarioRecord(input = {}, opts = {}) {
   next.speakerTokens = Array.isArray(input?.speakerTokens) ? input.speakerTokens : [];
   next.speakerTokenHiddenKeys = Array.isArray(input?.speakerTokenHiddenKeys) ? input.speakerTokenHiddenKeys : [];
   next.memos = Array.isArray(input?.memos) ? input.memos : [];
+  next.tocOrder = Array.isArray(input?.tocOrder) ? input.tocOrder.filter(id => typeof id === 'string') : [];
   next.folderId = typeof input?.folderId === 'string' ? input.folderId : '';
   normalizeScenarioBlocksForStorage(next, opts);
   return next;
@@ -12519,11 +12520,78 @@ function appendGenericChildren(el, block, cid, depth = 0) {
   host.appendChild(wrap);
 }
 
+const SCRIPT_TOC_TYPES = ['intro', 'chapter', 'branch', 'roll', 'ending'];
+
+function getScriptTocItems(blocks) {
+  return (blocks || []).filter(b => SCRIPT_TOC_TYPES.includes(b.type));
+}
+
+function getScriptTocOrderIds(s, items) {
+  const ids = new Set((items || []).map(b => b.id));
+  const stored = Array.isArray(s?.tocOrder) ? s.tocOrder.filter(id => ids.has(id)) : [];
+  const seen = new Set(stored);
+  return stored.concat((items || []).map(b => b.id).filter(id => !seen.has(id)));
+}
+
+function getScriptTocOrderedItems(blocks, s = cur()) {
+  const items = getScriptTocItems(blocks);
+  const byId = new Map(items.map(b => [b.id, b]));
+  return getScriptTocOrderIds(s, items).map(id => byId.get(id)).filter(Boolean);
+}
+
+function moveScriptTocItem(blockId, toIndex) {
+  const s = cur();
+  if (!s) return;
+  const items = getScriptTocItems(s.blocks);
+  const order = getScriptTocOrderIds(s, items);
+  const from = order.indexOf(blockId);
+  if (from < 0) return;
+  const to = Math.max(0, Math.min(Number(toIndex) || 0, order.length - 1));
+  if (to === from) return;
+  const [id] = order.splice(from, 1);
+  order.splice(to, 0, id);
+  s.tocOrder = order;
+  commitScenarioHistory(`toc:${blockId}:move`, { force: true });
+  renderToc(s.blocks);
+}
+
+function promptScriptTocRank(blockId) {
+  const s = cur();
+  if (!s) return;
+  const items = getScriptTocOrderedItems(s.blocks, s);
+  const index = items.findIndex(b => b.id === blockId);
+  if (index < 0) return;
+  const input = prompt(`이 목차 항목의 순번을 입력하세요. (1-${items.length})`, String(index + 1));
+  if (input == null) return;
+  const rank = Number(input);
+  if (!Number.isFinite(rank)) return;
+  moveScriptTocItem(blockId, rank - 1);
+}
+
+function openScriptTocItemMenu(e, blockId) {
+  e.preventDefault();
+  e.stopPropagation();
+  const s = cur();
+  if (!s) return false;
+  const items = getScriptTocOrderedItems(s.blocks, s);
+  const index = items.findIndex(b => b.id === blockId);
+  if (index < 0) return false;
+  tbShowCtxMenu(e.clientX, e.clientY, [
+    { icon: '↑', label: '위로 이동', disabled: index <= 0, action: () => moveScriptTocItem(blockId, index - 1) },
+    { icon: '↓', label: '아래로 이동', disabled: index >= items.length - 1, action: () => moveScriptTocItem(blockId, index + 1) },
+    { sep: true },
+    { icon: '⇞', label: '맨 위로 이동', disabled: index <= 0, action: () => moveScriptTocItem(blockId, 0) },
+    { icon: '⇟', label: '맨 아래로 이동', disabled: index >= items.length - 1, action: () => moveScriptTocItem(blockId, items.length - 1) },
+    { sep: true },
+    { icon: '#', label: '순번 입력', action: () => promptScriptTocRank(blockId) },
+  ]);
+  return false;
+}
+
 function renderToc(blocks) {
   const list = document.getElementById('toc-list');
   if (!list) return;
-  const TOC_TYPES = ['intro', 'chapter', 'branch', 'roll', 'ending'];
-  const items = (blocks || []).filter(b => TOC_TYPES.includes(b.type));
+  const items = getScriptTocOrderedItems(blocks);
   if (!items.length) {
     list.innerHTML = '<div class="toc-empty">목차 항목 없음</div>';
     return;
@@ -12537,7 +12605,7 @@ function renderToc(blocks) {
     else if (b.type === 'branch') label = extractBlockPlainText(b.content, '').trim().slice(0, 24) || '분기점';
     else if (b.type === 'roll') label = [getRollTargetText(b), getRollSkillText(b)].filter(Boolean).join(' ') || '판정';
     else if (b.type === 'ending') label = b.name || '엔딩';
-    return `<button class="toc-item" onclick="tocScrollTo('${b.id}')">
+    return `<button class="toc-item" onclick="tocScrollTo('${b.id}')" oncontextmenu="return openScriptTocItemMenu(event,'${b.id}')">
       <span class="toc-badge ${badgeClass[b.type]}">${badgeLabel[b.type]}</span>
       <span class="toc-label" title="${esc(label)}">${esc(label)}</span>
     </button>`;
