@@ -3999,11 +3999,11 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 /* 자식 영역은 왼쪽으로만 --child-indent 만큼 들여쓰기되어 오른쪽에는 대응 여백이 없다.
    콜아웃은 테두리가 있어 그 차이가 그대로 드러나므로, 폭에서 들여쓰기만큼 더 빼
    부모 기준 좌우 여백이 같아 보이게 한다. */
-/* 자식 콜아웃은 자식 영역 폭을 그대로 채운다 (좌우 여백은 자식 영역이 이미 갖고 있음) */
+/* 루트 자식 콜아웃은 child indent 6px를 좌우 동일하게 둔다. */
 .block-children-wrap > .block.block-callout.block-child {
-  width: 100%;
-  max-width: 100%;
-  margin: 5px 0 !important;
+  width: calc(100% - var(--child-indent));
+  max-width: calc(100% - var(--child-indent));
+  margin: 5px var(--child-indent) 5px 0 !important;
   box-sizing: border-box;
 }
 
@@ -4011,14 +4011,19 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 .callout-body > .block-children-wrap {
   --child-indent: 6px;
 
-  /* 콜아웃 좌측 테두리에 붙지 않도록 안쪽 여백을 준다 */
-  flex-basis: calc(100% - 18px);
-  width: calc(100% - 18px);
-  max-width: calc(100% - 18px);
-  margin: 10px 9px; /* 좌우 대칭. 예전엔 우측만 2px이라 안쪽 카드가 오른쪽으로 치우쳤다 */
+  /* 부모 border-left 3px까지 포함해 보이는 좌우 여백이 9px/9px가 되게 한다. */
+  flex-basis: calc(100% - 15px);
+  width: calc(100% - 15px);
+  max-width: calc(100% - 15px);
+  margin: 10px 9px 10px 6px;
 
   padding-left: 0;
   border-left: none;
+}
+.callout-body > .block-children-wrap > .block.block-callout.block-child {
+  width: 100%;
+  max-width: 100%;
+  margin: 5px 0 !important;
 }
 /* 콜아웃 내부 기본(text) 블록은 일반 기본 블록과 크기를 동일하게 하되,
    좌우 inset(padding)을 줄여 텍스트가 콜아웃 폭을 최대한 쓰도록 한다
@@ -4064,6 +4069,12 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 
   padding-left: 0;
   border-left: none;
+}
+.bib-item-callout .nested-callout > .block-children-wrap > .block.block-callout.block-child,
+.branch-inner-callout .nested-callout > .block-children-wrap > .block.block-callout.block-child {
+  width: 100%;
+  max-width: 100%;
+  margin: 5px 0 !important;
 }
 .bib-item-callout .nested-callout > .block-children-wrap > .block.block-text.block-child,
 .branch-inner-callout .nested-callout > .block-children-wrap > .block.block-text.block-child {
