@@ -25890,6 +25890,7 @@ function renderRecordPage() {
             const durationLabel = getRecordDurationLabel(rec);
             const hasNote = /<img/i.test(rec.notesHtml || '') || !!getRecordNotesText(rec);
             const hasScenarioLink = rec.scenarioId && state.scenarios.find(s => s.id === rec.scenarioId);
+            const roomLinkUrl = normalizeInsertedUrl(rec.roomLink);
             return `
               <tr class="record-table-row${rec.id === currentRecordSidebarId ? ' active' : ''}" data-record-id="${rec.id}" onclick="selectRecordSidebarItem('${rec.id}', { scroll: false, expand: false })" onmouseenter="openRecordHoverPopup('${rec.id}', this)" onmouseleave="scheduleHideRecordHoverPopup()" oncontextmenu="return openRecordRowCtxMenu(event,'${rec.id}')">
                 <td class="record-col-datetime">${renderRecordDateTimeSummary(rec)}</td>
@@ -25904,8 +25905,8 @@ function renderRecordPage() {
                 <td class="record-col-gm"><span class="record-summary-text">${esc(rec.gm || '') || '-'}</span></td>
                 <td class="record-col-players">${renderRecordPlayersSummary(rec)}</td>
                 <td class="record-col-link">
-                  ${rec.roomLink
-                    ? renderRecordActionButton('🔗', `event.stopPropagation();openRecordRoomLink('${rec.id}')`, '세션룸 링크 열기')
+                  ${roomLinkUrl
+                    ? `<a class="record-icon-btn" href="${esc(roomLinkUrl)}" target="_blank" rel="noopener noreferrer" title="세션룸 링크 열기" aria-label="세션룸 링크 열기" onclick="event.stopPropagation()">🔗</a>`
                     : '<span class="record-cell-empty">-</span>'}
                 </td>
                 <td class="record-col-script">
