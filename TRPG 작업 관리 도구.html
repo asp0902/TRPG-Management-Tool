@@ -6738,8 +6738,10 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-insane-specialties .isp-skill { display: flex; align-items: center; gap: 5px; padding: 4px 6px; border: 1px solid #e4e4e4; border-radius: 4px; background: #fff; cursor: pointer; }
 .sh-insane-specialties .isp-skill:hover { border-color: #bbb; }
 .sh-insane-specialties .isp-skill input { margin: 0; flex-shrink: 0; cursor: pointer; }
-.sh-insane-specialties .isp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sh-insane-specialties .isp-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sh-insane-specialties .isp-skill.is-fear .isp-name { color: #dc2626; font-weight: 700; }
+.sh-insane-specialties .isp-target { flex: 0 0 auto; min-width: 18px; height: 17px; line-height: 17px; border-radius: 9px; background: #f1f1f1; color: #555; font-size: 10px; font-weight: 800; text-align: center; }
+.sh-insane-specialties .isp-skill.is-owned .isp-target { background: #111; color: #fff; }
 .isp-foot { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px; }
 .isp-foot .isp-foot-field { flex: 0 0 130px; }
 .isp-foot .isp-foot-field.is-wide { flex: 1 1 200px; }
@@ -33742,7 +33744,7 @@ function renderCharacterSheet(chId) {
     cocoBtnEl._copyTimer = null;
     cocoBtnEl.textContent = 'API';
     cocoBtnEl.title = 'API 복사';
-    cocoBtnEl.style.display = (activeSheet.templateKey === 'coc7e' || activeSheet.templateKey === 'arianrhod2e') ? '' : 'none';
+    cocoBtnEl.style.display = (activeSheet.templateKey === 'coc7e' || activeSheet.templateKey === 'arianrhod2e' || activeSheet.templateKey === 'insane') ? '' : 'none';
   }
 
   var tpl = SHEET_TEMPLATES[activeSheet.templateKey];
@@ -35092,6 +35094,64 @@ function generateArianrhod2eCocofoliaJSON(chId, sheetId) {
   };
 }
 
+function countInsaneTrack(sectionData, prefix) {
+  var count = 0;
+  for (var i = 1; i <= 6; i++) {
+    if (isSheetCheckboxChecked(sectionData[prefix + i])) count++;
+  }
+  return count;
+}
+
+function generateInsaneCocofoliaJSON(chId, sheetId) {
+  var ch = state.characters.find(function(c) { return c.id === chId; });
+  if (!ch) return null;
+  var sheet = (ch.sheets || []).find(function(s) { return s.id === sheetId; });
+  if (!sheet || sheet.templateKey !== 'insane') return null;
+  var d = sheet.data || {};
+  var basic = (d.basic && typeof d.basic === 'object' && !Array.isArray(d.basic)) ? d.basic : {};
+  var madness = (d.madnessState && typeof d.madnessState === 'object' && !Array.isArray(d.madnessState)) ? d.madnessState : {};
+  var specialties = (d.specialties && typeof d.specialties === 'object' && !Array.isArray(d.specialties)) ? d.specialties : {};
+  var targets = calcInsaneSpecialtyTargets(specialties);
+  var modifier = parseCocSheetNumber(specialties.modifier);
+  var modText = modifier > 0 ? '+' + modifier : (modifier < 0 ? String(modifier) : '');
+  var cmd = ['──특기 판정──'];
+  INSANE_SPECIALTY_COLUMNS.forEach(function(col, colIndex) {
+    col.names.forEach(function(name, rowIndex) {
+      var fieldId = getInsaneSpecialtyFieldId(colIndex, rowIndex);
+      cmd.push('2D6' + modText + '>=' + targets[fieldId] + ' ' + name);
+    });
+  });
+  var tokenSize = normalizeCharacterTokenSize(ch.tokenSize);
+  var characterColor = normalizeCharacterColor(ch.color);
+  var name = basic.charName || ch.name || '이름 없음';
+  return {
+    kind: 'character',
+    data: {
+      name: name,
+      memo: [basic.occupation, basic.age, basic.gender].filter(Boolean).join(' / '),
+      initiative: '',
+      externalUrl: '',
+      status: [
+        { label: '생명력', value: countInsaneTrack(basic, 'lp'), max: 6 },
+        { label: '이성치', value: countInsaneTrack(basic, 'sn'), max: 6 },
+        { label: '광기', value: parseCocSheetNumber(madness.current), max: 6 },
+      ],
+      params: [
+        { label: '공적점', value: String(parseCocSheetNumber(basic.merit)) },
+        { label: '전체 수정치', value: String(modifier) },
+        { label: '호기심', value: specialties.curiosity || '' },
+        { label: '공포심', value: specialties.fear || '' },
+      ],
+      width: tokenSize,
+      height: tokenSize,
+      color: characterColor,
+      invisible: ch.invisible || false,
+      secret: ch.secret || false,
+      commands: cmd.join('\n'),
+    },
+  };
+}
+
 function _copyTextWithFallback(text) {
   if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
     return navigator.clipboard.writeText(text).catch(function() {
@@ -35145,7 +35205,8 @@ function copyCharacterSheetAPI(btn) {
   var json = null;
   if (sheet.templateKey === 'coc7e') json = generateCoc7eCocofoliaJSON(chId, sheet.id);
   else if (sheet.templateKey === 'arianrhod2e') json = generateArianrhod2eCocofoliaJSON(chId, sheet.id);
-  if (!json) { alert('이 시트는 API 복사를 지원하지 않습니다. (CoC 7판, 아리안로드 2E만 지원)'); return; }
+  else if (sheet.templateKey === 'insane') json = generateInsaneCocofoliaJSON(chId, sheet.id);
+  if (!json) { alert('이 시트는 API 복사를 지원하지 않습니다. (CoC 7판, 아리안로드 2E, inSANe만 지원)'); return; }
   var jsonStr = JSON.stringify(json, null, 2);
   _copyTextWithFallback(jsonStr).then(function() {
     if (!btn) return;
@@ -36334,11 +36395,59 @@ const INSANE_SPECIALTY_COLUMNS = [
   { key: 'kno', label: '5.지식', names: ['물리학', '수학', '화학', '생물학', '의학', '교양', '인류학', '역사', '민속학', '고고학', '천문학'] },
   { key: 'occ', label: '6.괴이', names: ['시간', '혼돈', '심해', '죽음', '영혼', '마술', '암흑', '종말', '꿈', '지저', '우주'] },
 ];
+function getInsaneSpecialtyFieldId(colIndex, rowIndex) {
+  return INSANE_SPECIALTY_COLUMNS[colIndex].key + (rowIndex + 2);
+}
+function getInsaneOpenGaps(curiosity) {
+  var n = Number((String(curiosity || '').match(/[1-6]/) || [0])[0]);
+  var gaps = new Set();
+  if (n === 1) gaps.add(0);
+  else if (n === 6) gaps.add(4);
+  else if (n >= 2 && n <= 5) { gaps.add(n - 2); gaps.add(n - 1); }
+  return gaps;
+}
+function calcInsaneSpecialtyTargets(sectionData) {
+  sectionData = (sectionData && typeof sectionData === 'object' && !Array.isArray(sectionData)) ? sectionData : {};
+  var rows = 11;
+  var cols = INSANE_SPECIALTY_COLUMNS.length;
+  var gaps = getInsaneOpenGaps(sectionData.curiosity);
+  var dist = Array.from({ length: rows }, function() { return Array(cols).fill(99); });
+  var queue = [];
+  var targets = {};
+  for (var row = 0; row < rows; row++) {
+    for (var col = 0; col < cols; col++) {
+      if (isSheetCheckboxChecked(sectionData[getInsaneSpecialtyFieldId(col, row)])) {
+        dist[row][col] = 0;
+        queue.push([row, col]);
+      }
+    }
+  }
+  for (var qi = 0; qi < queue.length; qi++) {
+    var cur = queue[qi];
+    var r = cur[0];
+    var c = cur[1];
+    [[r - 1, c, 1], [r + 1, c, 1], [r, c - 1, gaps.has(c - 1) ? 1 : 2], [r, c + 1, gaps.has(c) ? 1 : 2]].forEach(function(next) {
+      var nr = next[0], nc = next[1], cost = next[2];
+      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) return;
+      if (dist[nr][nc] <= dist[r][c] + cost) return;
+      dist[nr][nc] = dist[r][c] + cost;
+      queue.push([nr, nc]);
+    });
+  }
+  for (var outRow = 0; outRow < rows; outRow++) {
+    for (var outCol = 0; outCol < cols; outCol++) {
+      targets[getInsaneSpecialtyFieldId(outCol, outRow)] = Math.min(12, 5 + dist[outRow][outCol]);
+    }
+  }
+  return targets;
+}
 function renderInsaneSpecialtiesSection(sec, sectionData, chId, sheetId) {
   sectionData = (sectionData && typeof sectionData === 'object' && !Array.isArray(sectionData)) ? sectionData : {};
-  var saveExpr = function(fieldId, valueExpr) {
-    return 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ','
+  var targets = calcInsaneSpecialtyTargets(sectionData);
+  var saveExpr = function(fieldId, valueExpr, rerender) {
+    var code = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ','
       + JSON.stringify(sec.id) + ',' + JSON.stringify(fieldId) + ',' + valueExpr + ')';
+    return rerender ? code + ';renderCharacterSheet(' + JSON.stringify(chId) + ')' : code;
   };
   var head = '<div class="isp-cell isp-corner"></div>'
     + INSANE_SPECIALTY_COLUMNS.map(function(col) {
@@ -36350,18 +36459,20 @@ function renderInsaneSpecialtiesSection(sec, sectionData, chId, sheetId) {
     body += INSANE_SPECIALTY_COLUMNS.map(function(col) {
       var fieldId = col.key + (row + 2);
       var name = col.names[row];
+      var isOwned = isSheetCheckboxChecked(sectionData[fieldId]);
       var isFear = String(sectionData.fear || '').trim() === name;
-      return '<label class="isp-cell isp-skill' + (isFear ? ' is-fear' : '') + '">'
-        + '<input type="checkbox"' + (sectionData[fieldId] ? ' checked' : '')
-        + ' onchange="' + esc(saveExpr(fieldId, 'this.checked')) + '">'
-        + '<span class="isp-name">' + esc(name) + '</span></label>';
+      return '<label class="isp-cell isp-skill' + (isOwned ? ' is-owned' : '') + (isFear ? ' is-fear' : '') + '">'
+        + '<input type="checkbox"' + (isOwned ? ' checked' : '')
+        + ' onchange="' + esc(saveExpr(fieldId, 'this.checked', true)) + '">'
+        + '<span class="isp-name">' + esc(name) + '</span>'
+        + '<span class="isp-target" title="판정치">' + esc(targets[fieldId]) + '</span></label>';
     }).join('');
   }
   var curiosityOpts = (sec.fields.find(function(f) { return f.id === 'curiosity'; }) || {}).options || [];
   var curVal = sectionData.curiosity !== undefined ? String(sectionData.curiosity) : '';
   var footer = '<div class="sh-field isp-foot-field">'
       + '<label class="sh-field-label">호기심</label>'
-      + '<select class="sh-field-input" onchange="' + esc(saveExpr('curiosity', 'this.value')) + '">'
+      + '<select class="sh-field-input" onchange="' + esc(saveExpr('curiosity', 'this.value', true)) + '">'
       + curiosityOpts.map(function(o) {
           return '<option value="' + esc(o) + '"' + (o === curVal ? ' selected' : '') + '>' + esc(o || '—') + '</option>';
         }).join('')
