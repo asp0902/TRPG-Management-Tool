@@ -518,6 +518,9 @@ tr.ct-row-end .ct-select:focus {
   position: sticky; top: 0; z-index: 2; background: #f8f8f8; font-size: 10pt;
   font-weight: 800; color: #666; letter-spacing: 0.04em; white-space: nowrap; padding: 10px 12px;
 }
+.record-sort-btn { border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; font-weight: inherit; letter-spacing: inherit; padding: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.record-sort-btn:hover { color: #111; }
+.record-sort-mark { min-width: 9px; font-size: 9px; color: #111; }
 .record-table tbody tr:last-child td { border-bottom: none; }
 .record-table-row { cursor: pointer; transition: background 0.12s; }
 .record-table-row:hover { background: #fafafa; }
@@ -8461,6 +8464,7 @@ let currentRecordSidebarId = null;
 let expandedRecordId = null;
 let recordHoverPopupHideTimer = null;
 let recordSearchQuery = '';
+let recordScenarioSortDir = '';
 const recordSidebarGroupState = Object.create(null);
 const scenarioSidebarRuleState = Object.create(null);
 const characterSidebarRuleState = Object.create(null);
@@ -10353,21 +10357,33 @@ function getRecordSearchText(record) {
     getRecordNotesText(record),
   ].join('\n').toLowerCase();
 }
+function compareRecordDefaultOrder(a, b) {
+  const as = getRecordDateTimeInfo(a?.dateTime || a?.date).sortValue;
+  const bs = getRecordDateTimeInfo(b?.dateTime || b?.date).sortValue;
+  if (as && bs) {
+    if (as !== bs) return bs - as;
+    return (Number(b?.createdAt) || 0) - (Number(a?.createdAt) || 0);
+  }
+  if (as) return -1;
+  if (bs) return 1;
+  return (Number(b?.createdAt) || 0) - (Number(a?.createdAt) || 0);
+}
+function toggleRecordScenarioSort() {
+  recordScenarioSortDir = recordScenarioSortDir === 'asc' ? 'desc' : 'asc';
+  renderRecordPage();
+  if (currentPage === 'record') renderList();
+}
 function getFilteredSortedRecords() {
   const query = String(recordSearchQuery || '').trim().toLowerCase();
   return state.records
     .filter(record => !query || getRecordSearchText(record).includes(query))
     .slice()
     .sort((a, b) => {
-      const as = getRecordDateTimeInfo(a?.dateTime || a?.date).sortValue;
-      const bs = getRecordDateTimeInfo(b?.dateTime || b?.date).sortValue;
-      if (as && bs) {
-        if (as !== bs) return bs - as;
-        return (Number(b?.createdAt) || 0) - (Number(a?.createdAt) || 0);
+      if (recordScenarioSortDir) {
+        const cmp = getRecordDisplayTitle(a).localeCompare(getRecordDisplayTitle(b), 'ko', { sensitivity: 'base', numeric: true });
+        if (cmp) return recordScenarioSortDir === 'asc' ? cmp : -cmp;
       }
-      if (as) return -1;
-      if (bs) return 1;
-      return (Number(b?.createdAt) || 0) - (Number(a?.createdAt) || 0);
+      return compareRecordDefaultOrder(a, b);
     });
 }
 function getRecordGroupKey(record) {
@@ -25879,7 +25895,7 @@ function renderRecordPage() {
             <th class="record-col-datetime">날짜와 시간</th>
             <th class="record-col-duration">플레이 시간</th>
             <th class="record-col-rule">룰</th>
-            <th class="record-col-scenario">시나리오 이름</th>
+            <th class="record-col-scenario"><button type="button" class="record-sort-btn" onclick="toggleRecordScenarioSort()" title="시나리오 이름 정렬">시나리오 이름${recordScenarioSortDir ? `<span class="record-sort-mark">${recordScenarioSortDir === 'asc' ? '▲' : '▼'}</span>` : ''}</button></th>
             <th class="record-col-gm">GM</th>
             <th class="record-col-players">PL</th>
             <th class="record-col-link">링크</th>
