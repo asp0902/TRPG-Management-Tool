@@ -8464,6 +8464,7 @@ let currentRecordSidebarId = null;
 let expandedRecordId = null;
 let recordHoverPopupHideTimer = null;
 let recordSearchQuery = '';
+let recordDateSortDir = '';
 let recordScenarioSortDir = '';
 const recordSidebarGroupState = Object.create(null);
 const scenarioSidebarRuleState = Object.create(null);
@@ -10357,19 +10358,31 @@ function getRecordSearchText(record) {
     getRecordNotesText(record),
   ].join('\n').toLowerCase();
 }
-function compareRecordDefaultOrder(a, b) {
+function compareRecordDateOrder(a, b, dir = 'desc') {
   const as = getRecordDateTimeInfo(a?.dateTime || a?.date).sortValue;
   const bs = getRecordDateTimeInfo(b?.dateTime || b?.date).sortValue;
+  const ac = Number(a?.createdAt) || 0;
+  const bc = Number(b?.createdAt) || 0;
   if (as && bs) {
-    if (as !== bs) return bs - as;
-    return (Number(b?.createdAt) || 0) - (Number(a?.createdAt) || 0);
+    if (as !== bs) return dir === 'asc' ? as - bs : bs - as;
+    return dir === 'asc' ? ac - bc : bc - ac;
   }
   if (as) return -1;
   if (bs) return 1;
-  return (Number(b?.createdAt) || 0) - (Number(a?.createdAt) || 0);
+  return dir === 'asc' ? ac - bc : bc - ac;
+}
+function compareRecordDefaultOrder(a, b) {
+  return compareRecordDateOrder(a, b, 'desc');
+}
+function toggleRecordDateSort() {
+  recordDateSortDir = recordDateSortDir === 'asc' ? 'desc' : 'asc';
+  recordScenarioSortDir = '';
+  renderRecordPage();
+  if (currentPage === 'record') renderList();
 }
 function toggleRecordScenarioSort() {
   recordScenarioSortDir = recordScenarioSortDir === 'asc' ? 'desc' : 'asc';
+  recordDateSortDir = '';
   renderRecordPage();
   if (currentPage === 'record') renderList();
 }
@@ -10379,6 +10392,7 @@ function getFilteredSortedRecords() {
     .filter(record => !query || getRecordSearchText(record).includes(query))
     .slice()
     .sort((a, b) => {
+      if (recordDateSortDir) return compareRecordDateOrder(a, b, recordDateSortDir);
       if (recordScenarioSortDir) {
         const cmp = getRecordDisplayTitle(a).localeCompare(getRecordDisplayTitle(b), 'ko', { sensitivity: 'base', numeric: true });
         if (cmp) return recordScenarioSortDir === 'asc' ? cmp : -cmp;
@@ -25892,7 +25906,7 @@ function renderRecordPage() {
       <table class="record-table">
         <thead>
           <tr>
-            <th class="record-col-datetime">날짜와 시간</th>
+            <th class="record-col-datetime"><button type="button" class="record-sort-btn" onclick="toggleRecordDateSort()" title="날짜/시간 정렬">날짜/시간${recordDateSortDir ? `<span class="record-sort-mark">${recordDateSortDir === 'asc' ? '▲' : '▼'}</span>` : ''}</button></th>
             <th class="record-col-duration">플레이 시간</th>
             <th class="record-col-rule">룰</th>
             <th class="record-col-scenario"><button type="button" class="record-sort-btn" onclick="toggleRecordScenarioSort()" title="시나리오 이름 정렬">시나리오 이름${recordScenarioSortDir ? `<span class="record-sort-mark">${recordScenarioSortDir === 'asc' ? '▲' : '▼'}</span>` : ''}</button></th>
