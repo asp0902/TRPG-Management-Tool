@@ -4450,6 +4450,39 @@ body.block-pointer-dragging {
   transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
 .img-file-btn:hover { color: #222; border-color: #aaa; background: #f5f5f5; }
+.block.block-image .block-body { width: 100%; }
+.image-block-view { display: flex; justify-content: center; width: 100%; }
+.image-block-view img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.rb-modal-backdrop.image-block-modal-backdrop { z-index: 10000; }
+.rb-modal.image-block-modal { width: min(440px, 100%); }
+.image-block-modal-head { display: flex; align-items: center; justify-content: space-between; }
+.image-block-modal-close {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: none; background: transparent;
+  color: #999; cursor: pointer; border-radius: 5px;
+}
+.image-block-modal-close:hover { color: #222; background: #f3f4f6; }
+.image-block-source-btn {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  width: 100%; border: 1px solid #ddd; border-radius: 6px; background: #fff;
+  color: #444; cursor: pointer; padding: 8px 12px; font: inherit; font-size: 13px;
+}
+.image-block-source-btn:hover { border-color: #999; color: #111; }
+.image-block-paste-zone {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 54px; border: 1px dashed #ccc; border-radius: 6px;
+  color: #777; font-size: 12px; cursor: text; outline: none;
+}
+.image-block-paste-zone:hover,
+.image-block-paste-zone:focus-visible { border-color: #777; color: #222; background: #fafafa; }
+.image-block-paste-zone kbd { color: #999; font: inherit; font-size: 11px; }
+.image-block-modal-preview {
+  display: none; justify-content: center; padding: 8px;
+  border: 1px solid #eee; border-radius: 6px; background: #fafafa;
+}
+.image-block-modal-preview.visible { display: flex; }
+.image-block-modal-preview img { display: block; max-width: 100%; max-height: 240px; object-fit: contain; }
+.image-block-modal-save:disabled { opacity: 0.35; cursor: default; }
 
 /* Roll */
 .block.block-roll {
@@ -7060,6 +7093,42 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
   <!-- 블록 삽입 팝업 -->
   <div id="block-insert-popup" class="block-insert-popup">
     <div class="bip-grid" id="bip-grid"></div>
+  </div>
+
+  <!-- 이미지 블록 추가 모달 -->
+  <div id="image-block-modal-backdrop" class="rb-modal-backdrop image-block-modal-backdrop"
+    role="dialog" aria-modal="true" aria-labelledby="image-block-modal-title"
+    onclick="if(event.target===this) closeImageBlockModal()"
+    onkeydown="if(event.key==='Escape') closeImageBlockModal()">
+    <div class="rb-modal image-block-modal" onclick="event.stopPropagation()">
+      <div class="image-block-modal-head">
+        <div class="rb-modal-heading" id="image-block-modal-title">이미지 추가</div>
+        <button type="button" class="image-block-modal-close" onclick="closeImageBlockModal()" title="닫기" aria-label="닫기">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="rb-modal-field">
+        <label class="rb-modal-label" for="image-block-url">이미지 URL</label>
+        <input type="url" class="rb-modal-input" id="image-block-url" placeholder="https://..." spellcheck="false"
+          oninput="setImageBlockModalSource(this.value)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();submitImageBlockModal();}">
+      </div>
+      <button type="button" class="image-block-source-btn" onclick="document.getElementById('image-block-file').click()">
+        <i class="fa-solid fa-folder-open"></i><span>파일 불러오기</span>
+      </button>
+      <input type="file" id="image-block-file" accept="image/*" hidden onchange="onImageBlockModalFile(event)">
+      <div id="image-block-paste-zone" class="image-block-paste-zone" tabindex="0" onpaste="onImageBlockModalPaste(event)">
+        <i class="fa-solid fa-paste"></i><span>클립보드에서 붙여넣기</span><kbd>Ctrl+V</kbd>
+      </div>
+      <div id="image-block-modal-preview" class="image-block-modal-preview">
+        <img id="image-block-modal-preview-img" alt="선택한 이미지 미리보기">
+      </div>
+      <div class="rb-modal-footer">
+        <button type="button" class="rb-modal-cancel" onclick="closeImageBlockModal()">취소</button>
+        <button type="button" class="rb-modal-save image-block-modal-save" id="image-block-modal-submit"
+          onclick="submitImageBlockModal()" disabled>추가</button>
+      </div>
+    </div>
   </div>
 
   <!-- 링크 삽입 팝업 -->
@@ -14469,6 +14538,13 @@ function insertChildBlockFromContext(parentBlock, parentEl, typeId, cid = 'block
   if (!Array.isArray(parentBlock.children)) parentBlock.children = [];
 
   const targetKey = makeChildBlockTargetKey(parentBlock.id, cid);
+  if (typeId === 'image' && currentPage === 'script' && cid === 'blocks-container') {
+    openImageBlockModal(src => {
+      const insertIdx = prepareChildInsertIndexFromContext(parentBlock, parentEl, event, cid);
+      insertBlockAt(typeId, insertIdx, targetKey, src);
+    });
+    return;
+  }
   const insertIdx = prepareChildInsertIndexFromContext(parentBlock, parentEl, event, cid);
 
   insertBlockAt(typeId, insertIdx, targetKey);
@@ -16117,7 +16193,7 @@ function mkBlockEl(b, cid, ctx = {}) {
   if (b.type === 'toggle' && typeof b.collapsed !== 'boolean') b.collapsed = false;
   const def = bdef(b.type);
   const el = document.createElement('div');
-  const typeClass = { callout:'block-callout', chapter:'block-chapter', speech:'block-speech', roll:'block-roll', branch:'block-branch' };
+  const typeClass = { callout:'block-callout', chapter:'block-chapter', speech:'block-speech', roll:'block-roll', branch:'block-branch', image:'block-image' };
   el.className = typeClass[b.type] ? `block ${typeClass[b.type]}` : 'block';
   if ((ctx.depth || 0) > 0) el.classList.add('block-child');
   el.style.setProperty('--bc', def.color);
@@ -16239,15 +16315,17 @@ function mkBlockEl(b, cid, ctx = {}) {
       </div>`;
       break;
     case 'image':
-      bodyHtml = `
-        <div class="img-input-row">
-          <input class="block-inp" placeholder="이미지 URL" value="${esc(b.content||'')}"
-            oninput="upd('${b.id}','content',this.value,'${cid}');renderImgPreview(this)">
-          <label class="img-file-btn" title="내 컴퓨터에서 이미지 선택">파일
-            <input type="file" accept="image/*" hidden onchange="pickImageBlockFile(event,'${b.id}','${cid}')">
-          </label>
-        </div>
-        <div class="img-preview">${isRenderableImageSrc(b.content) ? `<img src="${esc(b.content)}" style="max-width:100%;max-height:200px;border-radius:4px;margin-top:4px;">` : ''}</div>`;
+      bodyHtml = currentPage === 'script' && cid === 'blocks-container'
+        ? `<div class="image-block-view">${isRenderableImageSrc(b.content) ? `<img src="${esc(b.content)}" alt="">` : ''}</div>`
+        : `
+          <div class="img-input-row">
+            <input class="block-inp" placeholder="이미지 URL" value="${esc(b.content||'')}"
+              oninput="upd('${b.id}','content',this.value,'${cid}');renderImgPreview(this)">
+            <label class="img-file-btn" title="내 컴퓨터에서 이미지 선택">파일
+              <input type="file" accept="image/*" hidden onchange="pickImageBlockFile(event,'${b.id}','${cid}')">
+            </label>
+          </div>
+          <div class="img-preview">${isRenderableImageSrc(b.content) ? `<img src="${esc(b.content)}" style="max-width:100%;max-height:200px;border-radius:4px;margin-top:4px;">` : ''}</div>`;
       break;
     case 'callout': {
       const ct = b.calloutType || 'info';
@@ -16592,6 +16670,66 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
 
 function isRenderableImageSrc(src) {
   return /^(https?:\/\/|data:image\/)/.test(String(src || ''));
+}
+let imageBlockModalSource = '';
+let imageBlockModalSubmit = null;
+function openImageBlockModal(onSubmit) {
+  imageBlockModalSubmit = onSubmit;
+  imageBlockModalSource = '';
+  document.getElementById('image-block-url').value = '';
+  document.getElementById('image-block-file').value = '';
+  setImageBlockModalSource('');
+  document.getElementById('image-block-modal-backdrop').classList.add('open');
+  setTimeout(() => document.getElementById('image-block-url').focus(), 0);
+}
+function closeImageBlockModal() {
+  document.getElementById('image-block-modal-backdrop').classList.remove('open');
+  imageBlockModalSource = '';
+  imageBlockModalSubmit = null;
+}
+function setImageBlockModalSource(src) {
+  imageBlockModalSource = String(src || '').trim();
+  const valid = isRenderableImageSrc(imageBlockModalSource);
+  const preview = document.getElementById('image-block-modal-preview');
+  const img = document.getElementById('image-block-modal-preview-img');
+  document.getElementById('image-block-modal-submit').disabled = !valid;
+  preview.classList.toggle('visible', valid);
+  if (valid) img.src = imageBlockModalSource;
+  else img.removeAttribute('src');
+}
+function setImageBlockModalFile(file) {
+  if (!file || !/^image\//.test(file.type)) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('image-block-url').value = '';
+    setImageBlockModalSource(String(e.target.result || ''));
+  };
+  reader.readAsDataURL(file);
+}
+function onImageBlockModalFile(e) {
+  const file = e.target.files?.[0];
+  e.target.value = '';
+  setImageBlockModalFile(file);
+}
+function onImageBlockModalPaste(e) {
+  const file = getImageFileFromTransfer(e.clipboardData);
+  if (file) {
+    e.preventDefault();
+    setImageBlockModalFile(file);
+    return;
+  }
+  const text = e.clipboardData?.getData('text/plain')?.trim() || '';
+  if (!isRenderableImageSrc(text)) return;
+  e.preventDefault();
+  document.getElementById('image-block-url').value = text;
+  setImageBlockModalSource(text);
+}
+function submitImageBlockModal() {
+  if (!isRenderableImageSrc(imageBlockModalSource) || typeof imageBlockModalSubmit !== 'function') return;
+  const submit = imageBlockModalSubmit;
+  const src = imageBlockModalSource;
+  closeImageBlockModal();
+  submit(src);
 }
 function renderImgPreview(input) {
   const url = input.value;
@@ -18217,13 +18355,18 @@ function closeInsertPopup() {
 }
 
 // ─── BLOCK ADD ───
-function insertBlockAt(typeId, insertIdx, targetKey) {
+function insertBlockAt(typeId, insertIdx, targetKey, imageSource = '') {
   closeInsertPopup();
 
   const target = getBlockListByTargetKey(targetKey, 'blocks-container');
   if (!target) return;
+  if (typeId === 'image' && currentPage === 'script' && target.cid === 'blocks-container' && !imageSource) {
+    openImageBlockModal(src => insertBlockAt(typeId, insertIdx, targetKey, src));
+    return;
+  }
 
   const b = createBlockData(typeId);
+  if (typeId === 'image') b.content = imageSource;
   const idx = Math.max(0, Math.min(Number(insertIdx) || 0, target.array.length));
 
   target.array.splice(idx, 0, b);
