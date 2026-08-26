@@ -7147,6 +7147,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
             <div class="section-heading">시나리오 정보</div>
             <div class="info-grid">
               <div class="field full"><label>개요</label><div class="info-ce" id="i-overview" contenteditable="true" data-ph="시나리오 개요" oninput="syncInfo()"></div></div>
+              <div class="field full" id="field-insane-handout" style="display:none"><label>핸드아웃</label><div class="info-ce" id="i-handout" contenteditable="true" data-ph="핸드아웃" oninput="syncInfo()"></div></div>
               <div class="field full"><label>진상</label><div class="info-ce" id="i-truth" contenteditable="true" data-ph="사건의 진상 (GM 전용)" oninput="syncInfo()"></div></div>
               <div class="field full"><label>주의사항</label><div class="info-ce" id="i-cautions" contenteditable="true" data-ph="플레이어에게 전달할 주의사항" oninput="syncInfo()"></div></div>
               <div class="field full"><label>트리거 요소</label><div class="info-ce" id="i-triggers" contenteditable="true" data-ph="트리거 요소" oninput="syncInfo()"></div></div>
@@ -8515,7 +8516,7 @@ function mkScenario(folderId = '') {
       playtime:'', players:'', skills:'', relations:'',
       madness:'', combat:'', lost:'',
       insaneCard:'', sceneTable:'',
-      overview:'', truth:'', cautions:'', triggers:'', other:'', afterword:'',
+      overview:'', handout:'', truth:'', cautions:'', triggers:'', other:'', afterword:'',
       sessionCard: null
     },
     introCode: '', blocks: [], endings: [], speakerTokens: [], speakerTokenHiddenKeys: [], memos: [],
@@ -11256,7 +11257,7 @@ function loadInfo(s) {
   v('i-skills', s.info.skills, next => { s.info.skills = next; }); v('i-relations', s.info.relations, next => { s.info.relations = next; });
   v('i-madness', s.info.madness); v('i-combat', s.info.combat); v('i-lost', s.info.lost);
   v('i-insane-card', s.info.insaneCard, next => { s.info.insaneCard = next; }); v('i-scene-table', s.info.sceneTable, next => { s.info.sceneTable = next; });
-  v('i-overview', s.info.overview, next => { s.info.overview = next; }); v('i-truth', s.info.truth, next => { s.info.truth = next; });
+  v('i-overview', s.info.overview, next => { s.info.overview = next; }); v('i-handout', s.info.handout, next => { s.info.handout = next; }); v('i-truth', s.info.truth, next => { s.info.truth = next; });
   v('i-cautions', s.info.cautions, next => { s.info.cautions = next; }); v('i-triggers', s.info.triggers, next => { s.info.triggers = next; });
   v('i-other', s.info.other, next => { s.info.other = next; }); v('i-afterword', s.info.afterword, next => { s.info.afterword = next; });
   const img = document.getElementById('card-img');
@@ -11280,11 +11281,13 @@ function updateInfoGridByRule() {
   const fs = document.getElementById('field-skills');
   const possibilityGrid = document.getElementById('info-possibility-grid');
   const insanePossibilityGrid = document.getElementById('info-possibility-grid-insane');
+  const insaneHandoutField = document.getElementById('field-insane-handout');
   const possibilityHeading = possibilityGrid ? possibilityGrid.previousElementSibling : null;
   if (fp) fp.style.display = showPlayers ? '' : 'none';
   if (fs) fs.style.display = showSkills  ? '' : 'none';
   if (possibilityGrid) possibilityGrid.style.display = (isUnsungDuet || isInsane) ? 'none' : '';
   if (insanePossibilityGrid) insanePossibilityGrid.style.display = isInsane ? '' : 'none';
+  if (insaneHandoutField) insaneHandoutField.style.display = isInsane ? '' : 'none';
   if (possibilityHeading && possibilityHeading.classList?.contains('section-heading')) {
     possibilityHeading.style.display = (isUnsungDuet && !isInsane) ? 'none' : '';
   }
@@ -11522,7 +11525,7 @@ function syncInfo(options = {}) {
   s.info.relations = g('i-relations'); s.info.madness = g('i-madness');
   s.info.combat = g('i-combat'); s.info.lost = g('i-lost');
   s.info.insaneCard = g('i-insane-card'); s.info.sceneTable = g('i-scene-table');
-  s.info.overview = g('i-overview'); s.info.truth = g('i-truth');
+  s.info.overview = g('i-overview'); s.info.handout = g('i-handout'); s.info.truth = g('i-truth');
   s.info.cautions = g('i-cautions'); s.info.triggers = g('i-triggers');
   s.info.other = g('i-other'); s.info.afterword = g('i-afterword');
   if (currentPage === 'script') {
