@@ -1445,7 +1445,6 @@ tr.ct-row-end .ct-select:focus {
   max-width: 100%;
   height: auto;
   max-height: 240px;
-  border-radius: 8px;
   vertical-align: middle;
 }
 .css-macro-preview-chatbox hr {
@@ -26714,7 +26713,7 @@ function renderCssMacroPreviewHtml(value) {
   }
   const normalizeDescPreviewSource = (input, isDesc) => {
     if (!isDesc) return input;
-    return String(input || '').replace(/\s*%NEWLINE%\s*/gi, ' ');
+    return String(input || '').replace(/\s*%NEWLINE%\s*/gi, '\u00a0');
   };
 
   const normalizeCssMacroPreviewImageUrl = (input) => {
