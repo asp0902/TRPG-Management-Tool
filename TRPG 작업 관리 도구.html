@@ -8563,7 +8563,7 @@ function mkScenario(folderId = '') {
       madness:'', combat:'', lost:'',
       insaneCard:'', sceneTable:'',
       overview:'', handout:'', truth:'', cautions:'', triggers:'', other:'', afterword:'',
-      sessionCard: null
+      sessionCard: null, introPreviewDark: false
     },
     introCode: '', blocks: [], endings: [], speakerTokens: [], speakerTokenHiddenKeys: [], memos: [],
     folderId
@@ -16155,12 +16155,14 @@ function mkBlockEl(b, cid, ctx = {}) {
     }
     case 'intro': {
       const introContent = b.content || '';
+      const isScriptIntro = currentPage === 'script';
+      const introPreviewDark = isScriptIntro && !!cur()?.info?.introPreviewDark;
       bodyHtml = `
         <div class="intro-split-wrap">
-          <div class="intro-preview-pane css-macro-preview-wrap${isCssMacroPreviewDark(b.id) ? ' dark' : ''}">
+          <div class="intro-preview-pane css-macro-preview-wrap${introPreviewDark ? ' dark' : ''}">
             <div class="css-macro-preview-head">
               <div class="intro-pane-label">PREVIEW</div>
-              ${renderCssMacroPreviewBackgroundToggle(b.id)}
+              ${isScriptIntro ? renderPreviewBackgroundToggle(introPreviewDark, 'toggleIntroPreviewBackground(this)') : ''}
             </div>
             <div class="css-macro-preview-chatbox">
               <div class="css-macro-preview-body intro-preview-body" data-intro-preview-id="${b.id}">
@@ -26903,8 +26905,7 @@ function isCssMacroPreviewOpen(itemId) {
 function isCssMacroPreviewDark(itemId) {
   return !!cssMacroPreviewDarkMap[itemId];
 }
-function toggleCssMacroPreviewBackground(itemId, button) {
-  const dark = cssMacroPreviewDarkMap[itemId] = !isCssMacroPreviewDark(itemId);
+function applyPreviewBackgroundToggle(button, dark) {
   button?.closest('.css-macro-preview-wrap')?.classList.toggle('dark', dark);
   if (button) {
     const nextColor = dark ? '흰색' : '검은색';
@@ -26914,14 +26915,31 @@ function toggleCssMacroPreviewBackground(itemId, button) {
     button.title = `미리보기 배경을 ${nextColor}으로 변경`;
   }
 }
-function renderCssMacroPreviewBackgroundToggle(itemId) {
-  const dark = isCssMacroPreviewDark(itemId);
+function toggleCssMacroPreviewBackground(itemId, button) {
+  const dark = cssMacroPreviewDarkMap[itemId] = !isCssMacroPreviewDark(itemId);
+  applyPreviewBackgroundToggle(button, dark);
+}
+function toggleIntroPreviewBackground(button) {
+  const scenario = cur();
+  if (!scenario) return;
+  const dark = scenario.info.introPreviewDark = !scenario.info.introPreviewDark;
+  document.querySelectorAll('#blocks-container .intro-preview-pane .css-macro-preview-bg-toggle')
+    .forEach(toggle => applyPreviewBackgroundToggle(toggle, dark));
+  commitScenarioHistory('info:intro-preview-background', { force: true });
+}
+function renderPreviewBackgroundToggle(dark, onclick) {
   const nextColor = dark ? '흰색' : '검은색';
   return `<button type="button" class="css-macro-preview-bg-toggle${dark ? ' dark' : ''}"
     aria-pressed="${dark ? 'true' : 'false'}"
     aria-label="미리보기 배경을 ${nextColor}으로 변경"
     title="미리보기 배경을 ${nextColor}으로 변경"
-    onclick="toggleCssMacroPreviewBackground('${itemId}',this)"></button>`;
+    onclick="${onclick}"></button>`;
+}
+function renderCssMacroPreviewBackgroundToggle(itemId) {
+  return renderPreviewBackgroundToggle(
+    isCssMacroPreviewDark(itemId),
+    `toggleCssMacroPreviewBackground('${itemId}',this)`
+  );
 }
 function toggleCssMacroPreview(itemId, button) {
   cssMacroPreviewOpenMap[itemId] = !cssMacroPreviewOpenMap[itemId];
