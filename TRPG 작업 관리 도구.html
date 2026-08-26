@@ -3621,6 +3621,8 @@ body.is-block-range-selecting * {
   font-size: 30px; font-weight: 800; color: #111; line-height: 1.3;
   letter-spacing: -0.02em; word-break: break-word; cursor: text; white-space: pre-wrap;
 }
+.info-title-preview[contenteditable="true"],
+.body-title-preview[contenteditable="true"] { outline: none; }
 .info-title-css-panel {
   display: none; flex-direction: column; gap: 6px;
   margin-top: 6px; padding: 8px 10px;
@@ -7090,7 +7092,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
             <div style="margin-bottom:4px">
               <div class="info-title-wrap">
                 <textarea class="info-title-input" id="i-title" rows="1" placeholder="시나리오명" oninput="autoResize(this);syncInfo()" oncontextmenu="return openTitleCssCtxMenu(event)" onblur="updateInfoTitlePreview()" spellcheck="false"></textarea>
-                <div class="info-title-preview" id="i-title-preview" style="display:none" onclick="focusInfoTitleInput()" oncontextmenu="return openTitleCssCtxMenu(event)" title="클릭하여 편집"></div>
+                <div class="info-title-preview" id="i-title-preview" style="display:none" onclick="focusInfoTitleInput()" oninput="syncInfo()" onblur="finishTitlePreviewEdit(this)" oncontextmenu="return openTitleCssCtxMenu(event)" contenteditable="false" spellcheck="false" title="클릭하여 편집"></div>
                 <span class="info-title-css-badge" id="i-title-css-badge" title="CSS 서식 적용됨 (클릭하여 편집)" style="display:none" onclick="openInfoTitleCssPanel()">✦</span>
               </div>
               <div class="info-title-css-panel css-macro-field" id="info-title-css-panel"></div>
@@ -7162,7 +7164,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
                 oninput="autoResize(this);const s=cur();if(s){s.title=this.value;renderList();updateInfoTitlePreview();}"
                 onblur="updateBodyTitlePreview()" oncontextmenu="return openTitleCssCtxMenu(event)" spellcheck="false"></textarea>
               <div class="body-title-preview" id="body-title-preview" style="display:none"
-                onclick="focusBodyTitleInput()" oncontextmenu="return openTitleCssCtxMenu(event)" title="클릭하여 편집"></div>
+                onclick="focusBodyTitleInput()" oninput="syncBodyTitlePreviewEdit()" onblur="finishTitlePreviewEdit(this)" oncontextmenu="return openTitleCssCtxMenu(event)" contenteditable="false" spellcheck="false" title="클릭하여 편집"></div>
               <input class="body-display-subtitle" id="body-display-subtitle" placeholder="부제목을 입력하세요"
                 oninput="const s=cur();if(s&&s.info)s.info.subtitle=this.value;">
               <div class="body-display-sep"></div>
@@ -11348,6 +11350,53 @@ function normalizeInfoEditableValue(value) {
   return renderInfoFieldPreviewHtml(raw);
 }
 
+function titleValueHasRenderedMarkup(value) {
+  return /<\/?(?:span|div|p|br|b|strong|i|em|u|s|font)\b/i.test(String(value || ''));
+}
+function isTitlePreviewEditing(preview) {
+  return preview?.contentEditable === 'true' && document.activeElement === preview;
+}
+function readTitlePreviewEdit(preview) {
+  const html = normalizeEditableHtml(preview?.innerHTML || '');
+  return html || String(preview?.innerText || preview?.textContent || '').trim();
+}
+function focusTitlePreview(preview) {
+  preview.contentEditable = 'true';
+  preview.focus();
+  lastFocusedTA = preview;
+  const range = document.createRange();
+  let node = preview;
+  while (node.lastChild) node = node.lastChild;
+  if (node !== preview && node.nodeType === Node.TEXT_NODE) range.setStart(node, node.textContent.length);
+  else range.selectNodeContents(node);
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+}
+function finishTitlePreviewEdit(preview) {
+  if (!preview) return;
+  const dirty = preview.dataset.titleDirty === '1';
+  if (dirty) {
+    const s = cur();
+    if (s) {
+      s.title = readTitlePreviewEdit(preview);
+      ['i-title', 'body-display-title'].forEach(id => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.value = s.title;
+        if (input.tagName === 'TEXTAREA') autoResize(input);
+      });
+      updateScriptTopbarTitle();
+      renderList();
+    }
+  }
+  delete preview.dataset.titleDirty;
+  preview.contentEditable = 'false';
+  updateInfoTitlePreview();
+  updateBodyTitlePreview();
+}
+
 function updateInfoTitlePreview() {
   const s = cur();
   const input = document.getElementById('i-title');
@@ -11365,13 +11414,17 @@ function updateInfoTitlePreview() {
   }
 
   const hasMacro = /\[[^\]]*\]\(#"/i.test(titleText);
+  const hasHtml = titleValueHasRenderedMarkup(titleText);
   const hasCss = !!titleCss;
-  if (!hasMacro && !hasCss) {
+  if (isTitlePreviewEditing(preview)) {
+    input.style.display = 'none';
+    preview.style.display = '';
+  } else if (!hasMacro && !hasHtml && !hasCss) {
     input.style.display = '';
     preview.style.display = 'none';
     preview.innerHTML = '';
     if (input.tagName === 'TEXTAREA') autoResize(input);
-  } else if (hasMacro) {
+  } else if (hasMacro || hasHtml) {
     preview.innerHTML = renderCssMacroPreviewHtml(titleText);
     input.style.display = 'none';
     preview.style.display = '';
@@ -11395,6 +11448,10 @@ function focusInfoTitleInput() {
   const input = document.getElementById('i-title');
   const preview = document.getElementById('i-title-preview');
   if (!input || !preview) return;
+  if (preview.style.display !== 'none') {
+    focusTitlePreview(preview);
+    return;
+  }
   preview.style.display = 'none';
   input.style.display = '';
   if (input.tagName === 'TEXTAREA') autoResize(input);
@@ -11451,7 +11508,13 @@ function syncInfo(options = {}) {
     }
     return el.value;
   };
-  s.title = g('i-title');
+  const titlePreview = document.getElementById('i-title-preview');
+  if (isTitlePreviewEditing(titlePreview)) {
+    titlePreview.dataset.titleDirty = '1';
+    s.title = readTitlePreviewEdit(titlePreview);
+  } else {
+    s.title = g('i-title');
+  }
   s.info.subtitle = g('i-subtitle'); s.info.writer = g('i-writer');
   s.info.rule = g('i-rule'); s.info.format = g('i-format');
   s.info.background = g('i-background'); s.info.playtime = g('i-playtime');
@@ -11519,13 +11582,17 @@ function updateBodyTitlePreview() {
   const titleText = s?.title || '';
   const titleCss = s?.info?.titleCss || '';
   const hasMacro = /\[[^\]]*\]\(#"/i.test(titleText);
+  const hasHtml = titleValueHasRenderedMarkup(titleText);
   const hasCss = !!titleCss;
-  if (!hasMacro && !hasCss) {
+  if (isTitlePreviewEditing(preview)) {
+    input.style.display = 'none';
+    preview.style.display = '';
+  } else if (!hasMacro && !hasHtml && !hasCss) {
     input.style.display = '';
     preview.style.display = 'none';
     preview.innerHTML = '';
     if (input.tagName === 'TEXTAREA') autoResize(input);
-  } else if (hasMacro) {
+  } else if (hasMacro || hasHtml) {
     preview.innerHTML = renderCssMacroPreviewHtml(titleText);
     input.style.display = 'none';
     preview.style.display = '';
@@ -11543,10 +11610,26 @@ function focusBodyTitleInput() {
   const input = document.getElementById('body-display-title');
   const preview = document.getElementById('body-title-preview');
   if (!input || !preview) return;
+  if (preview.style.display !== 'none') {
+    focusTitlePreview(preview);
+    return;
+  }
   preview.style.display = 'none';
   input.style.display = '';
   if (input.tagName === 'TEXTAREA') autoResize(input);
   input.focus();
+}
+function syncBodyTitlePreviewEdit() {
+  const s = cur();
+  const preview = document.getElementById('body-title-preview');
+  if (!s || !isTitlePreviewEditing(preview)) return;
+  preview.dataset.titleDirty = '1';
+  s.title = readTitlePreviewEdit(preview);
+  const input = document.getElementById('i-title');
+  if (input) input.value = s.title;
+  updateScriptTopbarTitle();
+  renderList();
+  updateInfoTitlePreview();
 }
 
 // ─── RENDER ───
