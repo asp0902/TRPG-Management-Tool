@@ -16155,8 +16155,11 @@ function mkBlockEl(b, cid, ctx = {}) {
       const introContent = b.content || '';
       bodyHtml = `
         <div class="intro-split-wrap">
-          <div class="intro-preview-pane">
-            <div class="intro-pane-label">PREVIEW</div>
+          <div class="intro-preview-pane css-macro-preview-wrap${isCssMacroPreviewDark(b.id) ? ' dark' : ''}">
+            <div class="css-macro-preview-head">
+              <div class="intro-pane-label">PREVIEW</div>
+              ${renderCssMacroPreviewBackgroundToggle(b.id)}
+            </div>
             <div class="css-macro-preview-chatbox">
               <div class="css-macro-preview-body intro-preview-body" data-intro-preview-id="${b.id}">
                 ${renderCssMacroPreviewHtml(introContent)}
@@ -26909,6 +26912,15 @@ function toggleCssMacroPreviewBackground(itemId, button) {
     button.title = `미리보기 배경을 ${nextColor}으로 변경`;
   }
 }
+function renderCssMacroPreviewBackgroundToggle(itemId) {
+  const dark = isCssMacroPreviewDark(itemId);
+  const nextColor = dark ? '흰색' : '검은색';
+  return `<button type="button" class="css-macro-preview-bg-toggle${dark ? ' dark' : ''}"
+    aria-pressed="${dark ? 'true' : 'false'}"
+    aria-label="미리보기 배경을 ${nextColor}으로 변경"
+    title="미리보기 배경을 ${nextColor}으로 변경"
+    onclick="toggleCssMacroPreviewBackground('${itemId}',this)"></button>`;
+}
 function toggleCssMacroPreview(itemId, button) {
   cssMacroPreviewOpenMap[itemId] = !cssMacroPreviewOpenMap[itemId];
   const open = !!cssMacroPreviewOpenMap[itemId];
@@ -27493,11 +27505,7 @@ function renderCssMacroPage() {
           <div class="css-macro-preview-wrap${isCssMacroPreviewDark(item.id) ? ' dark' : ''}">
             <div class="css-macro-preview-head">
               <div class="css-macro-preview-label">PREVIEW</div>
-              <button type="button" class="css-macro-preview-bg-toggle${isCssMacroPreviewDark(item.id) ? ' dark' : ''}"
-                aria-pressed="${isCssMacroPreviewDark(item.id) ? 'true' : 'false'}"
-                aria-label="미리보기 배경을 ${isCssMacroPreviewDark(item.id) ? '흰색' : '검은색'}으로 변경"
-                title="미리보기 배경을 ${isCssMacroPreviewDark(item.id) ? '흰색' : '검은색'}으로 변경"
-                onclick="toggleCssMacroPreviewBackground('${item.id}',this)"></button>
+              ${renderCssMacroPreviewBackgroundToggle(item.id)}
             </div>
             <div class="css-macro-preview-chatbox">
               <div class="css-macro-preview-body" data-css-macro-id="${item.id}">${renderCssMacroPreviewHtml(getCssMacroResolvedContent(item))}</div>
