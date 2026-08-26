@@ -26660,7 +26660,7 @@ function replaceCssMacroPreviewTokens(source, options = {}) {
     }
     parsedToken = true;
     const styleAttr = token.style ? ` style="${esc(token.style)}"` : '';
-    html += `<span${styleAttr}>${esc(token.text)}</span>`;
+    html += `<span${styleAttr}>${esc(token.text.trim() ? token.text : '\u00a0')}</span>`;
     cursor = token.end;
   }
   return { html, parsedToken };
