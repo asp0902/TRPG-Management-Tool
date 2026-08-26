@@ -12372,6 +12372,7 @@ function normalizeBlockTree(blocks, opts = {}) {
     if (block.type === 'branch') normalizeBranchBlock(block, opts);
     if (block.type === 'column') normalizeColumnBlock(block);
     if (block.type === 'divider') normalizeDividerBlock(block);
+    if (block.type === 'image') block.content = normalizeImageBlockSource(block.content);
 
     normalizeBlockTree(block.children, opts);
   });
@@ -16528,12 +16529,15 @@ function mkBlockEl(b, cid, ctx = {}) {
       },
       { sep: true },
     ] : [];
+    const imageItems = b.type === 'image' && currentPage === 'script' && cid === 'blocks-container' ? [
+      { icon: '<i class="fa-solid fa-pen"></i>', label: '이미지 수정', action: () => editImageBlock(b.id, cid) },
+    ] : [];
     tbShowCtxMenu(e.clientX, e.clientY, tbBuildBlockCtxMenu(
       e,
       b.id,
       cid,
       { icon: '✦', label: 'CSS 서식 추가', action: () => tbOpenCssPanel(b.id, el, null) },
-      [...rollItems, ...columnItems, ...childInsertItems, ...chapterItems]
+      [...rollItems, ...columnItems, ...imageItems, ...childInsertItems, ...chapterItems]
     ));
   });
   el.addEventListener('dragstart', e => beginBlockDrag(e, b.id, cid, el));
@@ -16668,17 +16672,37 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
   return el;
 }
 
+function normalizeImageBlockSource(src) {
+  const raw = String(src || '').trim();
+  if (!raw || /^data:image\//i.test(raw)) return raw;
+  try {
+    const url = new URL(raw);
+    const host = url.hostname.replace(/^www\./i, '').toLowerCase();
+    const imgur = url.pathname.match(/^\/([a-z0-9]+)(\.(?:png|jpe?g|gif|webp|svg))?\/?$/i);
+    if ((host === 'imgur.com' || host === 'i.imgur.com') && imgur) {
+      url.hostname = 'i.imgur.com';
+      url.pathname = `/${imgur[1]}${imgur[2] || '.png'}`;
+      url.search = '';
+      url.hash = '';
+    }
+    return url.href;
+  } catch {
+    return raw;
+  }
+}
 function isRenderableImageSrc(src) {
-  return /^(https?:\/\/|data:image\/)/.test(String(src || ''));
+  return /^(https?:\/\/|data:image\/)/i.test(String(src || ''));
 }
 let imageBlockModalSource = '';
 let imageBlockModalSubmit = null;
-function openImageBlockModal(onSubmit) {
+function openImageBlockModal(onSubmit, initialSource = '', editing = false) {
   imageBlockModalSubmit = onSubmit;
-  imageBlockModalSource = '';
-  document.getElementById('image-block-url').value = '';
+  const source = normalizeImageBlockSource(initialSource);
+  document.getElementById('image-block-modal-title').textContent = editing ? '이미지 수정' : '이미지 추가';
+  document.getElementById('image-block-modal-submit').textContent = editing ? '수정' : '추가';
+  document.getElementById('image-block-url').value = /^https?:\/\//i.test(source) ? source : '';
   document.getElementById('image-block-file').value = '';
-  setImageBlockModalSource('');
+  setImageBlockModalSource(source);
   document.getElementById('image-block-modal-backdrop').classList.add('open');
   setTimeout(() => document.getElementById('image-block-url').focus(), 0);
 }
@@ -16688,7 +16712,7 @@ function closeImageBlockModal() {
   imageBlockModalSubmit = null;
 }
 function setImageBlockModalSource(src) {
-  imageBlockModalSource = String(src || '').trim();
+  imageBlockModalSource = normalizeImageBlockSource(src);
   const valid = isRenderableImageSrc(imageBlockModalSource);
   const preview = document.getElementById('image-block-modal-preview');
   const img = document.getElementById('image-block-modal-preview-img');
@@ -16731,8 +16755,18 @@ function submitImageBlockModal() {
   closeImageBlockModal();
   submit(src);
 }
+function editImageBlock(blockId, cid = 'blocks-container') {
+  const block = getGenericBlockById(blockId, cid);
+  if (!block || block.type !== 'image') return;
+  openImageBlockModal(src => {
+    block.content = src;
+    commitBlockTreeChange(`block:${blockId}:image`, cid, { force: true });
+    renderRootBlocksByCid(cid);
+    focusBlockAfterRender(blockId);
+  }, block.content, true);
+}
 function renderImgPreview(input) {
-  const url = input.value;
+  const url = normalizeImageBlockSource(input.value);
   const preview = input.closest('.img-input-row')?.nextElementSibling || input.nextElementSibling;
   if (preview && isRenderableImageSrc(url))
     preview.innerHTML = `<img src="${esc(url)}" style="max-width:100%;max-height:200px;border-radius:4px;margin-top:4px;">`;
@@ -26911,20 +26945,7 @@ function renderCssMacroPreviewHtml(value) {
     return String(input || '').replace(/\s*%NEWLINE%\s*/gi, '\u00a0');
   };
 
-  const normalizeCssMacroPreviewImageUrl = (input) => {
-    const rawUrl = String(input || '').trim();
-    if (!rawUrl) return '';
-    try {
-      const url = new URL(rawUrl);
-      const host = url.hostname.replace(/^www\./i, '').toLowerCase();
-      if (host === 'imgur.com' && /\.(png|jpe?g|gif|webp|svg)$/i.test(url.pathname)) {
-        url.hostname = 'i.imgur.com';
-      }
-      return url.href;
-    } catch {
-      return rawUrl;
-    }
-  };
+  const normalizeCssMacroPreviewImageUrl = normalizeImageBlockSource;
   const isCssMacroPreviewImageUrl = (input) => {
     const rawUrl = String(input || '').trim();
     if (!/^https?:\/\//i.test(rawUrl)) return false;
