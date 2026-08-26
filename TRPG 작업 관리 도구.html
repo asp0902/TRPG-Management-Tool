@@ -26784,6 +26784,7 @@ function normalizeCssMacroPreviewStyleText(value) {
     .replace(/text-text-align\s*:/gi, 'text-align:')
     .trim()
     .replace(/^["']+|["']+$/g, '')
+    .replace(/\s+@판정\s*$/u, '')
     .trim();
 }
 function tryParseCssMacroToken(source, startIdx) {
@@ -26792,6 +26793,7 @@ function tryParseCssMacroToken(source, startIdx) {
   if (closeBracketIdx < 0) return null;
   const tokenText = source.slice(startIdx + 1, closeBracketIdx);
   let idx = closeBracketIdx + 1;
+  if (source[idx] === '\\' && source[idx + 1] === '(') idx += 1;
   if (source[idx] !== '(') return null;
   idx += 1;
   while (idx < source.length && /\s/.test(source[idx])) idx += 1;
