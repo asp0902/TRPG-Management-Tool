@@ -876,8 +876,8 @@ tr.ct-row-end .ct-select:focus {
   color: #e53e3e;
 }
 .css-macro-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 440px));
+  display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: 12px;
   justify-content: flex-start;
@@ -892,6 +892,11 @@ tr.ct-row-end .ct-select:focus {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 0 1 440px;
+  min-width: 0;
+}
+.css-macro-card:has(.css-macro-card-body.open) {
+  flex-basis: 892px;
 }
 .css-macro-card-head {
   display: flex;
@@ -1078,12 +1083,18 @@ tr.ct-row-end .ct-select:focus {
 }
 .css-macro-card-body {
   display: none;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
 }
 .css-macro-card-body.open {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+.css-macro-editor-pane {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 .css-macro-fields {
   display: flex;
@@ -1477,6 +1488,11 @@ tr.ct-row-end .ct-select:focus {
   text-align: center;
   padding: 24px 16px;
   font-size: 12px;
+}
+@media (max-width: 1000px) {
+  .css-macro-card-body.open {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 @media (max-width: 640px) {
   .css-macro-field-row {
@@ -27430,20 +27446,22 @@ function renderCssMacroPage() {
           </div>
         </div>
         <div class="css-macro-card-body${isCssMacroPreviewOpen(item.id) ? ' open' : ''}">
-          ${renderCssMacroFieldControls(item)}
-          <textarea class="css-macro-textarea" data-css-macro-id="${item.id}" rows="1" placeholder="Roll20용 CSS 매크로를 입력하세요..."
-            oninput="btcpAutoResize(this);updateCssMacroItemField('${item.id}','content',this.value)"
-            oncontextmenu="return openCssMacroTextareaCtxMenu(event,'${item.id}',this)"
-            spellcheck="false">${esc(getCssMacroResolvedContent(item))}</textarea>
-          <div class="css-macro-tags-row">
-            <div class="css-macro-tags" data-css-macro-id="${item.id}">${renderCssMacroTagChips(item.tags, item.id)}</div>
-            <button type="button" class="css-macro-tag-add" title="태그 추가"
-              onmousedown="event.preventDefault()" onclick="addCssMacroTag('${item.id}')">+</button>
-          </div>
           <div class="css-macro-preview-wrap">
             <div class="css-macro-preview-label">PREVIEW</div>
             <div class="css-macro-preview-chatbox">
               <div class="css-macro-preview-body" data-css-macro-id="${item.id}">${renderCssMacroPreviewHtml(getCssMacroResolvedContent(item))}</div>
+            </div>
+          </div>
+          <div class="css-macro-editor-pane">
+            ${renderCssMacroFieldControls(item)}
+            <textarea class="css-macro-textarea" data-css-macro-id="${item.id}" rows="1" placeholder="Roll20용 CSS 매크로를 입력하세요..."
+              oninput="btcpAutoResize(this);updateCssMacroItemField('${item.id}','content',this.value)"
+              oncontextmenu="return openCssMacroTextareaCtxMenu(event,'${item.id}',this)"
+              spellcheck="false">${esc(getCssMacroResolvedContent(item))}</textarea>
+            <div class="css-macro-tags-row">
+              <div class="css-macro-tags" data-css-macro-id="${item.id}">${renderCssMacroTagChips(item.tags, item.id)}</div>
+              <button type="button" class="css-macro-tag-add" title="태그 추가"
+                onmousedown="event.preventDefault()" onclick="addCssMacroTag('${item.id}')">+</button>
             </div>
           </div>
         </div>
