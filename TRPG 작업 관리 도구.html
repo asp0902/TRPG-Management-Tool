@@ -7488,7 +7488,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
                     </div>
                     <div class="record-gm-card" id="rf-gm-card">
                       <div class="record-player-media">
-                        <div class="record-player-thumb record-gm-thumb" title="클릭하여 이미지 주소 입력" onclick="openRecordImageUrlPopup(this)"></div>
+                        <div class="record-player-thumb record-gm-thumb" title="클릭하여 이미지 설정" onclick="openRecordImageUrlPopup(this)"></div>
                       </div>
                       <div class="record-player-fields">
                         <input type="text" class="record-form-input" id="rf-gm-name" placeholder="GM 이름">
@@ -7539,8 +7539,12 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
       </div>
       <div id="record-image-url-popup-backdrop" class="record-image-url-popup-backdrop" onclick="if(event.target===this) closeRecordImageUrlPopup()">
         <div class="record-image-url-popup" onclick="event.stopPropagation()">
-          <div class="record-image-url-popup-title">이미지 주소 입력</div>
+          <div class="record-image-url-popup-title">이미지 설정</div>
           <input type="text" id="record-image-url-popup-input" class="record-image-url-popup-input" placeholder="https://... (비우면 제거)">
+          <button type="button" class="image-block-source-btn" onclick="document.getElementById('record-image-file-input').click()">
+            <i class="fa-solid fa-folder-open"></i><span>파일 불러오기</span>
+          </button>
+          <input type="file" id="record-image-file-input" accept="image/*" hidden onchange="onRecordImageFile(event)">
           <div class="record-image-url-popup-actions">
             <button type="button" class="record-image-url-popup-btn" onclick="closeRecordImageUrlPopup()">취소</button>
             <button type="button" class="record-image-url-popup-btn primary" onclick="saveRecordImageUrlPopup()">적용</button>
@@ -25591,7 +25595,7 @@ function createRecordPlayerRow(player = {}) {
   row.dataset.playerId = player.id || mkId();
   row.innerHTML = `
     <div class="record-player-media">
-      <div class="record-player-thumb" title="클릭하여 이미지 주소 입력" onclick="openRecordImageUrlPopup(this)"></div>
+      <div class="record-player-thumb" title="클릭하여 이미지 설정" onclick="openRecordImageUrlPopup(this)"></div>
     </div>
     <div class="record-player-fields">
       <input type="text" class="record-form-input record-player-pl" placeholder="PL 이름" value="${esc(player.plName || '')}">
@@ -25769,6 +25773,20 @@ function saveRecordImageUrlPopup() {
     syncRecordPlayerRow(host);
   }
   closeRecordImageUrlPopup();
+}
+
+function onRecordImageFile(event) {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  if (!file || !/^image\//.test(file.type)) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const input = document.getElementById('record-image-url-popup-input');
+    if (!input) return;
+    input.value = String(e.target.result || '');
+    saveRecordImageUrlPopup();
+  };
+  reader.readAsDataURL(file);
 }
 
 function collectRecordPlayersData() {
