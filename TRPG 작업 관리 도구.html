@@ -364,9 +364,11 @@ tr.ct-row-end .ct-select:focus {
   display: flex; margin: 0; border: none; border-radius: 0; background: transparent;
   padding: 14px 18px 18px; min-width: 0;
 }
-.record-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.record-form-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
 .record-form-row { display: flex; flex-direction: column; gap: 4px; }
-.record-form-row.full { grid-column: 1 / -1; }
+.record-form-grid > .record-form-row { grid-column: span 3; }
+.record-form-grid > .record-form-row.third { grid-column: span 2; }
+.record-form-grid > .record-form-row.full { grid-column: 1 / -1; }
 .record-form-inline-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .record-session-tag-editor {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
@@ -408,7 +410,7 @@ tr.ct-row-end .ct-select:focus {
 .record-cast-layout {
   display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 12px; align-items: start;
 }
-.record-cast-column { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.record-cast-column { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .record-cast-label-row {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
@@ -467,6 +469,12 @@ tr.ct-row-end .ct-select:focus {
 }
 .record-image-url-popup-btn:hover { border-color: #999; color: #111; }
 .record-image-url-popup-btn.primary:hover { background: #333; border-color: #333; color: #fff; }
+@media (max-width: 640px) {
+  .record-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .record-form-grid > .record-form-row,
+  .record-form-grid > .record-form-row.third { grid-column: 1 / -1; }
+  .record-cast-layout { grid-template-columns: minmax(0, 1fr); }
+}
 .record-note-toolbar {
   display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
   padding: 6px 8px; border: 1px solid #e4e4e4; border-bottom: none;
@@ -7451,35 +7459,33 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
           </div>
           <div class="record-form-wrap" id="record-form-wrap">
             <div class="record-form-grid">
-              <!-- 1행: 날짜와 시간 | 플레이 시간(분) -->
-              <div class="record-form-row">
+              <!-- 1행: 날짜와 시간 | 플레이 시간(분) | 룰 -->
+              <div class="record-form-row third">
                 <label class="record-form-label">날짜와 시간</label>
                 <input type="text" class="record-form-input" id="rf-datetime" placeholder="2026-04-14 20:00~21:00">
                 <div class="record-form-hint" id="rf-duration-hint">플레이 시간이 자동 계산됩니다.</div>
               </div>
-              <div class="record-form-row">
+              <div class="record-form-row third">
                 <label class="record-form-label">플레이 시간(분)</label>
                 <input type="text" class="record-form-input" id="rf-duration" placeholder="자동 계산" readonly>
               </div>
-              <!-- 2행: 룰 | 시나리오 -->
-              <div class="record-form-row">
+              <div class="record-form-row third">
                 <label class="record-form-label">룰</label>
                 <input type="text" class="record-form-input" id="rf-rule" placeholder="예) CoC 7판">
               </div>
+              <!-- 2행: 시나리오 | 시나리오명 직접 입력 -->
               <div class="record-form-row">
                 <label class="record-form-label">시나리오</label>
                 <select class="record-form-select" id="rf-scenario">
                   <option value="">— 직접 입력 —</option>
                 </select>
               </div>
-              <!-- 시나리오명 직접 입력 (full, 조건부 표시) -->
-              <div class="record-form-row full" id="rf-custom-name-row" style="display:none">
+              <div class="record-form-row" id="rf-custom-name-row" style="display:none">
                 <label class="record-form-label">시나리오명 (직접 입력)</label>
                 <input type="text" class="record-form-input" id="rf-custom-name" placeholder="시나리오 이름">
               </div>
-              <!-- 참여자: GM 좌측 고정 | PL 우측 확장 -->
+              <!-- GM 좌측 고정 | PL 우측 확장 -->
               <div class="record-form-row full">
-                <label class="record-form-label">참여자</label>
                 <div class="record-cast-layout">
                   <div class="record-cast-column">
                     <div class="record-cast-label-row">
