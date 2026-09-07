@@ -75,7 +75,7 @@ body {
 .record-inner { padding: 24px 0 24px 28px; width: 100%; max-width: none; min-width: 0; }
 .record-top {
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
-  padding-right: 28px;
+  position: sticky; top: 0; z-index: 3; background: #fff; padding-right: 28px;
 }
 .record-top-actions { display: flex; align-items: center; gap: 8px; }
 .record-heading {
@@ -523,7 +523,7 @@ tr.ct-row-end .ct-select:focus {
 }
 .record-table td { padding: 5px 12px; }
 .record-table th {
-  position: sticky; top: 0; z-index: 2; background: #f8f8f8; font-size: 10pt;
+  position: sticky; top: 31px; z-index: 2; background: #f8f8f8; font-size: 10pt;
   font-weight: 800; color: #666; letter-spacing: 0.04em; white-space: nowrap; padding: 10px 12px;
 }
 .record-sort-btn { border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; font-weight: inherit; letter-spacing: inherit; padding: 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
