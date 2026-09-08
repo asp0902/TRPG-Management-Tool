@@ -33134,39 +33134,106 @@ function exportCharacterSheetHtml() {
 
   const bodyEl = document.getElementById('ch-sheet-body');
   const clone = bodyEl.cloneNode(true);
+  const isEditableCoc7e = activeSheet.templateKey === 'coc7e';
+
+  if (isEditableCoc7e) {
+    const sourceFields = bodyEl.querySelectorAll('input, select, textarea');
+    clone.querySelectorAll('input, select, textarea').forEach((el, index) => {
+      const source = sourceFields[index];
+      if (!source) return;
+      if (source.type === 'checkbox' || source.type === 'radio') {
+        el.toggleAttribute('checked', source.checked);
+      } else if (source.tagName === 'SELECT') {
+        Array.from(el.options).forEach((option, optionIndex) => option.toggleAttribute('selected', !!source.options[optionIndex]?.selected));
+      } else if (source.tagName === 'TEXTAREA') {
+        el.textContent = source.value;
+      } else {
+        el.setAttribute('value', source.value);
+      }
+    });
+    clone.querySelectorAll('[readonly], [disabled]').forEach(el => {
+      el.removeAttribute('readonly');
+      el.removeAttribute('disabled');
+      el.removeAttribute('tabindex');
+    });
+    clone.querySelectorAll('*').forEach(el => {
+      Array.from(el.attributes).forEach(attr => {
+        if (attr.name.startsWith('on')) el.removeAttribute(attr.name);
+      });
+    });
+  } else {
+    // 다른 시트는 기존처럼 읽기 전용 HTML로 내보낸다.
+    clone.querySelectorAll('input, select, textarea').forEach(el => {
+      let val = '';
+      if (el.type === 'checkbox') {
+        val = el.checked ? '☑' : '☐';
+      } else if (el.tagName === 'SELECT') {
+        val = el.options[el.selectedIndex]?.text || '';
+      } else {
+        val = el.value || '';
+      }
+      const span = document.createElement('span');
+      span.textContent = val || '-';
+      if (el.tagName === 'TEXTAREA') {
+        span.style.whiteSpace = 'pre-wrap';
+        span.style.display = 'block';
+      }
+      el.replaceWith(span);
+    });
+  }
 
   // 불필요한 UI 요소 제거 (탭 바, 삭제 버튼 등)
   clone.querySelectorAll('.sh-tabs-wrap, .sh-repeat-del, .sh-repeat-add-row, .sh-coc-balance-add, .sk-add-btn, .sh-coc-balance-del, .sh-coc-balance-col-del, .sh-roll-hint').forEach(el => el.remove());
 
-  // 입력 필드(input, select, textarea)를 고정 텍스트로 변환
-  clone.querySelectorAll('input, select, textarea').forEach(el => {
-    let val = '';
-    if (el.type === 'checkbox') {
-      val = el.checked ? '☑' : '☐';
-    } else if (el.tagName === 'SELECT') {
-      val = el.options[el.selectedIndex]?.text || '';
-    } else {
-      val = el.value || '';
-    }
-    const span = document.createElement('span');
-    span.textContent = val || '-';
-    if (el.tagName === 'TEXTAREA') {
-      span.style.whiteSpace = 'pre-wrap';
-      span.style.display = 'block';
-    }
-    el.replaceWith(span);
-  });
-
   const title = (ch.name || '캐릭터') + ' 시트';
   const appStyles = document.querySelector('style')?.textContent || '';
+  const editableStyles = isEditableCoc7e ? `
+.standalone-sheet-header { display:flex; align-items:center; gap:16px; margin-bottom:20px; border-bottom:3px solid #111; padding-bottom:10px; }
+.standalone-sheet-header h1 { flex:1; min-width:0; }
+.sh-coc-balance-titlebar { padding-right:0; }
+.sh-coc-balance-title { justify-content:center; }
+.sh-coc-balance-input { text-align:center; }
+.sh-coc-wealth-currency-cell { display:flex; align-items:center; justify-content:center; }
+.sh-coc-wealth-rate-input { width:60px; flex:none; }
+@media print { .standalone-sheet-save { display:none; } }` : '';
+  const headerHtml = isEditableCoc7e
+    ? `<div class="standalone-sheet-header"><h1>${esc(title)}</h1><button type="button" class="ch-sheet-save standalone-sheet-save" onclick="saveStandaloneCharacterSheet()">저장</button></div>`
+    : `<h1 style="margin-bottom:20px;border-bottom:3px solid #111;padding-bottom:10px;">${esc(title)}</h1>`;
+  const saveScript = isEditableCoc7e ? `<script>
+function saveStandaloneCharacterSheet() {
+  const copy = document.documentElement.cloneNode(true);
+  const currentFields = document.querySelectorAll('input, select, textarea');
+  copy.querySelectorAll('input, select, textarea').forEach((field, index) => {
+    const source = currentFields[index];
+    if (source.type === 'checkbox' || source.type === 'radio') {
+      field.toggleAttribute('checked', source.checked);
+    } else if (source.tagName === 'SELECT') {
+      Array.from(field.options).forEach((option, optionIndex) => option.toggleAttribute('selected', !!source.options[optionIndex]?.selected));
+    } else if (source.tagName === 'TEXTAREA') {
+      field.textContent = source.value;
+    } else {
+      field.setAttribute('value', source.value);
+    }
+  });
+  const url = URL.createObjectURL(new Blob(['<!DOCTYPE html>\\n' + copy.outerHTML], { type: 'text/html' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = (document.title || 'character_sheet') + '.html';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+<\/script>` : '';
   const htmlContent = `<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${esc(title)}</title>
-<style>${appStyles} body { background:#fff; padding:40px; height:auto; overflow:auto; } .ch-sheet-body { max-width:1000px; margin:0 auto; } @media print { body { padding:0; } }</style>
+<style>${appStyles} body { background:#fff; padding:40px; height:auto; overflow:auto; } .ch-sheet-body { max-width:1000px; margin:0 auto; } ${editableStyles} @media print { body { padding:0; } }</style>
 </head>
-<body><div class="ch-sheet-body"><h1 style="margin-bottom:20px;border-bottom:3px solid #111;padding-bottom:10px;">${esc(title)}</h1><div class="sh-sheet-content">${clone.querySelector('.sh-sheet-content').innerHTML}</div></div></body>
+<body><div class="ch-sheet-body">${headerHtml}<div class="sh-sheet-content">${clone.querySelector('.sh-sheet-content').innerHTML}</div></div>${saveScript}</body>
 </html>`;
 
   const blob = new Blob([htmlContent], { type: 'text/html' });
