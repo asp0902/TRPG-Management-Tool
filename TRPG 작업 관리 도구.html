@@ -34459,7 +34459,7 @@ function renderCharacterSheet(chId) {
   var activeSheet = getActiveCharacterSheet(ch);
   var modalEl = bodyEl.closest('.ch-sheet-modal');
   if (modalEl) {
-    var isWideSheet = !!(activeSheet && (activeSheet.templateKey === 'coc7e' || activeSheet.templateKey === 'dnd5e' || activeSheet.templateKey === 'arianrhod2e' || activeSheet.templateKey === 'unsungduet'));
+    var isWideSheet = !!(activeSheet && (activeSheet.templateKey === 'coc7e' || activeSheet.templateKey === 'dnd5e' || activeSheet.templateKey === 'arianrhod2e' || activeSheet.templateKey === 'unsungduet' || activeSheet.templateKey === 'cypher'));
     modalEl.classList.toggle('sheet-wide', isWideSheet);
     modalEl.classList.toggle('sheet-wide-coc7e', !!(activeSheet && activeSheet.templateKey === 'coc7e'));
   }
