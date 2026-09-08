@@ -28451,6 +28451,7 @@ let _chTags = [];
 let _chFilterTag = null;
 let _chSidebarSelectedId = null;
 let _openCharacterSheetId = null;
+const CHARACTER_CYPHER_RULEBOOK_ID = '__cypher__';
 let _cocCustomSkillModalTarget = null;
 let _coc7eSkillGuideOpen = false;
 let _ar2eSkillGuideOpen = false;
@@ -32775,6 +32776,7 @@ function openCharacterModal(id) {
   const rbSelect = document.getElementById('ch-rulebook-select');
   if (rbSelect) {
     rbSelect.innerHTML = '<option value="">룰북 선택 (선택사항)</option>' +
+      '<option value="' + CHARACTER_CYPHER_RULEBOOK_ID + '">사이퍼</option>' +
       state.rulebooks.map(rb => `<option value="${esc(rb.id)}">${esc(rb.title || '(이름 없음)')}</option>`).join('');
   }
   if (id) {
@@ -32829,7 +32831,9 @@ function onChRulebookChange() {
   const ruleNameInput = document.getElementById('ch-rulename');
   if (!rbSelect || !ruleNameInput) return;
   const rbId = rbSelect.value;
-  if (rbId && !ruleNameInput.value.trim()) {
+  if (rbId === CHARACTER_CYPHER_RULEBOOK_ID) {
+    ruleNameInput.value = '사이퍼';
+  } else if (rbId && !ruleNameInput.value.trim()) {
     const rb = state.rulebooks.find(r => r.id === rbId);
     if (rb) ruleNameInput.value = rb.title;
   }
@@ -32839,7 +32843,7 @@ function onChRulebookChange() {
   const infoText = document.getElementById('ch-sheet-info-text');
   if (!infoRow || !badge || !infoText) return;
   if (rbId) {
-    const tpl = resolveSheetTemplate(rbId);
+    const tpl = resolveCharacterSheetTemplate(rbId);
     if (tpl) {
       badge.textContent = tpl.label;
       infoText.textContent = '시트가 자동 연결됩니다.';
@@ -32985,7 +32989,7 @@ function saveCharacterModal() {
       }
       // 룰북 변경 시: lockedToRulebook 시트만 교체 대상
       if (rulebookId !== prevRulebookId) {
-        const newTpl = resolveSheetTemplate(rulebookId);
+        const newTpl = resolveCharacterSheetTemplate(rulebookId);
         const lockedIdx = ch.sheets.findIndex(s => s.lockedToRulebook && s.source === 'rulebook');
         if (newTpl) {
           // 같은 templateKey의 rulebook 시트가 이미 있으면 skip
@@ -33024,7 +33028,7 @@ function saveCharacterModal() {
       sheets: [],
       activeSheetId: ''
     };
-    const tpl = resolveSheetTemplate(rulebookId);
+    const tpl = resolveCharacterSheetTemplate(rulebookId);
     if (tpl) {
       const inst = createCharacterSheetInstance(tpl.key, newCh,
         { source: 'rulebook', sourceRulebookId: rulebookId, lockedToRulebook: true });
@@ -33173,6 +33177,10 @@ function resolveSheetTemplate(rulebookId) {
   // 3) 명시 키가 없거나 알 수 없는 값일 때: 제목/태그/메모에서 자동 감지
   const detected = detectSheetTemplateKeyFromRulebook(rb);
   return SHEET_TEMPLATES[detected] || null;
+}
+
+function resolveCharacterSheetTemplate(rulebookId) {
+  return rulebookId === CHARACTER_CYPHER_RULEBOOK_ID ? SHEET_TEMPLATES.cypher : resolveSheetTemplate(rulebookId);
 }
 
 // 템플릿으로부터 빈 sheetData 초기화 (기본 필드 동기화 포함)
@@ -33339,7 +33347,7 @@ function openCharacterSheet(id) {
   if (titleEl) titleEl.textContent = n.name || '(이름 없음)';
   if (subtitleEl) {
     var rbName = n.rulebookId ? ((state.rulebooks.find(function(r) { return r.id === n.rulebookId; }) || {}).title || '') : '';
-    subtitleEl.textContent = rbName || '캐릭터 시트';
+    subtitleEl.textContent = rbName || n.ruleName || '캐릭터 시트';
   }
   renderCharacterSheet(id);
   document.getElementById('ch-sheet-backdrop').classList.add('open');
