@@ -6413,6 +6413,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-section-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .ch-sheet-basic-wrap { display: flex; align-items: stretch; gap: 14px; min-width: 0; }
 .ch-sheet-basic-portrait { position: relative; width: 150px; min-height: 0; border: 1px solid #e4e4e4; border-radius: 10px; background: #f5f5f5; color: #bbb; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; overflow: hidden; flex: 0 0 150px; align-self: stretch; box-sizing: border-box; }
+.ch-sheet-basic-portrait.is-square { aspect-ratio: 1 / 1; align-self: flex-start; }
 .ch-sheet-basic-portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .ch-sheet-basic-fields { flex: 1; min-width: 0; }
 @media(max-width:640px) {
@@ -6445,6 +6446,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-field-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sh-field-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .sh-field-grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sh-numenera-basic .sh-field:nth-child(n+3):nth-child(-n+6) .sh-field-label { min-height: 30px; display: flex; align-items: flex-end; }
 .sh-field-grid.has-separator { position: relative; column-gap: 24px; }
 @media(min-width:541px) {
   .sh-field-grid.cols-4.has-separator::after {
@@ -8546,12 +8548,13 @@ const SHEET_TEMPLATES = {
 
     key: 'numenera', label: '누메네라', version: 1,
     sections: [
-      { id: 'basic', label: '기본 정보', columns: 3, fields: [
-        { id: 'charName', label: '캐릭터명', type: 'text', syncTarget: 'name' },
-        { id: 'playerName', label: '플레이어', type: 'text' },
-        { id: 'descriptor', label: '디스크립터', type: 'text' },
-        { id: 'type', label: '타입', type: 'select', options: ['글레이브 (Glaive)', '나노 (Nano)', '잭 (Jack)', '라이트 (Wright)', '딜브 (Delve)', '아르커스 (Arkus)'] },
-        { id: 'focus', label: '포커스', type: 'text' },
+      { id: 'basic', label: '기본 정보', columns: 4, fields: [
+        { id: 'playerName', label: '플레이어', type: 'text', colSpan: 2 },
+        { id: 'charName', label: '캐릭터명', type: 'text', syncTarget: 'name', colSpan: 2 },
+        { id: 'descriptor', label: '수식어 DESCRIPTOR(ADJECTIVE)', type: 'text' },
+        { id: 'species', label: '종족 SPECIES(OPTIONAL)', type: 'text' },
+        { id: 'type', label: '유형 TYPE(NOUN)', type: 'select', options: ['글레이브 (Glaive)', '나노 (Nano)', '잭 (Jack)', '라이트 (Wright)', '딜브 (Delve)', '아르커스 (Arkus)'] },
+        { id: 'focus', label: '특징 FOCUS(VERB)', type: 'text' },
         { id: 'tier', label: '티어 (Tier)', type: 'number' },
         { id: 'xp', label: '경험치 (XP)', type: 'number' },
         { id: 'effort', label: '노력 최대 (Effort)', type: 'number' },
@@ -28381,6 +28384,7 @@ function toggleArianrhod2eSkillGuide() {
 function fitCharacterPortrait(img) {
   if (!img || !img.parentElement) return;
   const portrait = img.parentElement;
+  if (portrait.classList.contains('is-square')) return;
   const nw = img.naturalWidth, nh = img.naturalHeight;
   if (!nw || !nh) return;
   const ratio = nw / nh;
@@ -34617,7 +34621,8 @@ function renderCharacterSheet(chId) {
         }
         return '<div class="sh-field"' + fieldStyle + '>' + labelHtml + inputHtml + levelHtml + '</div>';
       }).join('');
-      var gridClass = 'sh-field-grid ' + colsClass + (sec.hasSeparator ? ' has-separator' : '');
+      var gridClass = 'sh-field-grid ' + colsClass + (sec.hasSeparator ? ' has-separator' : '')
+        + (tpl.key === 'numenera' && sec.id === 'basic' ? ' sh-numenera-basic' : '');
       var hasRollable = (sec.fields || []).some(function(f) { return f.rollFormula; });
       var secTitleAttr = sec.tooltip ? ' title="' + esc(sec.tooltip) + '"' : '';
       var secHdHtml;
@@ -34634,9 +34639,10 @@ function renderCharacterSheet(chId) {
       var sectionBodyHtml = '<div class="' + gridClass + '">' + fieldsHtml + '</div>' + ageAdjHtml;
       if (sec.id === 'basic') {
         var characterImage = String(ch.image || '').trim();
+        var portraitClass = 'ch-sheet-basic-portrait' + (tpl.key === 'numenera' ? ' is-square' : '');
         var portraitHtml = characterImage
-          ? '<div class="ch-sheet-basic-portrait"><img src="' + esc(characterImage) + '" alt="' + esc(ch.name || '캐릭터 이미지') + '" onload="fitCharacterPortrait(this)" onerror="this.parentElement.textContent=\'NO IMAGE\'"></div>'
-          : '<div class="ch-sheet-basic-portrait">NO IMAGE</div>';
+          ? '<div class="' + portraitClass + '"><img src="' + esc(characterImage) + '" alt="' + esc(ch.name || '캐릭터 이미지') + '" onload="fitCharacterPortrait(this)" onerror="this.parentElement.textContent=\'NO IMAGE\'"></div>'
+          : '<div class="' + portraitClass + '">NO IMAGE</div>';
         sectionBodyHtml = '<div class="ch-sheet-basic-wrap">' + portraitHtml
           + '<div class="ch-sheet-basic-fields"><div class="' + gridClass + '">' + fieldsHtml + '</div>' + ageAdjHtml + '</div></div>';
       }
