@@ -8656,7 +8656,11 @@ const SHEET_TEMPLATES = {
       { id: 'skills', label: '기술 (Skills)', repeatable: true, fields: [
         { id: 'name', label: '기술명', type: 'text' },
         { id: 'level', label: '숙련도', type: 'select', options: ['무능 (Inability)', '훈련됨 (Trained)', '전문화 (Specialized)'] },
-        { id: 'note', label: '메모', type: 'text' },
+        { id: 'pool', label: '능력', type: 'select', options: ['없음 No pool', '힘 Might', '속도 Speed', '지성 Intellect'] },
+        { id: 'asset', label: 'Asset', type: 'select', options: ['0', '1', '2'] },
+        { id: 'proficiency', label: 'Proficiency', type: 'checkbox' },
+        { id: 'source', label: 'Source', type: 'text' },
+        { id: 'note', label: '설명 Description', type: 'text' },
       ]},
       { id: 'abilities', label: '어빌리티 (Abilities)', repeatable: true, fields: [
         { id: 'name', label: '어빌리티명', type: 'text' },
