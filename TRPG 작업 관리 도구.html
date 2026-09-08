@@ -23518,7 +23518,7 @@ function tbFontFamily(fontFamily) {
       } else { // contenteditable
         isIndented = document.queryCommandState('indent'); // Use native command state for contenteditable
       }
-      if (indentBtn) indentBtn.classList.toggle('active', true); // 들여쓰기는 항상 가능하다고 가정
+      if (indentBtn) indentBtn.classList.toggle('active', isIndented);
       if (outdentBtn) outdentBtn.classList.toggle('active', isIndented);
     }
 
