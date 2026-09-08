@@ -8683,7 +8683,7 @@ const SHEET_TEMPLATES = {
       { id: 'damageRecovery', label: '피해 및 회복 DAMAGE & RECOVERY', customType: 'cypher-damage-recovery' },
       { id: 'skills', label: '기술 (Skills)', repeatable: true, fields: [
         { id: 'name', label: '기술명', type: 'text' },
-        { id: 'level', label: '숙련도', type: 'select', options: ['무능 (Inability)', '훈련됨 (Trained)', '전문화 (Specialized)'] },
+        { id: 'level', label: '숙련도', type: 'select', options: ['미숙 INABILITY', '연습함 PRACTICED', '훈련됨 TRAINED', '전문화됨 SPECIALIZED', '전문가 EXPERT'] },
         { id: 'pool', label: '능력', type: 'select', options: ['없음 No pool', '힘 Might', '속도 Speed', '지성 Intellect'] },
         { id: 'asset', label: 'Asset', type: 'select', options: ['0', '1', '2'] },
         { id: 'proficiency', label: 'Proficiency', type: 'checkbox' },
@@ -34745,6 +34745,9 @@ function renderCharacterSheet(chId) {
           var val = row[f.id] !== undefined ? row[f.id] : defaultVal;
           if (tpl.key === 'arianrhod2e' && sec.id === 'skills' && f.id === 'level' && (val === undefined || val === null || val === '') && row.sl !== undefined && row.sl !== null) {
             val = row.sl;
+          }
+          if (tpl.key === 'cypher' && sec.id === 'skills' && f.id === 'level') {
+            val = ({ '무능 (Inability)': '미숙 INABILITY', '훈련됨 (Trained)': '훈련됨 TRAINED', '전문화 (Specialized)': '전문화됨 SPECIALIZED' })[val] || val;
           }
           var handler = 'saveSheetRepeatCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + rowIdx + ',' + JSON.stringify(f.id) + ',this.value)';
           var extraAttr = '';
