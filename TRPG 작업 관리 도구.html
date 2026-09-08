@@ -2474,6 +2474,21 @@ tr.ct-row-end .ct-select:focus {
 }
 .tb-color-btn:hover { background: #f0f0f0; }
 .tb-color-bar { width: 14px; height: 3px; border-radius: 1px; border: 1px solid rgba(0,0,0,0.12); }
+.editor-quote {
+  position: relative; box-sizing: border-box; min-height: 52px; margin: 10px 0;
+  padding: 13px 42px 13px 16px; border: 0; border-left: 6px solid #9ca3af;
+  border-radius: 5px; background: #303238; color: #f5f5f5; line-height: 1.6;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.editor-quote::after {
+  content: '\22ee'; position: absolute; top: 0; right: 4px; bottom: 0; width: 30px;
+  display: flex; align-items: center; justify-content: center; color: currentColor;
+  font-size: 19px; line-height: 1; opacity: 0.62; pointer-events: none;
+}
+[contenteditable="true"] .editor-quote::after { cursor: pointer; pointer-events: auto; }
+[contenteditable="true"] .editor-quote:hover::after { opacity: 0.9; }
+.editor-quote > :first-child { margin-top: 0; }
+.editor-quote > :last-child { margin-bottom: 0; }
 /* ─── 커스텀 컬러 패널 ─── */
 .cp-panel {
   position: fixed; z-index: 9999;
@@ -7113,8 +7128,9 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
         <option value="3">3</option>
       </select>
       <div class="tb-sep"></div>
-      <!-- 링크 삽입 -->
-      <button class="tb-btn" onclick="tbInsertLink()" title="링크 삽입 (Ctrl+K)"><i class="fa-solid fa-link"></i></button>
+      <!-- 링크 / 인용 -->
+      <button class="tb-btn" onclick="tbInsertLink()" title="링크"><i class="fa-solid fa-link"></i></button>
+      <button class="tb-btn" id="tb-quote-btn" onmousedown="tbCaptureFormatTarget()" onclick="tbInsertQuote()" title="인용"><i class="fa-solid fa-quote-left"></i></button>
       <div class="tb-sep"></div>
       <!-- 찾아 바꾸기 -->
       <button class="tb-btn" onclick="openFindReplace()" title="찾아 바꾸기 (Ctrl+H)"><i class="fa-solid fa-magnifying-glass"></i></button>
@@ -11603,7 +11619,7 @@ function decodeHtmlEntitiesOnce(value) {
 function repairInfoEditableStoredValue(value) {
   const raw = String(value || '');
   if (!raw) return '';
-  if (!/&(?:amp;)*(?:lt|#60);\/?(?:a|br|div|p|span|strong|em|u|ul|ol|li|b|i|s|strike|font)\b/i.test(raw)) {
+  if (!/&(?:amp;)*(?:lt|#60);\/?(?:a|br|div|p|span|strong|em|u|ul|ol|li|blockquote|b|i|s|strike|font)\b/i.test(raw)) {
     return raw;
   }
   let current = raw;
@@ -11618,14 +11634,14 @@ function repairInfoEditableStoredValue(value) {
 function normalizeInfoEditableValue(value) {
   const raw = repairInfoEditableStoredValue(value);
   if (!raw) return '';
-  if (/<(?:a|br|div|p|span|strong|em|u|ul|ol|li|b|i|s|strike|font)\b/i.test(raw)) {
+  if (/<(?:a|br|div|p|span|strong|em|u|ul|ol|li|blockquote|b|i|s|strike|font)\b/i.test(raw)) {
     return raw;
   }
   return renderInfoFieldPreviewHtml(raw);
 }
 
 function titleValueHasRenderedMarkup(value) {
-  return /<\/?(?:span|div|p|br|b|strong|i|em|u|s|font)\b/i.test(String(value || ''));
+  return /<\/?(?:span|div|p|br|blockquote|b|strong|i|em|u|s|font)\b/i.test(String(value || ''));
 }
 function isTitlePreviewEditing(preview) {
   return preview?.contentEditable === 'true' && document.activeElement === preview;
@@ -22827,6 +22843,10 @@ function getEmbeddedColorTargetBlock(target = cpTarget) {
 
 function cpPreviewCurrentColor() {
   if (!cpTarget) return;
+  if (cpTarget.type === 'quote') {
+    applyQuoteBlockBackground(cpTarget.quoteEl, cpGetCurrentColor());
+    return;
+  }
   if (cpTarget.type === 'divider') {
     const block = getGenericBlockById(cpTarget.blockId, cpTarget.cid || 'blocks-container');
     if (!block) return;
@@ -22943,6 +22963,12 @@ function closeColorPanel(options = {}) {
   if (cpTarget?.type === 'chapter' && !apply) {
     applyChapterColorToDOM(cpTarget.blockId, cpTarget.key, cpTarget.originalColor);
   }
+  if (cpTarget?.type === 'quote' && !apply && cpTarget.quoteEl?.isConnected) {
+    if (cpTarget.originalBackground) cpTarget.quoteEl.style.backgroundColor = cpTarget.originalBackground;
+    else cpTarget.quoteEl.style.removeProperty('background-color');
+    if (cpTarget.originalTextColor) cpTarget.quoteEl.style.color = cpTarget.originalTextColor;
+    else cpTarget.quoteEl.style.removeProperty('color');
+  }
   panel.style.display = 'none';
   panel.classList.remove('centered');
   panel.style.transform = '';
@@ -22952,6 +22978,17 @@ function closeColorPanel(options = {}) {
 
 function applyColorPanel() {
   const color = cpGetCurrentColor();
+  if (cpTarget?.type === 'quote') {
+    const quoteEl = cpTarget.quoteEl;
+    const editable = cpTarget.editable;
+    if (quoteEl?.isConnected) {
+      applyQuoteBlockBackground(quoteEl, color);
+      editable?.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    closeColorPanel({ apply: true });
+    document.getElementById('cp-native').value = '#000000';
+    return;
+  }
   if (cpTarget?.type === 'divider' || cpTarget?.type === 'roll') {
     const block = getGenericBlockById(cpTarget.blockId, cpTarget.cid || 'blocks-container');
     if (block) {
@@ -23722,6 +23759,7 @@ function tbFontFamily(fontFamily) {
   const alignJustifyBtn = document.getElementById('tb-align-justify-btn');
   const listUlBtn = document.getElementById('tb-list-ul-btn');
   const listOlBtn = document.getElementById('tb-list-ol-btn');
+  const quoteBtn = document.getElementById('tb-quote-btn');
   const lineHeightSelect = document.getElementById('tb-lh');
   const indentBtn = document.getElementById('tb-indent-btn');
   const outdentBtn = document.getElementById('tb-outdent-btn');
@@ -23768,6 +23806,7 @@ function tbFontFamily(fontFamily) {
     // 목록 버튼 상태 동기화
     if (listUlBtn) listUlBtn.classList.toggle('active', document.queryCommandState('insertUnorderedList'));
     if (listOlBtn) listOlBtn.classList.toggle('active', document.queryCommandState('insertOrderedList'));
+    if (quoteBtn) quoteBtn.classList.toggle('active', !!parent.closest?.('.editor-quote'));
 
     // 줄간격 드롭다운 동기화
     if (lineHeightSelect) {
@@ -24519,6 +24558,105 @@ function tbInsertLink() {
     initialUrl: '',
   });
 }
+
+const EDITOR_QUOTE_DEFAULT_BACKGROUND = '#303238';
+function getQuoteTextColor(background) {
+  const hex = normalizePickerColor(background, EDITOR_QUOTE_DEFAULT_BACKGROUND).slice(1);
+  const red = parseInt(hex.slice(0, 2), 16);
+  const green = parseInt(hex.slice(2, 4), 16);
+  const blue = parseInt(hex.slice(4, 6), 16);
+  return red * 0.299 + green * 0.587 + blue * 0.114 > 165 ? '#202124' : '#f5f5f5';
+}
+function applyQuoteBlockBackground(quoteEl, background) {
+  if (!quoteEl?.style) return;
+  const color = normalizePickerColor(background, EDITOR_QUOTE_DEFAULT_BACKGROUND);
+  quoteEl.style.backgroundColor = color;
+  quoteEl.style.color = getQuoteTextColor(color);
+}
+function getQuoteForRange(root, range) {
+  if (!root || !range) return null;
+  const closestQuote = node => {
+    const el = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+    const quote = el?.closest?.('.editor-quote');
+    return quote && root.contains(quote) ? quote : null;
+  };
+  const direct = closestQuote(range.startContainer) || closestQuote(range.endContainer);
+  if (direct) return direct;
+  return Array.from(root.querySelectorAll('.editor-quote')).find(quote => {
+    try { return range.intersectsNode(quote); } catch { return false; }
+  }) || null;
+}
+function tbInsertQuote() {
+  const target = tbResolveFormatTarget();
+  const root = target?.type === 'ce' ? target.ta : (isCE() ? lastFocusedTA : null);
+  if (!root?.isConnected) return null;
+  let range = target?.type === 'ce' ? target.range?.cloneRange?.() : null;
+  if (!range || !tbRangeInsideRoot(range, root)) range = getCurrentLinkRange(root);
+  if (!range || !tbRangeInsideRoot(range, root)) {
+    range = document.createRange();
+    range.selectNodeContents(root);
+    range.collapse(false);
+  }
+  const existing = getQuoteForRange(root, range);
+  if (existing) return existing;
+
+  const holder = document.createElement('div');
+  if (!range.collapsed) holder.appendChild(range.cloneContents());
+  const content = range.collapsed || !holder.innerHTML ? '<br>' : holder.innerHTML;
+  const token = 'quote-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const textColor = getQuoteTextColor(EDITOR_QUOTE_DEFAULT_BACKGROUND);
+  const html = '<blockquote class="editor-quote" data-quote-token="' + token + '" style="background-color:' + EDITOR_QUOTE_DEFAULT_BACKGROUND + ';color:' + textColor + ';">' + content + '</blockquote>';
+
+  focusWithoutScroll(root);
+  const selection = window.getSelection();
+  if (selection) { selection.removeAllRanges(); selection.addRange(range); }
+  document.execCommand('insertHTML', false, html);
+  const quote = root.querySelector('[data-quote-token="' + token + '"]');
+  if (!quote) return null;
+  quote.removeAttribute('data-quote-token');
+
+  const caret = document.createRange();
+  caret.selectNodeContents(quote);
+  caret.collapse(false);
+  if (selection) { selection.removeAllRanges(); selection.addRange(caret); }
+  lastFocusedTA = root;
+  savedCERange = caret.cloneRange();
+  savedFormatTarget = { type: 'ce', ta: root, range: caret.cloneRange() };
+  _savedFormatSel = null;
+  root.dispatchEvent(new Event('input', { bubbles: true }));
+  return quote;
+}
+function openQuoteBackgroundPicker(quoteEl) {
+  const editable = quoteEl?.closest?.('[contenteditable="true"]');
+  if (!quoteEl || !editable) return;
+  if (cpTarget) closeColorPanel();
+  lastFocusedTA = editable;
+  const rawColor = quoteEl.style.backgroundColor || getComputedStyle(quoteEl).backgroundColor;
+  const color = rawColor.startsWith('rgb') ? cpRgbToHex(rawColor) : normalizePickerColor(rawColor, EDITOR_QUOTE_DEFAULT_BACKGROUND);
+  cpTarget = {
+    type: 'quote',
+    quoteEl,
+    editable,
+    originalBackground: quoteEl.style.backgroundColor,
+    originalTextColor: quoteEl.style.color,
+  };
+  cpOpenPanel('quote-bg', color, { centered: true });
+}
+function isQuoteMenuHit(event, quoteEl) {
+  const rect = quoteEl?.getBoundingClientRect?.();
+  return !!rect && event.clientX >= rect.right - 38 && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+}
+document.addEventListener('mousedown', event => {
+  const quote = event.target?.closest?.('.editor-quote');
+  if (quote?.closest?.('[contenteditable="true"]') && isQuoteMenuHit(event, quote)) event.preventDefault();
+});
+document.addEventListener('click', event => {
+  const quote = event.target?.closest?.('.editor-quote');
+  if (!quote?.closest?.('[contenteditable="true"]') || !isQuoteMenuHit(event, quote)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  openQuoteBackgroundPicker(quote);
+});
 
 function initLinkInsertDialogEvents() {
   if (window.__linkInsertDialogEventsBound) return;
