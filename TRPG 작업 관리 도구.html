@@ -33193,8 +33193,16 @@ function exportCharacterSheetHtml() {
 .sh-coc-balance-titlebar { padding-right:0; }
 .sh-coc-balance-title { justify-content:center; }
 .sh-coc-balance-input { text-align:center; }
-.sh-coc-wealth-currency-cell { display:flex; align-items:center; justify-content:center; }
-.sh-coc-wealth-rate-input { width:60px; flex:none; }
+.sh-coc-wealth-currency-cell { display:grid; grid-template-columns:1.25em 5ch; align-items:center; justify-content:center; gap:2px; }
+.sh-coc-wealth-currency-symbol { text-align:center; }
+.sh-coc-wealth-rate-input { width:100%; }
+.sh-coc-skills-wrap { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; overflow:visible; }
+.sh-coc-skills-wrap > table, .sh-coc-skills-wrap > div, .sh-coc-skills-wrap > div > table { width:100%; min-width:0; }
+.sh-coc-skills-table th, .sh-coc-skills-table td, .sh-coc-skills-table input { font-size:9px; padding-left:1px; padding-right:1px; }
+.sh-coc-skills-table th:nth-child(1), .sh-coc-skills-table td:nth-child(1) { width:18px; min-width:18px; max-width:18px; }
+.sh-coc-skills-table th:nth-child(2), .sh-coc-skills-table td:nth-child(2) { width:90px; min-width:90px; max-width:90px; }
+.sh-coc-skills-table th:nth-child(n+3):nth-child(-n+6), .sh-coc-skills-table td:nth-child(n+3):nth-child(-n+6) { width:24px; min-width:24px; max-width:24px; }
+.sh-coc-skills-table th:nth-child(n+7), .sh-coc-skills-table td:nth-child(n+7) { width:22px; min-width:22px; max-width:22px; }
 @media print { .standalone-sheet-save { display:none; } }` : '';
   const headerHtml = isEditableCoc7e
     ? `<div class="standalone-sheet-header"><h1>${esc(title)}</h1><button type="button" class="ch-sheet-save standalone-sheet-save" onclick="saveStandaloneCharacterSheet()">저장</button></div>`
