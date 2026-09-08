@@ -6446,7 +6446,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-field-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sh-field-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .sh-field-grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.sh-numenera-basic .sh-field:nth-child(n+3):nth-child(-n+6) .sh-field-label { min-height: 30px; display: flex; align-items: flex-end; }
+.sh-cypher-family-basic .sh-field:nth-child(n+3):nth-child(-n+6) .sh-field-label { min-height: 30px; display: flex; align-items: flex-end; }
 .sh-field-grid.has-separator { position: relative; column-gap: 24px; }
 @media(min-width:541px) {
   .sh-field-grid.cols-4.has-separator::after {
@@ -7881,6 +7881,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
           <option value="arianrhod2e">아리안로드 2E (Arianrhod)</option>
           <option value="unsungduet">언성 듀엣 (UNSUNG DUET)</option>
           <option value="numenera">누메네라 (Numenera)</option>
+          <option value="cypher">사이퍼 (Cypher System)</option>
         </select>
         <div id="rb-sheet-inherit-wrap" style="display:none;margin-top:4px;">
           <label class="rb-sheet-inherit-row">
@@ -8615,6 +8616,91 @@ const SHEET_TEMPLATES = {
         { id: 'background', label: '배경 이야기', type: 'textarea', keepGridWidth: true },
         { id: 'connections', label: '관계 (Connections)', type: 'textarea', keepGridWidth: true },
         { id: 'notes', label: '메모', type: 'textarea', keepGridWidth: true },
+      ]},
+    ]
+  },
+  cypher: {
+    key: 'cypher', label: '사이퍼', version: 1,
+    sections: [
+      { id: 'basic', label: '기본 정보', columns: 4, fields: [
+        { id: 'playerName', label: '플레이어', type: 'text', colSpan: 2 },
+        { id: 'charName', label: '캐릭터명', type: 'text', syncTarget: 'name', colSpan: 2 },
+        { id: 'descriptor', label: '수식어 DESCRIPTOR(ADJECTIVE)', type: 'text' },
+        { id: 'species', label: '종족 SPECIES(OPTIONAL)', type: 'text' },
+        { id: 'type', label: '유형 TYPE(NOUN)', type: 'text' },
+        { id: 'focus', label: '특징 FOCUS(VERB)', type: 'text' },
+        { id: 'tier', label: '티어 (Tier)', type: 'number' },
+        { id: 'effort', label: '노력 (Effort)', type: 'number' },
+        { id: 'xp', label: '경험치 (XP)', type: 'number' },
+        { id: 'storyXp', label: '스토리 XP', type: 'number' },
+        { id: 'rp', label: 'RP', type: 'number' },
+        { id: 'rank', label: '랭크 (Rank)', type: 'number' },
+        { id: 'genre', label: '장르 (Genre)', type: 'text' },
+        { id: 'subgenre', label: '하위 장르 (Subgenre)', type: 'text' },
+      ]},
+      { id: 'pools', label: '능력 풀', customType: 'numenera-pools' },
+      { id: 'damageRecovery', label: '피해 및 회복', columns: 4, fields: [
+        { id: 'recoveryRoll', label: '회복 주사위', type: 'text' },
+        { id: 'minorWounds', label: '경상 (Minor)', type: 'select', options: ['0', '1', '2', '3'] },
+        { id: 'moderateWounds', label: '중상 (Moderate)', type: 'select', options: ['0', '1', '2', '3'] },
+        { id: 'majorWounds', label: '치명상 (Major)', type: 'select', options: ['0', '1', '2', '3'] },
+        { id: 'recAction', label: '회복 체크: 1 행동', type: 'checkbox' },
+        { id: 'rec10min', label: '회복 체크: 10분', type: 'checkbox' },
+        { id: 'rec1hour', label: '회복 체크: 1시간', type: 'checkbox' },
+        { id: 'rec10hour', label: '회복 체크: 10시간', type: 'checkbox' },
+      ]},
+      { id: 'skills', label: '기술 (Skills)', repeatable: true, fields: [
+        { id: 'name', label: '기술명', type: 'text' },
+        { id: 'level', label: '숙련도', type: 'select', options: ['무능 (Inability)', '훈련됨 (Trained)', '전문화 (Specialized)'] },
+        { id: 'note', label: '메모', type: 'text' },
+      ]},
+      { id: 'abilities', label: '어빌리티 (Abilities)', repeatable: true, fields: [
+        { id: 'name', label: '어빌리티명', type: 'text' },
+        { id: 'cost', label: '풀 비용', type: 'text' },
+        { id: 'activation', label: '활성화', type: 'select', options: ['행동 (Action)', '보조 (Enabler)'] },
+        { id: 'effect', label: '효과', type: 'text' },
+      ]},
+      { id: 'advancement', label: '성장 (Advancement)', columns: 4, fields: [
+        { id: 'pool', label: '능력 풀 +4', type: 'checkbox' },
+        { id: 'edge', label: '엣지 +1', type: 'checkbox' },
+        { id: 'effort', label: '노력 +1', type: 'checkbox' },
+        { id: 'skill', label: '기술 훈련', type: 'checkbox' },
+        { id: 'other', label: '기타 성장', type: 'textarea' },
+      ]},
+      { id: 'attacks', label: '공격 (Attacks)', repeatable: true, fields: [
+        { id: 'name', label: '공격명', type: 'text' },
+        { id: 'modifier', label: '수정치', type: 'text' },
+        { id: 'damage', label: '피해', type: 'text' },
+        { id: 'range', label: '사거리', type: 'text' },
+        { id: 'notes', label: '특성', type: 'text' },
+      ]},
+      { id: 'cyphers', label: '사이퍼 (Cyphers)', repeatable: true, fields: [
+        { id: 'name', label: '이름', type: 'text' },
+        { id: 'level', label: '레벨', type: 'number' },
+        { id: 'form', label: '형태', type: 'text' },
+        { id: 'effect', label: '효과', type: 'text' },
+      ]},
+      { id: 'artifacts', label: '아티팩트 (Artifacts)', repeatable: true, fields: [
+        { id: 'name', label: '이름', type: 'text' },
+        { id: 'level', label: '레벨', type: 'number' },
+        { id: 'depletion', label: '소진 (Depletion)', type: 'text' },
+        { id: 'effect', label: '효과', type: 'text' },
+      ]},
+      { id: 'gear', label: '장비 (Gear)', fields: [
+        { id: 'armor', label: '방어구', type: 'textarea' },
+      ]},
+      { id: 'equipment', label: '소지품 (Equipment)', repeatable: true, fields: [
+        { id: 'name', label: '이름', type: 'text' },
+        { id: 'qty', label: '수량', type: 'text' },
+        { id: 'notes', label: '메모', type: 'text' },
+      ]},
+      { id: 'currencies', label: '통화 (Currencies)', repeatable: true, fields: [
+        { id: 'name', label: '통화명', type: 'text' },
+        { id: 'amount', label: '수량', type: 'number' },
+      ]},
+      { id: 'background', label: '배경 및 메모', columns: 2, fields: [
+        { id: 'background', label: '배경', type: 'textarea', keepGridWidth: true },
+        { id: 'notes', label: '메모', type: 'textarea', keepGridWidth: true, syncTarget: 'memo' },
       ]},
     ]
   },
@@ -28844,6 +28930,7 @@ const RB_SHEET_TEMPLATE_OPTION_LABELS = {
   unsungduet: '언성 듀엣 (UNSUNG DUET)',
   insane: 'inSANe (인세인)',
   numenera: '누메네라 (Numenera)',
+  cypher: '사이퍼 (Cypher System)',
 };
 
 function populateRulebookSheetTemplateSelect(selectedKey) {
@@ -33010,6 +33097,9 @@ const _SHEET_KEY_ALIASES = {
     'numenera', '누메네라',
     'numenera2', '누메네라2',
   ],
+  cypher: [
+    'cypher', 'cyphersystem', '사이퍼', '사이퍼시스템',
+  ],
   arianrhod2e: [
     'arianrhod2e', 'arianrhod2', 'arianrhod', 'ar2e', 'ar25',
     '아리안로드2e', '아리안로드2', '아리안로드',
@@ -34622,7 +34712,7 @@ function renderCharacterSheet(chId) {
         return '<div class="sh-field"' + fieldStyle + '>' + labelHtml + inputHtml + levelHtml + '</div>';
       }).join('');
       var gridClass = 'sh-field-grid ' + colsClass + (sec.hasSeparator ? ' has-separator' : '')
-        + (tpl.key === 'numenera' && sec.id === 'basic' ? ' sh-numenera-basic' : '');
+        + ((tpl.key === 'numenera' || tpl.key === 'cypher') && sec.id === 'basic' ? ' sh-cypher-family-basic' : '');
       var hasRollable = (sec.fields || []).some(function(f) { return f.rollFormula; });
       var secTitleAttr = sec.tooltip ? ' title="' + esc(sec.tooltip) + '"' : '';
       var secHdHtml;
@@ -34639,7 +34729,7 @@ function renderCharacterSheet(chId) {
       var sectionBodyHtml = '<div class="' + gridClass + '">' + fieldsHtml + '</div>' + ageAdjHtml;
       if (sec.id === 'basic') {
         var characterImage = String(ch.image || '').trim();
-        var portraitClass = 'ch-sheet-basic-portrait' + (tpl.key === 'numenera' ? ' is-square' : '');
+        var portraitClass = 'ch-sheet-basic-portrait' + ((tpl.key === 'numenera' || tpl.key === 'cypher') ? ' is-square' : '');
         var portraitHtml = characterImage
           ? '<div class="' + portraitClass + '"><img src="' + esc(characterImage) + '" alt="' + esc(ch.name || '캐릭터 이미지') + '" onload="fitCharacterPortrait(this)" onerror="this.parentElement.textContent=\'NO IMAGE\'"></div>'
           : '<div class="' + portraitClass + '">NO IMAGE</div>';
