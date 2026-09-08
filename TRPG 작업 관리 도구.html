@@ -6870,6 +6870,27 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-numenera-pools .np-cell:last-child { border-right: none; }
 .sh-numenera-pools .np-input { width: 68px; text-align: center; border: 1px solid #ccc; border-radius: 5px; padding: 4px 4px; font-size: 14px; font-family: inherit; outline: none; }
 .sh-numenera-pools .np-input:focus { border-color: #111; }
+.sh-cypher-damage-recovery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sh-cypher-damage-pane { min-width: 0; padding-right: 24px; }
+.sh-cypher-recovery-pane { min-width: 0; padding-left: 24px; border-left: 1px solid #e4e4e4; }
+.sh-cypher-track-title { display: flex; align-items: center; gap: 10px; min-height: 24px; margin-bottom: 10px; font-size: 12px; font-weight: 800; color: #222; }
+.sh-cypher-recovery-roll { font-size: 11px; font-weight: 700; color: #777; }
+.sh-cypher-wound-list { display: flex; flex-direction: column; gap: 8px; }
+.sh-cypher-wound-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 28px; }
+.sh-cypher-track-label { font-size: 12px; font-weight: 700; color: #444; }
+.sh-cypher-checks { display: flex; align-items: center; gap: 10px; }
+.sh-cypher-check, .sh-cypher-recovery-check { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+.sh-cypher-check input, .sh-cypher-recovery-check input { width: 17px; height: 17px; margin: 0; cursor: pointer; accent-color: #111; }
+.sh-cypher-recovery-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.sh-cypher-recovery-check { justify-content: center; font-size: 11px; color: #555; white-space: nowrap; }
+.sh-cypher-recovery-description { font-size: 11px; line-height: 1.6; color: #666; }
+.sh-cypher-recovery-description p { margin: 0; }
+.sh-cypher-recovery-description p + p { margin-top: 6px; }
+@media(max-width:760px) {
+  .sh-cypher-damage-recovery { grid-template-columns: 1fr; }
+  .sh-cypher-damage-pane { padding: 0 0 16px; }
+  .sh-cypher-recovery-pane { padding: 16px 0 0; border-left: 0; border-top: 1px solid #e4e4e4; }
+}
 /* Sheet template info in character modal */
 .ch-sheet-info-row { display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: #f5f5f5; border-radius: 6px; font-size: 11px; color: #666; }
 .ch-sheet-info-badge { font-weight: 700; color: #111; background: #e8e8e8; border-radius: 4px; padding: 1px 6px; font-size: 10px; letter-spacing: 0.04em; }
@@ -8643,16 +8664,7 @@ const SHEET_TEMPLATES = {
         { id: 'subgenre', label: '하위 장르 (Subgenre)', type: 'text' },
       ]},
       { id: 'pools', label: '능력', customType: 'numenera-pools', transpose: true },
-      { id: 'damageRecovery', label: '피해 및 회복', columns: 4, fields: [
-        { id: 'recoveryRoll', label: '회복 주사위', type: 'text' },
-        { id: 'minorWounds', label: '경상 (Minor)', type: 'select', options: ['0', '1', '2', '3'] },
-        { id: 'moderateWounds', label: '중상 (Moderate)', type: 'select', options: ['0', '1', '2', '3'] },
-        { id: 'majorWounds', label: '치명상 (Major)', type: 'select', options: ['0', '1', '2', '3'] },
-        { id: 'recAction', label: '회복 체크: 1 행동', type: 'checkbox' },
-        { id: 'rec10min', label: '회복 체크: 10분', type: 'checkbox' },
-        { id: 'rec1hour', label: '회복 체크: 1시간', type: 'checkbox' },
-        { id: 'rec10hour', label: '회복 체크: 10시간', type: 'checkbox' },
-      ]},
+      { id: 'damageRecovery', label: '피해 및 회복 DAMAGE & RECOVERY', customType: 'cypher-damage-recovery' },
       { id: 'skills', label: '기술 (Skills)', repeatable: true, fields: [
         { id: 'name', label: '기술명', type: 'text' },
         { id: 'level', label: '숙련도', type: 'select', options: ['무능 (Inability)', '훈련됨 (Trained)', '전문화 (Specialized)'] },
@@ -34569,6 +34581,10 @@ function renderCharacterSheet(chId) {
       var sectionData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
       return renderNumeneraPoolsSection(sec, sectionData, chId, sheetId);
     }
+    if (sec.customType === 'cypher-damage-recovery') {
+      var sectionData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
+      return renderCypherDamageRecoverySection(sec, sectionData, chId, sheetId);
+    }
     if (sec.customType === 'insane-basic') {
       var sectionData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
       return renderInsaneBasicSection(sec, sectionData, chId, sheetId);
@@ -37165,6 +37181,48 @@ function renderNumeneraPoolsSection(sec, sectionData, chId, sheetId) {
   }).join('');
   return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'
     + '<div class="sh-section-body"><div class="sh-numenera-pools">' + headerCells + bodyCells + '</div></div></div>';
+}
+
+function renderCypherDamageRecoverySection(sec, sectionData, chId, sheetId) {
+  sectionData = (sectionData && typeof sectionData === 'object' && !Array.isArray(sectionData)) ? sectionData : {};
+  function saveHandler(fieldId) {
+    return 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + JSON.stringify(fieldId) + ',this.checked)';
+  }
+  function checkHtml(fieldId, label, checked, className) {
+    return '<label class="' + className + '"><input type="checkbox" aria-label="' + esc(label) + '"' + (checked ? ' checked' : '') + ' onchange="' + esc(saveHandler(fieldId)) + '"></label>';
+  }
+  var wounds = [
+    { legacyId: 'minorWounds', fieldPrefix: 'minorWound', label: '경상 MINOR' },
+    { legacyId: 'moderateWounds', fieldPrefix: 'moderateWound', label: '중상 MODERATE' },
+    { legacyId: 'majorWounds', fieldPrefix: 'majorWound', label: '치명상 MAJOR' },
+  ];
+  var woundsHtml = wounds.map(function(wound) {
+    var legacyCount = parseInt(sectionData[wound.legacyId], 10) || 0;
+    var checks = [1, 2, 3].map(function(index) {
+      var fieldId = wound.fieldPrefix + index;
+      var checked = sectionData[fieldId] !== undefined ? isSheetCheckboxChecked(sectionData[fieldId]) : index <= legacyCount;
+      return checkHtml(fieldId, wound.label + ' ' + index, checked, 'sh-cypher-check');
+    }).join('');
+    return '<div class="sh-cypher-wound-row"><span class="sh-cypher-track-label">' + esc(wound.label) + '</span><div class="sh-cypher-checks">' + checks + '</div></div>';
+  }).join('');
+  var recoveryItems = [
+    { id: 'recAction', label: '행동' },
+    { id: 'rec10min', label: '10분' },
+    { id: 'rec1hour', label: '1시간' },
+    { id: 'rec10hour', label: '10시간' },
+  ];
+  var recoveryHtml = recoveryItems.map(function(item) {
+    return '<label class="sh-cypher-recovery-check"><input type="checkbox" aria-label="회복 ' + esc(item.label) + '"' + (isSheetCheckboxChecked(sectionData[item.id]) ? ' checked' : '') + ' onchange="' + esc(saveHandler(item.id)) + '"><span>' + esc(item.label) + '</span></label>';
+  }).join('');
+  return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div><div class="sh-section-body">'
+    + '<div class="sh-cypher-damage-recovery">'
+      + '<div class="sh-cypher-damage-pane"><div class="sh-cypher-track-title">상처 WOUNDS</div><div class="sh-cypher-wound-list">' + woundsHtml + '</div></div>'
+      + '<div class="sh-cypher-recovery-pane"><div class="sh-cypher-track-title"><span>회복 RECOVERY</span><span class="sh-cypher-recovery-roll">1D6+1</span></div>'
+        + '<div class="sh-cypher-recovery-list">' + recoveryHtml + '</div>'
+        + '<div class="sh-cypher-recovery-description"><p>상처를 치료하는 네 가지 방법: 집결(Rally), 치료(Treatment), 휴식(Rest), 그리고 특별한 치유 능력(Exceptional healing abilities). 만약 마지막 행동(Last action)으로 \'1행동 회복(One-action recovery)\'을 사용한다면 +2점을 얻습니다.</p>'
+        + '<p>Four ways to heal wounds: rally, treatment, rest, and exceptional healing abilities. +2 points if one-action recovery is taken as Last action.</p></div>'
+      + '</div>'
+    + '</div></div></div>';
 }
 
 // inSANe 특기표 — 롤20 시트와 같은 6분야 × 11행 구성. 행 번호는 2~12.
