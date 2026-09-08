@@ -23512,12 +23512,52 @@ function tbStripInlineFontSize(root) {
     if (!el.getAttribute('style')) el.removeAttribute('style');
   });
 }
+function tbApplyQuoteBlockType(root, range, tagName) {
+  const quote = getQuoteForRange(root, range);
+  if (!quote) return false;
+
+  const blockSelector = 'p,h1,h2,h3,h4';
+  let blocks = Array.from(quote.children).filter(el => {
+    if (!el.matches(blockSelector)) return false;
+    try { return range.intersectsNode(el); } catch(e) { return false; }
+  });
+  if (!blocks.length) {
+    const block = document.createElement(tagName);
+    while (quote.firstChild) block.appendChild(quote.firstChild);
+    quote.appendChild(block);
+    blocks = [block];
+  } else {
+    blocks = blocks.map(block => {
+      if (block.tagName.toLowerCase() === tagName) return block;
+      const replacement = document.createElement(tagName);
+      Array.from(block.attributes).forEach(attr => replacement.setAttribute(attr.name, attr.value));
+      while (block.firstChild) replacement.appendChild(block.firstChild);
+      block.replaceWith(replacement);
+      return replacement;
+    });
+  }
+
+  const nextRange = document.createRange();
+  nextRange.setStart(blocks[0], 0);
+  const last = blocks[blocks.length - 1];
+  nextRange.setEnd(last, last.childNodes.length);
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(nextRange);
+  savedCERange = nextRange.cloneRange();
+  _savedFormatSel = { ta: root, range: nextRange.cloneRange() };
+  savedFormatTarget = { type: 'ce', ta: root, range: nextRange.cloneRange() };
+  return true;
+}
 function tbBlockType(val) {
   if (!val) return;
   if (isCE()) {
-    document.execCommand('formatBlock', false, val);
+    restoreCERange();
+    const ce = lastFocusedTA;
+    const selection = window.getSelection();
+    const range = selection && selection.rangeCount ? selection.getRangeAt(0) : null;
+    if (!range || !tbApplyQuoteBlockType(ce, range, val)) document.execCommand('formatBlock', false, val);
     if (/^h[1-4]$/i.test(val)) {
-      const ce = lastFocusedTA;
       const sel = window.getSelection();
       const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
       ce?.querySelectorAll('h1,h2,h3,h4').forEach(h => {
@@ -23525,8 +23565,8 @@ function tbBlockType(val) {
         try { hit = hit || range.intersectsNode(h); } catch (e) { hit = true; }
         if (hit) tbStripInlineFontSize(h);
       });
-      ce?.dispatchEvent(new Event('input', { bubbles: true }));
     }
+    lastFocusedTA?.dispatchEvent(new Event('input', { bubbles: true }));
   }
   else { const css = BLOCK_TYPE_CSS[val]; if (css) tbWrap(css); }
   // 적용 후 빈 값으로 되돌리지 않고 현재 서식을 그대로 표시한다.
