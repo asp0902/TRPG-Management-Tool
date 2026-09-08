@@ -8690,17 +8690,18 @@ const SHEET_TEMPLATES = {
         { id: 'depletion', label: '소진 (Depletion)', type: 'text' },
         { id: 'effect', label: '효과', type: 'text' },
       ]},
-      { id: 'gear', label: '장비 (Gear)', fields: [
-        { id: 'armor', label: '방어구', type: 'textarea' },
+      { id: 'gear', label: '휴대품 GEAR', fields: [
+        { id: 'armor', label: '방어구 ARMOR', type: 'textarea' },
       ]},
-      { id: 'equipment', label: '소지품 (Equipment)', repeatable: true, fields: [
+      { id: 'equipment', label: '장비 EQUIPMENT', repeatable: true, fields: [
         { id: 'name', label: '이름', type: 'text' },
         { id: 'qty', label: '수량', type: 'text' },
         { id: 'notes', label: '메모', type: 'text' },
       ]},
-      { id: 'currencies', label: '통화 (Currencies)', repeatable: true, fields: [
-        { id: 'name', label: '통화명', type: 'text' },
+      { id: 'currencies', label: '화폐 CURRENCIES', repeatable: true, fields: [
+        { id: 'name', label: '이름', type: 'text' },
         { id: 'amount', label: '수량', type: 'number' },
+        { id: 'notes', label: '메모', type: 'text' },
       ]},
       { id: 'background', label: '배경 및 메모', columns: 2, fields: [
         { id: 'background', label: '배경', type: 'textarea', keepGridWidth: true },
