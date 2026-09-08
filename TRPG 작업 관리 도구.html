@@ -8642,7 +8642,7 @@ const SHEET_TEMPLATES = {
         { id: 'genre', label: '장르 (Genre)', type: 'text' },
         { id: 'subgenre', label: '하위 장르 (Subgenre)', type: 'text' },
       ]},
-      { id: 'pools', label: '능력 풀', customType: 'numenera-pools' },
+      { id: 'pools', label: '능력', customType: 'numenera-pools', transpose: true },
       { id: 'damageRecovery', label: '피해 및 회복', columns: 4, fields: [
         { id: 'recoveryRoll', label: '회복 주사위', type: 'text' },
         { id: 'minorWounds', label: '경상 (Minor)', type: 'select', options: ['0', '1', '2', '3'] },
@@ -37138,20 +37138,25 @@ function renderNumeneraPoolsSection(sec, sectionData, chId, sheetId) {
     { key: 'intellect', label: '지성 (Intellect)' },
   ];
   var rows = [
-    { key: 'max',     label: '풀 최대' },
-    { key: 'current', label: '풀 현재' },
+    { key: 'max',     label: '풀 최대', columnLabel: '최대 풀' },
+    { key: 'current', label: '풀 현재', columnLabel: '현재 풀' },
     { key: 'edge',    label: '엣지 (Edge)' },
   ];
+  var transposed = !!sec.transpose;
+  var columns = transposed ? rows : stats;
+  var rowItems = transposed ? stats : rows;
   var headerCells = '<div class="np-header"></div>'
-    + stats.map(function(s) { return '<div class="np-header">' + esc(s.label) + '</div>'; }).join('');
-  var bodyCells = rows.map(function(row) {
-    var cells = stats.map(function(stat) {
-      var fieldId = stat.key + '_' + row.key;
+    + columns.map(function(item) { return '<div class="np-header">' + esc(item.columnLabel || item.label) + '</div>'; }).join('');
+  var bodyCells = rowItems.map(function(rowItem) {
+    var cells = columns.map(function(columnItem) {
+      var stat = transposed ? rowItem : columnItem;
+      var poolValue = transposed ? columnItem : rowItem;
+      var fieldId = stat.key + '_' + poolValue.key;
       var val = sectionData[fieldId] !== undefined ? String(sectionData[fieldId]) : '';
       var handler = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + JSON.stringify(fieldId) + ',this.value)';
       return '<div class="np-cell"><input class="np-input" type="number" min="0" value="' + esc(val) + '" oninput="' + esc(handler) + '"></div>';
     }).join('');
-    return '<div class="np-row-label">' + esc(row.label) + '</div>' + cells;
+    return '<div class="np-row-label">' + esc(rowItem.label) + '</div>' + cells;
   }).join('');
   return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'
     + '<div class="sh-section-body"><div class="sh-numenera-pools">' + headerCells + bodyCells + '</div></div></div>';
