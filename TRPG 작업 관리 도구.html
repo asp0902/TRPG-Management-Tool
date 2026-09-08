@@ -2676,6 +2676,27 @@ tr.ct-row-end .ct-select:focus {
   cursor: pointer; flex-shrink: 0;
 }
 .tb-select:focus { border-color: #000; }
+.tb-font-wrap { position: relative; width: 120px; flex: 0 0 120px; }
+.tb-font-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  font-family: inherit; text-align: left;
+}
+.tb-font-trigger-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-font-trigger .fa-chevron-down { flex-shrink: 0; font-size: 9px; color: #777; }
+.tb-font-menu {
+  display: none; position: fixed; z-index: 10001; width: 190px; max-height: 320px;
+  overflow-y: auto; padding: 3px 0; background: #fff; border: 1px solid #bbb;
+  border-radius: 4px; box-shadow: 0 5px 16px rgba(0,0,0,0.16);
+}
+.tb-font-menu.open { display: block; }
+.tb-font-option {
+  display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 30px;
+  padding: 5px 10px; border: none; background: #fff; color: #222; cursor: pointer;
+  text-align: left; font-size: 13px; letter-spacing: 0;
+}
+.tb-font-option:hover, .tb-font-option:focus, .tb-font-option.active { background: #e9e9e9; outline: none; }
+.tb-font-option.more { color: #2563eb; font-weight: 700; font-family: inherit; }
+.tb-font-menu-sep { height: 1px; margin: 3px 0; background: #e5e5e5; }
 .tb-btn.active {
   background: #e0e0e0;
   color: #000;
@@ -7002,7 +7023,21 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
         <option value="h3">제목 3</option>
         <option value="h4">소제목</option>
       </select>
-      <select class="tb-select tb-select-font" id="tb-font-family" onmousedown="tbCaptureFormatTarget()" onfocus="tbCaptureFormatTarget()" onchange="tbFontFamily(this.value)" title="글꼴"></select>
+      <div class="tb-font-wrap">
+        <button type="button" class="tb-select tb-select-font tb-font-trigger" id="tb-font-trigger"
+          title="글꼴" aria-haspopup="listbox" aria-controls="tb-font-menu" aria-expanded="false"
+          onmousedown="tbCaptureFormatTarget()" onclick="tbToggleFontDropdown(event)">
+          <span class="tb-font-trigger-label" id="tb-font-trigger-label">글꼴</span>
+          <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </button>
+        <select id="tb-font-family" hidden aria-hidden="true" tabindex="-1"></select>
+        <div class="tb-font-menu" id="tb-font-menu" role="listbox" aria-label="글꼴"
+          onmouseover="tbPreviewFont(event.target.closest('.tb-font-option')?.dataset.value || '')"
+          onfocusin="tbPreviewFont(event.target.dataset.value || '')"
+          onmousedown="if(event.target.closest('.tb-font-option'))event.preventDefault()"
+          onclick="tbChooseFontDropdownOption(event.target.closest('.tb-font-option')?.dataset.value)"
+          onmouseleave="tbPreviewFont('')"></div>
+      </div>
       <input type="number" class="tb-size-inp" id="tb-size" value="12" min="1" max="200" title="글자 크기" onchange="tbFontSize(this.value)" onkeydown="if(event.key==='Enter'){tbFontSize(this.value);this.blur();}">
       <div class="tb-sep"></div>
       <!-- 굵게 / 기울임 / 밑줄 / 취소선 / 서식 지우기 -->
@@ -22317,7 +22352,140 @@ function updateFontDropdown() {
   if ([...sel.options].some(opt => opt.value === currentValue)) {
     sel.value = currentValue;
   }
+  tbSyncFontDropdownLabel();
 }
+
+let tbFontPreview = null;
+
+function tbSyncFontDropdownLabel() {
+  const select = document.getElementById('tb-font-family');
+  const trigger = document.getElementById('tb-font-trigger');
+  const label = document.getElementById('tb-font-trigger-label');
+  if (!select || !trigger || !label) return;
+  const option = select.options[select.selectedIndex];
+  const value = option?.value || '';
+  label.textContent = value && value !== '__MORE__' ? option.textContent : '글꼴';
+  trigger.style.fontFamily = value && value !== '__MORE__' ? value : '';
+}
+
+function tbRenderFontDropdownMenu() {
+  const select = document.getElementById('tb-font-family');
+  const menu = document.getElementById('tb-font-menu');
+  if (!select || !menu) return;
+  menu.innerHTML = [...select.options].map(option => option.disabled
+    ? '<div class="tb-font-menu-sep"></div>'
+    : `<button type="button" role="option" aria-selected="${option.value === select.value}" data-value="${esc(option.value)}" class="tb-font-option${option.value === '__MORE__' ? ' more' : ''}${option.value === select.value ? ' active' : ''}">${esc(option.textContent)}</button>`
+  ).join('');
+  menu.querySelectorAll('.tb-font-option').forEach(item => {
+    if (item.dataset.value && item.dataset.value !== '__MORE__') item.style.fontFamily = item.dataset.value;
+  });
+}
+
+function tbToggleFontDropdown(event) {
+  event?.preventDefault();
+  event?.stopPropagation();
+  const menu = document.getElementById('tb-font-menu');
+  const trigger = document.getElementById('tb-font-trigger');
+  if (!menu || !trigger) return;
+  if (menu.classList.contains('open')) return tbCloseFontDropdown();
+  tbCaptureFormatTarget();
+  tbRenderFontDropdownMenu();
+  menu.classList.add('open');
+  trigger.setAttribute('aria-expanded', 'true');
+  const rect = trigger.getBoundingClientRect();
+  const height = Math.min(menu.scrollHeight, 320);
+  menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8))}px`;
+  menu.style.top = `${rect.bottom + height < window.innerHeight ? rect.bottom + 2 : Math.max(8, rect.top - height - 2)}px`;
+}
+
+function tbPreviewFont(fontFamily) {
+  if (!fontFamily || fontFamily === '__MORE__') {
+    if (tbFontPreview) {
+      tbFontPreview.span.style.fontFamily = '';
+      document.getElementById('tb-font-family').value = tbFontPreview.selectValue;
+      tbSyncFontDropdownLabel();
+    }
+    return;
+  }
+  if (!tbFontPreview) {
+    const target = tbResolveFormatTarget();
+    const range = target?.type === 'ce' ? target.range?.cloneRange?.() : null;
+    if (!range || range.collapsed || !tbRangeInsideRoot(range, target.ta)) return;
+    try {
+      const span = document.createElement('span');
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+      const previewRange = document.createRange();
+      previewRange.selectNodeContents(span);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(previewRange);
+      tbFontPreview = { root: target.ta, span, selectValue: document.getElementById('tb-font-family').value };
+    } catch(e) { return; }
+  }
+  tbFontPreview.span.style.fontFamily = fontFamily;
+  document.getElementById('tb-font-family').value = fontFamily;
+  tbSyncFontDropdownLabel();
+}
+
+function tbEndFontPreview(fontFamily = '') {
+  if (!tbFontPreview) return false;
+  const { root, span } = tbFontPreview;
+  const nodes = [...span.childNodes];
+  const range = document.createRange();
+  if (fontFamily) {
+    span.style.fontFamily = fontFamily;
+    range.selectNodeContents(span);
+    tbCleanCEContainerStyle(root);
+    root.dispatchEvent(new Event('input', { bubbles: true }));
+  } else {
+    span.replaceWith(...nodes);
+    if (nodes.length) {
+      range.setStartBefore(nodes[0]);
+      range.setEndAfter(nodes[nodes.length - 1]);
+    }
+  }
+  if (nodes.length) {
+    focusWithoutScroll(root);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    savedCERange = range.cloneRange();
+    _savedFormatSel = { ta: root, range: range.cloneRange() };
+    savedFormatTarget = { type: 'ce', ta: root, range: range.cloneRange() };
+  }
+  lastFocusedTA = root;
+  tbFontPreview = null;
+  return !!fontFamily;
+}
+
+function tbCloseFontDropdown() {
+  tbEndFontPreview();
+  document.getElementById('tb-font-menu')?.classList.remove('open');
+  document.getElementById('tb-font-trigger')?.setAttribute('aria-expanded', 'false');
+}
+
+function tbChooseFontDropdownOption(value) {
+  if (value === undefined) return;
+  const select = document.getElementById('tb-font-family');
+  const committed = value && value !== '__MORE__' ? tbEndFontPreview(value) : false;
+  if (!committed) tbEndFontPreview();
+  document.getElementById('tb-font-menu')?.classList.remove('open');
+  document.getElementById('tb-font-trigger')?.setAttribute('aria-expanded', 'false');
+  select.value = value;
+  tbSyncFontDropdownLabel();
+  if (value && !committed) tbFontFamily(value);
+}
+
+document.addEventListener('mousedown', event => {
+  if (!document.getElementById('tb-font-menu')?.classList.contains('open')) return;
+  if (!event.target.closest?.('#tb-font-menu, #tb-font-trigger')) tbCloseFontDropdown();
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape' || !document.getElementById('tb-font-menu')?.classList.contains('open')) return;
+  event.preventDefault();
+  tbCloseFontDropdown();
+});
 
 function loadCustomFonts() {
   const custom = state.customFonts || [];
@@ -23400,6 +23568,7 @@ function tbFontFamily(fontFamily) {
   if (fontFamily === '__MORE__') {
     tbCaptureFormatTarget();
     document.getElementById('tb-font-family').value = '';
+    tbSyncFontDropdownLabel();
     openFontPicker();
     return;
   }
@@ -23466,6 +23635,7 @@ function tbFontFamily(fontFamily) {
         }
       }
       if (!matched) fontSelect.value = '';
+      tbSyncFontDropdownLabel();
     }
 
     // 글자 크기 입력란 동기화
