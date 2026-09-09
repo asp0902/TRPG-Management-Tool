@@ -2518,6 +2518,12 @@ tr.ct-row-end .ct-select:focus {
 [contenteditable="true"] .editor-quote:hover::after { opacity: 0.9; }
 .editor-quote > :first-child { margin-top: 0; }
 .editor-quote > :last-child { margin-bottom: 0; }
+.editor-quote > .editor-quote-children {
+  --child-indent: 0px;
+  width: 100%; max-width: 100%; margin: 8px 0 0; padding-top: 6px;
+  border-top: 1px solid rgba(127,127,127,.35); color: inherit;
+}
+.editor-quote > .editor-quote-children > .block.block-text > .block-text-ce { color: inherit; }
 /* ─── 커스텀 컬러 패널 ─── */
 .cp-panel {
   position: fixed; z-index: 9999;
@@ -12102,7 +12108,7 @@ function updColumn(blockId, idx, val, cid = 'blocks-container') {
   const block = getGenericBlockById(blockId, cid);
   if (!block) return;
   normalizeColumnBlock(block);
-  block.columns[idx] = val;
+  block.columns[idx] = normalizeEditableHtml(val);
   commitBlockTreeChange(`column:${blockId}:${idx}`, cid);
 }
 
@@ -12573,6 +12579,7 @@ function normalizeBlockTree(blocks, opts = {}) {
     if (block.type === 'image') block.content = normalizeImageBlockSource(block.content);
 
     normalizeBlockTree(block.children, opts);
+    Object.values(getQuoteChildrenMap(block, false)).forEach(children => normalizeBlockTree(children, opts));
   });
 
   return blocks;
@@ -12623,6 +12630,14 @@ function findGenericBlockArrayInfo(blocks, targetId, parent = null, relation = '
     if (Array.isArray(block.children)) {
       const found = findGenericBlockArrayInfo(block.children, targetId, block, 'children');
       if (found) return found;
+    }
+
+    for (const [quoteId, quoteChildren] of Object.entries(getQuoteChildrenMap(block, false))) {
+      const found = findGenericBlockArrayInfo(quoteChildren, targetId, block, 'quoteChildren');
+      if (found) {
+        if (!found.quoteId) found.quoteId = quoteId;
+        return found;
+      }
     }
 
     if (Array.isArray(block.nestedCallouts)) {
@@ -12693,6 +12708,10 @@ function makeChildBlockTargetKey(parentId, cid = 'blocks-container') {
   return `children|${parentId}|${cid || 'blocks-container'}`;
 }
 
+function makeQuoteChildBlockTargetKey(parentId, quoteId, cid = 'blocks-container') {
+  return `quoteChildren|${parentId}|${quoteId}|${cid || 'blocks-container'}`;
+}
+
 function makeRollResultBlockTargetKey(blockId, resultId, cid = 'blocks-container') {
   return `rollResultBlocks|${blockId}|${resultId}|${cid || 'blocks-container'}`;
 }
@@ -12701,6 +12720,9 @@ function makeBlockTargetKeyForArrayInfo(info) {
   if (!info) return null;
   if (!info.parent) return makeRootBlockTargetKey(info.rootCid);
   if (info.relation === 'children') return makeChildBlockTargetKey(info.parent.id, info.rootCid);
+  if (info.relation === 'quoteChildren') {
+    return makeQuoteChildBlockTargetKey(info.parent.id, info.quoteId, info.rootCid);
+  }
   if (info.relation === 'rollResultBlocks') {
     return makeRollResultBlockTargetKey(info.parent.id, info.rollResultId, info.rootCid);
   }
@@ -12709,6 +12731,16 @@ function makeBlockTargetKeyForArrayInfo(info) {
 
 function parseBlockTargetKey(targetKey, fallbackCid = 'blocks-container') {
   const raw = String(targetKey || '');
+
+  if (raw.startsWith('quoteChildren|')) {
+    const parts = raw.split('|');
+    return {
+      kind: 'quoteChildren',
+      parentId: parts[1] || '',
+      quoteId: parts[2] || '',
+      cid: parts[3] || fallbackCid,
+    };
+  }
 
   if (raw.startsWith('rollResultBlocks|')) {
     const parts = raw.split('|');
@@ -12774,6 +12806,23 @@ function getBlockListByTargetKey(targetKey, fallbackCid = 'blocks-container') {
       relation: 'rollResultBlocks',
       rollResultId: target.resultId,
       persistOnly: blockInfo.persistOnly,
+    };
+  }
+
+  if (target.kind === 'quoteChildren') {
+    const parentInfo = getBlockArrayInfo(target.parentId, target.cid);
+    if (!parentInfo || !target.quoteId) return null;
+    const quoteChildren = getQuoteChildrenMap(parentInfo.block);
+    if (!Array.isArray(quoteChildren[target.quoteId])) quoteChildren[target.quoteId] = [];
+
+    return {
+      array: quoteChildren[target.quoteId],
+      cid: parentInfo.rootCid,
+      rootBlocks: parentInfo.rootBlocks,
+      parent: parentInfo.block,
+      relation: 'quoteChildren',
+      quoteId: target.quoteId,
+      persistOnly: parentInfo.persistOnly,
     };
   }
 
@@ -12984,6 +13033,44 @@ const SCRIPT_TOC_DEFAULT_BADGE_COLORS = { intro: '#6b7280', chapter: '#111111', 
 
 function getScriptTocItems(blocks) {
   return (blocks || []).filter(b => SCRIPT_TOC_TYPES.includes(b.type));
+}
+
+function getQuoteChildrenMap(block, create = true) {
+  if (!block || typeof block !== 'object') return {};
+  if (!block.quoteChildren || typeof block.quoteChildren !== 'object' || Array.isArray(block.quoteChildren)) {
+    if (!create) return {};
+    block.quoteChildren = {};
+  }
+  return block.quoteChildren;
+}
+
+function hydrateQuoteChildBlocks(blockEl, block, cid, depth = 0) {
+  const quoteChildren = getQuoteChildrenMap(block, false);
+  if (!Object.keys(quoteChildren).length) return;
+
+  blockEl.querySelectorAll('.editor-quote[data-quote-id]').forEach(quote => {
+    if (quote.closest('.block[data-id]') !== blockEl) return;
+    const quoteId = quote.dataset.quoteId;
+    const children = quoteChildren[quoteId];
+    if (!Array.isArray(children) || !children.length) return;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'block-children-wrap editor-quote-children';
+    wrap.contentEditable = 'false';
+    wrap.dataset.parentId = quoteId;
+    wrap.dataset.mount = 'editor-quote';
+    wrap.dataset.empty = '0';
+    ['beforeinput', 'input', 'keydown', 'compositionstart', 'compositionend'].forEach(type => {
+      wrap.addEventListener(type, event => event.stopPropagation());
+    });
+
+    renderBlockListInto(wrap, children, {
+      cid,
+      targetKey: makeQuoteChildBlockTargetKey(block.id, quoteId, cid),
+      depth: depth + 1,
+    });
+    quote.appendChild(wrap);
+  });
 }
 
 function getScriptTocRank(blockId, s = cur()) {
@@ -13962,6 +14049,7 @@ function mkTextBlockEl(b, cid, ctx = {}) {
     _sideHandle.addEventListener('dragstart', e => { e.stopPropagation(); beginBlockDrag(e, b.id, cid, el); });
   }
   appendGenericChildren(el, b, cid, ctx.depth || 0);
+  hydrateQuoteChildBlocks(el, b, cid, ctx.depth || 0);
   return el;
 }
 
@@ -15265,6 +15353,7 @@ function tbUnwrapVariation(root, variation) {
 function tbGetCopyText(root) {
   if (!root) return '';
   const clone = root.cloneNode(true);
+  clone.querySelectorAll?.('.editor-quote-children').forEach(node => node.remove());
   if (clone.matches?.('.tb-variation')) {
     return clone.dataset.after || clone.querySelector('.tb-variation-after-text')?.innerText || '';
   }
@@ -15513,9 +15602,16 @@ function sanitizeImportedEditableHtml(value) {
     .replace(/^(?:\s|<br\s*\/?>)+/i, '')
     .replace(/(?:\s|<br\s*\/?>)+$/i, '');
 }
+function stripTransientEditableUi(value) {
+  if (typeof value !== 'string' || !value.includes('editor-quote-children')) return value;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = value;
+  wrap.querySelectorAll('.editor-quote-children').forEach(node => node.remove());
+  return wrap.innerHTML;
+}
 function normalizeEditableHtml(value) {
   if (typeof value !== 'string') return value;
-  const sanitized = sanitizeImportedEditableHtml(value);
+  const sanitized = sanitizeImportedEditableHtml(stripTransientEditableUi(value));
   const normalized = sanitized
     .replace(/\u200b/g, '')
     .replace(/&nbsp;|\u00a0/gi, ' ')
@@ -16751,6 +16847,7 @@ function mkBlockEl(b, cid, ctx = {}) {
     _sideHandle.addEventListener('dragstart', e => { e.stopPropagation(); beginBlockDrag(e, b.id, cid, el); });
   }
   appendGenericChildren(el, b, cid, ctx.depth || 0);
+  hydrateQuoteChildBlocks(el, b, cid, ctx.depth || 0);
   return el;
 }
 
@@ -16840,6 +16937,7 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
   }
 
   appendGenericChildren(el, ending, cid, ctx.depth || 0);
+  hydrateQuoteChildBlocks(el, ending, cid, ctx.depth || 0);
 
   el.querySelector('.ending-header').addEventListener('click', e => {
     if (e.target.classList.contains('ending-name-inp')) return;
@@ -17267,6 +17365,10 @@ function findBlockByIdDeep(blocks, targetId) {
     
     for (const key of ['blocks', 'items', 'children', 'innerBlocks', 'nestedCallouts', 'subBlocks', 'rollResults']) {
       const found = findBlockByIdDeep(block[key], targetId);
+      if (found) return found;
+    }
+    for (const quoteChildren of Object.values(getQuoteChildrenMap(block, false))) {
+      const found = findBlockByIdDeep(quoteChildren, targetId);
       if (found) return found;
     }
     if (Array.isArray(block.branches)) {
@@ -18256,6 +18358,12 @@ function reassignGenericChildIds(block) {
   } else {
     block.children = [];
   }
+  const quoteChildren = getQuoteChildrenMap(block, false);
+  Object.keys(quoteChildren).forEach(quoteId => {
+    quoteChildren[quoteId] = Array.isArray(quoteChildren[quoteId])
+      ? quoteChildren[quoteId].map(child => cloneBlockData(child))
+      : [];
+  });
   return block;
 }
 
@@ -18684,7 +18792,9 @@ function moveBibSubBlock(blockId, ibId, subId, dir, cid) {
 function updBibSubBlock(blockId, ibId, subId, key, val) {
   const ib = getIbByIds(blockId, ibId); if (!ib) return;
   const sub = (ib.subBlocks || []).find(x => x.id === subId); if (!sub) return;
-  sub[key] = sub.type === 'callout' && key === 'content' ? normalizeCalloutEditableHtml(val) : val;
+  sub[key] = sub.type === 'callout' && key === 'content'
+    ? normalizeCalloutEditableHtml(val)
+    : normalizeEditableHtml(val);
 }
 function updBibSubRollResult(blockId, ibId, subId, ri, val) {
   const ib = getIbByIds(blockId, ibId); if (!ib) return;
@@ -19392,7 +19502,7 @@ function delIbItem(blockId, ibId, itemId, cid) {
 function updIbItem(blockId, ibId, itemId, field, val) {
   const ib = getIbByIds(blockId, ibId); if (!ib) return;
   const item = (ib.items || []).find(x => x.id === itemId);
-  if (item) item[field] = val;
+  if (item) item[field] = normalizeEditableHtml(val);
 }
 function updIbItemHtml(blockId, ibId, itemId, field, val) {
   const ib = getIbByIds(blockId, ibId); if (!ib) return;
@@ -21150,6 +21260,7 @@ function isDescendantBlockId(parentBlock, maybeChildId) {
       if (walk(block.items)) return true;
       if (walk(block.subBlocks)) return true;
       if (walk(block.blocks)) return true;
+      if (Object.values(getQuoteChildrenMap(block, false)).some(walk)) return true;
 
       if (Array.isArray(block.rollResults)) {
         for (const result of block.rollResults) {
@@ -21167,6 +21278,7 @@ function isDescendantBlockId(parentBlock, maybeChildId) {
     || walk(parentBlock.items)
     || walk(parentBlock.subBlocks)
     || walk(parentBlock.blocks)
+    || Object.values(getQuoteChildrenMap(parentBlock, false)).some(walk)
     || (
       Array.isArray(parentBlock.rollResults)
       && parentBlock.rollResults.some(result => walk(result?.blocks))
@@ -24631,6 +24743,65 @@ function getQuoteForRange(root, range) {
     try { return range.intersectsNode(quote); } catch { return false; }
   }) || null;
 }
+function getQuoteBlockContext(quoteEl) {
+  const editable = quoteEl?.closest?.('[contenteditable="true"]');
+  const blockEl = editable?.closest?.('.block[data-id]');
+  if (!editable || !blockEl || quoteEl.closest('.block[data-id]') !== blockEl) return null;
+  const cid = blockEl.dataset.cid || 'blocks-container';
+  const block = getGenericBlockById(blockEl.dataset.id, cid);
+  return block ? { editable, blockEl, block, cid } : null;
+}
+function ensureQuoteId(quoteEl, editable) {
+  if (!quoteEl?.dataset) return '';
+  if (!quoteEl.dataset.quoteId) {
+    quoteEl.dataset.quoteId = mkId();
+    editable?.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  return quoteEl.dataset.quoteId;
+}
+function insertQuoteChildBlock(quoteEl, typeId) {
+  const ctx = getQuoteBlockContext(quoteEl);
+  if (!ctx) return;
+  const quoteId = ensureQuoteId(quoteEl, ctx.editable);
+  const quoteChildren = getQuoteChildrenMap(ctx.block);
+  if (!Array.isArray(quoteChildren[quoteId])) quoteChildren[quoteId] = [];
+  const targetKey = makeQuoteChildBlockTargetKey(ctx.block.id, quoteId, ctx.cid);
+  const insert = source => insertBlockAt(typeId, quoteChildren[quoteId].length, targetKey, source);
+
+  if (typeId === 'image' && currentPage === 'script' && ctx.cid === 'blocks-container') {
+    openImageBlockModal(insert);
+  } else {
+    insert('');
+  }
+}
+function makeQuoteChildInsertCtxItem(quoteEl) {
+  if (!getQuoteBlockContext(quoteEl)) return null;
+  return {
+    icon: '＋',
+    label: '하위 블록 추가',
+    submenu: BTYPES.filter(type => type.id !== 'intro').map(type => ({
+      icon: BIP_ICONS[type.id] || '?',
+      label: type.label,
+      action: () => insertQuoteChildBlock(quoteEl, type.id),
+    })),
+  };
+}
+function openQuoteContextMenu(quoteEl, x, y) {
+  const childItem = makeQuoteChildInsertCtxItem(quoteEl);
+  if (!childItem) {
+    openQuoteBackgroundPicker(quoteEl);
+    return;
+  }
+  tbShowCtxMenu(x, y, [
+    childItem,
+    { sep: true },
+    {
+      icon: '<i class="fa-solid fa-fill-drip"></i>',
+      label: '배경색',
+      action: () => openQuoteBackgroundPicker(quoteEl),
+    },
+  ]);
+}
 function tbInsertQuote() {
   const target = tbResolveFormatTarget();
   const root = target?.type === 'ce' ? target.ta : (isCE() ? lastFocusedTA : null);
@@ -24649,8 +24820,9 @@ function tbInsertQuote() {
   if (!range.collapsed) holder.appendChild(range.cloneContents());
   const content = range.collapsed || !holder.innerHTML ? '<br>' : holder.innerHTML;
   const token = 'quote-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const quoteId = mkId();
   const textColor = getQuoteTextColor(EDITOR_QUOTE_DEFAULT_BACKGROUND);
-  const html = '<blockquote class="editor-quote" data-quote-token="' + token + '" style="background-color:' + EDITOR_QUOTE_DEFAULT_BACKGROUND + ';color:' + textColor + ';">' + content + '</blockquote>';
+  const html = '<blockquote class="editor-quote" data-quote-token="' + token + '" data-quote-id="' + quoteId + '" style="background-color:' + EDITOR_QUOTE_DEFAULT_BACKGROUND + ';color:' + textColor + ';">' + content + '</blockquote>';
 
   focusWithoutScroll(root);
   const selection = window.getSelection();
@@ -24693,15 +24865,28 @@ function isQuoteMenuHit(event, quoteEl) {
 }
 document.addEventListener('mousedown', event => {
   const quote = event.target?.closest?.('.editor-quote');
+  const childHost = event.target?.closest?.('.editor-quote-children');
+  if (childHost?.closest?.('.editor-quote') === quote) return;
   if (quote?.closest?.('[contenteditable="true"]') && isQuoteMenuHit(event, quote)) event.preventDefault();
 });
 document.addEventListener('click', event => {
   const quote = event.target?.closest?.('.editor-quote');
+  const childHost = event.target?.closest?.('.editor-quote-children');
+  if (childHost?.closest?.('.editor-quote') === quote) return;
   if (!quote?.closest?.('[contenteditable="true"]') || !isQuoteMenuHit(event, quote)) return;
   event.preventDefault();
   event.stopPropagation();
-  openQuoteBackgroundPicker(quote);
+  openQuoteContextMenu(quote, event.clientX, event.clientY);
 });
+document.addEventListener('contextmenu', event => {
+  const quote = event.target?.closest?.('.editor-quote');
+  const childHost = event.target?.closest?.('.editor-quote-children');
+  if (!quote || childHost?.closest?.('.editor-quote') === quote || !makeQuoteChildInsertCtxItem(quote)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation?.();
+  openQuoteContextMenu(quote, event.clientX, event.clientY);
+}, true);
 
 function initLinkInsertDialogEvents() {
   if (window.__linkInsertDialogEventsBound) return;

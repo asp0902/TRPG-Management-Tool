@@ -17,6 +17,23 @@ assert.match(
   /!tbApplyQuoteBlockType\(ce, range, val\)\) document\.execCommand\('formatBlock'/,
   '인용 외곽 블록은 formatBlock 교체 대상에서 제외해야 합니다.',
 );
+assert.match(html, /function makeQuoteChildBlockTargetKey\(/, '인용 전용 하위 블록 저장 경로가 필요합니다.');
+assert.match(html, /function hydrateQuoteChildBlocks\(/, '저장된 하위 블록을 인용 안에 렌더해야 합니다.');
+assert.match(
+  html,
+  /label: '하위 블록 추가',[\s\S]*?action: \(\) => insertQuoteChildBlock/,
+  '인용 메뉴에서 하위 블록을 추가할 수 있어야 합니다.',
+);
+assert.match(
+  html,
+  /data-quote-id="' \+ quoteId \+ '"/,
+  '새 인용에는 하위 블록 연결용 ID가 저장되어야 합니다.',
+);
+assert.match(
+  html,
+  /wrap\.querySelectorAll\('\.editor-quote-children'\)\.forEach\(node => node\.remove\(\)\)/,
+  '렌더링 UI는 인용 원문 HTML에 저장되면 안 됩니다.',
+);
 
 const colorFunction = html.match(/function getQuoteTextColor\(background\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(colorFunction, '인용 글자색 계산 함수를 찾을 수 없습니다.');
