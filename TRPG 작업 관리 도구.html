@@ -13046,13 +13046,21 @@ function getQuoteChildrenMap(block, create = true) {
 
 function hydrateQuoteChildBlocks(blockEl, block, cid, depth = 0) {
   const quoteChildren = getQuoteChildrenMap(block, false);
-  if (!Object.keys(quoteChildren).length) return;
 
-  blockEl.querySelectorAll('.editor-quote[data-quote-id]').forEach(quote => {
+  blockEl.querySelectorAll('.editor-quote').forEach(quote => {
     if (quote.closest('.block[data-id]') !== blockEl) return;
+    if (!quote.querySelector(':scope > .editor-quote-content')) {
+      const content = document.createElement('div');
+      content.className = 'editor-quote-content';
+      Array.from(quote.childNodes).forEach(node => {
+        if (!node.classList?.contains('editor-quote-children')) content.appendChild(node);
+      });
+      quote.prepend(content);
+    }
     const quoteId = quote.dataset.quoteId;
     const children = quoteChildren[quoteId];
     if (!Array.isArray(children) || !children.length) return;
+    if (quote.querySelector(':scope > .editor-quote-children')) return;
 
     const wrap = document.createElement('div');
     wrap.className = 'block-children-wrap editor-quote-children';
@@ -23635,16 +23643,17 @@ function tbStripInlineFontSize(root) {
 function tbApplyQuoteBlockType(root, range, tagName) {
   const quote = getQuoteForRange(root, range);
   if (!quote) return false;
+  const content = quote.querySelector(':scope > .editor-quote-content') || quote;
 
   const blockSelector = 'p,h1,h2,h3,h4';
-  let blocks = Array.from(quote.children).filter(el => {
+  let blocks = Array.from(content.children).filter(el => {
     if (!el.matches(blockSelector)) return false;
     try { return range.intersectsNode(el); } catch(e) { return false; }
   });
   if (!blocks.length) {
     const block = document.createElement(tagName);
-    while (quote.firstChild) block.appendChild(quote.firstChild);
-    quote.appendChild(block);
+    while (content.firstChild) block.appendChild(content.firstChild);
+    content.appendChild(block);
     blocks = [block];
   } else {
     blocks = blocks.map(block => {
@@ -24084,6 +24093,13 @@ function tbInsertNumbered() {
   ta.dispatchEvent(new Event('input', { bubbles: true }));
   ta.setSelectionRange(pos + prefix.length, pos + prefix.length);
 }
+function tbSkipOpeningIndentBlocks(html, boundaryIndex) {
+  let openBlockMatch = null;
+  while ((openBlockMatch = html.slice(boundaryIndex).match(/^<(div|p|li|h1|h2|h3|h4|blockquote)(?:\s[^>]*)?>/i))) {
+    boundaryIndex += openBlockMatch[0].length;
+  }
+  return boundaryIndex;
+}
 function tbFindIndentBoundaryIndex(html, markerIndex) {
   const beforeMarker = html.slice(0, markerIndex);
   const boundaryRegex = /(?:<br\s*\/?>|<\/div>|<\/p>|<\/li>|<\/h1>|<\/h2>|<\/h3>|<\/h4>|<\/blockquote>)/gi;
@@ -24092,9 +24108,7 @@ function tbFindIndentBoundaryIndex(html, markerIndex) {
   while ((match = boundaryRegex.exec(beforeMarker))) {
     boundaryIndex = match.index + match[0].length;
   }
-  const openBlockMatch = html.slice(boundaryIndex).match(/^<(div|p|li|h1|h2|h3|h4|blockquote)(?:\s[^>]*)?>/i);
-  if (openBlockMatch) boundaryIndex += openBlockMatch[0].length;
-  return boundaryIndex;
+  return tbSkipOpeningIndentBlocks(html, boundaryIndex);
 }
 function tbFindNextIndentBoundaryIndex(html, fromIndex) {
   const boundaryRegex = /(?:<br\s*\/?>|<\/div>|<\/p>|<\/li>|<\/h1>|<\/h2>|<\/h3>|<\/h4>|<\/blockquote>)/gi;
@@ -24102,9 +24116,7 @@ function tbFindNextIndentBoundaryIndex(html, fromIndex) {
   const match = boundaryRegex.exec(html);
   if (!match) return -1;
   let boundaryIndex = match.index + match[0].length;
-  const openBlockMatch = html.slice(boundaryIndex).match(/^<(div|p|li|h1|h2|h3|h4|blockquote)(?:\s[^>]*)?>/i);
-  if (openBlockMatch) boundaryIndex += openBlockMatch[0].length;
-  return boundaryIndex;
+  return tbSkipOpeningIndentBlocks(html, boundaryIndex);
 }
 function tbSkipIndentMarkers(html, boundaryIndex, markerHtmls = []) {
   let nextIndex = boundaryIndex;
@@ -24142,6 +24154,10 @@ function tbIndentContentEditable(root, dir) {
 
   const sourceRange = tbGetIndentSelectionRange(root);
   if (!sourceRange || !tbRangeInsideRoot(sourceRange, root)) return;
+  const common = sourceRange.commonAncestorContainer;
+  const commonEl = common.nodeType === Node.ELEMENT_NODE ? common : common.parentElement;
+  const quoteContent = commonEl?.closest?.('.editor-quote-content');
+  const htmlRoot = quoteContent && root.contains(quoteContent) ? quoteContent : root;
 
   const sel = window.getSelection();
   const wasCollapsed = sourceRange.collapsed;
@@ -24168,7 +24184,7 @@ function tbIndentContentEditable(root, dir) {
   const markerHtmls = [startMarkerHtml, endMarkerHtml];
 
   const indentUnit = '\u3000';
-  let html = root.innerHTML;
+  let html = htmlRoot.innerHTML;
   const startMarkerIndex = html.indexOf(startMarkerHtml);
   const endMarkerIndex = html.indexOf(endMarkerHtml);
   if (startMarkerIndex < 0 || endMarkerIndex < 0) {
@@ -24223,9 +24239,9 @@ function tbIndentContentEditable(root, dir) {
     return;
   }
 
-  root.innerHTML = nextHtml;
-  const nextStartMarker = root.querySelector(`#${startMarkerId}`);
-  const nextEndMarker = root.querySelector(`#${endMarkerId}`);
+  htmlRoot.innerHTML = nextHtml;
+  const nextStartMarker = htmlRoot.querySelector(`#${startMarkerId}`);
+  const nextEndMarker = htmlRoot.querySelector(`#${endMarkerId}`);
   if (sel && nextStartMarker && nextEndMarker) {
     const restoreRange = document.createRange();
     restoreRange.setStartAfter(nextStartMarker);
@@ -24825,7 +24841,7 @@ function tbInsertQuote() {
   const token = 'quote-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   const quoteId = mkId();
   const textColor = getQuoteTextColor(EDITOR_QUOTE_DEFAULT_BACKGROUND);
-  const html = '<blockquote class="editor-quote" data-quote-token="' + token + '" data-quote-id="' + quoteId + '" style="background-color:' + EDITOR_QUOTE_DEFAULT_BACKGROUND + ';color:' + textColor + ';">' + content + '</blockquote>';
+  const html = '<blockquote class="editor-quote" data-quote-token="' + token + '" data-quote-id="' + quoteId + '" style="background-color:' + EDITOR_QUOTE_DEFAULT_BACKGROUND + ';color:' + textColor + ';"><div class="editor-quote-content">' + content + '</div></blockquote>';
 
   focusWithoutScroll(root);
   const selection = window.getSelection();
@@ -24836,7 +24852,7 @@ function tbInsertQuote() {
   quote.removeAttribute('data-quote-token');
 
   const caret = document.createRange();
-  caret.selectNodeContents(quote);
+  caret.selectNodeContents(quote.querySelector(':scope > .editor-quote-content') || quote);
   caret.collapse(false);
   if (selection) { selection.removeAllRanges(); selection.addRange(caret); }
   lastFocusedTA = root;

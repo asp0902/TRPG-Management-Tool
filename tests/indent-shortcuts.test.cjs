@@ -35,4 +35,19 @@ context.handleFormatIndentShortcut({ key: 'Tab', shiftKey: false, target: editor
 context.handleFormatIndentShortcut({ key: 'Tab', shiftKey: true, target: editor, preventDefault: () => calls.push('prevented') });
 assert.deepEqual(calls, ['prevented', 'range', 1, 'prevented', 'range', -1]);
 
+const boundaryStart = html.indexOf('function tbSkipOpeningIndentBlocks');
+const boundaryEnd = html.indexOf('function tbSkipIndentMarkers', boundaryStart);
+const boundaryFunctions = boundaryStart >= 0 && boundaryEnd > boundaryStart
+  ? html.slice(boundaryStart, boundaryEnd).trim()
+  : '';
+assert.ok(boundaryFunctions, '들여쓰기 경계 계산 함수를 찾을 수 없습니다.');
+const boundaryContext = {};
+vm.runInNewContext(boundaryFunctions, boundaryContext);
+const nestedHtml = '<blockquote><div class="editor-quote-content">본문<span id="marker"></span></div></blockquote>';
+assert.equal(
+  boundaryContext.tbFindIndentBoundaryIndex(nestedHtml, nestedHtml.indexOf('<span')),
+  nestedHtml.indexOf('본문'),
+  '인용 본문의 중첩된 여는 태그 뒤를 들여쓰기 시작점으로 사용해야 합니다.',
+);
+
 console.log('indent shortcut checks: OK');

@@ -21,6 +21,13 @@ assert.match(html, /function makeQuoteChildBlockTargetKey\(/, '인용 전용 하
 assert.match(html, /function hydrateQuoteChildBlocks\(/, '저장된 하위 블록을 인용 안에 렌더해야 합니다.');
 assert.match(
   html,
+  /class="editor-quote-content">' \+ content \+ '<\/div>/,
+  '인용 본문은 하위 블록과 분리된 편집 영역이어야 합니다.',
+);
+assert.match(html, /caret\.selectNodeContents\(quote\.querySelector\(':scope > \.editor-quote-content'\) \|\| quote\)/, '새 인용의 커서는 본문 안에 놓여야 합니다.');
+assert.match(html, /const htmlRoot = quoteContent && root\.contains\(quoteContent\) \? quoteContent : root;/, '인용 본문만 들여쓰기해야 합니다.');
+assert.match(
+  html,
   /label: '하위 블록 추가',[\s\S]*?action: \(\) => insertQuoteChildBlock/,
   '인용 메뉴에서 하위 블록을 추가할 수 있어야 합니다.',
 );
