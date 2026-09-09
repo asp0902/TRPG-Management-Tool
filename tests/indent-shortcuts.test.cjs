@@ -50,4 +50,30 @@ assert.equal(
   '인용 본문의 중첩된 여는 태그 뒤를 들여쓰기 시작점으로 사용해야 합니다.',
 );
 
+const indentStart = html.indexOf('function tbIndent(dir) {');
+const indentEnd = html.indexOf('function tbGetCEFormatRange', indentStart);
+const indentFunction = html.slice(indentStart, indentEnd).trim();
+const selectedEditor = { contentEditable: 'true' };
+const liveRange = {
+  commonAncestorContainer: {
+    nodeType: 3,
+    parentElement: { closest: () => selectedEditor },
+  },
+  cloneRange() { return this; },
+};
+const indentTargets = [];
+const indentContext = {
+  Node: { ELEMENT_NODE: 1 },
+  window: { getSelection: () => ({ rangeCount: 1, getRangeAt: () => liveRange }) },
+  document: { queryCommandState: () => false },
+  lastFocusedTA: null,
+  savedCERange: null,
+  tbRangeInsideRoot: () => true,
+  tbIndentContentEditable: target => indentTargets.push(target),
+  tbIndentTextInput: () => assert.fail('contenteditable을 일반 입력칸으로 처리했습니다.'),
+};
+vm.runInNewContext(indentFunction, indentContext);
+indentContext.tbIndent(1);
+assert.equal(indentTargets[0], selectedEditor, '마지막 포커스가 없어도 현재 선택 영역의 편집기를 사용해야 합니다.');
+
 console.log('indent shortcut checks: OK');

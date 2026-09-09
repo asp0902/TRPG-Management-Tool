@@ -22971,10 +22971,10 @@ function tbApplyCEInlineStyle(prop, val) {
   } catch(e) { return false; }
 }
 document.getElementById('format-bar').addEventListener('mousedown', e => {
+  if (e.target.tagName === 'BUTTON' || e.target.closest('button')) e.preventDefault();
   if (lastFocusedTA?.contentEditable === 'true') {
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0) savedCERange = sel.getRangeAt(0).cloneRange();
-    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) e.preventDefault();
   }
 });
 
@@ -24304,11 +24304,17 @@ function tbIndentTextInput(ta, dir) {
   );
 }
 function tbIndent(dir) {
-  const target = lastFocusedTA;
+  const selection = window.getSelection();
+  const liveRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+  const common = liveRange?.commonAncestorContainer;
+  const commonEl = common?.nodeType === Node.ELEMENT_NODE ? common : common?.parentElement;
+  const target = commonEl?.closest?.('[contenteditable="true"]') || lastFocusedTA;
   if (!target) return;
-  if (isCE()) {
+  lastFocusedTA = target;
+  if (target.contentEditable === 'true') {
+    if (liveRange && tbRangeInsideRoot(liveRange, target)) savedCERange = liveRange.cloneRange();
     // 현재 선택 영역이 리스트(ul 또는 ol) 내부라면 브라우저 기본 명령으로 들여쓰기/내어쓰기 수행
-    const sel = window.getSelection();
+    const sel = selection;
     if (sel && sel.rangeCount > 0) {
       // document.queryCommandState('insertUnorderedList') 또는 'insertOrderedList'로 현재 리스트 상태 확인
       // 이전에 사용하던 node?.closest?.('li') 대신 더 정확하게 리스트 상태를 판단합니다.
