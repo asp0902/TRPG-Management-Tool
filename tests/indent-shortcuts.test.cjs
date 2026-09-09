@@ -5,6 +5,22 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
 
+const cleanupFunction = html.match(/function removeOrphanIndentWhitespace\(html\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(cleanupFunction, '레거시 전각 공백 정리 함수를 찾을 수 없습니다.');
+const cleanupContext = {};
+vm.runInNewContext(cleanupFunction, cleanupContext);
+const orphanIndent = '　'.repeat(17);
+assert.equal(
+  cleanupContext.removeOrphanIndentWhitespace(`<blockquote class="editor-quote"><div class="editor-quote-content"><h1><span>기능</span></h1>${orphanIndent}\n본문</div></blockquote>`),
+  '<blockquote class="editor-quote"><div class="editor-quote-content"><h1><span>기능</span></h1>\n본문</div></blockquote>',
+  '블록 종료 뒤에 누적된 숨은 전각 공백을 제거해야 합니다.',
+);
+assert.equal(
+  cleanupContext.removeOrphanIndentWhitespace('<h1>　<span>기능</span></h1>\n본문'),
+  '<h1>　<span>기능</span></h1>\n본문',
+  '블록 내부의 정상 들여쓰기는 유지해야 합니다.',
+);
+
 assert.match(html, /id="tb-indent-btn"[^>]*title="들여쓰기\(Tab\)"/, '들여쓰기 버튼에 Tab 단축키를 표시해야 합니다.');
 assert.match(html, /id="tb-outdent-btn"[^>]*title="내어쓰기 \(Shift\+Tab\)"/, '내어쓰기 버튼에 Shift+Tab 단축키를 표시해야 합니다.');
 assert.match(
