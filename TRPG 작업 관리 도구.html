@@ -2728,7 +2728,7 @@ tr.ct-row-end .ct-select:focus {
 .tb-font-trigger-label { min-width: 0; margin-left: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tb-font-trigger .fa-chevron-down { flex-shrink: 0; font-size: 9px; color: #777; }
 .tb-font-menu {
-  display: none; position: fixed; z-index: 10001; width: 190px; max-height: 320px;
+  display: none; position: fixed; z-index: 10001; width: 230px; max-height: 420px;
   overflow-y: auto; padding: 3px 0; background: #fff; border: 1px solid #bbb;
   border-radius: 4px; box-shadow: 0 5px 16px rgba(0,0,0,0.16);
 }
@@ -2739,8 +2739,12 @@ tr.ct-row-end .ct-select:focus {
   text-align: left; font-size: 13px; letter-spacing: 0;
 }
 .tb-font-option:hover, .tb-font-option:focus, .tb-font-option.active { background: #e9e9e9; outline: none; }
-.tb-font-option.more { color: #2563eb; font-weight: 700; font-family: inherit; }
-.tb-font-menu-sep { height: 1px; margin: 3px 0; background: #e5e5e5; }
+.tb-font-option.more { min-height: 36px; color: #222; font-weight: 700; font-family: inherit; }
+.tb-font-option.more i { width: 18px; margin-right: 8px; text-align: center; }
+.tb-font-option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tb-font-option-check { width: 16px; flex: 0 0 16px; text-align: center; font-size: 10px; }
+.tb-font-menu-section { padding: 8px 10px 4px; color: #666; font-size: 10px; font-weight: 800; letter-spacing: 0; }
+.tb-font-menu-sep { height: 1px; margin: 5px 8px; background: #dedede; }
 .tb-btn.active {
   background: #e0e0e0;
   color: #000;
@@ -8777,7 +8781,7 @@ const SHEET_TEMPLATES = {
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-let state = { scenarios: [], folders: [], cssMacroFolders: [], records: [], catalog: [], cssMacros: [], cssPopupDictionary: [], bookmarks: [], rulebooks: [], dataSheets: [], characters: [], customFonts: [], findReplaceHistory: [], currentId: null };
+let state = { scenarios: [], folders: [], cssMacroFolders: [], records: [], catalog: [], cssMacros: [], cssPopupDictionary: [], bookmarks: [], rulebooks: [], dataSheets: [], characters: [], customFonts: [], recentFonts: [], findReplaceHistory: [], currentId: null };
 // +글꼴 더보기에서 추가한 글꼴은 모든 스크립트가 공유하는 기본 목록으로 저장된다.
 let currentPage = 'script';
 let currentCssMacroId = null;
@@ -9172,7 +9176,8 @@ function normalizeSidebarState(opts = {}) {
   state.rulebooks = Array.isArray(state.rulebooks) ? state.rulebooks.map(rb => normalizeRulebookEntry(rb, opts)) : [];
   state.dataSheets = Array.isArray(state.dataSheets) ? state.dataSheets.map(normalizeDataSheetEntry) : [];
   state.characters = Array.isArray(state.characters) ? state.characters.map(normalizeCharacterEntry) : [];
-  state.customFonts = Array.isArray(state.customFonts) ? state.customFonts.filter(name => typeof name === 'string' && name.trim()) : [];
+  state.customFonts = uniqueFontNames(state.customFonts);
+  state.recentFonts = uniqueFontNames(state.recentFonts).slice(0, MAX_RECENT_FONTS);
 }
 function getSidebarFolders(page = currentPage) {
   return page === 'css-macro' ? state.cssMacroFolders : state.folders;
@@ -9212,6 +9217,7 @@ function makeStatePayload() {
     dataSheets: state.dataSheets,
     characters: state.characters,
     customFonts: state.customFonts,
+    recentFonts: state.recentFonts,
     findReplaceHistory: state.findReplaceHistory,
   };
 }
@@ -9229,6 +9235,7 @@ function applyStatePayload(raw) {
     state.dataSheets = [];
     state.characters = [];
     state.customFonts = [];
+    state.recentFonts = [];
     state.findReplaceHistory = [];
   } else if (raw && typeof raw === 'object') {
     state.scenarios = Array.isArray(raw.scenarios) ? raw.scenarios : [];
@@ -9243,6 +9250,7 @@ function applyStatePayload(raw) {
     state.dataSheets = Array.isArray(raw.dataSheets) ? raw.dataSheets : [];
     state.characters = Array.isArray(raw.characters) ? raw.characters : [];
     state.customFonts = Array.isArray(raw.customFonts) ? raw.customFonts : [];
+    state.recentFonts = Array.isArray(raw.recentFonts) ? raw.recentFonts : [];
     state.findReplaceHistory = Array.isArray(raw.findReplaceHistory) ? raw.findReplaceHistory : [];
   }
   normalizeSidebarState({ promoteLegacyContent: true });
@@ -21293,6 +21301,7 @@ function getFullBackupPayload() {
     dataSheets: state.dataSheets,
     characters: state.characters,
     customFonts: state.customFonts,
+    recentFonts: state.recentFonts,
     findReplaceHistory: state.findReplaceHistory,
   };
 }
@@ -21519,6 +21528,7 @@ function makeImportPayload(data) {
       characters: [],
       dataSheets: [],
       customFonts: [],
+      recentFonts: [],
       findReplaceHistory: [],
     };
   }
@@ -21539,6 +21549,7 @@ function makeImportPayload(data) {
     dataSheets: Array.isArray(data.dataSheets) ? data.dataSheets.map(normalizeDataSheetEntry) : [],
     characters: Array.isArray(data.characters) ? data.characters.map(normalizeCharacterEntry) : [],
     customFonts: Array.isArray(data.customFonts) ? data.customFonts.filter(name => typeof name === 'string' && name.trim()) : [],
+    recentFonts: Array.isArray(data.recentFonts) ? data.recentFonts.filter(name => typeof name === 'string' && name.trim()) : [],
     findReplaceHistory: Array.isArray(data.findReplaceHistory) ? data.findReplaceHistory : [],
   };
 }
@@ -21651,6 +21662,7 @@ function replaceStateWithImportPayload(payload) {
   state.dataSheets = payload.dataSheets || [];
   state.characters = payload.characters;
   state.customFonts = payload.customFonts;
+  state.recentFonts = payload.recentFonts;
   // 찾아 바꾸기 이력은 시나리오/블록 ID에 종속이므로 replace 모드에서만 통째로 복원
   state.findReplaceHistory = Array.isArray(payload.findReplaceHistory) ? payload.findReplaceHistory : [];
 }
@@ -21668,6 +21680,7 @@ function mergeImportPayload(payload) {
   if (Array.isArray(payload.dataSheets)) state.dataSheets.push(...payload.dataSheets);
   state.characters.push(...payload.characters);
   state.customFonts = [...new Set([...(state.customFonts || []), ...payload.customFonts])];
+  state.recentFonts = uniqueFontNames([...(state.recentFonts || []), ...(payload.recentFonts || [])]).slice(0, MAX_RECENT_FONTS);
 }
 function makeImportSnapshot() {
   return {
@@ -21683,6 +21696,7 @@ function makeImportSnapshot() {
     dataSheets: state.dataSheets.slice(),
     characters: state.characters.slice(),
     customFonts: state.customFonts.slice(),
+    recentFonts: state.recentFonts.slice(),
     findReplaceHistory: Array.isArray(state.findReplaceHistory) ? state.findReplaceHistory.slice() : [],
     currentId: state.currentId,
     currentCssMacroId,
@@ -21691,7 +21705,7 @@ function makeImportSnapshot() {
   };
 }
 function restoreImportSnapshot(snapshot) {
-  ['scenarios','folders','cssMacroFolders','records','catalog','cssMacros','cssPopupDictionary','bookmarks','rulebooks','dataSheets','characters','customFonts','findReplaceHistory'].forEach(key => {
+  ['scenarios','folders','cssMacroFolders','records','catalog','cssMacros','cssPopupDictionary','bookmarks','rulebooks','dataSheets','characters','customFonts','recentFonts','findReplaceHistory'].forEach(key => {
     if (snapshot[key] !== undefined) state[key] = snapshot[key];
   });
   state.currentId = snapshot.currentId;
@@ -21739,6 +21753,7 @@ function refreshAfterImport(replaceMode = false) {
     resetCssMacroHistory();
   }
   loadCustomFonts();
+  updateFontDropdown();
   const hasCurrentScenario = state.currentId && state.scenarios.some(scenario => scenario.id === state.currentId);
   if (!hasCurrentScenario) state.currentId = state.scenarios[0]?.id || null;
   if (currentPage === 'script') {
@@ -22430,6 +22445,7 @@ const FONT_POOL = [
   "Cinzel", "MedievalSharp", "Almendra", "UnifrakturMaguntia", "Metamorphous",
   "Creepster", "Special Elite", "Eater", "Metal Mania"
 ];
+const MAX_RECENT_FONTS = 5;
 
 function normalizeFontNameForCompare(name) {
   return String(name || '')
@@ -22468,27 +22484,37 @@ function uniqueFontNames(list) {
   return out;
 }
 
+function prependRecentFont(recentFonts, name) {
+  return uniqueFontNames([name, ...(recentFonts || [])]).slice(0, MAX_RECENT_FONTS);
+}
+
+function getAllFontOptions() {
+  const customFonts = uniqueFontNames(state.customFonts || []);
+  state.customFonts = customFonts;
+  return [
+    ...DEFAULT_FONTS,
+    ...customFonts.filter(name => !isDefaultFontName(name)).map(name => ({ name, val: fontValueFromName(name) })),
+  ].sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
+}
+
+function rememberRecentFont(fontFamily) {
+  const key = normalizeFontNameForCompare(fontFamily);
+  const font = getAllFontOptions().find(option => normalizeFontNameForCompare(option.val || option.name) === key);
+  if (!font) return;
+  state.recentFonts = prependRecentFont(state.recentFonts, font.name);
+  persist();
+}
+
 function updateFontDropdown() {
   const sel = document.getElementById('tb-font-family');
   if (!sel) return;
 
   const currentValue = sel.value;
-  const customFonts = uniqueFontNames(state.customFonts || []);
-  state.customFonts = customFonts;
-  const persistentCustomFonts = customFonts.filter(name => !isDefaultFontName(name));
+  const allFonts = getAllFontOptions();
 
   let html = '<option value="">글꼴</option>';
-  html += '<option value="__MORE__" style="color:#4a9eff; font-weight:bold;">＋ 글꼴 더보기...</option>';
-  html += '<option disabled>──────</option>';
-
-  // 기본 글꼴 목록
-  DEFAULT_FONTS.forEach(f => {
+  allFonts.forEach(f => {
     html += `<option value="${esc(f.val)}">${esc(f.name)}</option>`;
-  });
-
-  // 한번 추가된 글꼴은 어느 스크립트에서든 기본 목록과 같은 영역에 계속 표시한다.
-  persistentCustomFonts.forEach(name => {
-    html += `<option value="${esc(fontValueFromName(name))}" style="font-family:'${esc(name)}'">${esc(name)}</option>`;
   });
 
   sel.innerHTML = html;
@@ -22517,10 +22543,18 @@ function tbRenderFontDropdownMenu() {
   const select = document.getElementById('tb-font-family');
   const menu = document.getElementById('tb-font-menu');
   if (!select || !menu) return;
-  menu.innerHTML = [...select.options].map(option => option.disabled
-    ? '<div class="tb-font-menu-sep"></div>'
-    : `<button type="button" role="option" aria-selected="${option.value === select.value}" data-value="${esc(option.value)}" class="tb-font-option${option.value === '__MORE__' ? ' more' : ''}${option.value === select.value ? ' active' : ''}">${esc(option.textContent)}</button>`
-  ).join('');
+  const allFonts = getAllFontOptions();
+  const byName = new Map(allFonts.map(font => [normalizeFontNameForCompare(font.name), font]));
+  const recentFonts = uniqueFontNames(state.recentFonts || []).map(name => byName.get(normalizeFontNameForCompare(name))).filter(Boolean);
+  const renderOption = font => {
+    const active = normalizeFontNameForCompare(font.val) === normalizeFontNameForCompare(select.value);
+    return `<button type="button" role="option" aria-selected="${active}" data-value="${esc(font.val)}" class="tb-font-option${active ? ' active' : ''}"><span class="tb-font-option-label">${esc(font.name)}</span>${active ? '<i class="fa-solid fa-check tb-font-option-check" aria-hidden="true"></i>' : '<span class="tb-font-option-check"></span>'}</button>`;
+  };
+  menu.innerHTML = '<button type="button" role="option" aria-selected="false" data-value="__MORE__" class="tb-font-option more"><span class="tb-font-option-label"><i class="fa-solid fa-font" aria-hidden="true"></i>글꼴 더보기</span><span class="tb-font-option-check"></span></button>'
+    + '<div class="tb-font-menu-sep"></div>'
+    + (recentFonts.length ? '<div class="tb-font-menu-section">최근 사용 항목</div>' + recentFonts.map(renderOption).join('') + '<div class="tb-font-menu-sep"></div>' : '')
+    + '<div class="tb-font-menu-section">모든 글꼴</div>'
+    + allFonts.map(renderOption).join('');
   menu.querySelectorAll('.tb-font-option').forEach(item => {
     if (item.dataset.value && item.dataset.value !== '__MORE__') item.style.fontFamily = item.dataset.value;
   });
@@ -22538,7 +22572,7 @@ function tbToggleFontDropdown(event) {
   menu.classList.add('open');
   trigger.setAttribute('aria-expanded', 'true');
   const rect = trigger.getBoundingClientRect();
-  const height = Math.min(menu.scrollHeight, 320);
+  const height = Math.min(menu.scrollHeight, 420);
   menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8))}px`;
   menu.style.top = `${rect.bottom + height < window.innerHeight ? rect.bottom + 2 : Math.max(8, rect.top - height - 2)}px`;
 }
@@ -22619,6 +22653,7 @@ function tbChooseFontDropdownOption(value) {
   document.getElementById('tb-font-trigger')?.setAttribute('aria-expanded', 'false');
   select.value = value;
   tbSyncFontDropdownLabel();
+  if (value && value !== '__MORE__') rememberRecentFont(value);
   if (value && !committed) tbFontFamily(value);
 }
 
@@ -22707,9 +22742,11 @@ function toggleFontInPicker(name) {
     // 기존 동작 유지:
     // 더보기 팝업에서 이미 추가된 글꼴을 다시 클릭하면 제거한다.
     state.customFonts.splice(idx, 1);
+    if (!isDefaultFontName(name)) state.recentFonts = (state.recentFonts || []).filter(font => normalizeFontNameForCompare(font) !== key);
   } else {
     state.customFonts.push(name);
     state.customFonts = uniqueFontNames(state.customFonts);
+    rememberRecentFont(fontValueFromName(name));
 
     const target = tbResolveFormatTarget();
     setTimeout(() => {
@@ -28725,6 +28762,8 @@ function fitCharacterPortrait(img) {
 
 async function bootstrapApp() {
   await load();
+  loadCustomFonts();
+  updateFontDropdown();
   resetCssMacroHistory();
   renderList();
   const _lastScriptView = loadLastScriptView();
