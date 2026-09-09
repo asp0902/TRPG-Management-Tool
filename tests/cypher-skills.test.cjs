@@ -43,5 +43,8 @@ assert.match(html, /data-section-id="cyphers"\]\s+tbody td \{ border-bottom: non
 assert.match(html, /isCypherItems = tpl\.key === 'cypher' && sec\.id === 'cyphers'/);
 assert.match(html, /sh-cypher-count[\s\S]*?rows\.length[\s\S]*?aria-label="사이퍼 제한 개수"/);
 assert.match(html, /saveSheetField[\s\S]*?"cypherMeta","limit",this\.value/);
+assert.match(html, /sh-cypher-status-row \{ display: grid; grid-template-columns: minmax\(320px, 1fr\) minmax\(0, 2fr\);/);
+assert.match(html, /tpl\.key === 'cypher' && sec\.id === 'pools'[\s\S]*?renderNumeneraPoolsSection[\s\S]*?renderCypherDamageRecoverySection/);
+assert.match(html, /tpl\.key === 'cypher' && sec\.id === 'damageRecovery'\) return ''/);
 
 console.log('cypher skill checks: OK');

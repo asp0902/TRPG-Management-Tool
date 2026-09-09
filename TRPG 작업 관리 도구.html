@@ -6953,6 +6953,8 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-numenera-pools .np-cell:last-child { border-right: none; }
 .sh-numenera-pools .np-input { width: 68px; text-align: center; border: 1px solid #ccc; border-radius: 5px; padding: 4px 4px; font-size: 14px; font-family: inherit; outline: none; }
 .sh-numenera-pools .np-input:focus { border-color: #111; }
+.sh-cypher-status-row { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(0, 2fr); gap: 16px; align-items: stretch; }
+.sh-cypher-status-row > .sh-section { min-width: 0; }
 .sh-cypher-damage-recovery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .sh-cypher-damage-pane { min-width: 0; padding-right: 24px; }
 .sh-cypher-recovery-pane { min-width: 0; padding-left: 24px; border-left: 1px solid #e4e4e4; }
@@ -6970,6 +6972,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-cypher-recovery-description p { margin: 0; }
 .sh-cypher-recovery-description p + p { margin-top: 6px; }
 @media(max-width:760px) {
+  .sh-cypher-status-row { grid-template-columns: 1fr; }
   .sh-cypher-damage-recovery { grid-template-columns: 1fr; }
   .sh-cypher-damage-pane { padding: 0 0 16px; }
   .sh-cypher-recovery-pane { padding: 16px 0 0; border-left: 0; border-top: 1px solid #e4e4e4; }
@@ -35186,6 +35189,14 @@ function renderCharacterSheet(chId) {
   var sheetId = activeSheet.id;
 
   var sectionsHtml = (tpl.sections || []).map(function(sec) {
+    if (tpl.key === 'cypher' && sec.id === 'pools') {
+      var poolsData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
+      var damageRecoverySec = tpl.sections.find(function(item) { return item.id === 'damageRecovery'; });
+      var damageRecoveryData = (sheetData.damageRecovery && typeof sheetData.damageRecovery === 'object') ? sheetData.damageRecovery : {};
+      return '<div class="sh-cypher-status-row">' + renderNumeneraPoolsSection(sec, poolsData, chId, sheetId)
+        + renderCypherDamageRecoverySection(damageRecoverySec, damageRecoveryData, chId, sheetId) + '</div>';
+    }
+    if (tpl.key === 'cypher' && sec.id === 'damageRecovery') return '';
     if (sec.customType === 'coc7e-stats') {
       var sectionData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
       return renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId);
