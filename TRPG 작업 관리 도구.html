@@ -6626,6 +6626,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-age-adjust-list li { margin-bottom: 2px; line-height: 1.5; }
 .sh-age-adjust-note { color: #888; font-size: 10px; font-style: italic; border-top: 1px solid #e0e0e0; padding-top: 5px; margin-top: 5px; }
 .sh-coc-stats-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 420px); gap: 14px; align-items: start; }
+.sh-coc-stats-main { min-width: 0; }
 .sh-coc-stats-layout .sh-coc-derived-section { border-top: none; border-left: 1px solid #ebebeb; padding-top: 0; padding-left: 14px; margin-top: 0; }
 .sh-coc-stats-layout .sh-coc-sanity-side { flex: 1 1 100%; }
 .sh-coc-attrs-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -6653,9 +6654,9 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-coc-sanity-side { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; flex: 1 1 420px; }
 .sh-coc-chk-stack { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .sh-coc-misc-section { border-top: 1px solid #ebebeb; padding-top: 12px; margin-top: 10px; }
-.sh-coc-misc-layout { display: grid; grid-template-columns: minmax(140px, 170px) minmax(320px, 400px) minmax(360px, 1fr); gap: 14px; align-items: start; }
-.sh-coc-misc-main { min-width: 0; }
+.sh-coc-misc-layout { display: grid; grid-template-columns: minmax(320px, 400px) minmax(360px, 1fr); gap: 14px; align-items: start; }
 .sh-coc-misc-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.sh-coc-stats-main .sh-coc-misc-row { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 16px; }
 .sh-coc-misc-field { display: flex; flex-direction: column; gap: 3px; align-items: center; text-align: center; }
 .sh-coc-misc-label { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; text-align: center; }
 .sh-coc-misc-input { border: 1px solid #e4e4e4; border-radius: 6px; padding: 5px 8px; font-size: 13px; font-family: inherit; color: #222; outline: none; width: 100%; background: #fff; box-sizing: border-box; text-align: center; }
@@ -6706,7 +6707,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
   .sh-coc-stats-layout .sh-coc-derived-section { border-left: none; border-top: 1px solid #ebebeb; padding-left: 0; padding-top: 12px; margin-top: 10px; }
   .sh-coc-misc-layout { grid-template-columns: 1fr; }
 }
-@media (max-width: 480px) { .sh-coc-attrs-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .sh-coc-attrs-grid, .sh-coc-stats-main .sh-coc-misc-row { grid-template-columns: repeat(2, 1fr); } }
 .sk-section-hdr { display: flex; gap: 0; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
 .sk-hdr-cell { flex: 1; display: flex; flex-direction: column; border-right: 1px solid #ddd; min-width: 0; }
 .sk-hdr-cell:last-child { border-right: none; }
@@ -34148,6 +34149,42 @@ function exportCharacterSheetHtml() {
     ? `<div class="standalone-sheet-header"><h1>${esc(title)}</h1><button type="button" class="ch-sheet-save standalone-sheet-save" onclick="saveStandaloneCharacterSheet()">저장</button></div>`
     : `<h1 style="margin-bottom:20px;border-bottom:3px solid #111;padding-bottom:10px;">${esc(title)}</h1>`;
   const saveScript = isEditableCoc7e ? `<script>
+function updateStandaloneCocSkills() {
+  const section = document.querySelector('.sh-coc-skills-section-hdr')?.closest('.sh-section');
+  if (!section) return;
+  const number = value => parseInt(value, 10) || 0;
+  const sum = selector => Array.from(section.querySelectorAll(selector)).reduce((total, input) => total + number(input.value), 0);
+  section.querySelectorAll('.sk-row').forEach(row => {
+    const base = number(row.querySelector('.sk-base-input')?.value ?? row.dataset.base);
+    const final = base + number(row.querySelector('.sk-job')?.value) + number(row.querySelector('.sk-interest')?.value) + number(row.querySelector('.sk-growth')?.value);
+    const finalCell = row.querySelector('.sk-final-cell');
+    const halfCell = row.querySelector('.sk-half-cell');
+    const fifthCell = row.querySelector('.sk-fifth-cell');
+    if (finalCell) finalCell.textContent = final;
+    if (halfCell) halfCell.textContent = Math.floor(final / 2);
+    if (fifthCell) fifthCell.textContent = Math.floor(final / 5);
+  });
+  const jobUsed = sum('.sk-job');
+  const interestUsed = sum('.sk-interest');
+  const growthUsed = sum('.sk-growth');
+  const jobMax = number(section.querySelector('.sk-job-max')?.value);
+  const interestMax = number(section.querySelector('.sk-interest-max')?.value);
+  const growthMax = number(section.querySelector('.sk-growth-max')?.value);
+  const set = (selector, value) => { const el = section.querySelector(selector); if (el) el.textContent = value; };
+  set('.sk-job-used', jobUsed);
+  set('.sk-job-remain', jobMax - jobUsed);
+  set('.sk-interest-used', interestUsed);
+  set('.sk-interest-remain', interestMax - interestUsed);
+  set('.sk-growth-used', growthUsed);
+  set('.sk-growth-remain', growthMax - growthUsed);
+  set('.sk-grand-max', jobMax + interestMax + growthMax);
+  set('.sk-total', jobUsed + interestUsed + growthUsed);
+  set('.sk-remain', jobMax + interestMax + growthMax - jobUsed - interestUsed - growthUsed);
+}
+document.addEventListener('input', event => {
+  if (event.target.matches('.sk-base-input,.sk-job,.sk-interest,.sk-growth,.sk-job-max,.sk-interest-max,.sk-growth-max')) updateStandaloneCocSkills();
+});
+updateStandaloneCocSkills();
 function saveStandaloneCharacterSheet() {
   const copy = document.documentElement.cloneNode(true);
   const currentFields = document.querySelectorAll('input, select, textarea');
@@ -35846,10 +35883,10 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
     + '<div class="sh-section-hd rollable" onclick="' + esc(rollAllH) + '" title="특성치 전체 굴리기">' + esc(sec.label) + '<span class="sh-roll-hint">클릭하여 특성치 전체 굴리기</span></div>'
     + '<div class="sh-section-body">'
     + '<div class="sh-coc-stats-layout">'
-    + '<div class="sh-coc-attrs-grid">' + attrsHtml + '</div>'
+    + '<div class="sh-coc-stats-main"><div class="sh-coc-attrs-grid">' + attrsHtml + '</div>' + miscRow + '</div>'
     + '<div class="sh-coc-derived-section">' + hpRow + mpRow + sanRow + '</div>'
     + '</div>'
-    + '<div class="sh-coc-misc-section"><div class="sh-coc-misc-layout"><div class="sh-coc-misc-main">' + miscRow + '</div>' + wealthPanel + balancePanel + '</div></div>'
+    + '<div class="sh-coc-misc-section"><div class="sh-coc-misc-layout">' + wealthPanel + balancePanel + '</div></div>'
     + '</div></div>';
 }
 
