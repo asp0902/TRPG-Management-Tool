@@ -6448,6 +6448,11 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 /* Sheet section */
 .sh-section { border: 1px solid #ebebeb; border-radius: 10px; overflow: hidden; }
 .sh-section-hd { padding: 9px 14px; background: #f8f8f8; border-bottom: 1px solid #ebebeb; font-size: 11px; font-weight: 700; color: #555; letter-spacing: 0.06em; text-transform: uppercase; }
+.sh-cypher-section-hd { display: flex; align-items: center; gap: 8px; }
+.sh-cypher-count { display: inline-flex; align-items: center; gap: 3px; letter-spacing: 0; }
+.sh-cypher-limit-input { width: 40px; height: 22px; box-sizing: border-box; border: 1px solid #d8d8d8; border-radius: 4px; background: #fff; color: #333; font: inherit; text-align: center; }
+.sh-cypher-limit-input::-webkit-inner-spin-button,
+.sh-cypher-limit-input::-webkit-outer-spin-button { margin: 0; }
 .sh-section-hd.rollable { cursor: pointer; user-select: none; }
 .sh-section-hd.rollable:hover { background: #f0f0f0; color: #111; }
 .sh-section-hd.rollable .sh-roll-hint { font-size: 10px; font-weight: 400; color: #aaa; margin-left: 6px; letter-spacing: 0; }
@@ -35276,10 +35281,21 @@ function renderCharacterSheet(chId) {
         return '<tr' + (isCompletedCypherRow ? ' class="is-complete"' : '') + '>' + cells + '<td><button class="sh-repeat-del" onclick="' + esc(delHandler) + '">✕</button></td></tr>';
       }).join('');
       var isAr2eSkills = tpl.key === 'arianrhod2e' && sec.id === 'skills';
+      var isCypherItems = tpl.key === 'cypher' && sec.id === 'cyphers';
       var secTitleAttr = sec.tooltip ? ' title="' + esc(sec.tooltip) + '"' : '';
-      var secHeaderHtml = isAr2eSkills
-        ? '<div class="sh-section-hd rollable" onclick="toggleArianrhod2eSkillGuide()">' + esc(sec.label) + '</div>'
-        : '<div class="sh-section-hd"' + secTitleAttr + '>' + esc(sec.label) + '</div>';
+      var secHeaderHtml;
+      if (isAr2eSkills) {
+        secHeaderHtml = '<div class="sh-section-hd rollable" onclick="toggleArianrhod2eSkillGuide()">' + esc(sec.label) + '</div>';
+      } else if (isCypherItems) {
+        var cypherMeta = sheetData.cypherMeta && typeof sheetData.cypherMeta === 'object' && !Array.isArray(sheetData.cypherMeta) ? sheetData.cypherMeta : {};
+        var cypherLimit = cypherMeta.limit !== undefined ? cypherMeta.limit : '';
+        var cypherLimitHandler = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',"cypherMeta","limit",this.value)';
+        secHeaderHtml = '<div class="sh-section-hd sh-cypher-section-hd"' + secTitleAttr + '><span>' + esc(sec.label) + '</span>'
+          + '<span class="sh-cypher-count"><span>' + rows.length + '</span><span>/</span>'
+          + '<input class="sh-cypher-limit-input" type="number" min="0" value="' + esc(String(cypherLimit)) + '" aria-label="사이퍼 제한 개수" oninput="' + esc(cypherLimitHandler) + '"></span></div>';
+      } else {
+        secHeaderHtml = '<div class="sh-section-hd"' + secTitleAttr + '>' + esc(sec.label) + '</div>';
+      }
       var guideHtml = isAr2eSkills
         ? '<div id="ar2e-skill-guide" class="sh-ar2-skill-guide' + (_ar2eSkillGuideOpen ? ' open' : '') + '">'
           + '<div class="sh-ar2-skill-guide-note">캐릭터 제작 시의 스킬 레벨 상한은 2레벨입니다.</div>'
