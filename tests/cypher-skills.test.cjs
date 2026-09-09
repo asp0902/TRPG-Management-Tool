@@ -25,5 +25,7 @@ const cyphersEnd = html.indexOf("{ id: 'artifacts'", cyphersStart);
 const cyphers = html.slice(cyphersStart, cyphersEnd);
 assert.match(cyphers, /id: 'form', label: '형태', type: 'select', options: \['미지정 Unspecified', '사이퍼 Cypher', '발현 Manifest'\]/);
 assert.match(cyphers, /id: 'active', label: '활성화', type: 'checkbox'/);
+assert.match(cyphers, /id: 'effect', label: '효과', type: 'textarea', autoGrow: true/);
+assert.match(html, /data-section-id="cyphers"\]\s+th:nth-child\(2\)[\s\S]*?td:nth-child\(4\) \{ width: 52px; min-width: 52px; max-width: 52px;/);
 
 console.log('cypher skill checks: OK');

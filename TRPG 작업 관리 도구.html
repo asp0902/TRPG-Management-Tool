@@ -6845,6 +6845,13 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-repeat-check-cell { text-align: center; width: 52px; }
 .sh-repeat-check { display: inline-flex; align-items: center; justify-content: center; min-height: 26px; cursor: pointer; }
 .sh-repeat-check input { width: 15px; height: 15px; cursor: pointer; accent-color: #111; }
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] { table-layout: fixed; }
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(2),
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(2),
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(4),
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(4) { width: 52px; min-width: 52px; max-width: 52px; text-align: center; }
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(3),
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(3) { width: 190px; }
 .ar2e-sk-list { display: flex; flex-direction: column; gap: 10px; }
 .ar2e-sk-card { position: relative; border: 1px solid #e4e4e4; border-radius: 8px; padding: 12px 14px; background: #fff; }
 .ar2e-sk-line1 { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end; padding-right: 44px; }
@@ -8759,7 +8766,7 @@ const SHEET_TEMPLATES = {
         { id: 'level', label: '레벨', type: 'number' },
         { id: 'form', label: '형태', type: 'select', options: ['미지정 Unspecified', '사이퍼 Cypher', '발현 Manifest'] },
         { id: 'active', label: '활성화', type: 'checkbox' },
-        { id: 'effect', label: '효과', type: 'text' },
+        { id: 'effect', label: '효과', type: 'textarea', autoGrow: true },
       ]},
       { id: 'artifacts', label: '아티팩트 (Artifacts)', repeatable: true, fields: [
         { id: 'name', label: '이름', type: 'text' },
@@ -35224,6 +35231,11 @@ function renderCharacterSheet(chId) {
               return '<option value="' + esc(o) + '"' + (String(o) === String(val) ? ' selected' : '') + '>' + esc(o) + '</option>';
             }).join('');
             return '<td><select class="sh-repeat-input" onchange="' + esc(handler) + '"' + extraAttr + '>' + opts + '</select></td>';
+          }
+          if (f.type === 'textarea') {
+            var textareaHandler = handler + (f.autoGrow ? ';autoResizeSheetTextarea(this)' : '');
+            var textareaAttrs = f.autoGrow ? ' rows="1" data-auto-grow="1"' : '';
+            return '<td><textarea class="sh-repeat-input sh-field-textarea' + (f.autoGrow ? ' auto-grow' : '') + '"' + textareaAttrs + ' oninput="' + esc(textareaHandler) + '"' + extraAttr + '>' + esc(String(val)) + '</textarea></td>';
           }
           return '<td><input class="sh-repeat-input" type="' + (f.type === 'number' ? 'number' : 'text') + '" value="' + esc(String(val)) + '" oninput="' + esc(handler) + '"' + extraAttr + '></td>';
         }).join('');
