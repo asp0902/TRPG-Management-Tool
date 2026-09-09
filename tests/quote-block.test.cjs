@@ -33,6 +33,21 @@ assert.match(
 );
 assert.match(
   html,
+  /function placeQuoteChildAnchor\([\s\S]*?insertRange\.insertNode\(anchor\)/,
+  '인용 하위 블록 위치 표식은 현재 커서에 삽입되어야 합니다.',
+);
+assert.match(
+  html,
+  /isOwnQuotePosition\(quoteEl, range\.startContainer\)[\s\S]*?isOwnQuotePosition\(quoteEl, range\.endContainer\)/,
+  '여러 문단으로 나뉜 인용에서도 실제 커서 범위를 사용해야 합니다.',
+);
+assert.match(
+  html,
+  /if \(anchor\) anchor\.after\(wrap\);\s*else quote\.appendChild\(wrap\);/,
+  '인용 하위 블록은 위치 표식 뒤에 렌더되어야 합니다.',
+);
+assert.match(
+  html,
   /data-quote-id="' \+ quoteId \+ '"/,
   '새 인용에는 하위 블록 연결용 ID가 저장되어야 합니다.',
 );

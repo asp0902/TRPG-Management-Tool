@@ -2518,12 +2518,15 @@ tr.ct-row-end .ct-select:focus {
 [contenteditable="true"] .editor-quote:hover::after { opacity: 0.9; }
 .editor-quote > :first-child { margin-top: 0; }
 .editor-quote > :last-child { margin-bottom: 0; }
-.editor-quote > .editor-quote-children {
+.editor-quote > .editor-quote-children,
+.editor-quote > .editor-quote-content .editor-quote-children {
   --child-indent: 0px;
   width: 100%; max-width: 100%; margin: 8px 0 0; padding-top: 6px;
   border-top: 1px solid rgba(127,127,127,.35); color: inherit;
 }
-.editor-quote > .editor-quote-children > .block.block-text > .block-text-ce { color: inherit; }
+.editor-quote > .editor-quote-children > .block.block-text > .block-text-ce,
+.editor-quote > .editor-quote-content .editor-quote-children > .block.block-text > .block-text-ce { color: inherit; }
+.editor-quote-children-anchor { display: none; }
 /* ─── 커스텀 컬러 패널 ─── */
 .cp-panel {
   position: fixed; z-index: 9999;
@@ -13060,8 +13063,9 @@ function hydrateQuoteChildBlocks(blockEl, block, cid, depth = 0) {
 
   blockEl.querySelectorAll('.editor-quote').forEach(quote => {
     if (quote.closest('.block[data-id]') !== blockEl) return;
-    if (!quote.querySelector(':scope > .editor-quote-content')) {
-      const content = document.createElement('div');
+    let content = quote.querySelector(':scope > .editor-quote-content');
+    if (!content) {
+      content = document.createElement('div');
       content.className = 'editor-quote-content';
       Array.from(quote.childNodes).forEach(node => {
         if (!node.classList?.contains('editor-quote-children')) content.appendChild(node);
@@ -13071,7 +13075,9 @@ function hydrateQuoteChildBlocks(blockEl, block, cid, depth = 0) {
     const quoteId = quote.dataset.quoteId;
     const children = quoteChildren[quoteId];
     if (!Array.isArray(children) || !children.length) return;
-    if (quote.querySelector(':scope > .editor-quote-children')) return;
+    const alreadyHydrated = Array.from(quote.querySelectorAll('.editor-quote-children'))
+      .some(node => node.closest('.editor-quote') === quote);
+    if (alreadyHydrated) return;
 
     const wrap = document.createElement('div');
     wrap.className = 'block-children-wrap editor-quote-children';
@@ -13091,7 +13097,10 @@ function hydrateQuoteChildBlocks(blockEl, block, cid, depth = 0) {
       targetKey: makeQuoteChildBlockTargetKey(block.id, quoteId, cid),
       depth: depth + 1,
     });
-    quote.appendChild(wrap);
+    const anchor = Array.from(quote.querySelectorAll('.editor-quote-children-anchor'))
+      .find(node => node.closest('.editor-quote') === quote);
+    if (anchor) anchor.after(wrap);
+    else quote.appendChild(wrap);
   });
 }
 
@@ -24855,14 +24864,63 @@ function ensureQuoteId(quoteEl, editable) {
   }
   return quoteEl.dataset.quoteId;
 }
-function insertQuoteChildBlock(quoteEl, typeId) {
+function isOwnQuotePosition(quoteEl, node) {
+  const el = node?.nodeType === Node.TEXT_NODE ? node.parentElement : node;
+  return !!el && el.closest?.('.editor-quote') === quoteEl && !el.closest?.('.editor-quote-children');
+}
+function getQuoteChildInsertRange(quoteEl) {
+  if (!quoteEl) return null;
+  const selection = window.getSelection();
+  if (selection?.rangeCount) {
+    const range = selection.getRangeAt(0);
+    if (isOwnQuotePosition(quoteEl, range.startContainer) && isOwnQuotePosition(quoteEl, range.endContainer)) {
+      const saved = range.cloneRange();
+      saved.collapse(false);
+      return saved;
+    }
+  }
+  const contents = quoteEl.querySelectorAll(':scope > .editor-quote-content');
+  const content = contents[contents.length - 1] || quoteEl;
+  const range = document.createRange();
+  range.selectNodeContents(content);
+  range.collapse(false);
+  return range;
+}
+function placeQuoteChildAnchor(quoteEl, range) {
+  if (!quoteEl) return false;
+  let insertRange = range?.cloneRange?.();
+  if (!insertRange || !isOwnQuotePosition(quoteEl, insertRange.startContainer) || !isOwnQuotePosition(quoteEl, insertRange.endContainer)) {
+    const contents = quoteEl.querySelectorAll(':scope > .editor-quote-content');
+    const content = contents[contents.length - 1] || quoteEl;
+    insertRange = document.createRange();
+    insertRange.selectNodeContents(content);
+    insertRange.collapse(false);
+  } else {
+    insertRange.collapse(false);
+  }
+  const anchor = document.createElement('span');
+  anchor.className = 'editor-quote-children-anchor';
+  anchor.contentEditable = 'false';
+  anchor.setAttribute('aria-hidden', 'true');
+  insertRange.insertNode(anchor);
+  quoteEl.querySelectorAll('.editor-quote-children-anchor').forEach(node => {
+    if (node !== anchor && node.closest('.editor-quote') === quoteEl) node.remove();
+  });
+  return true;
+}
+function insertQuoteChildBlock(quoteEl, typeId, insertionRange) {
   const ctx = getQuoteBlockContext(quoteEl);
   if (!ctx) return;
   const quoteId = ensureQuoteId(quoteEl, ctx.editable);
   const quoteChildren = getQuoteChildrenMap(ctx.block);
   if (!Array.isArray(quoteChildren[quoteId])) quoteChildren[quoteId] = [];
   const targetKey = makeQuoteChildBlockTargetKey(ctx.block.id, quoteId, ctx.cid);
-  const insert = source => insertBlockAt(typeId, quoteChildren[quoteId].length, targetKey, source);
+  const insert = source => {
+    if (placeQuoteChildAnchor(quoteEl, insertionRange)) {
+      ctx.editable.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    insertBlockAt(typeId, quoteChildren[quoteId].length, targetKey, source);
+  };
 
   if (typeId === 'image' && currentPage === 'script' && ctx.cid === 'blocks-container') {
     openImageBlockModal(insert);
@@ -24870,7 +24928,7 @@ function insertQuoteChildBlock(quoteEl, typeId) {
     insert('');
   }
 }
-function makeQuoteChildInsertCtxItem(quoteEl) {
+function makeQuoteChildInsertCtxItem(quoteEl, insertionRange = getQuoteChildInsertRange(quoteEl)) {
   if (!getQuoteBlockContext(quoteEl)) return null;
   return {
     icon: '＋',
@@ -24878,12 +24936,12 @@ function makeQuoteChildInsertCtxItem(quoteEl) {
     submenu: BTYPES.filter(type => type.id !== 'intro').map(type => ({
       icon: BIP_ICONS[type.id] || '?',
       label: type.label,
-      action: () => insertQuoteChildBlock(quoteEl, type.id),
+      action: () => insertQuoteChildBlock(quoteEl, type.id, insertionRange),
     })),
   };
 }
 function openQuoteContextMenu(quoteEl, x, y) {
-  const childItem = makeQuoteChildInsertCtxItem(quoteEl);
+  const childItem = makeQuoteChildInsertCtxItem(quoteEl, getQuoteChildInsertRange(quoteEl));
   if (!childItem) {
     openQuoteBackgroundPicker(quoteEl);
     return;
