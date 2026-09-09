@@ -49,6 +49,18 @@ vm.runInNewContext(shortcutFunction, context);
 context.handleFormatIndentShortcut({ key: 'Tab', shiftKey: false, target: editor, preventDefault: () => calls.push('prevented') });
 context.handleFormatIndentShortcut({ key: 'Tab', shiftKey: true, target: editor, preventDefault: () => calls.push('prevented') });
 assert.deepEqual(calls, ['prevented', 'range', 1, 'prevented', 'range', -1]);
+
+const shareLineFunction = html.match(/function _bnRectsShareLine\(a, b\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(shareLineFunction, '방향키 줄 경계 비교 함수를 찾을 수 없습니다.');
+const arrowContext = {};
+vm.runInNewContext(shareLineFunction, arrowContext);
+assert.equal(arrowContext._bnRectsShareLine({ top: 10, bottom: 30, height: 20 }, { top: 12, bottom: 28, height: 16 }), true);
+assert.equal(arrowContext._bnRectsShareLine({ top: 10, bottom: 30, height: 20 }, { top: 32, bottom: 52, height: 20 }), false);
+assert.match(
+  html,
+  /function _bnMoveCaretOneLine[\s\S]*?document\.caretPositionFromPoint[\s\S]*?_bnRectsShareLine/,
+  '블록 내부 방향키는 인접한 시각적 줄의 커서 위치를 찾아야 합니다.',
+);
 assert.match(
   html,
   /document\.addEventListener\('keydown', handleFormatIndentShortcut, true\)/,

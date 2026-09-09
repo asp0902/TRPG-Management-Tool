@@ -23422,31 +23422,54 @@ function _bnGetCaretRect(range, fallbackEl) {
   }
   return rect;
 }
-function _bnIsCaretAtFirstLine(ce) {
+function _bnGetOwnTextEdgeRect(ce, atEnd) {
+  const textNodes = [];
+  const collect = parent => Array.from(parent.childNodes).forEach(child => {
+    if (child.nodeType === Node.TEXT_NODE) {
+      if (child.nodeValue) textNodes.push(child);
+      return;
+    }
+    if (child.nodeType !== Node.ELEMENT_NODE || child.hasAttribute('contenteditable')) return;
+    collect(child);
+  });
+  collect(ce);
+  if (atEnd) textNodes.reverse();
+
+  for (const node of textNodes) {
+    const limit = atEnd ? -1 : node.nodeValue.length;
+    const step = atEnd ? -1 : 1;
+    for (let i = atEnd ? node.nodeValue.length - 1 : 0; i !== limit; i += step) {
+      const range = document.createRange();
+      range.setStart(node, i);
+      range.setEnd(node, i + 1);
+      const rects = range.getClientRects();
+      if (!rects.length) continue;
+      const rect = rects[atEnd ? rects.length - 1 : 0];
+      if (rect.height > 0) return rect;
+    }
+  }
+  return ce.getBoundingClientRect();
+}
+function _bnRectsShareLine(a, b) {
+  if (!a || !b) return false;
+  const overlap = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  return overlap >= Math.min(a.height, b.height) / 2;
+}
+function _bnIsCaretAtEdgeLine(ce, atEnd) {
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return true;
   const range = sel.getRangeAt(0);
-  if (!ce.contains(range.startContainer)) return false;
+  if (!range.collapsed || !ce.contains(range.startContainer)) return false;
   if (!(ce.textContent || '').length) return true;
   const caret = range.cloneRange(); caret.collapse(true);
   const caretRect = _bnGetCaretRect(caret, ce);
-  const first = document.createRange();
-  first.selectNodeContents(ce); first.collapse(true);
-  const firstRect = _bnGetCaretRect(first, ce);
-  return caretRect.top - firstRect.top < 4;
+  return _bnRectsShareLine(caretRect, _bnGetOwnTextEdgeRect(ce, atEnd));
+}
+function _bnIsCaretAtFirstLine(ce) {
+  return _bnIsCaretAtEdgeLine(ce, false);
 }
 function _bnIsCaretAtLastLine(ce) {
-  const sel = window.getSelection();
-  if (!sel || !sel.rangeCount) return true;
-  const range = sel.getRangeAt(0);
-  if (!ce.contains(range.startContainer)) return false;
-  if (!(ce.textContent || '').length) return true;
-  const caret = range.cloneRange(); caret.collapse(true);
-  const caretRect = _bnGetCaretRect(caret, ce);
-  const last = document.createRange();
-  last.selectNodeContents(ce); last.collapse(false);
-  const lastRect = _bnGetCaretRect(last, ce);
-  return lastRect.bottom - caretRect.bottom < 4;
+  return _bnIsCaretAtEdgeLine(ce, true);
 }
 function _bnPlaceCaret(el, atEnd) {
   focusWithoutScroll(el);
@@ -23459,6 +23482,41 @@ function _bnPlaceCaret(el, atEnd) {
   if (typeof el.scrollIntoView === 'function') {
     el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }
+}
+function _bnMoveCaretOneLine(ce, isUp) {
+  const selection = window.getSelection();
+  if (!selection?.isCollapsed || !selection.rangeCount) return false;
+  const sourceRange = selection.getRangeAt(0).cloneRange();
+  sourceRange.collapse(true);
+  const sourceRect = _bnGetCaretRect(sourceRange, ce);
+  const ceRect = ce.getBoundingClientRect();
+  const lineHeight = parseFloat(getComputedStyle(ce).lineHeight) || 0;
+  const step = Math.max(sourceRect.height, lineHeight, 16);
+  const x = Math.max(ceRect.left + 1, Math.min(sourceRect.left + 1, ceRect.right - 1));
+
+  for (const scale of [0.5, 1, 1.5, 2]) {
+    const y = isUp ? sourceRect.top - step * scale : sourceRect.bottom + step * scale;
+    const position = document.caretPositionFromPoint?.(x, y);
+    let nextRange = null;
+    if (position?.offsetNode) {
+      nextRange = document.createRange();
+      nextRange.setStart(position.offsetNode, position.offset);
+      nextRange.collapse(true);
+    } else {
+      nextRange = document.caretRangeFromPoint?.(x, y) || null;
+    }
+    if (!nextRange || !ce.contains(nextRange.startContainer)) continue;
+    const owner = nextRange.startContainer.nodeType === Node.ELEMENT_NODE
+      ? nextRange.startContainer.closest?.('[contenteditable]')
+      : nextRange.startContainer.parentElement?.closest?.('[contenteditable]');
+    if (owner && owner !== ce) continue;
+    const nextRect = _bnGetCaretRect(nextRange, ce);
+    if (_bnRectsShareLine(sourceRect, nextRect)) continue;
+    selection.removeAllRanges();
+    selection.addRange(nextRange);
+    return true;
+  }
+  return false;
 }
 function _bnGetNavigables(container) {
   return Array.from(container.querySelectorAll('[contenteditable="true"]'))
@@ -23474,7 +23532,10 @@ document.addEventListener('keydown', e => {
   if (!container) return;
   const isUp = e.key === 'ArrowUp';
   const atBoundary = isUp ? _bnIsCaretAtFirstLine(target) : _bnIsCaretAtLastLine(target);
-  if (!atBoundary) return;
+  if (!atBoundary) {
+    if (_bnMoveCaretOneLine(target, isUp)) e.preventDefault();
+    return;
+  }
   const all = _bnGetNavigables(container);
   const idx = all.indexOf(target);
   if (idx < 0) return;
