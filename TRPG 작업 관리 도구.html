@@ -6845,6 +6845,11 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-repeat-check-cell { text-align: center; width: 52px; }
 .sh-repeat-check { display: inline-flex; align-items: center; justify-content: center; min-height: 26px; cursor: pointer; }
 .sh-repeat-check input { width: 15px; height: 15px; cursor: pointer; accent-color: #111; }
+.sh-repeat-option-help { border: 0; border-radius: 3px; background: none; color: inherit; cursor: pointer; font: inherit; font-weight: inherit; letter-spacing: inherit; padding: 2px 3px; margin: -2px -3px; }
+.sh-repeat-option-help:hover, .sh-repeat-option-help:focus-visible { background: #eceff3; color: #111; outline: none; }
+.sh-option-help-menu .tb-ctx-item.disabled { color: #222; }
+.sh-option-help-menu .tb-ctx-item.disabled .tb-ctx-icon { display: none; }
+.sh-option-help-menu .tb-ctx-item.disabled .tb-ctx-main { gap: 0; }
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] { table-layout: fixed; }
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(2),
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(2),
@@ -6853,7 +6858,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(3),
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(3),
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(4),
-.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(4) { width: 190px; }
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(4) { width: 104px; }
 .ar2e-sk-list { display: flex; flex-direction: column; gap: 10px; }
 .ar2e-sk-card { position: relative; border: 1px solid #e4e4e4; border-radius: 8px; padding: 12px 14px; background: #fff; }
 .ar2e-sk-line1 { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end; padding-right: 44px; }
@@ -8766,8 +8771,8 @@ const SHEET_TEMPLATES = {
       { id: 'cyphers', label: '사이퍼 (Cyphers)', repeatable: true, fields: [
         { id: 'name', label: '이름', type: 'text' },
         { id: 'level', label: '레벨', type: 'number' },
-        { id: 'form', label: '형태', type: 'select', options: ['미지정 Unspecified', '사이퍼 Cypher', '발현 Manifest'] },
-        { id: 'powerTier', label: '등급', type: 'select', options: ['등급 없음 NO POWER TIER', '하급 LOW', '중급 MEDIUM', '상급 HIGH', '고급 ADVANCED', '최상급 ULTRA', '규격 외 NONSTANDARD'] },
+        { id: 'form', label: '형태', type: 'select', options: ['미지정 Unspecified', '사이퍼 Cypher', '발현 Manifest'], optionLabels: ['미지정', '사이퍼', '발현'], optionPopup: true },
+        { id: 'powerTier', label: '등급', type: 'select', options: ['등급 없음 NO POWER TIER', '하급 LOW', '중급 MEDIUM', '상급 HIGH', '고급 ADVANCED', '최상급 ULTRA', '규격 외 NONSTANDARD'], optionLabels: ['등급 없음', '하급', '중급', '상급', '고급', '최상급', '규격 외'], optionPopup: true },
         { id: 'active', label: '활성화', type: 'checkbox' },
         { id: 'effect', label: '효과', type: 'textarea', autoGrow: true },
       ]},
@@ -35073,6 +35078,17 @@ function normalizeUnsungDuetSheetData(data) {
   return data;
 }
 
+function openSheetOptionPopup(event, title, options) {
+  if (!event || !event.currentTarget || !Array.isArray(options)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  var rect = event.currentTarget.getBoundingClientRect();
+  var items = [{ heading: title }].concat(options.map(function(label) {
+    return { label: label, disabled: true };
+  }));
+  tbShowCtxMenu(rect.left, rect.bottom + 4, items, { menuClass: 'sh-option-help-menu' });
+}
+
 function renderCharacterSheet(chId) {
   var bodyEl = document.getElementById('ch-sheet-body');
   var deleteBtnEl = document.getElementById('ch-sheet-delete-btn');
@@ -35208,7 +35224,13 @@ function renderCharacterSheet(chId) {
     if (sec.repeatable) {
       var rows = Array.isArray(sheetData[sec.id]) ? sheetData[sec.id] : [];
       var repeatAttrs = ' data-template-key="' + esc(tpl.key) + '" data-section-id="' + esc(sec.id) + '"';
-      var thHtml = sec.fields.map(function(f) { return '<th>' + esc(f.label) + '</th>'; }).join('') + '<th style="width:28px;"></th>';
+      var thHtml = sec.fields.map(function(f) {
+        if (f.optionPopup && Array.isArray(f.options)) {
+          var popupHandler = 'openSheetOptionPopup(event,' + JSON.stringify(f.label) + ',' + JSON.stringify(f.options) + ')';
+          return '<th><button type="button" class="sh-repeat-option-help" onclick="' + esc(popupHandler) + '" aria-haspopup="true">' + esc(f.label) + '</button></th>';
+        }
+        return '<th>' + esc(f.label) + '</th>';
+      }).join('') + '<th style="width:28px;"></th>';
       var rowsHtml = rows.map(function(row, rowIdx) {
         var cells = sec.fields.map(function(f) {
           var defaultVal = f.type === 'checkbox' ? false : ((f.type === 'select' && Array.isArray(f.options) && f.options.length) ? f.options[0] : '');
@@ -35230,8 +35252,9 @@ function renderCharacterSheet(chId) {
             return '<td class="sh-repeat-check-cell"><label class="sh-repeat-check"><input type="checkbox"' + (isSheetCheckboxChecked(val) ? ' checked' : '') + ' onchange="' + esc(checkHandler) + '"' + extraAttr + '></label></td>';
           }
           if (f.type === 'select' && Array.isArray(f.options)) {
-            var opts = f.options.map(function(o) {
-              return '<option value="' + esc(o) + '"' + (String(o) === String(val) ? ' selected' : '') + '>' + esc(o) + '</option>';
+            var opts = f.options.map(function(o, optionIdx) {
+              var optionLabel = Array.isArray(f.optionLabels) && f.optionLabels[optionIdx] !== undefined ? f.optionLabels[optionIdx] : o;
+              return '<option value="' + esc(o) + '"' + (String(o) === String(val) ? ' selected' : '') + '>' + esc(optionLabel) + '</option>';
             }).join('');
             return '<td><select class="sh-repeat-input" onchange="' + esc(handler) + '"' + extraAttr + '>' + opts + '</select></td>';
           }
