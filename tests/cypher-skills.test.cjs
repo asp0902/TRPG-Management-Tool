@@ -31,7 +31,10 @@ assert.match(cyphers, /optionLabels: \['등급 없음', '하급', '중급', '상
 assert.match(cyphers, /id: 'active', label: '활성화', type: 'checkbox'/);
 assert.match(cyphers, /id: 'completed', label: '완료', type: 'checkbox'/);
 assert.match(cyphers, /id: 'effect', label: '효과', type: 'textarea', autoGrow: true/);
-assert.match(html, /data-section-id="cyphers"\]\s+th:nth-child\(2\)[\s\S]*?td:nth-child\(6\) \{ width: 52px; min-width: 52px; max-width: 52px;/);
+assert.match(html, /data-section-id="cyphers"\]\s+thead th \{ text-align: center; \}/);
+assert.match(html, /data-section-id="cyphers"\]\s+td:nth-child\(1\) \{ width: 190px; \}/);
+assert.match(html, /data-section-id="cyphers"\]\s+td:nth-child\(2\) \{ width: 52px; min-width: 52px; max-width: 52px;/);
+assert.match(html, /data-section-id="cyphers"\]\s+td:nth-child\(6\) \{ width: 40px; min-width: 40px; max-width: 40px;/);
 assert.match(html, /data-section-id="cyphers"\]\s+td:nth-child\(4\) \{ width: 104px; \}/);
 assert.match(html, /function openSheetOptionPopup\(event, title, options\)/);
 assert.match(html, /isCompletedCypherRow[\s\S]*?class="is-complete"/);
