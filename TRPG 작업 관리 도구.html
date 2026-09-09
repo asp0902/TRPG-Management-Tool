@@ -8757,7 +8757,8 @@ const SHEET_TEMPLATES = {
       { id: 'cyphers', label: '사이퍼 (Cyphers)', repeatable: true, fields: [
         { id: 'name', label: '이름', type: 'text' },
         { id: 'level', label: '레벨', type: 'number' },
-        { id: 'form', label: '형태', type: 'text' },
+        { id: 'form', label: '형태', type: 'select', options: ['미지정 Unspecified', '사이퍼 Cypher', '발현 Manifest'] },
+        { id: 'active', label: '활성화', type: 'checkbox' },
         { id: 'effect', label: '효과', type: 'text' },
       ]},
       { id: 'artifacts', label: '아티팩트 (Artifacts)', repeatable: true, fields: [
