@@ -74,6 +74,12 @@ assert.equal(
   nestedHtml.indexOf('본문'),
   '인용 본문의 중첩된 여는 태그 뒤를 들여쓰기 시작점으로 사용해야 합니다.',
 );
+const textAfterHeadingHtml = '<h1><span>기능</span></h1>\n캐릭터가 특정한 일을<span id="marker"></span>';
+assert.equal(
+  boundaryContext.tbFindIndentBoundaryIndex(textAfterHeadingHtml, textAfterHeadingHtml.indexOf('<span id="marker"')),
+  textAfterHeadingHtml.indexOf('캐릭터'),
+  '제목 뒤 첫 본문 줄은 줄바꿈 다음 위치부터 들여써야 합니다.',
+);
 
 const indentStart = html.indexOf('function tbIndent(dir) {');
 const indentEnd = html.indexOf('function tbGetCEFormatRange', indentStart);

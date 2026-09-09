@@ -24110,7 +24110,7 @@ function tbSkipOpeningIndentBlocks(html, boundaryIndex) {
 }
 function tbFindIndentBoundaryIndex(html, markerIndex) {
   const beforeMarker = html.slice(0, markerIndex);
-  const boundaryRegex = /(?:<br\s*\/?>|<\/div>|<\/p>|<\/li>|<\/h1>|<\/h2>|<\/h3>|<\/h4>|<\/blockquote>)/gi;
+  const boundaryRegex = /(?:<br\s*\/?>|<\/div>|<\/p>|<\/li>|<\/h1>|<\/h2>|<\/h3>|<\/h4>|<\/blockquote>|\r?\n)/gi;
   let boundaryIndex = 0;
   let match = null;
   while ((match = boundaryRegex.exec(beforeMarker))) {
@@ -24119,7 +24119,7 @@ function tbFindIndentBoundaryIndex(html, markerIndex) {
   return tbSkipOpeningIndentBlocks(html, boundaryIndex);
 }
 function tbFindNextIndentBoundaryIndex(html, fromIndex) {
-  const boundaryRegex = /(?:<br\s*\/?>|<\/div>|<\/p>|<\/li>|<\/h1>|<\/h2>|<\/h3>|<\/h4>|<\/blockquote>)/gi;
+  const boundaryRegex = /(?:<br\s*\/?>|<\/div>|<\/p>|<\/li>|<\/h1>|<\/h2>|<\/h3>|<\/h4>|<\/blockquote>|\r?\n)/gi;
   boundaryRegex.lastIndex = fromIndex;
   const match = boundaryRegex.exec(html);
   if (!match) return -1;
