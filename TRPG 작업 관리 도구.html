@@ -22971,11 +22971,9 @@ function tbApplyCEInlineStyle(prop, val) {
   } catch(e) { return false; }
 }
 document.getElementById('format-bar').addEventListener('mousedown', e => {
-  if (e.target.tagName === 'BUTTON' || e.target.closest('button')) e.preventDefault();
-  if (lastFocusedTA?.contentEditable === 'true') {
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0) savedCERange = sel.getRangeAt(0).cloneRange();
-  }
+  if (!e.target.closest('button')) return;
+  tbCaptureFormatTarget();
+  e.preventDefault();
 });
 
 // ─── 커스텀 컬러 패널 ───
@@ -23388,14 +23386,13 @@ document.addEventListener('keydown', e => {
 function handleFormatIndentShortcut(e) {
   if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
   const editable = e.target?.closest?.('textarea, [contenteditable="true"]');
-  const formatBarVisible = document.getElementById('format-bar')?.classList.contains('visible');
-  if (!editable || !formatBarVisible || !editable.closest('#panel-info.active, #panel-body.active, #rb-chapter-body')) return;
+  if (!editable || !editable.closest('#panel-info.active, #panel-body.active, #rb-chapter-body')) return;
   e.preventDefault();
   lastFocusedTA = editable;
   if (editable.contentEditable === 'true') tbSaveCERange();
   tbIndent(e.shiftKey ? -1 : 1);
 }
-document.addEventListener('keydown', handleFormatIndentShortcut);
+document.addEventListener('keydown', handleFormatIndentShortcut, true);
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault(); tbInsertLink();
@@ -24308,11 +24305,13 @@ function tbIndent(dir) {
   const liveRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
   const common = liveRange?.commonAncestorContainer;
   const commonEl = common?.nodeType === Node.ELEMENT_NODE ? common : common?.parentElement;
-  const target = commonEl?.closest?.('[contenteditable="true"]') || lastFocusedTA;
+  const captured = savedFormatTarget?.type === 'ce' && savedFormatTarget.ta?.isConnected ? savedFormatTarget : null;
+  const target = commonEl?.closest?.('[contenteditable="true"]') || captured?.ta || lastFocusedTA;
   if (!target) return;
   lastFocusedTA = target;
   if (target.contentEditable === 'true') {
     if (liveRange && tbRangeInsideRoot(liveRange, target)) savedCERange = liveRange.cloneRange();
+    else if (captured?.ta === target && captured.range && tbRangeInsideRoot(captured.range, target)) savedCERange = captured.range.cloneRange();
     // 현재 선택 영역이 리스트(ul 또는 ol) 내부라면 브라우저 기본 명령으로 들여쓰기/내어쓰기 수행
     const sel = selection;
     if (sel && sel.rangeCount > 0) {

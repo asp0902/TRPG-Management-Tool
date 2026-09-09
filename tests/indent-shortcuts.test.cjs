@@ -25,7 +25,6 @@ const editor = {
   },
 };
 const context = {
-  document: { getElementById: () => ({ classList: { contains: () => true } }) },
   lastFocusedTA: null,
   tbSaveCERange: () => calls.push('range'),
   tbIndent: direction => calls.push(direction),
@@ -34,6 +33,16 @@ vm.runInNewContext(shortcutFunction, context);
 context.handleFormatIndentShortcut({ key: 'Tab', shiftKey: false, target: editor, preventDefault: () => calls.push('prevented') });
 context.handleFormatIndentShortcut({ key: 'Tab', shiftKey: true, target: editor, preventDefault: () => calls.push('prevented') });
 assert.deepEqual(calls, ['prevented', 'range', 1, 'prevented', 'range', -1]);
+assert.match(
+  html,
+  /document\.addEventListener\('keydown', handleFormatIndentShortcut, true\)/,
+  '중첩 편집기가 이벤트 전파를 막아도 Tab 단축키를 먼저 처리해야 합니다.',
+);
+assert.match(
+  html,
+  /document\.getElementById\('format-bar'\)\.addEventListener\('mousedown', e => \{\s*if \(!e\.target\.closest\('button'\)\) return;\s*tbCaptureFormatTarget\(\);\s*e\.preventDefault\(\);/,
+  '툴바 버튼은 포커스가 이동하기 전에 현재 편집 대상을 저장해야 합니다.',
+);
 
 const boundaryStart = html.indexOf('function tbSkipOpeningIndentBlocks');
 const boundaryEnd = html.indexOf('function tbSkipIndentMarkers', boundaryStart);
@@ -53,7 +62,7 @@ assert.equal(
 const indentStart = html.indexOf('function tbIndent(dir) {');
 const indentEnd = html.indexOf('function tbGetCEFormatRange', indentStart);
 const indentFunction = html.slice(indentStart, indentEnd).trim();
-const selectedEditor = { contentEditable: 'true' };
+const selectedEditor = { contentEditable: 'true', isConnected: true };
 const liveRange = {
   commonAncestorContainer: {
     nodeType: 3,
@@ -67,6 +76,7 @@ const indentContext = {
   window: { getSelection: () => ({ rangeCount: 1, getRangeAt: () => liveRange }) },
   document: { queryCommandState: () => false },
   lastFocusedTA: null,
+  savedFormatTarget: null,
   savedCERange: null,
   tbRangeInsideRoot: () => true,
   tbIndentContentEditable: target => indentTargets.push(target),
@@ -75,5 +85,10 @@ const indentContext = {
 vm.runInNewContext(indentFunction, indentContext);
 indentContext.tbIndent(1);
 assert.equal(indentTargets[0], selectedEditor, '마지막 포커스가 없어도 현재 선택 영역의 편집기를 사용해야 합니다.');
+indentContext.window.getSelection = () => ({ rangeCount: 0 });
+indentContext.lastFocusedTA = null;
+indentContext.savedFormatTarget = { type: 'ce', ta: selectedEditor, range: liveRange };
+indentContext.tbIndent(1);
+assert.equal(indentTargets[1], selectedEditor, '툴바 클릭 전 저장한 편집기와 선택 영역을 사용해야 합니다.');
 
 console.log('indent shortcut checks: OK');
