@@ -1,0 +1,33 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
+
+assert.match(html, /id="tb-indent-btn"[^>]*title="들여쓰기 \(Tab\)"/, '들여쓰기 버튼에 Tab 단축키를 표시해야 합니다.');
+assert.match(html, /id="tb-outdent-btn"[^>]*title="내어쓰기 \(Shift\+Tab\)"/, '내어쓰기 버튼에 Shift+Tab 단축키를 표시해야 합니다.');
+
+const shortcutFunction = html.match(/function handleFormatIndentShortcut\(e\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(shortcutFunction, '들여쓰기 단축키 처리 함수를 찾을 수 없습니다.');
+
+const calls = [];
+const editor = {
+  contentEditable: 'true',
+  closest(selector) {
+    if (selector.includes('contenteditable') || selector.includes('#panel-body')) return this;
+    return null;
+  },
+};
+const context = {
+  document: { getElementById: () => ({ classList: { contains: () => true } }) },
+  lastFocusedTA: null,
+  tbSaveCERange: () => calls.push('range'),
+  tbIndent: direction => calls.push(direction),
+};
+vm.runInNewContext(shortcutFunction, context);
+context.handleFormatIndentShortcut({ key: 'Tab', shiftKey: false, target: editor, preventDefault: () => calls.push('prevented') });
+context.handleFormatIndentShortcut({ key: 'Tab', shiftKey: true, target: editor, preventDefault: () => calls.push('prevented') });
+assert.deepEqual(calls, ['prevented', 'range', 1, 'prevented', 'range', -1]);
+
+console.log('indent shortcut checks: OK');

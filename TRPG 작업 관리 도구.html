@@ -7144,8 +7144,8 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
       <!-- 글머리 기호 / 번호 목록 / 들여쓰기 / 내어쓰기 -->
       <button class="tb-btn" id="tb-list-ul-btn" onclick="tbInsertBullet()" title="글머리 기호"><i class="fa-solid fa-list-ul"></i></button>
       <button class="tb-btn" id="tb-list-ol-btn" onclick="tbInsertNumbered()" title="번호 목록"><i class="fa-solid fa-list-ol"></i></button>
-      <button class="tb-btn" id="tb-indent-btn" onclick="tbIndent(1)" title="들여쓰기"><i class="fa-solid fa-indent"></i></button>
-      <button class="tb-btn" id="tb-outdent-btn" onclick="tbIndent(-1)" title="내어쓰기"><i class="fa-solid fa-outdent"></i></button>
+      <button class="tb-btn" id="tb-indent-btn" onclick="tbIndent(1)" title="들여쓰기 (Tab)"><i class="fa-solid fa-indent"></i></button>
+      <button class="tb-btn" id="tb-outdent-btn" onclick="tbIndent(-1)" title="내어쓰기 (Shift+Tab)"><i class="fa-solid fa-outdent"></i></button>
       <div class="tb-sep"></div>
       <!-- 줄간격 -->
       <select class="tb-select tb-select-lh" id="tb-lh" onchange="tbLineHeight(this.value)" title="줄간격">
@@ -9538,19 +9538,6 @@ function focusBlockEditableAfterRender(blockId, selector, caret = 'start') {
   sel?.removeAllRanges();
   sel?.addRange(range);
   return ce;
-}
-function moveBibRollHeaderFocus(currentEl, reverse = false) {
-  if (!currentEl?.matches?.('.bib-roll-target[contenteditable="true"], .bib-roll-skill[contenteditable="true"]')) return false;
-  const header = currentEl.closest('.bib-roll-header');
-  if (!header) return false;
-  const fields = Array.from(header.querySelectorAll('.bib-roll-target[contenteditable="true"], .bib-roll-skill[contenteditable="true"]'))
-    .filter(el => el.isConnected && el.getClientRects().length > 0);
-  const idx = fields.indexOf(currentEl);
-  if (idx < 0) return false;
-  const nextEl = fields[idx + (reverse ? -1 : 1)];
-  if (!nextEl) return false;
-  placeCaretAtEnd(nextEl);
-  return true;
 }
 function findHistoryFocusTarget(target) {
   if (!target) return null;
@@ -23238,67 +23225,17 @@ document.addEventListener('keydown', e => {
   else if (e.key === '`') { e.preventDefault(); isCE() ? tbApplyCEInlineStyle('textDecoration','line-through') : tbWrap('text-decoration:line-through'); }
 });
 
-document.addEventListener('keydown', e => {
-  if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey) return;
-  const ce = e.target?.closest?.('[contenteditable="true"]');
-  const ta = e.target?.tagName === 'TEXTAREA' ? e.target : null;
-  if (!ce && !ta) return;
-
-  // 현재 커서가 리스트(li) 내부에 있는지 확인
-  const isInsideList = (() => {
-    if (!ce) return false;
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return false;
-    const node = sel.getRangeAt(0).commonAncestorContainer;
-    return !!(node.nodeType === 1 ? node : node.parentElement).closest('li');
-  })();
-
-  if (ce && moveBibRollHeaderFocus(ce, e.shiftKey)) {
-    e.preventDefault();
-    return;
-  }
-  const infoPanel = e.target?.closest?.('#panel-info');
-  if (infoPanel && !isInsideList) { // 리스트 내부가 아닐 때만 필드 간 이동 수행
-    const activeField = e.target?.closest?.('input, textarea, select, [contenteditable="true"]');
-    const focusables = Array.from(infoPanel.querySelectorAll('input, textarea, select, [contenteditable="true"]'))
-      .filter(el => {
-        if (!el || el.disabled) return false;
-        if (el.getAttribute('type') === 'hidden') return false;
-        if (!el.isConnected) return false;
-        let cur = el;
-        while (cur && cur !== infoPanel) {
-          const style = window.getComputedStyle(cur);
-          if (style.display === 'none' || style.visibility === 'hidden') return false;
-          cur = cur.parentElement;
-        }
-        return el.getClientRects().length > 0;
-      });
-    const idx = focusables.indexOf(activeField);
-    if (idx >= 0) {
-      e.preventDefault();
-      const nextIdx = e.shiftKey ? idx - 1 : idx + 1;
-      const nextEl = focusables[nextIdx];
-      if (nextEl) {
-        nextEl.focus();
-        if (nextEl.tagName === 'TEXTAREA' || nextEl.tagName === 'INPUT') {
-          nextEl.select?.();
-        } else if (nextEl.getAttribute('contenteditable') === 'true') {
-          const sel = window.getSelection();
-          const range = document.createRange();
-          range.selectNodeContents(nextEl);
-          range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
-      }
-      return;
-    }
-  }
+function handleFormatIndentShortcut(e) {
+  if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+  const editable = e.target?.closest?.('textarea, [contenteditable="true"]');
+  const formatBarVisible = document.getElementById('format-bar')?.classList.contains('visible');
+  if (!editable || !formatBarVisible || !editable.closest('#panel-info.active, #panel-body.active, #rb-chapter-body')) return;
   e.preventDefault();
-  lastFocusedTA = ce || ta;
-  if (ce) tbSaveCERange();
+  lastFocusedTA = editable;
+  if (editable.contentEditable === 'true') tbSaveCERange();
   tbIndent(e.shiftKey ? -1 : 1);
-});
+}
+document.addEventListener('keydown', handleFormatIndentShortcut);
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault(); tbInsertLink();
