@@ -49,7 +49,6 @@ assert.match(html, /data-section-id="cyphers"\]\s+td:nth-child\(1\) \{ width: 19
 assert.match(html, /data-section-id="cyphers"\]\s+td:nth-child\(2\) \{ width: 52px; min-width: 52px; max-width: 52px;/);
 assert.match(html, /data-section-id="cyphers"\]\s+td:nth-child\(6\) \{ width: 40px; min-width: 40px; max-width: 40px;/);
 assert.match(html, /data-section-id="cyphers"\]\s+td:nth-child\(4\) \{ width: 104px; \}/);
-assert.match(html, /function openSheetOptionPopup\(event, title, options\)/);
 assert.match(html, /isCompletedCypherRow[\s\S]*?class="is-complete"/);
 assert.match(html, /tbody tr\.is-complete \.sh-repeat-input \{ color: #999; text-decoration: line-through; \}/);
 assert.match(html, /data-section-id="cyphers"\]\s+tbody td \{ border-bottom: none; \}/);
@@ -59,5 +58,11 @@ assert.match(html, /saveSheetField[\s\S]*?"cypherMeta","limit",this\.value/);
 assert.match(html, /sh-cypher-status-row \{ display: grid; grid-template-columns: minmax\(320px, 1fr\) minmax\(0, 2fr\);/);
 assert.match(html, /tpl\.key === 'cypher' && sec\.id === 'pools'[\s\S]*?renderNumeneraPoolsSection[\s\S]*?renderCypherDamageRecoverySection/);
 assert.match(html, /tpl\.key === 'cypher' && sec\.id === 'damageRecovery'\) return ''/);
+assert.match(html, /openSheetOptionPopup\(event, title, options, menuClass\)/);
+assert.match(html, /recoveryHelpHandler[\s\S]*?sh-cypher-recovery-help-menu/);
+assert.match(html, /상처를 치료하는 네 가지 방법:[\s\S]*?Four ways to heal wounds:/);
+assert.doesNotMatch(html, /sh-cypher-recovery-description/);
+assert.match(html, /data-section-id="cyphers"\]\s+\.sh-field-textarea\.auto-grow \{ min-height: 28px; line-height: normal; \}/);
+assert.match(html, /var minHeight = parseFloat\(getComputedStyle\(el\)\.minHeight\) \|\| 34;/);
 
 console.log('cypher skill checks: OK');

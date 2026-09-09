@@ -6855,6 +6855,11 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-option-help-menu .tb-ctx-item.disabled { color: #222; }
 .sh-option-help-menu .tb-ctx-item.disabled .tb-ctx-icon { display: none; }
 .sh-option-help-menu .tb-ctx-item.disabled .tb-ctx-main { gap: 0; }
+.sh-cypher-recovery-help-menu { width: min(520px, calc(100vw - 16px)); }
+.sh-cypher-recovery-help-menu .tb-ctx-item.disabled { align-items: flex-start; color: #222; line-height: 1.55; white-space: normal; }
+.sh-cypher-recovery-help-menu .tb-ctx-item.disabled .tb-ctx-main { display: block; width: 100%; }
+.sh-cypher-recovery-help-menu .tb-ctx-item.disabled .tb-ctx-icon { display: none; }
+.sh-cypher-recovery-help-menu .tb-ctx-label { overflow-wrap: anywhere; white-space: normal; }
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] { table-layout: fixed; }
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] thead th { text-align: center; }
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(1),
@@ -6869,6 +6874,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(3),
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(4),
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(4) { width: 104px; }
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] .sh-field-textarea.auto-grow { min-height: 28px; line-height: normal; }
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] tbody td { border-bottom: none; }
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] tbody tr.is-complete .sh-repeat-input { color: #999; text-decoration: line-through; }
 .ar2e-sk-list { display: flex; flex-direction: column; gap: 10px; }
@@ -6968,9 +6974,6 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-cypher-check input, .sh-cypher-recovery-check input { width: 17px; height: 17px; margin: 0; cursor: pointer; accent-color: #111; }
 .sh-cypher-recovery-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
 .sh-cypher-recovery-check { justify-content: center; font-size: 11px; color: #555; white-space: nowrap; }
-.sh-cypher-recovery-description { font-size: 11px; line-height: 1.6; color: #666; }
-.sh-cypher-recovery-description p { margin: 0; }
-.sh-cypher-recovery-description p + p { margin-top: 6px; }
 @media(max-width:760px) {
   .sh-cypher-status-row { grid-template-columns: 1fr; }
   .sh-cypher-damage-recovery { grid-template-columns: 1fr; }
@@ -35094,7 +35097,7 @@ function normalizeUnsungDuetSheetData(data) {
   return data;
 }
 
-function openSheetOptionPopup(event, title, options) {
+function openSheetOptionPopup(event, title, options, menuClass) {
   if (!event || !event.currentTarget || !Array.isArray(options)) return;
   event.preventDefault();
   event.stopPropagation();
@@ -35102,7 +35105,7 @@ function openSheetOptionPopup(event, title, options) {
   var items = [{ heading: title }].concat(options.map(function(label) {
     return { label: label, disabled: true };
   }));
-  tbShowCtxMenu(rect.left, rect.bottom + 4, items, { menuClass: 'sh-option-help-menu' });
+  tbShowCtxMenu(rect.left, rect.bottom + 4, items, { menuClass: menuClass || 'sh-option-help-menu' });
 }
 
 function renderCharacterSheet(chId) {
@@ -37644,8 +37647,9 @@ function autoResizeDnd5ePersonalityTextarea(el) {
 
 function autoResizeSheetTextarea(el) {
   if (!el) return;
+  var minHeight = parseFloat(getComputedStyle(el).minHeight) || 34;
   el.style.height = 'auto';
-  el.style.height = Math.max(34, el.scrollHeight) + 'px';
+  el.style.height = Math.max(minHeight, el.scrollHeight) + 'px';
 }
 
 const _ARIANRHOD2E_ABILITIES = [
@@ -37890,13 +37894,16 @@ function renderCypherDamageRecoverySection(sec, sectionData, chId, sheetId) {
   var recoveryHtml = recoveryItems.map(function(item) {
     return '<label class="sh-cypher-recovery-check"><input type="checkbox" aria-label="회복 ' + esc(item.label) + '"' + (isSheetCheckboxChecked(sectionData[item.id]) ? ' checked' : '') + ' onchange="' + esc(saveHandler(item.id)) + '"><span>' + esc(item.label) + '</span></label>';
   }).join('');
+  var recoveryHelp = [
+    '상처를 치료하는 네 가지 방법: 집결(Rally), 치료(Treatment), 휴식(Rest), 그리고 특별한 치유 능력(Exceptional healing abilities). 만약 마지막 행동(Last action)으로 \'1행동 회복(One-action recovery)\'을 사용한다면 +2점을 얻습니다.',
+    'Four ways to heal wounds: rally, treatment, rest, and exceptional healing abilities. +2 points if one-action recovery is taken as Last action.',
+  ];
+  var recoveryHelpHandler = 'openSheetOptionPopup(event,"회복 RECOVERY",' + JSON.stringify(recoveryHelp) + ',"sh-cypher-recovery-help-menu")';
   return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div><div class="sh-section-body">'
     + '<div class="sh-cypher-damage-recovery">'
       + '<div class="sh-cypher-damage-pane"><div class="sh-cypher-track-title">상처 WOUNDS</div><div class="sh-cypher-wound-list">' + woundsHtml + '</div></div>'
-      + '<div class="sh-cypher-recovery-pane"><div class="sh-cypher-track-title"><span>회복 RECOVERY</span><span class="sh-cypher-recovery-roll">1D6+1</span></div>'
+      + '<div class="sh-cypher-recovery-pane"><div class="sh-cypher-track-title"><button type="button" class="sh-repeat-option-help" onclick="' + esc(recoveryHelpHandler) + '" aria-haspopup="true">회복 RECOVERY</button><span class="sh-cypher-recovery-roll">1D6+1</span></div>'
         + '<div class="sh-cypher-recovery-list">' + recoveryHtml + '</div>'
-        + '<div class="sh-cypher-recovery-description"><p>상처를 치료하는 네 가지 방법: 집결(Rally), 치료(Treatment), 휴식(Rest), 그리고 특별한 치유 능력(Exceptional healing abilities). 만약 마지막 행동(Last action)으로 \'1행동 회복(One-action recovery)\'을 사용한다면 +2점을 얻습니다.</p>'
-        + '<p>Four ways to heal wounds: rally, treatment, rest, and exceptional healing abilities. +2 points if one-action recovery is taken as Last action.</p></div>'
       + '</div>'
     + '</div></div></div>';
 }
