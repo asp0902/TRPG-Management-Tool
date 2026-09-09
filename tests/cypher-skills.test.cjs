@@ -20,6 +20,16 @@ assert.deepEqual(options, [
 assert.match(skills, /label: '기능 SKILLS'/);
 assert.match(skills, /id: 'level'[\s\S]*?optionLabels: \['미숙', '연습함', '훈련됨', '전문화됨', '전문가'\], optionPopup: true/);
 assert.match(skills, /id: 'pool'[\s\S]*?optionLabels: \['없음', '힘', '속도', '지성'\], optionPopup: true/);
+assert.match(skills, /id: 'asset', label: '보조'/);
+assert.match(skills, /id: 'proficiency', label: '숙련도'/);
+assert.match(skills, /id: 'source', label: '출처'/);
+assert.match(skills, /id: 'note', label: '설명'/);
+
+const abilitiesStart = html.indexOf("{ id: 'abilities'", skillsEnd);
+const abilitiesEnd = html.indexOf("{ id: 'advancement'", abilitiesStart);
+const abilities = html.slice(abilitiesStart, abilitiesEnd);
+assert.match(abilities, /label: '어빌리티 ABILITIES'/);
+assert.match(abilities, /id: 'cost', label: '비용', type: 'select', options: \['비용 없음 No cost', '고정 비용 Fixed', '가변 비용 Variable'\], optionLabels: \['없음', '고정', '가변'\], optionPopup: true/);
 assert.match(html, /'무능 \(Inability\)': '미숙 INABILITY'/);
 assert.match(html, /'전문화 \(Specialized\)': '전문화됨 SPECIALIZED'/);
 
