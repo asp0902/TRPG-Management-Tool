@@ -17,6 +17,9 @@ assert.deepEqual(options, [
   '전문화됨 SPECIALIZED',
   '전문가 EXPERT',
 ]);
+assert.match(skills, /label: '기능 SKILLS'/);
+assert.match(skills, /id: 'level'[\s\S]*?optionLabels: \['미숙', '연습함', '훈련됨', '전문화됨', '전문가'\], optionPopup: true/);
+assert.match(skills, /id: 'pool'[\s\S]*?optionLabels: \['없음', '힘', '속도', '지성'\], optionPopup: true/);
 assert.match(html, /'무능 \(Inability\)': '미숙 INABILITY'/);
 assert.match(html, /'전문화 \(Specialized\)': '전문화됨 SPECIALIZED'/);
 
