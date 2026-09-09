@@ -24,8 +24,9 @@ const cyphersStart = html.indexOf("{ id: 'cyphers'", cypherStart);
 const cyphersEnd = html.indexOf("{ id: 'artifacts'", cyphersStart);
 const cyphers = html.slice(cyphersStart, cyphersEnd);
 assert.match(cyphers, /id: 'form', label: '형태', type: 'select', options: \['미지정 Unspecified', '사이퍼 Cypher', '발현 Manifest'\]/);
+assert.match(cyphers, /id: 'powerTier', label: '등급', type: 'select', options: \['등급 없음 NO POWER TIER', '하급 LOW', '중급 MEDIUM', '상급 HIGH', '고급 ADVANCED', '최상급 ULTRA', '규격 외 NONSTANDARD'\]/);
 assert.match(cyphers, /id: 'active', label: '활성화', type: 'checkbox'/);
 assert.match(cyphers, /id: 'effect', label: '효과', type: 'textarea', autoGrow: true/);
-assert.match(html, /data-section-id="cyphers"\]\s+th:nth-child\(2\)[\s\S]*?td:nth-child\(4\) \{ width: 52px; min-width: 52px; max-width: 52px;/);
+assert.match(html, /data-section-id="cyphers"\]\s+th:nth-child\(2\)[\s\S]*?td:nth-child\(5\) \{ width: 52px; min-width: 52px; max-width: 52px;/);
 
 console.log('cypher skill checks: OK');

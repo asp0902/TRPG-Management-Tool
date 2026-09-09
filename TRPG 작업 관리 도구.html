@@ -6848,10 +6848,12 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] { table-layout: fixed; }
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(2),
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(2),
-.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(4),
-.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(4) { width: 52px; min-width: 52px; max-width: 52px; text-align: center; }
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(5),
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(5) { width: 52px; min-width: 52px; max-width: 52px; text-align: center; }
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(3),
-.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(3) { width: 190px; }
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(3),
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(4),
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(4) { width: 190px; }
 .ar2e-sk-list { display: flex; flex-direction: column; gap: 10px; }
 .ar2e-sk-card { position: relative; border: 1px solid #e4e4e4; border-radius: 8px; padding: 12px 14px; background: #fff; }
 .ar2e-sk-line1 { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end; padding-right: 44px; }
@@ -8765,6 +8767,7 @@ const SHEET_TEMPLATES = {
         { id: 'name', label: '이름', type: 'text' },
         { id: 'level', label: '레벨', type: 'number' },
         { id: 'form', label: '형태', type: 'select', options: ['미지정 Unspecified', '사이퍼 Cypher', '발현 Manifest'] },
+        { id: 'powerTier', label: '등급', type: 'select', options: ['등급 없음 NO POWER TIER', '하급 LOW', '중급 MEDIUM', '상급 HIGH', '고급 ADVANCED', '최상급 ULTRA', '규격 외 NONSTANDARD'] },
         { id: 'active', label: '활성화', type: 'checkbox' },
         { id: 'effect', label: '효과', type: 'textarea', autoGrow: true },
       ]},
