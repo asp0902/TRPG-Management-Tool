@@ -2412,6 +2412,35 @@ tr.ct-row-end .ct-select:focus {
 /* ─── MAIN ─── */
 #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
+/* ─── PAGE TABS ─── */
+.app-page-tabs {
+  height: 36px; flex-shrink: 0; display: flex; align-items: flex-end; gap: 2px;
+  padding: 4px 8px 0; overflow-x: auto; overflow-y: hidden;
+  background: #e7e8ea; border-bottom: 1px solid #d2d3d5;
+  scrollbar-width: thin;
+}
+.app-page-tab {
+  flex: 0 0 auto; width: 150px; max-width: min(150px, 42vw); height: 31px;
+  display: flex; align-items: center; gap: 6px; padding: 0 7px 0 12px;
+  color: #666; background: #d9dade; border: 1px solid transparent; border-bottom: 0;
+  border-radius: 7px 7px 0 0; cursor: pointer; user-select: none;
+}
+.app-page-tab:hover { background: #e1e2e5; color: #333; }
+.app-page-tab.active {
+  color: #111; background: #fff; border-color: #d2d3d5;
+}
+.app-page-tab-label {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; font-weight: 800; letter-spacing: 0;
+}
+.app-page-tab-close {
+  width: 20px; height: 20px; flex: 0 0 20px; display: grid; place-items: center;
+  padding: 0; color: #777; background: transparent; border: 0; border-radius: 4px;
+  cursor: pointer; font-size: 11px;
+}
+.app-page-tab-close:hover { color: #111; background: rgba(0,0,0,0.09); }
+.app-page-tab:focus-visible, .app-page-tab-close:focus-visible { outline: 2px solid #555; outline-offset: -2px; }
+
 /* ─── TOPBAR ─── */
 #topbar {
   background: #fff; border-bottom: 1px solid var(--border);
@@ -7034,6 +7063,8 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 
 <!-- MAIN -->
 <div id="main">
+
+  <div class="app-page-tabs" id="app-page-tabs" role="tablist" aria-label="열린 페이지"></div>
 
   <!-- TOPBAR -->
   <div id="topbar">
@@ -28564,6 +28595,63 @@ const CSS_MACRO_PAGE_LABELS = {
   character: 'CHARACTER',
   datasheet: 'DATA SHEET',
 };
+const APP_OPEN_PAGES_KEY = 'trpg-open-pages';
+function normalizeAppPages(pages) {
+  return Array.isArray(pages)
+    ? pages.filter((page, index) => page !== 'datasheet' && CSS_MACRO_PAGE_LABELS[page] && pages.indexOf(page) === index)
+    : [];
+}
+function loadOpenAppPages() {
+  try {
+    const pages = normalizeAppPages(JSON.parse(localStorage.getItem(APP_OPEN_PAGES_KEY)));
+    return pages.length ? pages : ['script'];
+  } catch (e) {
+    return ['script'];
+  }
+}
+let openAppPages = loadOpenAppPages();
+function saveOpenAppPages() {
+  localStorage.setItem(APP_OPEN_PAGES_KEY, JSON.stringify(normalizeAppPages(openAppPages)));
+}
+function ensureAppPageTab(page) {
+  if (!CSS_MACRO_PAGE_LABELS[page] || openAppPages.includes(page)) return;
+  openAppPages.push(page);
+  saveOpenAppPages();
+}
+function removeAppPageTab(page) {
+  openAppPages = openAppPages.filter(openPage => openPage !== page);
+  saveOpenAppPages();
+  renderAppPageTabs();
+}
+function renderAppPageTabs() {
+  const container = document.getElementById('app-page-tabs');
+  if (!container) return;
+  container.innerHTML = openAppPages.map(page => {
+    const isActive = page === currentPage;
+    const canClose = openAppPages.length > 1 || page !== 'script';
+    return '<div class="app-page-tab' + (isActive ? ' active' : '') + '" role="tab" tabindex="0"'
+      + ' aria-selected="' + isActive + '" data-page="' + page + '">'
+      + '<span class="app-page-tab-label">' + CSS_MACRO_PAGE_LABELS[page] + '</span>'
+      + (canClose ? '<button class="app-page-tab-close" type="button" data-page="' + page
+        + '" title="탭 닫기" aria-label="' + CSS_MACRO_PAGE_LABELS[page] + ' 탭 닫기"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>' : '')
+      + '</div>';
+  }).join('');
+  container.querySelector('.app-page-tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
+function closeAppPageTab(page) {
+  const index = openAppPages.indexOf(page);
+  if (index < 0) return;
+  if (openAppPages.length === 1) {
+    openAppPages = ['script'];
+    saveOpenAppPages();
+    switchPage('script');
+    return;
+  }
+  openAppPages.splice(index, 1);
+  saveOpenAppPages();
+  if (page === currentPage) switchPage(openAppPages[Math.min(index, openAppPages.length - 1)]);
+  else renderAppPageTabs();
+}
 /* const CSS_MACRO_PAGE_TITLES = {
   scenario: '시나리오 목록',
   record: '세션 기록',
@@ -28581,7 +28669,9 @@ const CSS_MACRO_PAGE_TITLES = {
 function switchPage(page) {
   // 데이터 시트는 _dsEditId 휘발성에 의존하므로 직접 진입 불가 → 룰북으로 리다이렉트
   if (page === 'datasheet' && !findDataSheet(_dsEditId)) page = 'rulebook';
+  ensureAppPageTab(page);
   currentPage = page;
+  renderAppPageTabs();
   // datasheet는 새로고침 후 복구 불가하므로 last-page에 저장하지 않음
   if (page !== 'datasheet') localStorage.setItem('trpg-last-page', page);
   closeCssPopupDictionary();
@@ -28711,7 +28801,7 @@ async function bootstrapApp() {
   }
   // 마지막 페이지 복원
   const _lastPage = localStorage.getItem('trpg-last-page');
-  if (_lastPage && _lastPage !== 'script') switchPage(_lastPage);
+  switchPage(_lastPage && CSS_MACRO_PAGE_LABELS[_lastPage] && _lastPage !== 'datasheet' ? _lastPage : 'script');
   restoreScriptSidePanelWidths();
   await initAutoBackup();
 }
@@ -28726,6 +28816,19 @@ document.getElementById('sidebar-logo-wrap').addEventListener('click', function(
   const item = e.target.closest('.page-dropdown-item');
   if (item) { switchPage(item.dataset.page); return; }
   this.classList.toggle('open');
+});
+document.getElementById('app-page-tabs').addEventListener('click', function(e) {
+  const close = e.target.closest('.app-page-tab-close');
+  if (close) { closeAppPageTab(close.dataset.page); return; }
+  const tab = e.target.closest('.app-page-tab');
+  if (tab) switchPage(tab.dataset.page);
+});
+document.getElementById('app-page-tabs').addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const tab = e.target.closest('.app-page-tab');
+  if (!tab || e.target.closest('.app-page-tab-close')) return;
+  e.preventDefault();
+  switchPage(tab.dataset.page);
 });
 document.addEventListener('mousedown', function(e) {
   const wrap = document.getElementById('sidebar-logo-wrap');
@@ -29500,6 +29603,7 @@ function closeDataSheetEditor() {
   _dsSelectedCellRange = null;
   _dsRowSelectionAnchorIdx = null;
   _dsColSelectionAnchorId = null;
+  removeAppPageTab('datasheet');
   switchPage('rulebook');
 }
 
