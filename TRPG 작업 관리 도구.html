@@ -7154,7 +7154,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
       <!-- 글머리 기호 / 번호 목록 / 들여쓰기 / 내어쓰기 -->
       <button class="tb-btn" id="tb-list-ul-btn" onclick="tbInsertBullet()" title="글머리 기호"><i class="fa-solid fa-list-ul"></i></button>
       <button class="tb-btn" id="tb-list-ol-btn" onclick="tbInsertNumbered()" title="번호 목록"><i class="fa-solid fa-list-ol"></i></button>
-      <button class="tb-btn" id="tb-indent-btn" onclick="tbIndent(1)" title="들여쓰기 (Tab)"><i class="fa-solid fa-indent"></i></button>
+      <button class="tb-btn" id="tb-indent-btn" onclick="tbIndent(1)" title="들여쓰기(Tab)"><i class="fa-solid fa-indent"></i></button>
       <button class="tb-btn" id="tb-outdent-btn" onclick="tbIndent(-1)" title="내어쓰기 (Shift+Tab)"><i class="fa-solid fa-outdent"></i></button>
       <div class="tb-sep"></div>
       <!-- 줄간격 -->
@@ -13060,8 +13060,11 @@ function hydrateQuoteChildBlocks(blockEl, block, cid, depth = 0) {
     wrap.dataset.parentId = quoteId;
     wrap.dataset.mount = 'editor-quote';
     wrap.dataset.empty = '0';
-    ['beforeinput', 'input', 'keydown', 'compositionstart', 'compositionend'].forEach(type => {
+    ['beforeinput', 'input', 'compositionstart', 'compositionend'].forEach(type => {
       wrap.addEventListener(type, event => event.stopPropagation());
+    });
+    wrap.addEventListener('keydown', event => {
+      if (event.key !== 'Tab') event.stopPropagation();
     });
 
     renderBlockListInto(wrap, children, {

@@ -5,8 +5,13 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
 
-assert.match(html, /id="tb-indent-btn"[^>]*title="들여쓰기 \(Tab\)"/, '들여쓰기 버튼에 Tab 단축키를 표시해야 합니다.');
+assert.match(html, /id="tb-indent-btn"[^>]*title="들여쓰기\(Tab\)"/, '들여쓰기 버튼에 Tab 단축키를 표시해야 합니다.');
 assert.match(html, /id="tb-outdent-btn"[^>]*title="내어쓰기 \(Shift\+Tab\)"/, '내어쓰기 버튼에 Shift+Tab 단축키를 표시해야 합니다.');
+assert.match(
+  html,
+  /wrap\.addEventListener\('keydown', event => \{\s*if \(event\.key !== 'Tab'\) event\.stopPropagation\(\);/,
+  '인용 하위 블록의 Tab 키는 공통 들여쓰기 처리기까지 전달되어야 합니다.',
+);
 
 const shortcutFunction = html.match(/function handleFormatIndentShortcut\(e\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(shortcutFunction, '들여쓰기 단축키 처리 함수를 찾을 수 없습니다.');
