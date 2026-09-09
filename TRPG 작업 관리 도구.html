@@ -6854,11 +6854,15 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(2),
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(2),
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(5),
-.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(5) { width: 52px; min-width: 52px; max-width: 52px; text-align: center; }
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(5),
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(6),
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(6) { width: 52px; min-width: 52px; max-width: 52px; text-align: center; }
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(3),
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(3),
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] th:nth-child(4),
 .sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] td:nth-child(4) { width: 104px; }
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] tbody td { border-bottom: none; }
+.sh-repeat-table[data-template-key="cypher"][data-section-id="cyphers"] tbody tr.is-complete .sh-repeat-input { color: #999; text-decoration: line-through; }
 .ar2e-sk-list { display: flex; flex-direction: column; gap: 10px; }
 .ar2e-sk-card { position: relative; border: 1px solid #e4e4e4; border-radius: 8px; padding: 12px 14px; background: #fff; }
 .ar2e-sk-line1 { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end; padding-right: 44px; }
@@ -8768,12 +8772,13 @@ const SHEET_TEMPLATES = {
         { id: 'range', label: '사거리', type: 'text' },
         { id: 'notes', label: '특성', type: 'text' },
       ]},
-      { id: 'cyphers', label: '사이퍼 (Cyphers)', repeatable: true, fields: [
+      { id: 'cyphers', label: '사이퍼 CYPHERS', repeatable: true, fields: [
         { id: 'name', label: '이름', type: 'text' },
         { id: 'level', label: '레벨', type: 'number' },
         { id: 'form', label: '형태', type: 'select', options: ['미지정 Unspecified', '사이퍼 Cypher', '발현 Manifest'], optionLabels: ['미지정', '사이퍼', '발현'], optionPopup: true },
         { id: 'powerTier', label: '등급', type: 'select', options: ['등급 없음 NO POWER TIER', '하급 LOW', '중급 MEDIUM', '상급 HIGH', '고급 ADVANCED', '최상급 ULTRA', '규격 외 NONSTANDARD'], optionLabels: ['등급 없음', '하급', '중급', '상급', '고급', '최상급', '규격 외'], optionPopup: true },
         { id: 'active', label: '활성화', type: 'checkbox' },
+        { id: 'completed', label: '완료', type: 'checkbox' },
         { id: 'effect', label: '효과', type: 'textarea', autoGrow: true },
       ]},
       { id: 'artifacts', label: '아티팩트 (Artifacts)', repeatable: true, fields: [
@@ -35232,6 +35237,7 @@ function renderCharacterSheet(chId) {
         return '<th>' + esc(f.label) + '</th>';
       }).join('') + '<th style="width:28px;"></th>';
       var rowsHtml = rows.map(function(row, rowIdx) {
+        var isCompletedCypherRow = tpl.key === 'cypher' && sec.id === 'cyphers' && isSheetCheckboxChecked(row.completed);
         var cells = sec.fields.map(function(f) {
           var defaultVal = f.type === 'checkbox' ? false : ((f.type === 'select' && Array.isArray(f.options) && f.options.length) ? f.options[0] : '');
           var val = row[f.id] !== undefined ? row[f.id] : defaultVal;
@@ -35249,6 +35255,7 @@ function renderCharacterSheet(chId) {
           }
           if (f.type === 'checkbox') {
             var checkHandler = 'saveSheetRepeatCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + rowIdx + ',' + JSON.stringify(f.id) + ',this.checked)';
+            if (tpl.key === 'cypher' && sec.id === 'cyphers' && f.id === 'completed') checkHandler += ';this.closest("tr").classList.toggle("is-complete",this.checked)';
             return '<td class="sh-repeat-check-cell"><label class="sh-repeat-check"><input type="checkbox"' + (isSheetCheckboxChecked(val) ? ' checked' : '') + ' onchange="' + esc(checkHandler) + '"' + extraAttr + '></label></td>';
           }
           if (f.type === 'select' && Array.isArray(f.options)) {
@@ -35266,7 +35273,7 @@ function renderCharacterSheet(chId) {
           return '<td><input class="sh-repeat-input" type="' + (f.type === 'number' ? 'number' : 'text') + '" value="' + esc(String(val)) + '" oninput="' + esc(handler) + '"' + extraAttr + '></td>';
         }).join('');
         var delHandler = 'removeSheetRow(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + rowIdx + ')';
-        return '<tr>' + cells + '<td><button class="sh-repeat-del" onclick="' + esc(delHandler) + '">✕</button></td></tr>';
+        return '<tr' + (isCompletedCypherRow ? ' class="is-complete"' : '') + '>' + cells + '<td><button class="sh-repeat-del" onclick="' + esc(delHandler) + '">✕</button></td></tr>';
       }).join('');
       var isAr2eSkills = tpl.key === 'arianrhod2e' && sec.id === 'skills';
       var secTitleAttr = sec.tooltip ? ' title="' + esc(sec.tooltip) + '"' : '';
