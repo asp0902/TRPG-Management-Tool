@@ -23386,6 +23386,8 @@ function closeColorPanel(options = {}) {
     else cpTarget.quoteEl.style.removeProperty('background-color');
     if (cpTarget.originalTextColor) cpTarget.quoteEl.style.color = cpTarget.originalTextColor;
     else cpTarget.quoteEl.style.removeProperty('color');
+    if (cpTarget.originalBorderColor) cpTarget.quoteEl.style.borderLeftColor = cpTarget.originalBorderColor;
+    else cpTarget.quoteEl.style.removeProperty('border-left-color');
   }
   panel.style.display = 'none';
   panel.classList.remove('centered');
@@ -25052,11 +25054,20 @@ function getQuoteTextColor(background) {
   const blue = parseInt(hex.slice(4, 6), 16);
   return red * 0.299 + green * 0.587 + blue * 0.114 > 165 ? '#202124' : '#f5f5f5';
 }
+function getQuoteAccentColor(background) {
+  const color = normalizePickerColor(background, EDITOR_QUOTE_DEFAULT_BACKGROUND);
+  const contrast = getQuoteTextColor(color);
+  const channel = offset => Math.round(
+    parseInt(color.slice(offset, offset + 2), 16) * 0.7 + parseInt(contrast.slice(offset, offset + 2), 16) * 0.3
+  ).toString(16).padStart(2, '0');
+  return `#${channel(1)}${channel(3)}${channel(5)}`;
+}
 function applyQuoteBlockBackground(quoteEl, background) {
   if (!quoteEl?.style) return;
   const color = normalizePickerColor(background, EDITOR_QUOTE_DEFAULT_BACKGROUND);
   quoteEl.style.backgroundColor = color;
   quoteEl.style.color = getQuoteTextColor(color);
+  quoteEl.style.borderLeftColor = getQuoteAccentColor(color);
 }
 function getQuoteForRange(root, range) {
   if (!root || !range) return null;
@@ -25297,6 +25308,7 @@ function openQuoteBackgroundPicker(quoteEl) {
     editable,
     originalBackground: quoteEl.style.backgroundColor,
     originalTextColor: quoteEl.style.color,
+    originalBorderColor: quoteEl.style.borderLeftColor,
   };
   cpOpenPanel('quote-bg', color, { centered: true });
 }

@@ -81,12 +81,16 @@ assert.equal(quoteMenuItems[0].label, '개변 추가', '인용 블록 메뉴 첫
 
 const colorFunction = html.match(/function getQuoteTextColor\(background\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(colorFunction, '인용 글자색 계산 함수를 찾을 수 없습니다.');
+const accentFunction = html.match(/function getQuoteAccentColor\(background\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(accentFunction, '인용 라벨 색상 계산 함수를 찾을 수 없습니다.');
 const context = {
   EDITOR_QUOTE_DEFAULT_BACKGROUND: '#303238',
   normalizePickerColor: color => color,
 };
-vm.runInNewContext(`${colorFunction}; result = [getQuoteTextColor('#ffffff'), getQuoteTextColor('#303238')];`, context);
+vm.runInNewContext(`${colorFunction}\n${accentFunction}; result = [getQuoteTextColor('#ffffff'), getQuoteTextColor('#303238')]; accent = getQuoteAccentColor('#e92323');`, context);
 assert.deepEqual(Array.from(context.result), ['#202124', '#f5f5f5']);
+assert.equal(context.accent, '#ed6262', '인용 라벨은 배경색과 같은 계열의 대비색이어야 합니다.');
+assert.match(html, /quoteEl\.style\.borderLeftColor = getQuoteAccentColor\(color\)/, '배경색 변경 시 왼쪽 라벨 색상도 함께 바꿔야 합니다.');
 
 const deleteFunction = html.match(/function deleteQuoteBlock\(quoteEl\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(deleteFunction, '인용 블록 삭제 함수를 찾을 수 없습니다.');
