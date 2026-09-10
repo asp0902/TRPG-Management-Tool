@@ -15,6 +15,13 @@ assert.match(exported, /set\('\.sk-job-used'[\s\S]*?set\('\.sk-interest-used'[\s
 assert.match(html, /document\.addEventListener\('input'[\s\S]*?updateStandaloneCocSkills\(\)/);
 assert.match(html, /if \(tpl\.key === 'coc7e'\)[\s\S]*?skillsSection\.after\(financeSection\)/);
 assert.match(html, /\.sh-coc-skills-table \.sk-name-input\.is-emphasis \{ font-style: italic; \}/);
+assert.match(html, /target\.closest\('#ch-sheet-body'\)\) return true/);
+
+const ledgerAmountFunctions = html.slice(html.indexOf('function normalizeCocWealthLedgerAmount'), html.indexOf('function buildCoc7eWealthCurrencyRow'));
+const ledgerAmountContext = {};
+vm.runInNewContext(`${ledgerAmountFunctions}\nresult = formatCocWealthLedgerAmount('1234567.50');`, ledgerAmountContext);
+assert.equal(ledgerAmountContext.result, '1,234,567.50');
+assert.match(stats, /type="text" inputmode="decimal"[\s\S]*?onblur="this\.value=formatCocWealthLedgerAmount\(this\.value\)"/);
 
 const skillsPreset = html.match(/const _COC7E_SKILLS_PRESET = \[[\s\S]*?\n\];/)?.[0];
 assert.ok(skillsPreset, 'CoC 7판 기능 프리셋을 찾을 수 없습니다.');

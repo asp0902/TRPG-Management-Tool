@@ -24305,6 +24305,7 @@ function tbWrapMacro(css) {
 function shouldUseNativeHistoryShortcut(e) {
   const target = e.target;
   if (!target?.closest) return false;
+  if (target.closest('#ch-sheet-body')) return true;
   const recordModal = document.getElementById('record-form-modal');
   if (recordModal?.classList.contains('open') && target.closest('#record-form-modal')) return true;
   if (target.classList?.contains('btcp-textarea') || target.classList?.contains('btcp-macro-ta')) return true;
@@ -36594,11 +36595,13 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
     + wealthValueCell(wealthInfo.assets.jpy, 'sh-coc-wealth-assets-jpy sh-coc-wealth-cell-right-edge')
     + '</div></div>';
   var balanceRowsHtml = wealthLedgerRows.map(function(row, rowIdx) {
+    function amountCell(fieldId) {
+      var handler = 'saveCocWealthLedgerCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + rowIdx + ',' + JSON.stringify(fieldId) + ',this.value)';
+      return '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" type="text" inputmode="decimal" value="' + esc(formatCocWealthLedgerAmount(row[fieldId])) + '" onfocus="this.value=normalizeCocWealthLedgerAmount(this.value)" oninput="' + esc(handler) + '" onblur="this.value=formatCocWealthLedgerAmount(this.value)"></td>';
+    }
     return '<tr>'
       + '<td><input class="sh-coc-balance-input" type="text" value="' + esc(String(row.usage)) + '" placeholder="" oninput="saveCocWealthLedgerCell(' + esc(JSON.stringify(chId)) + ',' + esc(JSON.stringify(sheetId)) + ',' + esc(JSON.stringify(secId)) + ',' + rowIdx + ',\'usage\',this.value)"></td>'
-      + '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" type="number" step="any" value="' + esc(String(row.income)) + '" placeholder="" oninput="saveCocWealthLedgerCell(' + esc(JSON.stringify(chId)) + ',' + esc(JSON.stringify(sheetId)) + ',' + esc(JSON.stringify(secId)) + ',' + rowIdx + ',\'income\',this.value)"></td>'
-      + '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" type="number" step="any" value="' + esc(String(row.expense)) + '" placeholder="" oninput="saveCocWealthLedgerCell(' + esc(JSON.stringify(chId)) + ',' + esc(JSON.stringify(sheetId)) + ',' + esc(JSON.stringify(secId)) + ',' + rowIdx + ',\'expense\',this.value)"></td>'
-      + '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" type="number" step="any" value="' + esc(String(row.balance)) + '" placeholder="" oninput="saveCocWealthLedgerCell(' + esc(JSON.stringify(chId)) + ',' + esc(JSON.stringify(sheetId)) + ',' + esc(JSON.stringify(secId)) + ',' + rowIdx + ',\'balance\',this.value)"></td>'
+      + amountCell('income') + amountCell('expense') + amountCell('balance')
       + '</tr>';
   }).join('');
   var balancePanel = '<div class="sh-coc-balance-panel">'
@@ -36889,6 +36892,17 @@ function formatCoc7eCurrencyAmount(amount, symbol, suffix) {
     ? num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : num.toLocaleString('en-US');
   return symbol + text + (suffix || '');
+}
+
+function normalizeCocWealthLedgerAmount(value) {
+  return String(value === null || value === undefined ? '' : value).replace(/,/g, '').trim();
+}
+
+function formatCocWealthLedgerAmount(value) {
+  var raw = normalizeCocWealthLedgerAmount(value);
+  var match = raw.match(/^([+-]?)(\d+)(\.\d*)?$/);
+  if (!match) return raw;
+  return match[1] + match[2].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (match[3] || '');
 }
 
 function buildCoc7eWealthCurrencyRow(kind, amount, rates) {
@@ -39005,7 +39019,7 @@ function saveCocWealthLedgerCell(chId, sheetId, sectionId, rowIdx, fieldId, valu
   if (!sheet.data[sectionId] || typeof sheet.data[sectionId] !== 'object' || Array.isArray(sheet.data[sectionId])) sheet.data[sectionId] = {};
   var rows = normalizeCocWealthLedgerRows(sheet.data[sectionId].wealthLedger);
   if (!rows[rowIdx]) rows[rowIdx] = { usage: '', income: '', expense: '', balance: '' };
-  rows[rowIdx][fieldId] = value;
+  rows[rowIdx][fieldId] = fieldId === 'usage' ? value : normalizeCocWealthLedgerAmount(value);
   sheet.data[sectionId].wealthLedger = rows;
   persist();
 }
