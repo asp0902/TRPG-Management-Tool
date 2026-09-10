@@ -20,6 +20,11 @@ assert.match(html, /id: 'eraType', label: '시대 유형', type: 'select', optio
 assert.match(html, /data-coc-era-select="1"/);
 assert.match(html, /body\[data-coc-era="1920년대"\][\s\S]*?body\[data-coc-era="현대"\][\s\S]*?body\[data-coc-era="기타"\]/);
 assert.match(html, /function updateStandaloneCocEraTheme\(value\)[\s\S]*?document\.body\.dataset\.cocEra = era/);
+assert.match(stats, /sh-coc-wealth-title">현금과 자산/);
+assert.match(stats, /data-coc-ledger-field=/);
+assert.match(stats, /data-coc-ledger-total=/);
+assert.match(exported, /data-coc-ledger-field[\s\S]*?updateStandaloneCocLedgerTotals/);
+assert.match(html, /list = new Array\(3\)\.fill/);
 assert.match(html, /data-section-id="weapons"\]\s+:is\(th, td\):nth-child\(n\+4\):nth-child\(-n\+8\)\s*\{\s*width: 56px; min-width: 56px; max-width: 56px;/);
 assert.match(html, /data-section-id="weapons"\]\s+thead th \{ text-align: center; \}/);
 assert.match(html, /data-section-id="weapons"\]\s*> \.sh-section-hd \{ text-align: center; \}/);
@@ -27,9 +32,20 @@ assert.match(html, /data-section-id="weapons"\]\s+tbody td \{ border-bottom: non
 
 const ledgerAmountFunctions = html.slice(html.indexOf('function normalizeCocWealthLedgerAmount'), html.indexOf('function buildCoc7eWealthCurrencyRow'));
 const ledgerAmountContext = {};
-vm.runInNewContext(`${ledgerAmountFunctions}\nresult = formatCocWealthLedgerAmount('1234567.50');`, ledgerAmountContext);
-assert.equal(ledgerAmountContext.result, '1,234,567.50');
+vm.runInNewContext(`${ledgerAmountFunctions}\nresult = { formatted: formatCocWealthLedgerAmount('1234567.50'), totals: getCocWealthLedgerTotals([{ income: '1,200', expense: '200', balance: '1000' }, { income: '300.5', expense: '50.5', balance: '250' }]) };`, ledgerAmountContext);
+assert.equal(ledgerAmountContext.result.formatted, '1,234,567.50');
+assert.deepEqual({ ...ledgerAmountContext.result.totals }, { income: 1500.5, expense: 250.5, balance: 1250 });
 assert.match(stats, /type="text" inputmode="decimal"[\s\S]*?onblur="this\.value=formatCocWealthLedgerAmount\(this\.value\)"/);
+
+const currencyFormatter = html.match(/function formatCoc7eCurrencyAmount\(amount, symbol, suffix\) \{[\s\S]*?\n\}/)?.[0];
+const currencyContext = {};
+vm.runInNewContext(`${currencyFormatter}\nresult = formatCoc7eCurrencyAmount(1500, '$', '');`, currencyContext);
+assert.equal(currencyContext.result, '$\u00a0\u00a01,500');
+
+const wealthLevelFunctions = html.slice(html.indexOf('function getCoc7eWealthTier'), html.indexOf('function calcCoc7eWealthInfo'));
+const wealthLevelContext = {};
+vm.runInNewContext(`function parseCocSheetNumber(value) { return Number(value) || 0; }\n${wealthLevelFunctions}\nresult = [0, 1, 9, 10, 49, 50, 89, 90, 98, 99].map(value => getCoc7eWealthLevelLabel(getCoc7eWealthTier(value)));`, wealthLevelContext);
+assert.deepEqual(Array.from(wealthLevelContext.result), ['무일푼', '가난', '가난', '보통', '보통', '부유', '부유', '자산가', '자산가', '갑부']);
 
 const skillsPreset = html.match(/const _COC7E_SKILLS_PRESET = \[[\s\S]*?\n\];/)?.[0];
 assert.ok(skillsPreset, 'CoC 7판 기능 프리셋을 찾을 수 없습니다.');
@@ -97,6 +113,7 @@ let inputHandler;
 const context = {
   document: {
     querySelector: () => ({ closest: () => section }),
+    querySelectorAll: () => [],
     addEventListener: (type, handler) => { if (type === 'input') inputHandler = handler; },
     body: { dataset: {} },
   },

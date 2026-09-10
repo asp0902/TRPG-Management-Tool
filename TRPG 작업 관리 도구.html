@@ -6705,12 +6705,13 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-coc-wealth-cell { min-width: 0; padding: 8px 10px; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd; background: #fff; box-sizing: border-box; }
 .sh-coc-wealth-cell-right-edge { border-right: none; }
 .sh-coc-wealth-cell-bottom-edge { border-bottom: none; }
+.sh-coc-wealth-title,
 .sh-coc-wealth-side-title,
 .sh-coc-wealth-row-label,
 .sh-coc-balance-title { background: #f0f0f0; font-size: 12px; font-weight: 800; color: #333; display: flex; align-items: center; justify-content: center; text-align: center; }
+.sh-coc-wealth-title { min-height: 41px; padding: 0 12px; justify-content: flex-start; border-bottom: 1px solid #ddd; }
 .sh-coc-wealth-desc-cell { grid-column: 2 / span 3; display: flex; flex-direction: column; gap: 4px; background: #fcfcfc; }
 .sh-coc-wealth-desc-main { font-size: 12px; font-weight: 700; color: #222; line-height: 1.45; }
-.sh-coc-wealth-desc-meta { font-size: 10px; color: #666; line-height: 1.35; }
 .sh-coc-wealth-currency-cell { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px; }
 .sh-coc-wealth-currency-symbol { font-size: 12px; font-weight: 800; color: #555; }
 .sh-coc-wealth-rate-input { width: 100%; border: none; padding: 0; background: transparent; font-size: 12px; font-family: inherit; color: #222; text-align: center; outline: none; -moz-appearance: textfield; }
@@ -6733,6 +6734,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-coc-balance-input-num { text-align: center; -moz-appearance: textfield; }
 .sh-coc-balance-input-num::-webkit-inner-spin-button,
 .sh-coc-balance-input-num::-webkit-outer-spin-button { -webkit-appearance: none; }
+.sh-coc-balance-total-row td { background: #f7f7f7; padding: 9px 10px; font-size: 12px; font-weight: 800; text-align: center; }
 .sh-coc-balance-col-del { width: 30px; border-right: none !important; }
 .sh-coc-balance-del { background: none; border: none; cursor: pointer; color: #ccc; font-size: 13px; width: 100%; min-height: 31px; display: flex; align-items: center; justify-content: center; transition: color 0.1s; }
 .sh-coc-balance-del:hover { color: #ef4444; background: #fef2f2; }
@@ -34959,6 +34961,16 @@ function updateStandaloneCocEraTheme(value) {
   const label = document.querySelector('.standalone-era-label');
   if (label) label.textContent = era === '기타' ? '기타 시대 탐사자' : era + ' 탐사자';
 }
+function updateStandaloneCocLedgerTotals() {
+  ['income', 'expense', 'balance'].forEach(field => {
+    const total = Array.from(document.querySelectorAll('[data-coc-ledger-field="' + field + '"]')).reduce((sum, input) => {
+      const value = Number(String(input.value || '').replace(/,/g, ''));
+      return sum + (Number.isFinite(value) ? value : 0);
+    }, 0);
+    const target = document.querySelector('[data-coc-ledger-total="' + field + '"]');
+    if (target) target.textContent = total.toLocaleString('en-US', { maximumFractionDigits: 20 });
+  });
+}
 function updateStandaloneCocSkills() {
   const section = document.querySelector('.sh-coc-skills-section-hdr')?.closest('.sh-section');
   if (!section) return;
@@ -34993,11 +35005,13 @@ function updateStandaloneCocSkills() {
 }
 document.addEventListener('input', event => {
   if (event.target.matches('.sk-base-input,.sk-job,.sk-interest,.sk-growth,.sk-job-max,.sk-interest-max,.sk-growth-max')) updateStandaloneCocSkills();
+  if (event.target.matches('[data-coc-ledger-field]')) updateStandaloneCocLedgerTotals();
 });
 document.addEventListener('change', event => {
   if (event.target.matches('[data-coc-era-select]')) updateStandaloneCocEraTheme(event.target.value);
 });
 updateStandaloneCocSkills();
+updateStandaloneCocLedgerTotals();
 updateStandaloneCocEraTheme(document.querySelector('[data-coc-era-select]')?.value || document.body.dataset.cocEra);
 function saveStandaloneCharacterSheet() {
   const copy = document.documentElement.cloneNode(true);
@@ -36661,14 +36675,14 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
     + sanSide + '</div>';
   var wealthInfo = derived.wealth || calcCoc7eWealthInfo(0, '', sectionData);
   var wealthLedgerRows = normalizeCocWealthLedgerRows(sectionData.wealthLedger);
+  var wealthLedgerTotals = getCocWealthLedgerTotals(wealthLedgerRows);
   var miscRow = '<div class="sh-coc-misc-row">'
     + miscInp('armor','장갑',false) + miscDerivedInp('move','이동력',derived.move)
     + miscDerivedInp('damageBonus','피해 보너스',derived.damageBonus) + miscDerivedInp('build','체구',derived.build) + '</div>';
-  var wealthPanel = '<div class="sh-coc-wealth-panel"><div class="sh-coc-wealth-table">'
+  var wealthPanel = '<div class="sh-coc-wealth-panel"><div class="sh-coc-wealth-title">현금과 자산</div><div class="sh-coc-wealth-table">'
     + '<div class="sh-coc-wealth-cell sh-coc-wealth-side-title">재력</div>'
     + '<div class="sh-coc-wealth-cell sh-coc-wealth-desc-cell sh-coc-wealth-cell-right-edge">'
-    + '<div class="sh-coc-wealth-desc-main">' + esc(wealthInfo.desc) + '</div>'
-    + '<div class="sh-coc-wealth-desc-meta">재력 수치 <span class="sh-coc-wealth-credit">' + esc(String(wealthInfo.creditRating)) + '</span> · 기준 시대 <span class="sh-coc-wealth-era">' + esc(wealthInfo.eraType) + '</span></div>'
+    + '<div class="sh-coc-wealth-desc-main">' + esc(wealthInfo.level) + '</div>'
     + '</div>'
     + '<div class="sh-coc-wealth-cell sh-coc-wealth-row-label">환율</div>'
     + wealthRateCell('wealthRateDollar', '$', 1)
@@ -36690,7 +36704,7 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
   var balanceRowsHtml = wealthLedgerRows.map(function(row, rowIdx) {
     function amountCell(fieldId) {
       var handler = 'saveCocWealthLedgerCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + rowIdx + ',' + JSON.stringify(fieldId) + ',this.value)';
-      return '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" type="text" inputmode="decimal" value="' + esc(formatCocWealthLedgerAmount(row[fieldId])) + '" onfocus="this.value=normalizeCocWealthLedgerAmount(this.value)" oninput="' + esc(handler) + '" onblur="this.value=formatCocWealthLedgerAmount(this.value)"></td>';
+      return '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" data-coc-ledger-field="' + esc(fieldId) + '" type="text" inputmode="decimal" value="' + esc(formatCocWealthLedgerAmount(row[fieldId])) + '" onfocus="this.value=normalizeCocWealthLedgerAmount(this.value)" oninput="' + esc(handler) + '" onblur="this.value=formatCocWealthLedgerAmount(this.value)"></td>';
     }
     return '<tr>'
       + '<td><input class="sh-coc-balance-input" type="text" value="' + esc(String(row.usage)) + '" placeholder="" oninput="saveCocWealthLedgerCell(' + esc(JSON.stringify(chId)) + ',' + esc(JSON.stringify(sheetId)) + ',' + esc(JSON.stringify(secId)) + ',' + rowIdx + ',\'usage\',this.value)"></td>'
@@ -36699,7 +36713,7 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
   }).join('');
   var balancePanel = '<div class="sh-coc-balance-panel">'
     + '<div class="sh-coc-balance-titlebar"><div class="sh-coc-balance-title">잔액</div><button class="sh-coc-balance-add" type="button" onclick="addCocWealthLedgerRow(' + esc(JSON.stringify(chId)) + ',' + esc(JSON.stringify(sheetId)) + ',' + esc(JSON.stringify(secId)) + ')">+ 행 추가</button></div>'
-    + '<div class="sh-coc-balance-table-wrap"><table class="sh-coc-balance-table"><thead><tr><th>사용처</th><th>수입</th><th>지출</th><th>잔액</th></tr></thead><tbody>' + balanceRowsHtml + '</tbody></table></div>'
+    + '<div class="sh-coc-balance-table-wrap"><table class="sh-coc-balance-table"><thead><tr><th>사용처</th><th>수입</th><th>지출</th><th>잔액</th></tr></thead><tbody>' + balanceRowsHtml + '</tbody><tfoot><tr class="sh-coc-balance-total-row"><td>합계</td><td data-coc-ledger-total="income">' + esc(formatCocWealthLedgerAmount(wealthLedgerTotals.income)) + '</td><td data-coc-ledger-total="expense">' + esc(formatCocWealthLedgerAmount(wealthLedgerTotals.expense)) + '</td><td data-coc-ledger-total="balance">' + esc(formatCocWealthLedgerAmount(wealthLedgerTotals.balance)) + '</td></tr></tfoot></table></div>'
     + '</div>';
   var rollAllH = 'rollAllCocStats(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ')';
   return '<div class="sh-section">'
@@ -36984,7 +36998,7 @@ function formatCoc7eCurrencyAmount(amount, symbol, suffix) {
   var text = hasFraction
     ? num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : num.toLocaleString('en-US');
-  return symbol + text + (suffix || '');
+  return symbol + '\u00a0\u00a0' + text + (suffix || '');
 }
 
 function normalizeCocWealthLedgerAmount(value) {
@@ -36996,6 +37010,18 @@ function formatCocWealthLedgerAmount(value) {
   var match = raw.match(/^([+-]?)(\d+)(\.\d*)?$/);
   if (!match) return raw;
   return match[1] + match[2].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (match[3] || '');
+}
+
+function getCocWealthLedgerTotals(rows) {
+  var totals = { income: 0, expense: 0, balance: 0 };
+  (Array.isArray(rows) ? rows : []).forEach(function(row) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return;
+    Object.keys(totals).forEach(function(fieldId) {
+      var value = Number(normalizeCocWealthLedgerAmount(row[fieldId]));
+      if (isFinite(value)) totals[fieldId] += value;
+    });
+  });
+  return totals;
 }
 
 function buildCoc7eWealthCurrencyRow(kind, amount, rates) {
@@ -37018,6 +37044,10 @@ function getCoc7eWealthTier(creditRating) {
   return 'tycoon';
 }
 
+function getCoc7eWealthLevelLabel(tier) {
+  return { destitute: '무일푼', poor: '가난', average: '보통', wealthy: '부유', rich: '자산가', tycoon: '갑부' }[tier] || '';
+}
+
 function calcCoc7eWealthInfo(creditRating, eraType, statsData) {
   var cr = parseCocSheetNumber(creditRating);
   var tier = getCoc7eWealthTier(cr);
@@ -37032,7 +37062,7 @@ function calcCoc7eWealthInfo(creditRating, eraType, statsData) {
   var info = {
     creditRating: cr,
     eraType: normalizedEraType,
-    desc: '',
+    level: getCoc7eWealthLevelLabel(tier),
     rates: rates,
     spendingLevel: { usd: '', krw: '', jpy: '' },
     cash: { usd: '', krw: '', jpy: '' },
@@ -37040,37 +37070,31 @@ function calcCoc7eWealthInfo(creditRating, eraType, statsData) {
   };
   switch (tier) {
     case 'destitute':
-      info.desc = '무일푼. 가난한 생활조차 영위하기 어려움.';
       info.spendingLevel = buildCoc7eWealthCurrencyRow('amount', isModern ? 10 : 0.5, rates);
       info.cash = buildCoc7eWealthCurrencyRow('amount', isModern ? 10 : 0.5, rates);
       info.assets = buildCoc7eWealthCurrencyRow('none', 0, rates);
       break;
     case 'poor':
-      info.desc = '가난. 간신히 지붕 밑 등에서 살며 하루 1끼.';
       info.spendingLevel = buildCoc7eWealthCurrencyRow('amount', isModern ? 40 : 2, rates);
       info.cash = buildCoc7eWealthCurrencyRow('amount', cr * (isModern ? 20 : 1), rates);
       info.assets = buildCoc7eWealthCurrencyRow('amount', cr * (isModern ? 200 : 10), rates);
       break;
     case 'average':
-      info.desc = '보통. 하루 3끼, 간간이 호사, 적당히 안락.';
       info.spendingLevel = buildCoc7eWealthCurrencyRow('amount', isModern ? 200 : 10, rates);
       info.cash = buildCoc7eWealthCurrencyRow('amount', cr * (isModern ? 40 : 2), rates);
       info.assets = buildCoc7eWealthCurrencyRow('amount', cr * (isModern ? 1000 : 50), rates);
       break;
     case 'wealthy':
-      info.desc = '부유. 호사와 사치가 가능.';
       info.spendingLevel = buildCoc7eWealthCurrencyRow('amount', isModern ? 1000 : 50, rates);
       info.cash = buildCoc7eWealthCurrencyRow('amount', cr * (isModern ? 100 : 5), rates);
       info.assets = buildCoc7eWealthCurrencyRow('amount', cr * (isModern ? 10000 : 500), rates);
       break;
     case 'rich':
-      info.desc = '자산가. 굉장한 사치와 안락을 누릴 수 있음.';
       info.spendingLevel = buildCoc7eWealthCurrencyRow('amount', isModern ? 5000 : 250, rates);
       info.cash = buildCoc7eWealthCurrencyRow('amount', cr * (isModern ? 400 : 20), rates);
       info.assets = buildCoc7eWealthCurrencyRow('amount', cr * (isModern ? 40000 : 2000), rates);
       break;
     default:
-      info.desc = '갑부. 돈 걱정이 전혀 없는, 손꼽히는 부자.';
       info.spendingLevel = buildCoc7eWealthCurrencyRow('amount', isModern ? 100000 : 5000, rates);
       info.cash = buildCoc7eWealthCurrencyRow('amount', isModern ? 1000000 : 50000, rates);
       info.assets = buildCoc7eWealthCurrencyRow('plus', isModern ? 100000000 : 5000000, rates);
@@ -37091,7 +37115,7 @@ function normalizeCocWealthLedgerRows(rows) {
     };
   }) : [];
   if (!list.length) {
-    list = new Array(4).fill(null).map(function() {
+    list = new Array(3).fill(null).map(function() {
       return { usage: '', income: '', expense: '', balance: '' };
     });
   }
@@ -37654,9 +37678,7 @@ function refreshCoc7eDerivedUi(chId, sheetId) {
   setInputValue('[data-coc-derived="move"]', derived.move);
   setInputValue('[data-coc-derived="damageBonus"]', derived.damageBonus);
   setInputValue('[data-coc-derived="build"]', derived.build);
-  setTextValue('.sh-coc-wealth-credit', derived.wealth.creditRating);
-  setTextValue('.sh-coc-wealth-era', derived.wealth.eraType);
-  setTextValue('.sh-coc-wealth-desc-main', derived.wealth.desc);
+  setTextValue('.sh-coc-wealth-desc-main', derived.wealth.level);
   setTextValue('.sh-coc-wealth-spending-usd', derived.wealth.spendingLevel.usd);
   setTextValue('.sh-coc-wealth-spending-krw', derived.wealth.spendingLevel.krw);
   setTextValue('.sh-coc-wealth-spending-jpy', derived.wealth.spendingLevel.jpy);
@@ -39128,6 +39150,12 @@ function saveCocWealthLedgerCell(chId, sheetId, sectionId, rowIdx, fieldId, valu
   rows[rowIdx][fieldId] = fieldId === 'usage' ? value : normalizeCocWealthLedgerAmount(value);
   sheet.data[sectionId].wealthLedger = rows;
   persist();
+  var totals = getCocWealthLedgerTotals(rows);
+  var bodyEl = document.getElementById('ch-sheet-body');
+  ['income', 'expense', 'balance'].forEach(function(totalFieldId) {
+    var totalEl = bodyEl && bodyEl.querySelector('[data-coc-ledger-total="' + totalFieldId + '"]');
+    if (totalEl) totalEl.textContent = formatCocWealthLedgerAmount(totals[totalFieldId]);
+  });
 }
 
 function deleteCocWealthLedgerRow(chId, sheetId, sectionId, rowIdx) {
