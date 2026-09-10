@@ -16,6 +16,10 @@ assert.match(html, /document\.addEventListener\('input'[\s\S]*?updateStandaloneC
 assert.match(html, /if \(tpl\.key === 'coc7e'\)[\s\S]*?skillsSection\.after\(financeSection\)/);
 assert.match(html, /\.sh-coc-skills-table \.sk-name-input\.is-emphasis \{ font-style: italic; \}/);
 assert.match(html, /target\.closest\('#ch-sheet-body'\)\) return true/);
+assert.match(html, /data-section-id="weapons"\]\s+:is\(th, td\):nth-child\(n\+4\):nth-child\(-n\+8\)\s*\{\s*width: 56px; min-width: 56px; max-width: 56px;/);
+assert.match(html, /data-section-id="weapons"\]\s+thead th \{ text-align: center; \}/);
+assert.match(html, /data-section-id="weapons"\]\s*> \.sh-section-hd \{ text-align: center; \}/);
+assert.match(html, /data-section-id="weapons"\]\s+tbody td \{ border-bottom: none; \}/);
 
 const ledgerAmountFunctions = html.slice(html.indexOf('function normalizeCocWealthLedgerAmount'), html.indexOf('function buildCoc7eWealthCurrencyRow'));
 const ledgerAmountContext = {};
