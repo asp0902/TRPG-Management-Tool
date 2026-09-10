@@ -23,8 +23,19 @@ assert.match(html, /function updateStandaloneCocEraTheme\(value\)[\s\S]*?documen
 assert.match(stats, /sh-coc-wealth-title">현금과 자산/);
 assert.match(stats, /data-coc-ledger-field=/);
 assert.match(stats, /data-coc-ledger-total=/);
+assert.doesNotMatch(stats, /sh-coc-balance-add/);
 assert.match(exported, /data-coc-ledger-field[\s\S]*?updateStandaloneCocLedgerTotals/);
-assert.match(html, /list = new Array\(3\)\.fill/);
+assert.match(html, /new Array\(hasStoredRows \? 1 : 3\)\.fill/);
+assert.match(stats, /title="클릭하여 특성치 전체 굴리기"/);
+assert.doesNotMatch(stats, /sh-roll-hint/);
+assert.match(html, /\.sh-sheet-content > \.sh-coc-misc-section \{ border-top: none; padding-top: 0; margin-top: 0; \}/);
+assert.match(html, /\.sh-coc-wealth-title \{ min-height: 33px; padding: 4px 12px; justify-content: center;/);
+assert.match(html, /\.sh-coc-balance-title \{ min-height: 33px; padding: 4px 12px;/);
+assert.match(html, /\.sh-coc-misc-select option \{ text-align: center; \}/);
+assert.match(html, /\.sh-coc-wealth-currency-cell,[\s\S]*?\.sh-coc-wealth-currency-value \{[^}]*grid-template-columns: 1\.25em minmax\(0, 1fr\);[^}]*gap: 6px;/);
+assert.match(stats, /function wealthValueCell\(value, extraCls\)[\s\S]*?buildCoc7eWealthValueHtml\(value\)/);
+assert.match(html, /function setWealthValue\(selector, value\)[\s\S]*?el\.innerHTML = buildCoc7eWealthValueHtml\(value\)/);
+assert.match(html, /setWealthValue\('\.sh-coc-wealth-spending-usd', derived\.wealth\.spendingLevel\.usd\)/);
 assert.match(html, /data-section-id="weapons"\]\s+:is\(th, td\):nth-child\(n\+4\):nth-child\(-n\+8\)\s*\{\s*width: 56px; min-width: 56px; max-width: 56px;/);
 assert.match(html, /data-section-id="weapons"\]\s+thead th \{ text-align: center; \}/);
 assert.match(html, /data-section-id="weapons"\]\s*> \.sh-section-hd \{ text-align: center; \}/);
@@ -32,7 +43,8 @@ assert.match(html, /data-section-id="weapons"\]\s+tbody td \{ border-bottom: non
 assert.match(html, /\.ch-sheet-modal\.sheet-wide-coc7e \{ overflow-x: auto; \}/);
 assert.match(html, /\.ch-sheet-modal\.sheet-wide-coc7e \.ch-sheet-body \{ width: 1220px; min-width: 1220px; max-width: 1220px;/);
 assert.match(html, /\.ch-sheet-modal\.sheet-wide-coc7e \.sh-section-hd,[\s\S]*?font-size: 14px; font-weight: 800; text-align: center;/);
-assert.match(html, /\.sh-coc-skills-table \.sk-row\.is-growth-selected > td \{ background: #e8f0ff; \}/);
+assert.match(html, /\.sh-coc-skills-table \.sk-row\.is-growth-selected > td \{ background: #ececec; \}/);
+assert.match(html, /\.sk-chk \{ display: block; margin: 0 auto; cursor: pointer; \}/);
 assert.match(html, /classList\.toggle\(\\"is-growth-selected\\",this\.checked\)/);
 
 const ledgerAmountFunctions = html.slice(html.indexOf('function normalizeCocWealthLedgerAmount'), html.indexOf('function buildCoc7eWealthCurrencyRow'));
@@ -42,15 +54,55 @@ assert.equal(ledgerAmountContext.result.formatted, '1,234,567.50');
 assert.deepEqual({ ...ledgerAmountContext.result.totals }, { income: 1500.5, expense: 250.5, balance: 1250 });
 assert.match(stats, /type="text" inputmode="decimal"[\s\S]*?onblur="this\.value=formatCocWealthLedgerAmount\(this\.value\)"/);
 
+const ledgerRowsFunction = html.slice(html.indexOf('function normalizeCocWealthLedgerRows'), html.indexOf('function normalizeCocOccupationType'));
+const ledgerCurrencyFunction = html.match(/function normalizeCocWealthLedgerCurrency\(value\) \{[\s\S]*?\n\}/)?.[0];
+const ledgerCrudFunctions = html.slice(html.indexOf('function saveCocWealthLedgerCell'), html.indexOf('// 반복 섹션 셀 저장'));
+const ledgerContext = {
+  state: { characters: [{ id: 'ch', sheets: [{ id: 'sheet', data: { stats: { wealthLedger: [
+    { usage: 'A', income: '', expense: '', balance: '' },
+    { usage: 'B', income: '', expense: '', balance: '' },
+  ] } } }] }] },
+  persistCalls: 0,
+  renderCalls: 0,
+  setTimeout() {},
+};
+ledgerContext.persist = () => { ledgerContext.persistCalls += 1; };
+ledgerContext.renderCharacterSheet = () => { ledgerContext.renderCalls += 1; };
+vm.runInNewContext(`${ledgerRowsFunction}\n${ledgerCurrencyFunction}\n${ledgerCrudFunctions}`, ledgerContext);
+assert.equal(ledgerContext.normalizeCocWealthLedgerRows(undefined).length, 3);
+assert.equal(ledgerContext.normalizeCocWealthLedgerRows([]).length, 1);
+ledgerContext.insertCocWealthLedgerRow('ch', 'sheet', 'stats', 1);
+assert.deepEqual(Array.from(ledgerContext.state.characters[0].sheets[0].data.stats.wealthLedger, row => row.usage), ['A', '', 'B']);
+ledgerContext.setCocWealthLedgerCurrency('ch', 'sheet', 'stats', 'usd');
+assert.equal(ledgerContext.state.characters[0].sheets[0].data.stats.wealthLedgerCurrency, 'usd');
+ledgerContext.deleteCocWealthLedgerRow('ch', 'sheet', 'stats', 0);
+assert.deepEqual(Array.from(ledgerContext.state.characters[0].sheets[0].data.stats.wealthLedger, row => row.usage), ['', 'B']);
+assert.equal(ledgerContext.persistCalls, 3);
+assert.equal(ledgerContext.renderCalls, 3);
+
 const currencyFormatter = html.match(/function formatCoc7eCurrencyAmount\(amount, symbol, suffix\) \{[\s\S]*?\n\}/)?.[0];
 const currencyContext = {};
 vm.runInNewContext(`${currencyFormatter}\nresult = formatCoc7eCurrencyAmount(1500, '$', '');`, currencyContext);
 assert.equal(currencyContext.result, '$\u00a0\u00a01,500');
+const wealthValueBuilder = html.match(/function buildCoc7eWealthValueHtml\(value\) \{[\s\S]*?\n\}/)?.[0];
+const wealthValueContext = { esc: value => String(value) };
+vm.runInNewContext(`${wealthValueBuilder}\nresult = buildCoc7eWealthValueHtml('$ 200');`, wealthValueContext);
+assert.match(wealthValueContext.result, /sh-coc-wealth-currency-symbol">\$<[\s\S]*?sh-coc-wealth-currency-amount">200</);
 
 const wealthLevelFunctions = html.slice(html.indexOf('function getCoc7eWealthTier'), html.indexOf('function calcCoc7eWealthInfo'));
 const wealthLevelContext = {};
 vm.runInNewContext(`function parseCocSheetNumber(value) { return Number(value) || 0; }\n${wealthLevelFunctions}\nresult = [0, 1, 9, 10, 49, 50, 89, 90, 98, 99].map(value => getCoc7eWealthLevelLabel(getCoc7eWealthTier(value)));`, wealthLevelContext);
 assert.deepEqual(Array.from(wealthLevelContext.result), ['무일푼', '가난', '가난', '보통', '보통', '부유', '부유', '자산가', '자산가', '갑부']);
+assert.match(wealthLevelFunctions, /average: '하루 3끼, 간간이 호사, 적당히 안락\.'/);
+assert.match(stats, /sh-coc-wealth-desc-sub/);
+assert.match(html, /\.sh-coc-wealth-desc-sub \{[^}]*font-weight: 400;/);
+assert.match(stats, /data-coc-ledger-currency=/);
+assert.match(stats, /sh-coc-balance-unit/);
+assert.match(stats, /openCocWealthLedgerRowMenu/);
+assert.match(stats, /openCocWealthLedgerCurrencyMenu/);
+assert.match(html, /function normalizeCocWealthLedgerCurrency\(value\)[\s\S]*?return \['krw', 'usd', 'jpy'\]\.includes\(value\) \? value : 'krw'/);
+assert.match(html, /label: '원화 \(₩\)'[\s\S]*?label: '달러 \(\$\)'[\s\S]*?label: '엔화 \(¥\)'/);
+assert.match(html, /label: '위에 삽입'[\s\S]*?label: '아래에 삽입'[\s\S]*?label: '행 삭제'/);
 
 const skillsPreset = html.match(/const _COC7E_SKILLS_PRESET = \[[\s\S]*?\n\];/)?.[0];
 assert.ok(skillsPreset, 'CoC 7판 기능 프리셋을 찾을 수 없습니다.');
@@ -62,9 +114,10 @@ assert.match(html, /sk\.id === 'creditRating' \|\| sk\.id === 'cthulhuMythos'/);
 const supportSection = html.slice(html.indexOf('function renderCoc7eGearRelationsSection'), html.indexOf('// ── D&D 5판 캐릭터 빌더'));
 assert.match(supportSection, /listId === 'possessions' && rightFieldId === 'effect'/);
 assert.match(supportSection, /<textarea class="sh-coc-support-input sh-coc-support-textarea sh-field-textarea"[\s\S]*?data-auto-grow="1"[\s\S]*?autoResizeSheetTextarea\(this\)/);
-assert.match(supportSection, /deleteCocSupportRow/);
-assert.match(supportSection, /class="sh-coc-support-add"/);
-assert.match(supportSection, /class="sh-coc-support-del"/);
+assert.match(supportSection, /openCocSupportRowMenu/);
+assert.match(supportSection, /oncontextmenu=/);
+assert.doesNotMatch(supportSection, /class="sh-coc-support-add"/);
+assert.doesNotMatch(supportSection, /class="sh-coc-support-del"/);
 assert.match(html, /\.sh-coc-support-input\.sh-coc-support-textarea \{[^}]*min-height: 31px;[^}]*overflow: hidden;/);
 assert.match(html, /customType: 'coc7e-gear-relations', rowCount: 3/);
 
@@ -78,10 +131,15 @@ assert.match(html, /\.sh-coc-backstory-grid \.sh-field-textarea \{ flex: 1 1 aut
 
 assert.match(html, /const title = ch\.name \|\| '캐릭터';/);
 assert.match(html, /function addStandaloneCocSkill\(button\)/);
-assert.match(html, /function addStandaloneCocLedgerRow\(button\)/);
-assert.match(html, /function addStandaloneCocSupportRow\(button\)/);
+assert.match(html, /function openStandaloneCocLedgerRowMenu\(event, row\)/);
+assert.match(html, /function openStandaloneCocSupportRowMenu\(event, row\)/);
+assert.match(html, /function openStandaloneCocLedgerCurrencyMenu\(event, button\)/);
+assert.doesNotMatch(html, /function addStandaloneCocLedgerRow\(button\)/);
+assert.doesNotMatch(html, /function addStandaloneCocSupportRow\(button\)/);
 assert.match(html, /\.sh-coc-skills-wrap table \{ table-layout:fixed; \}/);
 assert.match(html, /\.sk-add-btn'\)\.forEach\(el => el\.setAttribute\('onclick', 'addStandaloneCocSkill\(this\)'\)\)/);
+assert.match(html, /\.sh-coc-balance-table tbody tr'\)\.forEach\(el => el\.setAttribute\('oncontextmenu', 'return openStandaloneCocLedgerRowMenu\(event,this\)'\)\)/);
+assert.match(html, /\.sh-coc-support-table tbody tr'\)\.forEach\(el => el\.setAttribute\('oncontextmenu', 'return openStandaloneCocSupportRowMenu\(event,this\)'\)\)/);
 
 const eraNormalizer = html.match(/function normalizeCoc7eEraType\(value\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(eraNormalizer, 'CoC 시대 유형 정규화 함수를 찾을 수 없습니다.');
@@ -161,9 +219,12 @@ const supportContext = {
 };
 supportContext.persist = () => { supportContext.persistCalls += 1; };
 supportContext.renderCharacterSheet = () => { supportContext.renderCalls += 1; };
-vm.runInNewContext(`${supportFunctions}\ndeleteCocSupportRow('ch', 'sheet', 'gearRelations', 'equipment', 1);`, supportContext);
-assert.deepEqual(Array.from(supportContext.state.characters[0].sheets[0].data.gearRelations.equipment, row => row.name), ['A', 'C']);
-assert.equal(supportContext.persistCalls, 1);
-assert.equal(supportContext.renderCalls, 1);
+vm.runInNewContext(supportFunctions, supportContext);
+supportContext.insertCocSupportRow('ch', 'sheet', 'gearRelations', 'equipment', 1, 'name');
+assert.deepEqual(Array.from(supportContext.state.characters[0].sheets[0].data.gearRelations.equipment, row => row.name), ['A', '', 'B', 'C']);
+supportContext.deleteCocSupportRow('ch', 'sheet', 'gearRelations', 'equipment', 2);
+assert.deepEqual(Array.from(supportContext.state.characters[0].sheets[0].data.gearRelations.equipment, row => row.name), ['A', '', 'C']);
+assert.equal(supportContext.persistCalls, 2);
+assert.equal(supportContext.renderCalls, 2);
 
 console.log('CoC 7e sheet checks: OK');

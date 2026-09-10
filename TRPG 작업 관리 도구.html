@@ -6699,7 +6699,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-coc-sanity-side { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; flex: 1 1 420px; }
 .sh-coc-chk-stack { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .sh-coc-misc-section { border-top: 1px solid #ebebeb; padding-top: 12px; margin-top: 10px; }
-.sh-sheet-content > .sh-coc-misc-section { padding-top: 0; margin-top: 0; }
+.sh-sheet-content > .sh-coc-misc-section { border-top: none; padding-top: 0; margin-top: 0; }
 .sh-coc-misc-layout { display: grid; grid-template-columns: minmax(320px, 400px) minmax(360px, 1fr); gap: 14px; align-items: start; }
 .sh-coc-misc-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .sh-coc-stats-main .sh-coc-misc-row { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 16px; }
@@ -6707,7 +6707,8 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-coc-misc-label { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; text-align: center; }
 .sh-coc-misc-input { border: 1px solid #e4e4e4; border-radius: 6px; padding: 5px 8px; font-size: 13px; font-family: inherit; color: #222; outline: none; width: 100%; background: #fff; box-sizing: border-box; text-align: center; }
 .sh-coc-misc-input:focus { border-color: #111; }
-.sh-coc-misc-select { width: 150px; }
+.sh-coc-misc-select { width: 150px; text-align: center; text-align-last: center; }
+.sh-coc-misc-select option { text-align: center; }
 .sh-coc-mental-field { min-width: 220px; flex: 1 1 220px; }
 .sh-coc-mental-input { width: 100%; min-width: 220px; }
 .sh-coc-wealth-panel,
@@ -6721,20 +6722,23 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-coc-wealth-side-title,
 .sh-coc-wealth-row-label,
 .sh-coc-balance-title { background: #f0f0f0; font-size: 12px; font-weight: 800; color: #333; display: flex; align-items: center; justify-content: center; text-align: center; }
-.sh-coc-wealth-title { min-height: 41px; padding: 0 12px; justify-content: flex-start; border-bottom: 1px solid #ddd; }
+.sh-coc-wealth-title { min-height: 33px; padding: 4px 12px; justify-content: center; border-bottom: 1px solid #ddd; }
 .sh-coc-wealth-desc-cell { grid-column: 2 / span 3; display: flex; flex-direction: column; gap: 4px; background: #fcfcfc; }
 .sh-coc-wealth-desc-main { font-size: 12px; font-weight: 700; color: #222; line-height: 1.45; }
-.sh-coc-wealth-currency-cell { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px; }
-.sh-coc-wealth-currency-symbol { font-size: 12px; font-weight: 800; color: #555; }
+.sh-coc-wealth-desc-sub { font-size: 11px; font-weight: 400; color: #666; line-height: 1.45; }
+.sh-coc-wealth-currency-cell,
+.sh-coc-wealth-currency-value { display: grid; grid-template-columns: 1.25em minmax(0, 1fr); align-items: center; gap: 6px; width: 100%; }
+.sh-coc-wealth-currency-symbol { font-size: 12px; font-weight: 800; color: #555; text-align: center; }
+.sh-coc-wealth-currency-amount { min-width: 0; text-align: center; }
 .sh-coc-wealth-rate-input { width: 100%; border: none; padding: 0; background: transparent; font-size: 12px; font-family: inherit; color: #222; text-align: center; outline: none; -moz-appearance: textfield; }
 .sh-coc-wealth-rate-input::-webkit-inner-spin-button,
 .sh-coc-wealth-rate-input::-webkit-outer-spin-button { -webkit-appearance: none; }
-.sh-coc-wealth-value-cell { font-size: 12px; font-weight: 600; color: #222; text-align: center; line-height: 1.4; }
+.sh-coc-wealth-value-cell { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #222; text-align: center; line-height: 1.4; }
 .sh-coc-balance-panel { display: flex; flex-direction: column; }
-.sh-coc-balance-titlebar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-right: 8px; background: #f0f0f0; border-bottom: 1px solid #ddd; }
-.sh-coc-balance-title { min-height: 41px; padding: 0 12px; border-bottom: none; justify-content: flex-start; flex: 1; }
-.sh-coc-balance-add { border: 1px solid #d0d0d0; background: #fff; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 700; color: #444; cursor: pointer; }
-.sh-coc-balance-add:hover { background: #f7f7f7; }
+.sh-coc-balance-titlebar { display: flex; align-items: center; justify-content: center; background: #f0f0f0; border-bottom: 1px solid #ddd; }
+.sh-coc-balance-title { min-height: 33px; padding: 4px 12px; border: 0; width: 100%; font-family: inherit; cursor: pointer; }
+.sh-coc-balance-title:hover { background: #e9e9e9; }
+.sh-coc-balance-unit { margin-left: 6px; color: #777; font-weight: 600; }
 .sh-coc-balance-table-wrap { background: #fff; overflow-x: auto; }
 .sh-coc-balance-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .sh-coc-balance-table th { background: #f7f7f7; border-bottom: 1px solid #ddd; border-right: 1px solid #eee; padding: 7px 8px; font-size: 11px; font-weight: 700; color: #555; text-align: center; }
@@ -6747,9 +6751,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-coc-balance-input-num::-webkit-inner-spin-button,
 .sh-coc-balance-input-num::-webkit-outer-spin-button { -webkit-appearance: none; }
 .sh-coc-balance-total-row td { background: #f7f7f7; padding: 9px 10px; font-size: 12px; font-weight: 800; text-align: center; }
-.sh-coc-balance-col-del { width: 30px; border-right: none !important; }
-.sh-coc-balance-del { background: none; border: none; cursor: pointer; color: #ccc; font-size: 13px; width: 100%; min-height: 31px; display: flex; align-items: center; justify-content: center; transition: color 0.1s; }
-.sh-coc-balance-del:hover { color: #ef4444; background: #fef2f2; }
+.sh-coc-balance-table tbody tr { cursor: context-menu; }
 @media (max-width: 900px) {
   .sh-coc-stats-layout { grid-template-columns: 1fr; }
   .sh-coc-stats-layout .sh-coc-derived-section { border-left: none; border-top: 1px solid #ebebeb; padding-left: 0; padding-top: 12px; margin-top: 10px; }
@@ -6788,8 +6790,8 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sk-table th { background: #f5f5f5; padding: 3px 4px; font-size: 10px; font-weight: 700; color: #555; border: 1px solid #ddd; text-align: center; white-space: nowrap; }
 .sk-table td { padding: 2px 3px; border: 1px solid #eee; vertical-align: middle; text-align: center; }
 .sk-row:hover td { background: #f9f9f9; }
-.sh-coc-skills-table .sk-row.is-growth-selected > td { background: #e8f0ff; }
-.sh-coc-skills-table .sk-row.is-growth-selected :is(.sk-name-input, .sk-base-input, .sk-num-input) { background: #f5f8ff; }
+.sh-coc-skills-table .sk-row.is-growth-selected > td { background: #ececec; }
+.sh-coc-skills-table .sk-row.is-growth-selected :is(.sk-name-input, .sk-base-input, .sk-num-input) { background: #f5f5f5; }
 .sk-name-cell { text-align: left !important; white-space: nowrap; font-size: 11px; color: #333; padding: 0 !important; }
 .sk-base-cell { color: #666; font-size: 11px; }
 .sk-num-input { width: 100%; max-width: 100%; box-sizing: border-box; border: 1px solid #e4e4e4; border-radius: 3px; padding: 2px; font-size: 11px; text-align: center; font-family: inherit; background: #fff; outline: none; -moz-appearance: textfield; }
@@ -6829,7 +6831,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sk-final-cell { font-weight: 700; color: #222; font-size: 11px; }
 .sk-half-cell { color: #7c3aed; font-weight: 600; font-size: 11px; }
 .sk-fifth-cell { color: #16a34a; font-weight: 600; font-size: 11px; }
-.sk-chk { cursor: pointer; }
+.sk-chk { display: block; margin: 0 auto; cursor: pointer; }
 .sk-custom-section { margin-top: 10px; }
 .sk-custom-label { font-size: 10px; font-weight: 700; color: #555; letter-spacing: 0.04em; padding-top: 8px; border-top: 2px solid #ddd; margin-bottom: 6px; }
 .sk-custom-divider { border-top: 2px solid #ddd; padding-top: 8px; margin-bottom: 8px; }
@@ -6839,9 +6841,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .coc-skill-modal-hint { font-size: 11px; line-height: 1.5; color: #888; }
 .sh-coc-support-panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
 .sh-coc-support-panel { border: 1px solid #ebebeb; border-radius: 10px; background: #fff; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
-.sh-coc-support-title { position: relative; background: #f8f8f8; color: #555; font-size: 11px; font-weight: 700; text-align: center; letter-spacing: 0.06em; padding: 9px 38px; border-bottom: 1px solid #ebebeb; }
-.sh-coc-support-add { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); width: 24px; height: 24px; border: 1px solid #d8d8d8; border-radius: 5px; background: #fff; color: #777; cursor: pointer; font: inherit; line-height: 1; }
-.sh-coc-support-add:hover { border-color: #999; color: #111; }
+.sh-coc-support-title { background: #f8f8f8; color: #555; font-size: 11px; font-weight: 700; text-align: center; letter-spacing: 0.06em; padding: 9px 12px; border-bottom: 1px solid #ebebeb; }
 .sh-coc-support-shell { flex: 1; display: flex; background: #fff; }
 .sh-coc-support-table { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; }
 .sh-coc-support-table th { background: #fafafa; padding: 5px 6px; font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; border: 1px solid #ebebeb; text-align: center; }
@@ -6851,9 +6851,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-coc-support-input.is-name { text-align: center; }
 .sh-coc-support-input.sh-coc-support-textarea { display: block; min-height: 31px; border: none; border-radius: 0; background: transparent; padding: 6px 8px; font-size: 12px; line-height: 1.5; resize: none; overflow: hidden; }
 .sh-coc-support-name-col { width: 108px; }
-.sh-coc-support-del-col { width: 28px; }
-.sh-coc-support-del { width: 100%; min-height: 31px; border: 0; background: none; color: #ccc; cursor: pointer; font-size: 13px; }
-.sh-coc-support-del:hover { color: #ef4444; background: #fef2f2; }
+.sh-coc-support-table tbody tr { cursor: context-menu; }
 @media (max-width: 1100px) { .sh-coc-support-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .sh-coc-support-panels { grid-template-columns: 1fr; } }
 .ch-sheet-modal.sheet-wide-coc7e .sh-section-hd,
@@ -6867,6 +6865,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-stats-main .sh-coc-misc-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-misc-layout { grid-template-columns: minmax(320px, 400px) minmax(360px, 1fr); }
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-support-panels { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-misc-section { border-top: none; }
 .sh-coc-backstory-grid { row-gap: 18px; align-items: stretch; }
 .sh-coc-backstory-grid .sh-field { height: 100%; }
 .sh-coc-backstory-grid .sh-field-textarea { flex: 1 1 auto; }
@@ -35013,16 +35012,16 @@ function exportCharacterSheetHtml() {
     });
   }
 
-  // 독립 HTML에서 작동할 CoC 행 추가 제어를 제외하고 편집 전용 UI를 제거한다.
+  // 편집 전용 UI를 제거하고 독립 HTML용 동작을 다시 연결한다.
   const removableUi = isEditableCoc7e
     ? '.sh-tabs-wrap, .sh-repeat-del, .sh-repeat-add-row, .sh-coc-balance-del, .sh-coc-balance-col-del, .sh-roll-hint'
-    : '.sh-tabs-wrap, .sh-repeat-del, .sh-repeat-add-row, .sh-coc-balance-add, .sk-add-btn, .sh-coc-balance-del, .sh-coc-balance-col-del, .sh-roll-hint';
+    : '.sh-tabs-wrap, .sh-repeat-del, .sh-repeat-add-row, .sk-add-btn, .sh-coc-balance-del, .sh-coc-balance-col-del, .sh-roll-hint';
   clone.querySelectorAll(removableUi).forEach(el => el.remove());
   if (isEditableCoc7e) {
     clone.querySelectorAll('.sk-add-btn').forEach(el => el.setAttribute('onclick', 'addStandaloneCocSkill(this)'));
-    clone.querySelectorAll('.sh-coc-balance-add').forEach(el => el.setAttribute('onclick', 'addStandaloneCocLedgerRow(this)'));
-    clone.querySelectorAll('.sh-coc-support-add').forEach(el => el.setAttribute('onclick', 'addStandaloneCocSupportRow(this)'));
-    clone.querySelectorAll('.sh-coc-support-del').forEach(el => el.setAttribute('onclick', 'removeStandaloneCocSupportRow(this)'));
+    clone.querySelectorAll('.sh-coc-balance-table tbody tr').forEach(el => el.setAttribute('oncontextmenu', 'return openStandaloneCocLedgerRowMenu(event,this)'));
+    clone.querySelectorAll('.sh-coc-support-table tbody tr').forEach(el => el.setAttribute('oncontextmenu', 'return openStandaloneCocSupportRowMenu(event,this)'));
+    clone.querySelectorAll('.sh-coc-balance-title').forEach(el => el.setAttribute('onclick', 'return openStandaloneCocLedgerCurrencyMenu(event,this)'));
   }
 
   const title = ch.name || '캐릭터';
@@ -35033,7 +35032,7 @@ function exportCharacterSheetHtml() {
 .sh-coc-balance-titlebar { padding-right:0; }
 .sh-coc-balance-title { justify-content:center; }
 .sh-coc-balance-input { text-align:center; }
-.sh-coc-wealth-currency-cell { display:grid; grid-template-columns:1.25em 5ch; align-items:center; justify-content:center; gap:2px; }
+.sh-coc-wealth-currency-cell, .sh-coc-wealth-currency-value { display:grid; grid-template-columns:1.25em minmax(0,1fr); align-items:center; gap:6px; width:100%; }
 .sh-coc-wealth-currency-symbol { text-align:center; }
 .sh-coc-wealth-rate-input { width:100%; }
 .sh-coc-skills-wrap { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; overflow:visible; }
@@ -35045,7 +35044,7 @@ function exportCharacterSheetHtml() {
 .sh-coc-skills-table th:nth-child(n+3):nth-child(-n+6), .sh-coc-skills-table td:nth-child(n+3):nth-child(-n+6) { width:24px; min-width:24px; max-width:24px; }
 .sh-coc-skills-table th:nth-child(n+7), .sh-coc-skills-table td:nth-child(n+7) { width:22px; min-width:22px; max-width:22px; }
 .sh-section-hd, .sh-coc-support-title { font-size:14px; font-weight:800; text-align:center; }
-@media print { .standalone-sheet-save, .sk-add-btn, .sh-coc-balance-add, .sh-coc-support-add, .sh-coc-support-del { display:none!important; } }` : '';
+@media print { .standalone-sheet-save, .sk-add-btn, .standalone-coc-context-menu { display:none!important; } }` : '';
   const eraThemeStyles = isEditableCoc7e ? `
 body[data-coc-era] { background:#dededb; color:#171717; color-scheme:light; }
 body[data-coc-era] .ch-sheet-body { width:min(1100px,100%); max-width:1100px; height:auto; overflow:visible; padding:28px; background-color:var(--coc-era-paper); border:4px solid var(--coc-era-accent); box-shadow:0 14px 40px rgba(0,0,0,.16); }
@@ -35151,40 +35150,89 @@ function addStandaloneCocSkill(button) {
   row.querySelector('.sk-name-input')?.focus();
   updateStandaloneCocSkills();
 }
-function addStandaloneCocLedgerRow(button) {
-  const tbody = button.closest('.sh-coc-balance-panel')?.querySelector('tbody');
-  if (!tbody) return;
-  const row = document.createElement('tr');
-  row.innerHTML = '<td><input class="sh-coc-balance-input" type="text"></td>'
-    + '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" data-coc-ledger-field="income" type="text" inputmode="decimal"></td>'
-    + '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" data-coc-ledger-field="expense" type="text" inputmode="decimal"></td>'
-    + '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" data-coc-ledger-field="balance" type="text" inputmode="decimal"></td>';
-  tbody.appendChild(row);
-  row.querySelector('input')?.focus();
-  updateStandaloneCocLedgerTotals();
-}
 function autoGrowStandaloneTextarea(textarea) {
   textarea.style.height = 'auto';
   textarea.style.height = textarea.scrollHeight + 'px';
 }
-function addStandaloneCocSupportRow(button) {
-  const panel = button.closest('.sh-coc-support-panel');
-  const tbody = panel?.querySelector('tbody');
-  if (!panel || !tbody) return;
-  const listId = panel.dataset.cocSupportPanel || '';
-  const rightControl = listId === 'possessions'
-    ? '<textarea class="sh-coc-support-input sh-coc-support-textarea sh-field-textarea" rows="1"></textarea>'
-    : '<input class="sh-coc-support-input" type="text">';
-  const row = document.createElement('tr');
-  row.innerHTML = '<td><input class="sh-coc-support-input is-name" type="text"></td><td>' + rightControl + '</td>'
-    + '<td class="sh-coc-support-del-col"><button type="button" class="sh-coc-support-del" title="행 삭제" aria-label="행 삭제" onclick="removeStandaloneCocSupportRow(this)">✕</button></td>';
-  tbody.appendChild(row);
-  const textarea = row.querySelector('textarea');
-  if (textarea) autoGrowStandaloneTextarea(textarea);
-  row.querySelector('input')?.focus();
+function closeStandaloneCocContextMenu() {
+  document.querySelector('.standalone-coc-context-menu')?.remove();
 }
-function removeStandaloneCocSupportRow(button) {
-  button.closest('tr')?.remove();
+function showStandaloneCocContextMenu(event, items) {
+  event.preventDefault();
+  event.stopPropagation();
+  closeStandaloneCocContextMenu();
+  const menu = document.createElement('div');
+  menu.className = 'tb-ctx-menu standalone-coc-context-menu';
+  items.forEach(item => {
+    if (item.sep) {
+      const separator = document.createElement('div');
+      separator.className = 'tb-ctx-sep';
+      menu.appendChild(separator);
+      return;
+    }
+    const row = document.createElement('div');
+    row.className = 'tb-ctx-item' + (item.disabled ? ' disabled' : '');
+    if (item.danger) row.style.color = '#ef4444';
+    const main = document.createElement('span');
+    main.className = 'tb-ctx-main';
+    const icon = document.createElement('span');
+    icon.className = 'tb-ctx-icon';
+    icon.textContent = item.icon || '';
+    const label = document.createElement('span');
+    label.className = 'tb-ctx-label';
+    label.textContent = item.label;
+    main.append(icon, label);
+    row.appendChild(main);
+    if (!item.disabled) row.onclick = () => { closeStandaloneCocContextMenu(); item.action(); };
+    menu.appendChild(row);
+  });
+  menu.onmousedown = event => event.stopPropagation();
+  document.body.appendChild(menu);
+  menu.style.left = Math.max(8, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+  menu.style.top = Math.max(8, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 8)) + 'px';
+  setTimeout(() => document.addEventListener('mousedown', closeStandaloneCocContextMenu, { once: true }), 0);
+  return false;
+}
+function insertStandaloneCocTableRow(row, before) {
+  const copy = row.cloneNode(true);
+  copy.querySelectorAll('input, textarea').forEach(field => {
+    field.value = '';
+    field.removeAttribute('value');
+    if (field.tagName === 'TEXTAREA') field.textContent = '';
+  });
+  row.parentNode.insertBefore(copy, before ? row : row.nextSibling);
+  copy.querySelectorAll('textarea').forEach(autoGrowStandaloneTextarea);
+  copy.querySelector('input, textarea')?.focus();
+  return copy;
+}
+function openStandaloneCocRowMenu(event, row, afterChange) {
+  const canDelete = row.parentElement.rows.length > 1;
+  return showStandaloneCocContextMenu(event, [
+    { icon: '↑', label: '위에 삽입', action: () => { insertStandaloneCocTableRow(row, true); afterChange(); } },
+    { icon: '↓', label: '아래에 삽입', action: () => { insertStandaloneCocTableRow(row, false); afterChange(); } },
+    { sep: true },
+    { icon: '−', label: '행 삭제', disabled: !canDelete, danger: true, action: () => { row.remove(); afterChange(); } },
+  ]);
+}
+function openStandaloneCocLedgerRowMenu(event, row) {
+  return openStandaloneCocRowMenu(event, row, updateStandaloneCocLedgerTotals);
+}
+function openStandaloneCocSupportRowMenu(event, row) {
+  return openStandaloneCocRowMenu(event, row, () => {});
+}
+function setStandaloneCocLedgerCurrency(button, currency, symbol) {
+  const panel = button.closest('.sh-coc-balance-panel');
+  if (panel) panel.dataset.cocLedgerCurrency = currency;
+  const unit = button.querySelector('.sh-coc-balance-unit');
+  if (unit) unit.textContent = symbol;
+}
+function openStandaloneCocLedgerCurrencyMenu(event, button) {
+  const current = button.closest('.sh-coc-balance-panel')?.dataset.cocLedgerCurrency || 'krw';
+  return showStandaloneCocContextMenu(event, [
+    { icon: current === 'krw' ? '✓' : '', label: '원화 (₩)', action: () => setStandaloneCocLedgerCurrency(button, 'krw', '₩') },
+    { icon: current === 'usd' ? '✓' : '', label: '달러 ($)', action: () => setStandaloneCocLedgerCurrency(button, 'usd', '$') },
+    { icon: current === 'jpy' ? '✓' : '', label: '엔화 (¥)', action: () => setStandaloneCocLedgerCurrency(button, 'jpy', '¥') },
+  ]);
 }
 document.addEventListener('input', event => {
   if (event.target.matches('.sk-base-input,.sk-job,.sk-interest,.sk-growth,.sk-job-max,.sk-interest-max,.sk-growth-max')) updateStandaloneCocSkills();
@@ -36830,7 +36878,7 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
       + '<input class="sh-coc-wealth-rate-input ' + esc('sh-coc-wealth-rate-' + fid.replace('wealthRate', '').toLowerCase()) + '" type="number" step="any" value="' + esc(String(v)) + '" oninput="' + esc(sf(fid, false)) + '"></div>';
   }
   function wealthValueCell(value, extraCls) {
-    return '<div class="sh-coc-wealth-cell sh-coc-wealth-value-cell' + (extraCls ? ' ' + extraCls : '') + '">' + esc(String(value)) + '</div>';
+    return '<div class="sh-coc-wealth-cell sh-coc-wealth-value-cell' + (extraCls ? ' ' + extraCls : '') + '">' + buildCoc7eWealthValueHtml(value) + '</div>';
   }
   function miscSel(fid, label, options, defaultValue) {
     var v = (sectionData[fid] !== undefined && sectionData[fid] !== '') ? sectionData[fid] : (defaultValue !== undefined ? defaultValue : '');
@@ -36864,6 +36912,8 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
   var wealthInfo = derived.wealth || calcCoc7eWealthInfo(0, '', sectionData);
   var wealthLedgerRows = normalizeCocWealthLedgerRows(sectionData.wealthLedger);
   var wealthLedgerTotals = getCocWealthLedgerTotals(wealthLedgerRows);
+  var wealthLedgerCurrency = normalizeCocWealthLedgerCurrency(sectionData.wealthLedgerCurrency);
+  var wealthLedgerSymbol = getCocWealthLedgerCurrencySymbol(wealthLedgerCurrency);
   var miscRow = '<div class="sh-coc-misc-row">'
     + miscInp('armor','장갑',false) + miscDerivedInp('move','이동력',derived.move)
     + miscDerivedInp('damageBonus','피해 보너스',derived.damageBonus) + miscDerivedInp('build','체구',derived.build) + '</div>';
@@ -36871,6 +36921,7 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
     + '<div class="sh-coc-wealth-cell sh-coc-wealth-side-title">재력</div>'
     + '<div class="sh-coc-wealth-cell sh-coc-wealth-desc-cell sh-coc-wealth-cell-right-edge">'
     + '<div class="sh-coc-wealth-desc-main">' + esc(wealthInfo.level) + '</div>'
+    + '<div class="sh-coc-wealth-desc-sub">' + esc(wealthInfo.description) + '</div>'
     + '</div>'
     + '<div class="sh-coc-wealth-cell sh-coc-wealth-row-label">환율</div>'
     + wealthRateCell('wealthRateDollar', '$', 1)
@@ -36894,18 +36945,20 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
       var handler = 'saveCocWealthLedgerCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + rowIdx + ',' + JSON.stringify(fieldId) + ',this.value)';
       return '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" data-coc-ledger-field="' + esc(fieldId) + '" type="text" inputmode="decimal" value="' + esc(formatCocWealthLedgerAmount(row[fieldId])) + '" onfocus="this.value=normalizeCocWealthLedgerAmount(this.value)" oninput="' + esc(handler) + '" onblur="this.value=formatCocWealthLedgerAmount(this.value)"></td>';
     }
-    return '<tr>'
+    var rowMenu = 'openCocWealthLedgerRowMenu(event,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + rowIdx + ')';
+    return '<tr data-coc-ledger-row="' + rowIdx + '" oncontextmenu="return ' + esc(rowMenu) + '">'
       + '<td><input class="sh-coc-balance-input" type="text" value="' + esc(String(row.usage)) + '" placeholder="" oninput="saveCocWealthLedgerCell(' + esc(JSON.stringify(chId)) + ',' + esc(JSON.stringify(sheetId)) + ',' + esc(JSON.stringify(secId)) + ',' + rowIdx + ',\'usage\',this.value)"></td>'
       + amountCell('income') + amountCell('expense') + amountCell('balance')
       + '</tr>';
   }).join('');
-  var balancePanel = '<div class="sh-coc-balance-panel">'
-    + '<div class="sh-coc-balance-titlebar"><div class="sh-coc-balance-title">잔액</div><button class="sh-coc-balance-add" type="button" onclick="addCocWealthLedgerRow(' + esc(JSON.stringify(chId)) + ',' + esc(JSON.stringify(sheetId)) + ',' + esc(JSON.stringify(secId)) + ')">+ 행 추가</button></div>'
+  var currencyMenu = 'openCocWealthLedgerCurrencyMenu(event,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ')';
+  var balancePanel = '<div class="sh-coc-balance-panel" data-coc-ledger-currency="' + esc(wealthLedgerCurrency) + '">'
+    + '<div class="sh-coc-balance-titlebar"><button type="button" class="sh-coc-balance-title" onclick="' + esc(currencyMenu) + '" title="잔액 단위 변경">잔액<span class="sh-coc-balance-unit">' + esc(wealthLedgerSymbol) + '</span></button></div>'
     + '<div class="sh-coc-balance-table-wrap"><table class="sh-coc-balance-table"><thead><tr><th>사용처</th><th>수입</th><th>지출</th><th>잔액</th></tr></thead><tbody>' + balanceRowsHtml + '</tbody><tfoot><tr class="sh-coc-balance-total-row"><td>합계</td><td data-coc-ledger-total="income">' + esc(formatCocWealthLedgerAmount(wealthLedgerTotals.income)) + '</td><td data-coc-ledger-total="expense">' + esc(formatCocWealthLedgerAmount(wealthLedgerTotals.expense)) + '</td><td data-coc-ledger-total="balance">' + esc(formatCocWealthLedgerAmount(wealthLedgerTotals.balance)) + '</td></tr></tfoot></table></div>'
     + '</div>';
   var rollAllH = 'rollAllCocStats(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ')';
   return '<div class="sh-section">'
-    + '<div class="sh-section-hd rollable" onclick="' + esc(rollAllH) + '" title="특성치 전체 굴리기">' + esc(sec.label) + '<span class="sh-roll-hint">클릭하여 특성치 전체 굴리기</span></div>'
+    + '<div class="sh-section-hd rollable" onclick="' + esc(rollAllH) + '" title="클릭하여 특성치 전체 굴리기">' + esc(sec.label) + '</div>'
     + '<div class="sh-section-body">'
     + '<div class="sh-coc-stats-layout">'
     + '<div class="sh-coc-stats-main"><div class="sh-coc-attrs-grid">' + attrsHtml + '</div>' + miscRow + '</div>'
@@ -37189,6 +37242,13 @@ function formatCoc7eCurrencyAmount(amount, symbol, suffix) {
   return symbol + '\u00a0\u00a0' + text + (suffix || '');
 }
 
+function buildCoc7eWealthValueHtml(value) {
+  var text = String(value === null || value === undefined ? '' : value);
+  var match = text.match(/^([$₩¥])\s*(.*)$/);
+  if (!match) return esc(text);
+  return '<span class="sh-coc-wealth-currency-value"><span class="sh-coc-wealth-currency-symbol">' + esc(match[1]) + '</span><span class="sh-coc-wealth-currency-amount">' + esc(match[2]) + '</span></span>';
+}
+
 function normalizeCocWealthLedgerAmount(value) {
   return String(value === null || value === undefined ? '' : value).replace(/,/g, '').trim();
 }
@@ -37236,6 +37296,25 @@ function getCoc7eWealthLevelLabel(tier) {
   return { destitute: '무일푼', poor: '가난', average: '보통', wealthy: '부유', rich: '자산가', tycoon: '갑부' }[tier] || '';
 }
 
+function getCoc7eWealthLevelDescription(tier) {
+  return {
+    destitute: '가난한 생활조차 영위하기 어려움.',
+    poor: '간신히 지붕 밑 등에서 살며 하루 1끼.',
+    average: '하루 3끼, 간간이 호사, 적당히 안락.',
+    wealthy: '호사와 사치가 가능.',
+    rich: '굉장한 사치와 안락을 누릴 수 있음.',
+    tycoon: '돈 걱정이 전혀 없는, 손꼽히는 부자.',
+  }[tier] || '';
+}
+
+function normalizeCocWealthLedgerCurrency(value) {
+  return ['krw', 'usd', 'jpy'].includes(value) ? value : 'krw';
+}
+
+function getCocWealthLedgerCurrencySymbol(value) {
+  return { krw: '₩', usd: '$', jpy: '¥' }[normalizeCocWealthLedgerCurrency(value)];
+}
+
 function calcCoc7eWealthInfo(creditRating, eraType, statsData) {
   var cr = parseCocSheetNumber(creditRating);
   var tier = getCoc7eWealthTier(cr);
@@ -37251,6 +37330,7 @@ function calcCoc7eWealthInfo(creditRating, eraType, statsData) {
     creditRating: cr,
     eraType: normalizedEraType,
     level: getCoc7eWealthLevelLabel(tier),
+    description: getCoc7eWealthLevelDescription(tier),
     rates: rates,
     spendingLevel: { usd: '', krw: '', jpy: '' },
     cash: { usd: '', krw: '', jpy: '' },
@@ -37292,6 +37372,7 @@ function calcCoc7eWealthInfo(creditRating, eraType, statsData) {
 }
 
 function normalizeCocWealthLedgerRows(rows) {
+  var hasStoredRows = Array.isArray(rows);
   var list = Array.isArray(rows) ? rows.filter(function(row) {
     return row && typeof row === 'object' && !Array.isArray(row);
   }).map(function(row) {
@@ -37303,7 +37384,7 @@ function normalizeCocWealthLedgerRows(rows) {
     };
   }) : [];
   if (!list.length) {
-    list = new Array(3).fill(null).map(function() {
+    list = new Array(hasStoredRows ? 1 : 3).fill(null).map(function() {
       return { usage: '', income: '', expense: '', balance: '' };
     });
   }
@@ -37838,6 +37919,10 @@ function refreshCoc7eDerivedUi(chId, sheetId) {
     var el = bodyEl.querySelector(selector);
     if (el) el.textContent = String(value);
   }
+  function setWealthValue(selector, value) {
+    var el = bodyEl.querySelector(selector);
+    if (el) el.innerHTML = buildCoc7eWealthValueHtml(value);
+  }
   function refreshSkillRow(skillId) {
     var preset = _COC7E_SKILLS_PRESET.find(function(sk) { return sk.id === skillId; });
     if (!preset) return;
@@ -37867,15 +37952,16 @@ function refreshCoc7eDerivedUi(chId, sheetId) {
   setInputValue('[data-coc-derived="damageBonus"]', derived.damageBonus);
   setInputValue('[data-coc-derived="build"]', derived.build);
   setTextValue('.sh-coc-wealth-desc-main', derived.wealth.level);
-  setTextValue('.sh-coc-wealth-spending-usd', derived.wealth.spendingLevel.usd);
-  setTextValue('.sh-coc-wealth-spending-krw', derived.wealth.spendingLevel.krw);
-  setTextValue('.sh-coc-wealth-spending-jpy', derived.wealth.spendingLevel.jpy);
-  setTextValue('.sh-coc-wealth-cash-usd', derived.wealth.cash.usd);
-  setTextValue('.sh-coc-wealth-cash-krw', derived.wealth.cash.krw);
-  setTextValue('.sh-coc-wealth-cash-jpy', derived.wealth.cash.jpy);
-  setTextValue('.sh-coc-wealth-assets-usd', derived.wealth.assets.usd);
-  setTextValue('.sh-coc-wealth-assets-krw', derived.wealth.assets.krw);
-  setTextValue('.sh-coc-wealth-assets-jpy', derived.wealth.assets.jpy);
+  setTextValue('.sh-coc-wealth-desc-sub', derived.wealth.description);
+  setWealthValue('.sh-coc-wealth-spending-usd', derived.wealth.spendingLevel.usd);
+  setWealthValue('.sh-coc-wealth-spending-krw', derived.wealth.spendingLevel.krw);
+  setWealthValue('.sh-coc-wealth-spending-jpy', derived.wealth.spendingLevel.jpy);
+  setWealthValue('.sh-coc-wealth-cash-usd', derived.wealth.cash.usd);
+  setWealthValue('.sh-coc-wealth-cash-krw', derived.wealth.cash.krw);
+  setWealthValue('.sh-coc-wealth-cash-jpy', derived.wealth.cash.jpy);
+  setWealthValue('.sh-coc-wealth-assets-usd', derived.wealth.assets.usd);
+  setWealthValue('.sh-coc-wealth-assets-krw', derived.wealth.assets.krw);
+  setWealthValue('.sh-coc-wealth-assets-jpy', derived.wealth.assets.jpy);
   setTextValue('.sk-job-used', derived.jobUsed);
   setTextValue('.sk-job-remain', derived.jobMax - derived.jobUsed);
   setTextValue('.sk-interest-used', derived.intUsed);
@@ -38272,40 +38358,45 @@ function getCoc7eRelationRows(sectionData, rowCount) {
   return out;
 }
 
+function getCocSupportRowsForEdit(sheet, sectionId, listId) {
+  if (!sheet.data || typeof sheet.data !== 'object') sheet.data = {};
+  if (!sheet.data[sectionId] || typeof sheet.data[sectionId] !== 'object' || Array.isArray(sheet.data[sectionId])) sheet.data[sectionId] = {};
+  var sectionData = sheet.data[sectionId];
+  if (Array.isArray(sectionData[listId]) && sectionData[listId].length) return sectionData[listId];
+  var tpl = SHEET_TEMPLATES[sheet.templateKey];
+  var sec = tpl ? (tpl.sections || []).find(function(s) { return s.id === sectionId; }) : null;
+  var minRows = parseInt(sec && sec.rowCount, 10);
+  if (isNaN(minRows) || minRows < 1) minRows = 3;
+  var rows = listId === 'equipment'
+    ? getCoc7eEquipmentRows(sectionData, minRows)
+    : (listId === 'possessions' ? getCoc7ePossessionRows(sectionData, minRows) : getCoc7eRelationRows(sectionData, minRows));
+  sectionData[listId] = rows;
+  return rows;
+}
+
+function getCocSupportBlankRow(listId) {
+  return listId === 'relations' ? { name: '', note: '' } : { name: '', effect: '' };
+}
+
 function saveCoc7eSupportCell(chId, sheetId, sectionId, listId, rowIdx, fieldId, value) {
   var ch = state.characters.find(function(c) { return c.id === chId; });
   if (!ch) return;
   var sheet = (ch.sheets || []).find(function(s) { return s.id === sheetId; });
   if (!sheet) return;
-  if (!sheet.data || typeof sheet.data !== 'object') sheet.data = {};
-  if (!sheet.data[sectionId] || typeof sheet.data[sectionId] !== 'object' || Array.isArray(sheet.data[sectionId])) sheet.data[sectionId] = {};
-  var hasStoredRows = Array.isArray(sheet.data[sectionId][listId]);
-  if (!hasStoredRows) sheet.data[sectionId][listId] = [];
-  if (!sheet.data[sectionId][listId][rowIdx] || typeof sheet.data[sectionId][listId][rowIdx] !== 'object') sheet.data[sectionId][listId][rowIdx] = {};
-  sheet.data[sectionId][listId][rowIdx][fieldId] = value;
+  var rows = getCocSupportRowsForEdit(sheet, sectionId, listId);
+  if (!rows[rowIdx]) rows[rowIdx] = getCocSupportBlankRow(listId);
+  rows[rowIdx][fieldId] = value;
   persist();
 }
 
-function addCocSupportRow(chId, sheetId, sectionId, listId, focusFieldId) {
+function insertCocSupportRow(chId, sheetId, sectionId, listId, rowIdx, focusFieldId) {
   var ch = state.characters.find(function(c) { return c.id === chId; });
   if (!ch) return;
   var sheet = (ch.sheets || []).find(function(s) { return s.id === sheetId; });
   if (!sheet) return;
-  if (!sheet.data || typeof sheet.data !== 'object') sheet.data = {};
-  if (!sheet.data[sectionId] || typeof sheet.data[sectionId] !== 'object' || Array.isArray(sheet.data[sectionId])) sheet.data[sectionId] = {};
-  if (!Array.isArray(sheet.data[sectionId][listId])) sheet.data[sectionId][listId] = [];
-  var tpl = SHEET_TEMPLATES[sheet.templateKey];
-  var sec = tpl ? (tpl.sections || []).find(function(s) { return s.id === sectionId; }) : null;
-  var minRows = parseInt(sec && sec.rowCount, 10);
-  if (isNaN(minRows) || minRows < 1) minRows = 3;
-  var rows = sheet.data[sectionId][listId];
-  if (!hasStoredRows) {
-    if (listId === 'equipment') rows = sheet.data[sectionId][listId] = getCoc7eEquipmentRows(sheet.data[sectionId], minRows);
-    else if (listId === 'possessions') rows = sheet.data[sectionId][listId] = getCoc7ePossessionRows(sheet.data[sectionId], minRows);
-    else rows = sheet.data[sectionId][listId] = getCoc7eRelationRows(sheet.data[sectionId], minRows);
-  }
-  rows.push(listId === 'relations' ? { name: '', note: '' } : { name: '', effect: '' });
-  var newIdx = rows.length - 1;
+  var rows = getCocSupportRowsForEdit(sheet, sectionId, listId);
+  var newIdx = Math.max(0, Math.min(parseInt(rowIdx, 10) || 0, rows.length));
+  rows.splice(newIdx, 0, getCocSupportBlankRow(listId));
   persist();
   renderCharacterSheet(chId);
   setTimeout(function() {
@@ -38314,27 +38405,49 @@ function addCocSupportRow(chId, sheetId, sectionId, listId, focusFieldId) {
   }, 0);
 }
 
+function addCocSupportRow(chId, sheetId, sectionId, listId, focusFieldId) {
+  var ch = state.characters.find(function(c) { return c.id === chId; });
+  var sheet = ch && (ch.sheets || []).find(function(s) { return s.id === sheetId; });
+  if (!sheet) return;
+  insertCocSupportRow(chId, sheetId, sectionId, listId, getCocSupportRowsForEdit(sheet, sectionId, listId).length, focusFieldId);
+}
+
 function deleteCocSupportRow(chId, sheetId, sectionId, listId, rowIdx) {
   var ch = state.characters.find(function(c) { return c.id === chId; });
   if (!ch) return;
   var sheet = (ch.sheets || []).find(function(s) { return s.id === sheetId; });
   if (!sheet) return;
-  if (!sheet.data || typeof sheet.data !== 'object') sheet.data = {};
-  var sectionData = sheet.data[sectionId];
-  if (!sectionData || typeof sectionData !== 'object' || Array.isArray(sectionData)) sectionData = sheet.data[sectionId] = {};
-  var tpl = SHEET_TEMPLATES[sheet.templateKey];
-  var sec = tpl ? (tpl.sections || []).find(function(s) { return s.id === sectionId; }) : null;
-  var minRows = parseInt(sec && sec.rowCount, 10);
-  if (isNaN(minRows) || minRows < 1) minRows = 3;
-  var currentCount = Array.isArray(sectionData[listId]) ? sectionData[listId].length : minRows;
-  var rows = listId === 'equipment'
-    ? getCoc7eEquipmentRows(sectionData, currentCount)
-    : (listId === 'possessions' ? getCoc7ePossessionRows(sectionData, currentCount) : getCoc7eRelationRows(sectionData, currentCount));
-  if (rowIdx < 0 || rowIdx >= rows.length) return;
+  var rows = getCocSupportRowsForEdit(sheet, sectionId, listId);
+  if (rows.length <= 1 || rowIdx < 0 || rowIdx >= rows.length) return;
   rows.splice(rowIdx, 1);
-  sectionData[listId] = rows;
   persist();
   renderCharacterSheet(chId);
+}
+
+function showCocTableRowMenu(event, insertAbove, insertBelow, deleteRow, canDelete) {
+  if (!event) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  var rect = event.currentTarget && event.currentTarget.getBoundingClientRect ? event.currentTarget.getBoundingClientRect() : null;
+  tbShowCtxMenu(event.clientX || (rect && rect.left) || 8, event.clientY || (rect && rect.top) || 8, [
+    { icon: '↑', label: '위에 삽입', action: insertAbove },
+    { icon: '↓', label: '아래에 삽입', action: insertBelow },
+    { sep: true },
+    { icon: '−', label: '행 삭제', action: deleteRow, disabled: !canDelete, danger: true },
+  ]);
+  return false;
+}
+
+function openCocSupportRowMenu(event, chId, sheetId, sectionId, listId, rowIdx) {
+  var rowCount = event && event.currentTarget && event.currentTarget.parentElement
+    ? event.currentTarget.parentElement.rows.length : 0;
+  return showCocTableRowMenu(
+    event,
+    function() { insertCocSupportRow(chId, sheetId, sectionId, listId, rowIdx, 'name'); },
+    function() { insertCocSupportRow(chId, sheetId, sectionId, listId, rowIdx + 1, 'name'); },
+    function() { deleteCocSupportRow(chId, sheetId, sectionId, listId, rowIdx); },
+    rowCount > 1
+  );
 }
 
 function handleCocSupportCellKeydown(event, chId, sheetId, sectionId, listId, rowIdx, fieldId) {
@@ -38360,30 +38473,28 @@ function renderCoc7eGearRelationsSection(sec, sectionData, chId, sheetId) {
   var secId = sec.id;
   var minRows = parseInt(sec.rowCount, 10);
   if (isNaN(minRows) || minRows < 1) minRows = 3;
-  var equipmentRows = getCoc7eEquipmentRows(sectionData, Array.isArray(sectionData.equipment) ? sectionData.equipment.length : minRows);
-  var possessionRows = getCoc7ePossessionRows(sectionData, Array.isArray(sectionData.possessions) ? sectionData.possessions.length : minRows);
-  var relationRows = getCoc7eRelationRows(sectionData, Array.isArray(sectionData.relations) ? sectionData.relations.length : minRows);
+  var equipmentRows = getCoc7eEquipmentRows(sectionData, Array.isArray(sectionData.equipment) && sectionData.equipment.length ? sectionData.equipment.length : minRows);
+  var possessionRows = getCoc7ePossessionRows(sectionData, Array.isArray(sectionData.possessions) && sectionData.possessions.length ? sectionData.possessions.length : minRows);
+  var relationRows = getCoc7eRelationRows(sectionData, Array.isArray(sectionData.relations) && sectionData.relations.length ? sectionData.relations.length : minRows);
   function buildSupportPanel(title, leftLabel, rightLabel, listId, rows, rightFieldId) {
     var rowHtml = rows.map(function(row, idx) {
       var nameHandler = 'saveCoc7eSupportCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',' + idx + ',' + JSON.stringify('name') + ',this.value)';
       var rightHandler = 'saveCoc7eSupportCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',' + idx + ',' + JSON.stringify(rightFieldId) + ',this.value)';
-      var deleteHandler = 'deleteCocSupportRow(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',' + idx + ')';
+      var rowMenu = 'openCocSupportRowMenu(event,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',' + idx + ')';
       var keyHandler = 'handleCocSupportCellKeydown(event,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',' + idx + ',' + JSON.stringify(rightFieldId) + ')';
       var isAutoGrowEffect = listId === 'possessions' && rightFieldId === 'effect';
       var rightControl = isAutoGrowEffect
         ? '<textarea class="sh-coc-support-input sh-coc-support-textarea sh-field-textarea" rows="1" data-auto-grow="1" data-coc-support-list="' + esc(listId) + '" data-coc-support-row="' + idx + '" data-coc-support-field="' + esc(rightFieldId) + '" oninput="' + esc(rightHandler + ';autoResizeSheetTextarea(this)') + '" onkeydown="' + esc(keyHandler) + '" spellcheck="false">' + esc(String(row[rightFieldId] || '')) + '</textarea>'
         : '<input class="sh-coc-support-input" type="text" value="' + esc(String(row[rightFieldId] || '')) + '" data-coc-support-list="' + esc(listId) + '" data-coc-support-row="' + idx + '" data-coc-support-field="' + esc(rightFieldId) + '" oninput="' + esc(rightHandler) + '" onkeydown="' + esc(keyHandler) + '" spellcheck="false">';
-      return '<tr>'
+      return '<tr oncontextmenu="return ' + esc(rowMenu) + '">'
         + '<td><input class="sh-coc-support-input is-name" type="text" value="' + esc(String(row.name || '')) + '" data-coc-support-list="' + esc(listId) + '" data-coc-support-row="' + idx + '" data-coc-support-field="name" oninput="' + esc(nameHandler) + '" spellcheck="false"></td>'
         + '<td>' + rightControl + '</td>'
-        + '<td class="sh-coc-support-del-col"><button type="button" class="sh-coc-support-del" title="행 삭제" aria-label="행 삭제" onclick="' + esc(deleteHandler) + '">✕</button></td>'
         + '</tr>';
     }).join('');
-    var addHandler = 'addCocSupportRow(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',"name")';
     return '<div class="sh-coc-support-panel" data-coc-support-panel="' + esc(listId) + '">'
-      + '<div class="sh-coc-support-title"><span>' + esc(title) + '</span><button type="button" class="sh-coc-support-add" data-coc-support-list="' + esc(listId) + '" title="행 추가" aria-label="' + esc(title) + ' 행 추가" onclick="' + esc(addHandler) + '">＋</button></div>'
+      + '<div class="sh-coc-support-title">' + esc(title) + '</div>'
       + '<div class="sh-coc-support-shell">'
-        + '<table class="sh-coc-support-table"><thead><tr><th class="sh-coc-support-name-col">' + esc(leftLabel) + '</th><th>' + esc(rightLabel) + '</th><th class="sh-coc-support-del-col"></th></tr></thead><tbody>' + rowHtml + '</tbody></table>'
+        + '<table class="sh-coc-support-table"><thead><tr><th class="sh-coc-support-name-col">' + esc(leftLabel) + '</th><th>' + esc(rightLabel) + '</th></tr></thead><tbody>' + rowHtml + '</tbody></table>'
       + '</div>'
     + '</div>';
   }
@@ -39374,13 +39485,14 @@ function deleteCocWealthLedgerRow(chId, sheetId, sectionId, rowIdx) {
   if (!sheet.data || typeof sheet.data !== 'object') sheet.data = {};
   if (!sheet.data[sectionId] || typeof sheet.data[sectionId] !== 'object' || Array.isArray(sheet.data[sectionId])) sheet.data[sectionId] = {};
   var rows = normalizeCocWealthLedgerRows(sheet.data[sectionId].wealthLedger);
+  if (rows.length <= 1 || rowIdx < 0 || rowIdx >= rows.length) return;
   rows.splice(rowIdx, 1);
   sheet.data[sectionId].wealthLedger = rows;
   persist();
   renderCharacterSheet(chId);
 }
 
-function addCocWealthLedgerRow(chId, sheetId, sectionId) {
+function insertCocWealthLedgerRow(chId, sheetId, sectionId, rowIdx) {
   var ch = state.characters.find(function(c) { return c.id === chId; });
   if (!ch) return;
   var sheet = (ch.sheets || []).find(function(s) { return s.id === sheetId; });
@@ -39388,10 +39500,65 @@ function addCocWealthLedgerRow(chId, sheetId, sectionId) {
   if (!sheet.data) sheet.data = {};
   if (!sheet.data[sectionId] || typeof sheet.data[sectionId] !== 'object' || Array.isArray(sheet.data[sectionId])) sheet.data[sectionId] = {};
   var rows = normalizeCocWealthLedgerRows(sheet.data[sectionId].wealthLedger);
-  rows.push({ usage: '', income: '', expense: '', balance: '' });
+  var newIdx = parseInt(rowIdx, 10);
+  if (isNaN(newIdx)) newIdx = rows.length;
+  newIdx = Math.max(0, Math.min(newIdx, rows.length));
+  rows.splice(newIdx, 0, { usage: '', income: '', expense: '', balance: '' });
   sheet.data[sectionId].wealthLedger = rows;
   persist();
   renderCharacterSheet(chId);
+  setTimeout(function() {
+    var target = document.querySelector('[data-coc-ledger-row="' + newIdx + '"] input');
+    if (target) target.focus();
+  }, 0);
+}
+
+function openCocWealthLedgerRowMenu(event, chId, sheetId, sectionId, rowIdx) {
+  var rowCount = event && event.currentTarget && event.currentTarget.parentElement
+    ? event.currentTarget.parentElement.rows.length : 0;
+  return showCocTableRowMenu(
+    event,
+    function() { insertCocWealthLedgerRow(chId, sheetId, sectionId, rowIdx); },
+    function() { insertCocWealthLedgerRow(chId, sheetId, sectionId, rowIdx + 1); },
+    function() { deleteCocWealthLedgerRow(chId, sheetId, sectionId, rowIdx); },
+    rowCount > 1
+  );
+}
+
+function setCocWealthLedgerCurrency(chId, sheetId, sectionId, currency) {
+  var ch = state.characters.find(function(c) { return c.id === chId; });
+  if (!ch) return;
+  var sheet = (ch.sheets || []).find(function(s) { return s.id === sheetId; });
+  if (!sheet) return;
+  if (!sheet.data || typeof sheet.data !== 'object') sheet.data = {};
+  if (!sheet.data[sectionId] || typeof sheet.data[sectionId] !== 'object' || Array.isArray(sheet.data[sectionId])) sheet.data[sectionId] = {};
+  sheet.data[sectionId].wealthLedgerCurrency = normalizeCocWealthLedgerCurrency(currency);
+  persist();
+  renderCharacterSheet(chId);
+}
+
+function openCocWealthLedgerCurrencyMenu(event, chId, sheetId, sectionId) {
+  if (!event) return false;
+  event.preventDefault();
+  event.stopPropagation();
+  var ch = state.characters.find(function(c) { return c.id === chId; });
+  var sheet = ch && (ch.sheets || []).find(function(s) { return s.id === sheetId; });
+  var sectionData = sheet && sheet.data && sheet.data[sectionId];
+  var current = normalizeCocWealthLedgerCurrency(sectionData && sectionData.wealthLedgerCurrency);
+  var rect = event.currentTarget.getBoundingClientRect();
+  var currencies = [
+    { id: 'krw', label: '원화 (₩)' },
+    { id: 'usd', label: '달러 ($)' },
+    { id: 'jpy', label: '엔화 (¥)' },
+  ];
+  tbShowCtxMenu(rect.left, rect.bottom + 4, currencies.map(function(item) {
+    return {
+      icon: item.id === current ? '✓' : '',
+      label: item.label,
+      action: function() { setCocWealthLedgerCurrency(chId, sheetId, sectionId, item.id); },
+    };
+  }));
+  return false;
 }
 
 // 반복 섹션 셀 저장 (sheetId 기반)
