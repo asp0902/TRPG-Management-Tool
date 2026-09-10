@@ -21635,7 +21635,7 @@ async function saveAll() {
   try {
     await persistNow();
     const btn = document.getElementById('save-btn');
-    btn.textContent = '저장됨 ✓'; btn.style.background = '#16a34a'; btn.style.borderColor = '#16a34a';
+    btn.textContent = '저장됨 ✓'; btn.style.background = '#2563eb'; btn.style.borderColor = '#2563eb';
     setTimeout(() => { btn.textContent = '저장'; btn.style.background = ''; btn.style.borderColor = ''; }, 1800);
   } catch (err) {
     console.error('save failed:', err);

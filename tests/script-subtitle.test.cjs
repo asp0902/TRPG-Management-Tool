@@ -4,6 +4,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
+
+assert.match(html, /btn\.textContent = '저장됨 ✓'; btn\.style\.background = '#2563eb'; btn\.style\.borderColor = '#2563eb';/, 'SCRIPT 저장 완료 버튼은 파랑색이어야 합니다.');
 assert.match(html, /<textarea[^>]+id="i-subtitle"[^>]+rows="1"/, '정보 탭 부제는 여러 줄 입력이어야 합니다.');
 assert.match(html, /<textarea[^>]+id="body-display-subtitle"[^>]+rows="1"/, '본문 탭 부제는 여러 줄 입력이어야 합니다.');
 
