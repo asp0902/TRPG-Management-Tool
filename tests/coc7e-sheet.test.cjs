@@ -30,6 +30,11 @@ vm.runInNewContext(`${skillsPreset}\nresult = _COC7E_SKILLS_PRESET;`, skillsCont
 assert.equal(Array.from(skillsContext.result).find(skill => skill.id === 'sleight').name, '말재주');
 assert.match(html, /sk\.id === 'creditRating' \|\| sk\.id === 'cthulhuMythos'/);
 
+const supportSection = html.slice(html.indexOf('function renderCoc7eGearRelationsSection'), html.indexOf('// ── D&D 5판 캐릭터 빌더'));
+assert.match(supportSection, /listId === 'possessions' && rightFieldId === 'effect'/);
+assert.match(supportSection, /<textarea class="sh-coc-support-input sh-coc-support-textarea sh-field-textarea"[\s\S]*?data-auto-grow="1"[\s\S]*?autoResizeSheetTextarea\(this\)/);
+assert.match(html, /\.sh-coc-support-input\.sh-coc-support-textarea \{[^}]*min-height: 31px;[^}]*overflow: hidden;/);
+
 const backstoryTemplate = html.slice(html.indexOf("{ id: 'backstory'"), html.indexOf("  sw25:"));
 ['appearance', 'injuriesScars', 'traits', 'phobiasObsessions', 'ideology', 'mythBooksSpellsArtifacts', 'importantPeople', 'encounters', 'meaningfulPlaces', 'strangeExperiences', 'treasuredPossessions', 'other'].forEach(fieldId => {
   assert.match(backstoryTemplate, new RegExp("id: '" + fieldId + "'[^\\n]*autoGrow: true"), `${fieldId} 입력칸은 자동으로 높이가 늘어나야 합니다.`);

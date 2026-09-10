@@ -6827,6 +6827,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-coc-support-input { width: 100%; border: none; background: transparent; padding: 6px 8px; font-size: 12px; color: #222; font-family: inherit; outline: none; box-sizing: border-box; }
 .sh-coc-support-input:focus { background: #fcfcfc; }
 .sh-coc-support-input.is-name { text-align: center; }
+.sh-coc-support-input.sh-coc-support-textarea { display: block; min-height: 31px; border: none; border-radius: 0; background: transparent; padding: 6px 8px; font-size: 12px; line-height: 1.5; resize: none; overflow: hidden; }
 .sh-coc-support-name-col { width: 108px; }
 @media (max-width: 1100px) { .sh-coc-support-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .sh-coc-support-panels { grid-template-columns: 1fr; } }
@@ -38039,9 +38040,13 @@ function renderCoc7eGearRelationsSection(sec, sectionData, chId, sheetId) {
       var nameHandler = 'saveCoc7eSupportCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',' + idx + ',' + JSON.stringify('name') + ',this.value)';
       var rightHandler = 'saveCoc7eSupportCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',' + idx + ',' + JSON.stringify(rightFieldId) + ',this.value)';
       var keyHandler = 'handleCocSupportCellKeydown(event,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',' + idx + ',' + JSON.stringify(rightFieldId) + ')';
+      var isAutoGrowEffect = listId === 'possessions' && rightFieldId === 'effect';
+      var rightControl = isAutoGrowEffect
+        ? '<textarea class="sh-coc-support-input sh-coc-support-textarea sh-field-textarea" rows="1" data-auto-grow="1" data-coc-support-list="' + esc(listId) + '" data-coc-support-row="' + idx + '" data-coc-support-field="' + esc(rightFieldId) + '" oninput="' + esc(rightHandler + ';autoResizeSheetTextarea(this)') + '" onkeydown="' + esc(keyHandler) + '" spellcheck="false">' + esc(String(row[rightFieldId] || '')) + '</textarea>'
+        : '<input class="sh-coc-support-input" type="text" value="' + esc(String(row[rightFieldId] || '')) + '" data-coc-support-list="' + esc(listId) + '" data-coc-support-row="' + idx + '" data-coc-support-field="' + esc(rightFieldId) + '" oninput="' + esc(rightHandler) + '" onkeydown="' + esc(keyHandler) + '" spellcheck="false">';
       return '<tr>'
         + '<td><input class="sh-coc-support-input is-name" type="text" value="' + esc(String(row.name || '')) + '" data-coc-support-list="' + esc(listId) + '" data-coc-support-row="' + idx + '" data-coc-support-field="name" oninput="' + esc(nameHandler) + '" spellcheck="false"></td>'
-        + '<td><input class="sh-coc-support-input" type="text" value="' + esc(String(row[rightFieldId] || '')) + '" data-coc-support-list="' + esc(listId) + '" data-coc-support-row="' + idx + '" data-coc-support-field="' + esc(rightFieldId) + '" oninput="' + esc(rightHandler) + '" onkeydown="' + esc(keyHandler) + '" spellcheck="false"></td>'
+        + '<td>' + rightControl + '</td>'
         + '</tr>';
     }).join('');
     return '<div class="sh-coc-support-panel">'
