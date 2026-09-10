@@ -8,7 +8,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도�
 assert.match(html, /class="tb-font-menu-section">최근 사용 항목</, '글꼴 메뉴에 최근 사용 영역이 필요합니다.');
 assert.match(html, /class="tb-font-menu-section">모든 글꼴</, '글꼴 메뉴에 전체 목록 영역이 필요합니다.');
 assert.match(html, /customFonts: state\.customFonts,[\s\S]*?recentFonts: state\.recentFonts,/, '최근 글꼴을 앱 저장 데이터에 포함해야 합니다.');
-assert.match(html, /async function bootstrapApp\(\) \{\s*await load\(\);\s*loadCustomFonts\(\);\s*updateFontDropdown\(\);/, '저장 데이터를 읽은 뒤 글꼴 목록을 복원해야 합니다.');
+assert.match(html, /async function bootstrapApp\(\) \{\s*await load\(\);\s*await initGitHubSync\(\);\s*loadCustomFonts\(\);\s*updateFontDropdown\(\);/, '로컬·GitHub 저장 데이터를 읽은 뒤 글꼴 목록을 복원해야 합니다.');
 assert.match(html, /\.block-text-ce:has\(span\[style\*="font-family"\]\)\s*\{\s*line-height:\s*1\.6;/, '낮은 기본 줄간격에서는 글꼴이 잘리지 않도록 줄 전체에 여유를 줘야 합니다.');
 assert.match(html, /\[contenteditable="true"\] span\[style\*="font-family"\]\s*\{\s*line-height:\s*inherit;/, '부분 글꼴은 부모 줄간격을 상속해야 합니다.');
 

@@ -2408,6 +2408,8 @@ tr.ct-row-end .ct-select:focus {
 }
 .sidebar-footer button:hover { border-color: #555; color: #ccc; }
 .sidebar-footer button.active { border-color: #16a34a; color: #bbf7d0; background: rgba(22,163,74,0.12); }
+.sidebar-footer #github-sync-btn.active { border-color: #2563eb; color: #bfdbfe; background: rgba(37,99,235,0.14); }
+.sidebar-footer #github-sync-btn.error { border-color: #dc2626; color: #fecaca; background: rgba(220,38,38,0.12); }
 
 /* ─── MAIN ─── */
 #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -6012,6 +6014,17 @@ body.block-pointer-dragging {
 .rb-modal-cancel:hover { border-color: #999; color: #111; }
 .rb-modal-save { background: #111; color: #fff; border: none; border-radius: 8px; padding: 8px 20px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
 .rb-modal-save:hover { background: #333; }
+.github-sync-modal { width: min(520px, 100%); }
+.github-sync-repo { font-size: 13px; color: #333; font-weight: 700; }
+.github-sync-help { margin: 0; color: #777; font-size: 12px; line-height: 1.55; }
+.github-sync-help a { color: #2563eb; text-decoration: none; }
+.github-sync-help a:hover { text-decoration: underline; }
+.github-sync-status { min-height: 36px; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f8fafc; color: #555; font-size: 12px; line-height: 1.5; }
+.github-sync-status.success { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
+.github-sync-status.error { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
+.github-sync-modal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.github-sync-modal-actions button { flex: 1 1 140px; }
+.github-sync-disconnect { margin-right: auto; color: #b91c1c; }
 
 /* ─── RULEBOOK DETAIL VIEW ─── */
 #rb-detail-view { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
@@ -7275,6 +7288,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
     <button onclick="exportDatedBackup()">내보내기</button>
     <button onclick="document.getElementById('import-input').click()">가져오기</button>
     <button id="auto-backup-btn" onclick="toggleAutoBackup()">자동 백업</button>
+    <button id="github-sync-btn" onclick="openGitHubSyncModal()">GitHub 동기화</button>
     <input type="file" id="import-input" accept=".json" style="display:none" onchange="importAll(event)">
   </div>
 </div>
@@ -8364,6 +8378,41 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
     </div>
   </div>
 
+  <!-- GITHUB SYNC MODAL -->
+  <div id="github-sync-backdrop" class="rb-modal-backdrop" style="z-index: 10000;"
+    role="dialog" aria-modal="true" aria-labelledby="github-sync-heading"
+    onclick="if(event.target===this)closeGitHubSyncModal()"
+    onkeydown="if(event.key==='Escape')closeGitHubSyncModal()">
+    <div class="rb-modal github-sync-modal" onclick="event.stopPropagation()">
+      <div class="rb-modal-heading" id="github-sync-heading">GitHub 동기화</div>
+      <div class="github-sync-repo">asp0902/TRPG-Management-Tool · sync</div>
+      <div class="rb-modal-field">
+        <label class="rb-modal-label req" for="github-sync-token">저장소 전용 토큰</label>
+        <input type="password" id="github-sync-token" class="rb-modal-input"
+          placeholder="Fine-grained token" autocomplete="new-password" spellcheck="false">
+      </div>
+      <label class="rb-modal-check-row">
+        <input type="checkbox" id="github-sync-enabled" checked>
+        자동 동기화 사용
+      </label>
+      <p class="github-sync-help">
+        변경 데이터는 최대 10분 간격으로 업로드됩니다. 토큰에는 이 저장소의
+        <strong>Contents 읽기/쓰기</strong> 권한만 부여하세요.
+        <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">토큰 만들기</a>
+      </p>
+      <div id="github-sync-status" class="github-sync-status" aria-live="polite">연결되지 않음</div>
+      <div class="github-sync-modal-actions">
+        <button type="button" class="rb-modal-cancel" onclick="pullGitHubSyncNow()">최신본 불러오기</button>
+        <button type="button" class="rb-modal-cancel" onclick="pushGitHubSyncNow()">현재 데이터 업로드</button>
+      </div>
+      <div class="rb-modal-footer">
+        <button type="button" class="rb-modal-cancel github-sync-disconnect" onclick="disconnectGitHubSync()">연결 해제</button>
+        <button type="button" class="rb-modal-cancel" onclick="closeGitHubSyncModal()">취소</button>
+        <button type="button" class="rb-modal-save" onclick="saveGitHubSyncSettings()">저장 및 동기화</button>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /main -->
 
 <script>
@@ -9417,6 +9466,7 @@ const APP_STATE_SCHEMA_VERSION = 3;
 let persistTimer = null;
 let persistDirty = false;
 let persistChain = Promise.resolve();
+let lastLocalSavedAt = '';
 
 function makeStatePayload() {
   normalizeSidebarState();
@@ -9542,7 +9592,11 @@ async function putIndexedState(payload) {
   });
 }
 function queuePersistPayload(payload) {
-  const job = persistChain.catch(() => {}).then(() => putIndexedState(payload));
+  const job = persistChain.catch(() => {}).then(async () => {
+    await putIndexedState(payload);
+    lastLocalSavedAt = payload?.savedAt || lastLocalSavedAt;
+    return payload;
+  });
   persistChain = job.catch(() => {});
   return job;
 }
@@ -9551,6 +9605,7 @@ async function load() {
   try {
     const indexed = await getIndexedState();
     if (indexed) {
+      lastLocalSavedAt = typeof indexed.savedAt === 'string' ? indexed.savedAt : '';
       const needsMigration = Number(indexed.version || 0) < APP_STATE_SCHEMA_VERSION;
       applyStatePayload(indexed);
       if (needsMigration) {
@@ -9591,9 +9646,10 @@ async function persistNow() {
   persistDirty = false;
   return await queuePersistPayload(makeStatePayload());
 }
-function persist() {
+function persist(options = {}) {
   if (currentPage === 'datasheet') commitDataSheetHistoryFromPersist();
   persistDirty = true;
+  if (options.remoteDirty !== false) markGitHubSyncDirty();
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
     flushPersist().catch(err => {
@@ -21640,6 +21696,7 @@ async function saveAll() {
   syncInfo({ commit: false });
   try {
     await persistNow();
+    markGitHubSyncDirty();
     const btn = document.getElementById('save-btn');
     btn.textContent = '저장됨 ✓'; btn.style.background = '#2563eb'; btn.style.borderColor = '#2563eb';
     setTimeout(() => { btn.textContent = '저장'; btn.style.background = ''; btn.style.borderColor = ''; }, 1800);
@@ -21866,6 +21923,317 @@ async function initAutoBackup() {
   } catch (err) {
     console.error('auto backup init failed:', err);
   }
+}
+
+// GitHub Pages는 앱만 배포한다. 데이터는 비공개 sync 브랜치의 단일 최신본으로 동기화한다.
+const GITHUB_SYNC_REPO = 'asp0902/TRPG-Management-Tool';
+const GITHUB_SYNC_BRANCH = 'sync';
+const GITHUB_SYNC_PATH = 'trpg-tool.latest.json';
+const GITHUB_SYNC_TOKEN_KEY = 'trpg-github-sync-token';
+const GITHUB_SYNC_ENABLED_KEY = 'trpg-github-sync-enabled';
+const GITHUB_SYNC_LAST_SHA_KEY = 'trpg-github-sync-last-sha';
+const GITHUB_SYNC_LAST_AT_KEY = 'trpg-github-sync-last-at';
+const GITHUB_SYNC_IDLE_MS = 60 * 1000;
+const GITHUB_SYNC_INTERVAL_MS = 10 * 60 * 1000;
+let githubSyncDirty = false;
+let githubSyncDirtySince = 0;
+let githubSyncTimer = null;
+let githubSyncPollTimer = null;
+let githubSyncInFlight = null;
+let githubSyncStatus = '';
+let githubSyncStatusType = '';
+
+function getGitHubSyncToken() {
+  return localStorage.getItem(GITHUB_SYNC_TOKEN_KEY) || '';
+}
+function isGitHubSyncEnabled() {
+  return localStorage.getItem(GITHUB_SYNC_ENABLED_KEY) === '1' && !!getGitHubSyncToken();
+}
+function getGitHubSyncApiUrl() {
+  const path = GITHUB_SYNC_PATH.split('/').map(encodeURIComponent).join('/');
+  return `https://api.github.com/repos/${GITHUB_SYNC_REPO}/contents/${path}`;
+}
+function getGitHubSyncDecision(input) {
+  if (!input.remoteExists) return input.localHasData ? 'push' : 'idle';
+  if (!input.paired) {
+    if (!input.localHasData) return 'pull';
+    if (!input.remoteSavedAt) return 'conflict';
+    return input.remoteSavedAt >= input.localSavedAt ? 'pull' : 'push';
+  }
+  if (input.remoteChanged && input.localChanged) return 'conflict';
+  if (input.remoteChanged) return 'pull';
+  if (input.localChanged) return 'push';
+  return 'idle';
+}
+function hasGitHubSyncData() {
+  return ['scenarios','folders','cssMacroFolders','records','catalog','cssMacros','cssPopupDictionary','bookmarks','rulebooks','dataSheets','characters','customFonts','recentFonts','findReplaceHistory']
+    .some(key => Array.isArray(state[key]) && state[key].length > 0);
+}
+function setGitHubSyncStatus(message, type = '') {
+  githubSyncStatus = message;
+  githubSyncStatusType = type;
+  const status = document.getElementById('github-sync-status');
+  if (status) {
+    status.textContent = message;
+    status.classList.toggle('success', type === 'success');
+    status.classList.toggle('error', type === 'error');
+  }
+  updateGitHubSyncButton();
+}
+function updateGitHubSyncButton() {
+  const btn = document.getElementById('github-sync-btn');
+  if (!btn) return;
+  const active = isGitHubSyncEnabled();
+  btn.classList.toggle('active', active && githubSyncStatusType !== 'error');
+  btn.classList.toggle('error', githubSyncStatusType === 'error');
+  btn.textContent = githubSyncInFlight ? '동기화 중' : (githubSyncStatusType === 'error' ? 'GitHub 확인' : (active ? 'GitHub 연결됨' : 'GitHub 동기화'));
+  const lastAt = localStorage.getItem(GITHUB_SYNC_LAST_AT_KEY);
+  btn.title = githubSyncStatus || (lastAt ? `마지막 동기화: ${new Date(lastAt).toLocaleString()}` : 'GitHub 자동 동기화 설정');
+}
+function openGitHubSyncModal() {
+  const token = getGitHubSyncToken();
+  const input = document.getElementById('github-sync-token');
+  const enabled = document.getElementById('github-sync-enabled');
+  if (input) {
+    input.value = '';
+    input.placeholder = token ? '저장된 토큰 사용 중' : 'Fine-grained token';
+  }
+  if (enabled) enabled.checked = localStorage.getItem(GITHUB_SYNC_ENABLED_KEY) !== '0';
+  const lastAt = localStorage.getItem(GITHUB_SYNC_LAST_AT_KEY);
+  setGitHubSyncStatus(githubSyncStatus || (lastAt ? `마지막 동기화: ${new Date(lastAt).toLocaleString()}` : '연결되지 않음'), githubSyncStatusType);
+  document.getElementById('github-sync-backdrop')?.classList.add('open');
+  setTimeout(() => input?.focus(), 0);
+}
+function closeGitHubSyncModal() {
+  document.getElementById('github-sync-backdrop')?.classList.remove('open');
+}
+function stopGitHubSyncTimers() {
+  if (githubSyncTimer) clearTimeout(githubSyncTimer);
+  if (githubSyncPollTimer) clearInterval(githubSyncPollTimer);
+  githubSyncTimer = null;
+  githubSyncPollTimer = null;
+}
+function startGitHubSyncTimers() {
+  stopGitHubSyncTimers();
+  if (!isGitHubSyncEnabled()) return;
+  githubSyncPollTimer = setInterval(() => syncGitHubState({ automatic: true }), GITHUB_SYNC_INTERVAL_MS);
+  if (githubSyncDirty) scheduleGitHubSync();
+}
+function markGitHubSyncDirty() {
+  githubSyncDirty = true;
+  if (!githubSyncDirtySince) githubSyncDirtySince = Date.now();
+  scheduleGitHubSync();
+}
+function scheduleGitHubSync() {
+  if (!isGitHubSyncEnabled()) return;
+  if (githubSyncTimer) clearTimeout(githubSyncTimer);
+  const lastSync = Date.parse(localStorage.getItem(GITHUB_SYNC_LAST_AT_KEY) || '') || 0;
+  const idleDue = Date.now() + GITHUB_SYNC_IDLE_MS;
+  const limitDue = (githubSyncDirtySince || Date.now()) + GITHUB_SYNC_INTERVAL_MS;
+  const due = Math.max(lastSync + GITHUB_SYNC_INTERVAL_MS, Math.min(idleDue, limitDue));
+  githubSyncTimer = setTimeout(() => {
+    githubSyncTimer = null;
+    syncGitHubState({ automatic: true });
+  }, Math.max(0, due - Date.now()));
+}
+async function githubSyncRequest(url, options = {}) {
+  const token = getGitHubSyncToken();
+  if (!token) throw new Error('GitHub 토큰이 없습니다.');
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(options.headers || {}),
+    },
+  });
+  if (options.allow404 && response.status === 404) return null;
+  if (!response.ok) {
+    let detail = '';
+    try { detail = (await response.json())?.message || ''; } catch(e) {}
+    throw new Error(`GitHub ${response.status}${detail ? `: ${detail}` : ''}`);
+  }
+  return response;
+}
+async function getGitHubSyncMeta() {
+  const url = `${getGitHubSyncApiUrl()}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}`;
+  const response = await githubSyncRequest(url, { allow404: true });
+  if (!response) return { exists: false, sha: '', size: 0 };
+  const data = await response.json();
+  return { exists: true, sha: data.sha || '', size: Number(data.size) || 0 };
+}
+async function getGitHubSyncRemote(meta) {
+  const url = `${getGitHubSyncApiUrl()}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}`;
+  const response = await githubSyncRequest(url, {
+    headers: { Accept: 'application/vnd.github.raw+json' },
+  });
+  let data;
+  try { data = JSON.parse(await response.text()); }
+  catch (err) { throw new Error('GitHub 최신본 JSON이 손상되었습니다.'); }
+  makeImportPayload(data);
+  return { ...meta, data };
+}
+function utf8ToBase64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+async function putGitHubSyncPayload(payload, sha = '') {
+  const body = {
+    message: `자동 동기화 ${new Date(payload.savedAt).toLocaleString('ko-KR')}`,
+    content: utf8ToBase64(JSON.stringify(payload)),
+    branch: GITHUB_SYNC_BRANCH,
+  };
+  if (sha) body.sha = sha;
+  const response = await githubSyncRequest(getGitHubSyncApiUrl(), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json();
+  return result?.content?.sha || '';
+}
+function rememberGitHubSync(sha, syncedAt) {
+  localStorage.setItem(GITHUB_SYNC_LAST_SHA_KEY, sha || '');
+  localStorage.setItem(GITHUB_SYNC_LAST_AT_KEY, syncedAt || new Date().toISOString());
+  githubSyncDirty = false;
+  githubSyncDirtySince = 0;
+}
+async function applyGitHubSyncRemote(remote, refresh = true) {
+  const payload = makeImportPayload(remote.data);
+  replaceStateWithImportPayload(payload);
+  normalizeSidebarState({ promoteLegacyContent: true });
+  const saved = await persistNow();
+  rememberGitHubSync(remote.sha, saved.savedAt);
+  if (refresh) refreshAfterImport(true);
+}
+async function uploadGitHubSyncState(meta) {
+  if (currentPage === 'script' && state.currentId) syncInfo({ commit: false });
+  const payload = await persistNow();
+  const sha = await putGitHubSyncPayload(payload, meta.exists ? meta.sha : '');
+  rememberGitHubSync(sha, payload.savedAt);
+}
+async function runGitHubSync(options = {}) {
+  if (!getGitHubSyncToken()) throw new Error('GitHub 토큰을 먼저 입력하세요.');
+  if (!isGitHubSyncEnabled() && !options.manual) return false;
+  setGitHubSyncStatus('GitHub 최신본 확인 중...');
+  await flushPersist();
+  const meta = await getGitHubSyncMeta();
+  if (options.forcePull) {
+    if (!meta.exists) throw new Error('GitHub에 저장된 최신본이 없습니다.');
+    await applyGitHubSyncRemote(await getGitHubSyncRemote(meta), !options.startup);
+    setGitHubSyncStatus('GitHub 최신본을 불러왔습니다.', 'success');
+    return true;
+  }
+  if (options.forcePush) {
+    await uploadGitHubSyncState(meta);
+    setGitHubSyncStatus('현재 데이터를 GitHub에 업로드했습니다.', 'success');
+    return true;
+  }
+
+  const lastSha = localStorage.getItem(GITHUB_SYNC_LAST_SHA_KEY) || '';
+  const lastSyncAt = Date.parse(localStorage.getItem(GITHUB_SYNC_LAST_AT_KEY) || '') || 0;
+  const localSavedAt = Date.parse(lastLocalSavedAt || '') || 0;
+  const localChanged = githubSyncDirty || localSavedAt > lastSyncAt;
+  const remoteChanged = meta.exists && meta.sha !== lastSha;
+  let remote = null;
+  if (meta.exists && (!lastSha || remoteChanged)) remote = await getGitHubSyncRemote(meta);
+  const remoteSavedAt = Date.parse(remote?.data?.savedAt || remote?.data?.exportedAt || '') || 0;
+  const decision = getGitHubSyncDecision({
+    remoteExists: meta.exists,
+    paired: !!lastSha,
+    remoteChanged,
+    localChanged,
+    localHasData: hasGitHubSyncData(),
+    localSavedAt,
+    remoteSavedAt,
+  });
+  if (decision === 'conflict') {
+    throw new Error('동기화 충돌: 이 기기와 GitHub가 모두 변경되었습니다. 최신본 불러오기 또는 현재 데이터 업로드를 선택하세요.');
+  }
+  if (decision === 'pull') {
+    await applyGitHubSyncRemote(remote || await getGitHubSyncRemote(meta), !options.startup);
+    setGitHubSyncStatus('GitHub 최신본을 불러왔습니다.', 'success');
+    return true;
+  }
+  if (decision === 'push') {
+    await uploadGitHubSyncState(meta);
+    setGitHubSyncStatus('변경 내용을 GitHub에 업로드했습니다.', 'success');
+    return true;
+  }
+  if (meta.exists && !lastSha) rememberGitHubSync(meta.sha, lastLocalSavedAt || new Date().toISOString());
+  setGitHubSyncStatus(meta.exists ? '최신 상태입니다.' : '동기화할 데이터가 없습니다.', 'success');
+  return true;
+}
+function syncGitHubState(options = {}) {
+  if (githubSyncInFlight) return githubSyncInFlight;
+  if (githubSyncTimer) clearTimeout(githubSyncTimer);
+  githubSyncTimer = null;
+  githubSyncInFlight = runGitHubSync(options).catch(err => {
+    console.error('GitHub sync failed:', err);
+    setGitHubSyncStatus(err?.message || 'GitHub 동기화에 실패했습니다.', 'error');
+    return false;
+  }).finally(() => {
+    githubSyncInFlight = null;
+    updateGitHubSyncButton();
+  });
+  updateGitHubSyncButton();
+  return githubSyncInFlight;
+}
+async function saveGitHubSyncSettings() {
+  const input = document.getElementById('github-sync-token');
+  const token = input?.value.trim() || getGitHubSyncToken();
+  if (!token) {
+    setGitHubSyncStatus('저장소 전용 토큰을 입력하세요.', 'error');
+    input?.focus();
+    return;
+  }
+  localStorage.setItem(GITHUB_SYNC_TOKEN_KEY, token);
+  localStorage.setItem(GITHUB_SYNC_ENABLED_KEY, document.getElementById('github-sync-enabled')?.checked ? '1' : '0');
+  if (input) input.value = '';
+  startGitHubSyncTimers();
+  if (isGitHubSyncEnabled()) await syncGitHubState({ manual: true });
+  else setGitHubSyncStatus('자동 동기화가 꺼졌습니다.');
+}
+async function pullGitHubSyncNow() {
+  if (!getGitHubSyncToken()) {
+    setGitHubSyncStatus('토큰을 저장한 뒤 최신본을 불러오세요.', 'error');
+    return;
+  }
+  if (!confirm('현재 기기의 데이터를 GitHub 최신본으로 교체하시겠습니까?')) return;
+  await syncGitHubState({ manual: true, forcePull: true });
+}
+async function pushGitHubSyncNow() {
+  if (!getGitHubSyncToken()) {
+    setGitHubSyncStatus('토큰을 저장한 뒤 업로드하세요.', 'error');
+    return;
+  }
+  if (!confirm('GitHub 최신본을 현재 기기의 데이터로 교체하시겠습니까?')) return;
+  await syncGitHubState({ manual: true, forcePush: true });
+}
+function disconnectGitHubSync() {
+  if (!getGitHubSyncToken()) return closeGitHubSyncModal();
+  if (!confirm('이 기기에서 GitHub 동기화 연결을 해제하시겠습니까?\nGitHub에 저장된 데이터는 삭제되지 않습니다.')) return;
+  stopGitHubSyncTimers();
+  [GITHUB_SYNC_TOKEN_KEY, GITHUB_SYNC_ENABLED_KEY, GITHUB_SYNC_LAST_SHA_KEY, GITHUB_SYNC_LAST_AT_KEY].forEach(key => localStorage.removeItem(key));
+  githubSyncDirty = false;
+  githubSyncDirtySince = 0;
+  githubSyncStatus = '';
+  githubSyncStatusType = '';
+  updateGitHubSyncButton();
+  closeGitHubSyncModal();
+  showToast('GitHub 동기화 연결을 해제했습니다.');
+}
+async function initGitHubSync() {
+  updateGitHubSyncButton();
+  if (!isGitHubSyncEnabled()) return;
+  startGitHubSyncTimers();
+  await syncGitHubState({ automatic: true, startup: true });
 }
 function normalizeCatalogImportEntry(input = {}) {
   const base = mkCatalogEntry();
@@ -22166,6 +22534,7 @@ function importAll(e) {
       }
 
       refreshAfterImport(replaceMode);
+      markGitHubSyncDirty();
       const summary = formatImportSummary(payload);
       alert(replaceMode
         ? `백업 데이터로 덮어쓰기가 완료되었습니다.\n\n${summary}를 복원했습니다.`
@@ -29408,6 +29777,7 @@ function fitCharacterPortrait(img) {
 
 async function bootstrapApp() {
   await load();
+  await initGitHubSync();
   loadCustomFonts();
   updateFontDropdown();
   resetCssMacroHistory();
@@ -29461,12 +29831,12 @@ window.addEventListener('resize', restoreScriptSidePanelWidths);
 compactSidebarMedia.addEventListener('change', syncSidebarForViewport);
 document.getElementById('rf-scenario').addEventListener('change', updateCustomNameRow);
 
-setInterval(() => { if (currentPage === 'script' && state.currentId) { syncInfo({ commit: false }); persist(); } }, 60000);
+setInterval(() => { if (currentPage === 'script' && state.currentId) { syncInfo({ commit: false }); persist({ remoteDirty: false }); } }, 60000);
 
 function flushBeforePageHide() {
   try {
     if (currentPage === 'script' && state.currentId) syncInfo({ commit: false });
-    persist();
+    persist({ remoteDirty: false });
     flushPersist().catch(err => {
       console.warn('last-minute persist failed:', err);
     });
@@ -29477,7 +29847,9 @@ function flushBeforePageHide() {
 window.addEventListener('pagehide', flushBeforePageHide);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') flushBeforePageHide();
+  else if (isGitHubSyncEnabled()) syncGitHubState({ automatic: true });
 });
+window.addEventListener('online', () => { if (isGitHubSyncEnabled()) syncGitHubState({ automatic: true }); });
 
 document.addEventListener('input', e => {
   if (e.target.classList.contains('btcp-textarea')) btcpAutoResize(e.target);
