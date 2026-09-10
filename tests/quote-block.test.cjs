@@ -60,6 +60,24 @@ assert.match(
   /wrap\.querySelectorAll\('\.editor-quote-children'\)\.forEach\(node => node\.remove\(\)\)/,
   '렌더링 UI는 인용 원문 HTML에 저장되면 안 됩니다.',
 );
+assert.match(
+  html,
+  /openQuoteContextMenu\(quote, event\.clientX, event\.clientY, event\);\s*\}, true\);/,
+  '인용 블록 우클릭 메뉴는 선택 텍스트 컨텍스트를 전달해야 합니다.',
+);
+
+const quoteMenuFunction = html.match(/function openQuoteContextMenu\(quoteEl, x, y, event = null\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(quoteMenuFunction, '인용 블록 메뉴 함수를 찾을 수 없습니다.');
+let quoteMenuItems = [];
+vm.runInNewContext(`${quoteMenuFunction}; openQuoteContextMenu(quote, 10, 20, event);`, {
+  quote: {},
+  event: {},
+  tbGetVariationCtxItems: () => [{ label: '개변 추가' }],
+  getQuoteChildInsertRange: () => null,
+  makeQuoteChildInsertCtxItem: () => null,
+  tbShowCtxMenu: (_x, _y, items) => { quoteMenuItems = items; },
+});
+assert.equal(quoteMenuItems[0].label, '개변 추가', '인용 블록 메뉴 첫 항목에 개변 기능이 있어야 합니다.');
 
 const colorFunction = html.match(/function getQuoteTextColor\(background\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(colorFunction, '인용 글자색 계산 함수를 찾을 수 없습니다.');

@@ -25169,9 +25169,11 @@ function makeQuoteChildInsertCtxItem(quoteEl, insertionRange = getQuoteChildInse
     })),
   };
 }
-function openQuoteContextMenu(quoteEl, x, y) {
+function openQuoteContextMenu(quoteEl, x, y, event = null) {
+  const items = event ? tbGetVariationCtxItems(event) : [];
+  if (items.length) items.push({ sep: true });
   const childItem = makeQuoteChildInsertCtxItem(quoteEl, getQuoteChildInsertRange(quoteEl));
-  const items = childItem ? [childItem, { sep: true }] : [];
+  if (childItem) items.push(childItem, { sep: true });
   items.push(
     {
       icon: '<i class="fa-solid fa-fill-drip"></i>',
@@ -25330,7 +25332,7 @@ document.addEventListener('contextmenu', event => {
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation?.();
-  openQuoteContextMenu(quote, event.clientX, event.clientY);
+  openQuoteContextMenu(quote, event.clientX, event.clientY, event);
 }, true);
 
 function initLinkInsertDialogEvents() {
