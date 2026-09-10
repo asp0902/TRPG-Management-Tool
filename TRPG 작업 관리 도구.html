@@ -2425,12 +2425,16 @@ tr.ct-row-end .ct-select:focus {
   flex: 0 0 auto; width: 150px; max-width: min(150px, 42vw); height: 31px;
   display: flex; align-items: center; gap: 6px; padding: 0 7px 0 12px;
   color: #666; background: #d9dade; border: 1px solid transparent; border-bottom: 0;
-  border-radius: 7px 7px 0 0; cursor: pointer; user-select: none;
+  border-radius: 7px 7px 0 0; cursor: grab; user-select: none;
 }
+.app-page-tab:active { cursor: grabbing; }
 .app-page-tab:hover { background: #e1e2e5; color: #333; }
 .app-page-tab.active {
   color: #111; background: #fff; border-color: #d2d3d5;
 }
+.app-page-tab.dragging { opacity: 0.45; }
+.app-page-tab.drag-before { box-shadow: inset 3px 0 #2563eb; }
+.app-page-tab.drag-after { box-shadow: inset -3px 0 #2563eb; }
 .app-page-tab-label {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: 11px; font-weight: 800; letter-spacing: 0;
@@ -29649,6 +29653,19 @@ function removeAppPageTab(page) {
   saveOpenAppPages();
   renderAppPageTabs();
 }
+function moveAppPageTab(sourcePage, targetPage, placeAfter = false) {
+  const sourceIndex = openAppPages.indexOf(sourcePage);
+  const targetIndex = openAppPages.indexOf(targetPage);
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return false;
+  const pages = openAppPages.slice();
+  pages.splice(sourceIndex, 1);
+  pages.splice(pages.indexOf(targetPage) + (placeAfter ? 1 : 0), 0, sourcePage);
+  if (pages.every((page, index) => page === openAppPages[index])) return false;
+  openAppPages = pages;
+  saveOpenAppPages();
+  renderAppPageTabs();
+  return true;
+}
 function renderAppPageTabs() {
   const container = document.getElementById('app-page-tabs');
   if (!container) return;
@@ -29656,8 +29673,8 @@ function renderAppPageTabs() {
     const isActive = page === currentPage;
     const canClose = openAppPages.length > 1 || page !== 'script';
     const label = getAppPageLabel(page);
-    return '<div class="app-page-tab' + (isActive ? ' active' : '') + '" role="tab" tabindex="0"'
-      + ' aria-selected="' + isActive + '" data-page="' + esc(page) + '">'
+    return '<div class="app-page-tab' + (isActive ? ' active' : '') + '" role="tab" tabindex="0" draggable="true"'
+      + ' aria-selected="' + isActive + '" aria-label="' + esc(label) + ' 탭. 드래그 또는 Alt+좌우 방향키로 순서 변경" data-page="' + esc(page) + '">'
       + '<span class="app-page-tab-label">' + esc(label) + '</span>'
       + (canClose ? '<button class="app-page-tab-close" type="button" data-page="' + esc(page)
         + '" title="탭 닫기" aria-label="' + esc(label) + ' 탭 닫기"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>' : '')
@@ -29883,12 +29900,57 @@ document.getElementById('app-page-tabs').addEventListener('click', function(e) {
   if (tab) switchPage(tab.dataset.page);
 });
 document.getElementById('app-page-tabs').addEventListener('keydown', function(e) {
-  if (e.key !== 'Enter' && e.key !== ' ') return;
   const tab = e.target.closest('.app-page-tab');
   if (!tab || e.target.closest('.app-page-tab-close')) return;
+  if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    const sourceIndex = openAppPages.indexOf(tab.dataset.page);
+    const targetIndex = sourceIndex + (e.key === 'ArrowLeft' ? -1 : 1);
+    if (targetIndex < 0 || targetIndex >= openAppPages.length) return;
+    e.preventDefault();
+    const page = tab.dataset.page;
+    moveAppPageTab(page, openAppPages[targetIndex], e.key === 'ArrowRight');
+    requestAnimationFrame(() => document.querySelector('.app-page-tab[data-page="' + CSS.escape(page) + '"]')?.focus());
+    return;
+  }
+  if (e.key !== 'Enter' && e.key !== ' ') return;
   e.preventDefault();
   switchPage(tab.dataset.page);
 });
+let draggedAppPage = '';
+function clearAppPageTabDragState() {
+  draggedAppPage = '';
+  document.querySelectorAll('.app-page-tab.dragging, .app-page-tab.drag-before, .app-page-tab.drag-after')
+    .forEach(tab => tab.classList.remove('dragging', 'drag-before', 'drag-after'));
+}
+document.getElementById('app-page-tabs').addEventListener('dragstart', function(e) {
+  const tab = e.target.closest('.app-page-tab');
+  if (!tab || e.target.closest('.app-page-tab-close')) { e.preventDefault(); return; }
+  draggedAppPage = tab.dataset.page;
+  tab.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', draggedAppPage);
+});
+document.getElementById('app-page-tabs').addEventListener('dragover', function(e) {
+  const tab = e.target.closest('.app-page-tab');
+  document.querySelectorAll('.app-page-tab.drag-before, .app-page-tab.drag-after')
+    .forEach(item => item.classList.remove('drag-before', 'drag-after'));
+  if (!draggedAppPage || !tab || tab.dataset.page === draggedAppPage) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const rect = tab.getBoundingClientRect();
+  tab.classList.add(e.clientX > rect.left + rect.width / 2 ? 'drag-after' : 'drag-before');
+});
+document.getElementById('app-page-tabs').addEventListener('drop', function(e) {
+  const tab = e.target.closest('.app-page-tab');
+  if (!draggedAppPage || !tab || tab.dataset.page === draggedAppPage) return;
+  e.preventDefault();
+  const sourcePage = draggedAppPage;
+  const rect = tab.getBoundingClientRect();
+  const placeAfter = e.clientX > rect.left + rect.width / 2;
+  clearAppPageTabDragState();
+  moveAppPageTab(sourcePage, tab.dataset.page, placeAfter);
+});
+document.getElementById('app-page-tabs').addEventListener('dragend', clearAppPageTabDragState);
 document.addEventListener('mousedown', function(e) {
   const wrap = document.getElementById('sidebar-logo-wrap');
   if (wrap && !wrap.contains(e.target)) wrap.classList.remove('open');
