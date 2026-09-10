@@ -399,6 +399,15 @@ tr.ct-row-end .ct-select:focus {
 .record-form-input:focus, .record-form-select:focus, .record-form-textarea:focus { border-color: #000; }
 .record-form-textarea { min-height: 64px; resize: vertical; line-height: 1.6; }
 .record-form-hint { font-size: 11px; color: #8a8a8a; line-height: 1.45; min-height: 16px; }
+.record-custom-scenario-fields { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.record-custom-scenario-fields .record-form-input { flex: 1 1 auto; min-width: 0; }
+.record-scenario-image-thumb {
+  flex: 0 0 112px; height: 33px; border: 1px solid #e4e4e4; border-radius: 5px;
+  background: #fff; color: #777; cursor: pointer; display: inline-flex; align-items: center;
+  justify-content: center; gap: 6px; padding: 4px 8px; font: inherit; font-size: 10px; font-weight: 700;
+}
+.record-scenario-image-thumb:hover { border-color: #999; color: #111; }
+.record-scenario-image-thumb img { width: 23px; height: 23px; border-radius: 3px; object-fit: cover; display: block; }
 .record-inline-add-btn {
   align-self: flex-start; background: none; border: 1px dashed #d0d0d0; border-radius: 6px;
   padding: 6px 10px; font-size: 12px; color: #666; cursor: pointer; font-family: inherit;
@@ -7850,7 +7859,11 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
               </div>
               <div class="record-form-row" id="rf-custom-name-row" style="display:none">
                 <label class="record-form-label">시나리오명 (직접 입력)</label>
-                <input type="text" class="record-form-input" id="rf-custom-name" placeholder="시나리오 이름">
+                <div class="record-custom-scenario-fields" id="rf-custom-scenario-fields">
+                  <input type="text" class="record-form-input" id="rf-custom-name" placeholder="시나리오 이름">
+                  <button type="button" class="record-scenario-image-thumb" id="rf-scenario-image-thumb" title="대표 이미지 설정" onclick="openRecordImageUrlPopup(this)">＋ 대표 이미지</button>
+                  <input type="hidden" id="rf-scenario-image">
+                </div>
               </div>
               <!-- GM 좌측 고정 | PL 우측 확장 -->
               <div class="record-form-row full">
@@ -7916,9 +7929,12 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
           <div class="record-image-url-popup-title">이미지 설정</div>
           <input type="text" id="record-image-url-popup-input" class="record-image-url-popup-input" placeholder="https://... (비우면 제거)">
           <button type="button" class="image-block-source-btn" onclick="document.getElementById('record-image-file-input').click()">
-            <i class="fa-solid fa-folder-open"></i><span>파일 불러오기</span>
+            <i class="fa-solid fa-folder-open"></i><span>파일 선택</span>
           </button>
           <input type="file" id="record-image-file-input" accept="image/*" hidden onchange="onRecordImageFile(event)">
+          <div class="image-block-paste-zone" tabindex="0" onpaste="onRecordImagePaste(event)">
+            <i class="fa-solid fa-paste"></i><span>클립보드에서 붙여넣기</span><kbd>Ctrl+V</kbd>
+          </div>
           <div class="record-image-url-popup-actions">
             <button type="button" class="record-image-url-popup-btn" onclick="closeRecordImageUrlPopup()">취소</button>
             <button type="button" class="record-image-url-popup-btn primary" onclick="saveRecordImageUrlPopup()">적용</button>
@@ -9228,6 +9244,7 @@ function mkRecordEntry(input = {}) {
     id: input?.id || mkId(),
     scenarioId: typeof input?.scenarioId === 'string' ? input.scenarioId : '',
     scenarioName: typeof input?.scenarioName === 'string' ? input.scenarioName : '',
+    scenarioImage: typeof input?.scenarioImage === 'string' ? input.scenarioImage : '',
     date: normalizeRecordDateValue(dateTime || input?.date),
     dateTime,
     gm: gmData.gmName,
@@ -26996,6 +27013,7 @@ function buildRecordFormSeedFromRecord(record) {
   return normalizeRecordEntry({
     scenarioId: record?.scenarioId || '',
     scenarioName: record?.scenarioName || '',
+    scenarioImage: record?.scenarioImage || '',
     dateTime: record?.dateTime || record?.date || '',
     gm: record?.gm || record?.gmName || '',
     gmName: record?.gmName || record?.gm || '',
@@ -27159,6 +27177,16 @@ function syncRecordGmCard() {
   syncRecordImageCard(gmCard, '.record-gm-image', '.record-gm-thumb');
 }
 
+function syncRecordScenarioImageCard() {
+  const hidden = document.getElementById('rf-scenario-image');
+  const thumb = document.getElementById('rf-scenario-image-thumb');
+  const src = String(hidden?.value || '').trim();
+  if (!thumb) return;
+  thumb.innerHTML = src
+    ? `<img src="${esc(src)}" alt="" onerror="this.parentNode.innerHTML='<span>IMAGE</span>'"><span>대표 이미지</span>`
+    : '<span>＋ 대표 이미지</span>';
+}
+
 function focusRecordSessionTagInput() {
   document.getElementById('rf-session-tag-input')?.focus();
 }
@@ -27246,25 +27274,27 @@ function removeRecordPlayerRow(buttonEl) {
 }
 
 function clearRecordImage(buttonEl) {
-  const host = buttonEl?.closest('.record-player-row, #rf-gm-card');
+  const host = buttonEl?.closest('.record-player-row, #rf-gm-card, #rf-custom-scenario-fields');
   if (!host) return;
-  const hidden = host.querySelector('.record-player-image, .record-gm-image');
+  const hidden = host.querySelector('.record-player-image, .record-gm-image, #rf-scenario-image');
   if (hidden) hidden.value = '';
   if (host.id === 'rf-gm-card') {
     syncRecordGmCard();
+  } else if (host.id === 'rf-custom-scenario-fields') {
+    syncRecordScenarioImageCard();
   } else {
     syncRecordPlayerRow(host);
   }
 }
 
 function openRecordImageUrlPopup(buttonEl) {
-  const host = buttonEl?.closest('.record-player-row, #rf-gm-card');
+  const host = buttonEl?.closest('.record-player-row, #rf-gm-card, #rf-custom-scenario-fields');
   const backdrop = document.getElementById('record-image-url-popup-backdrop');
   const input = document.getElementById('record-image-url-popup-input');
   if (!host || !backdrop || !input) return;
-  backdrop.dataset.targetType = host.id === 'rf-gm-card' ? 'gm' : 'player';
+  backdrop.dataset.targetType = host.id === 'rf-gm-card' ? 'gm' : (host.id === 'rf-custom-scenario-fields' ? 'scenario' : 'player');
   backdrop.dataset.targetId = host.id === 'rf-gm-card' ? 'rf-gm-card' : (host.dataset.playerId || '');
-  const hidden = host.querySelector('.record-player-image, .record-gm-image');
+  const hidden = host.querySelector('.record-player-image, .record-gm-image, #rf-scenario-image');
   input.value = String(hidden?.value || '').trim();
   backdrop.style.display = 'flex';
   setTimeout(() => input.focus(), 10);
@@ -27289,6 +27319,8 @@ function saveRecordImageUrlPopup() {
   let host = null;
   if (backdrop.dataset.targetType === 'gm') {
     host = document.getElementById('rf-gm-card');
+  } else if (backdrop.dataset.targetType === 'scenario') {
+    host = document.getElementById('rf-custom-scenario-fields');
   } else if (backdrop.dataset.targetId) {
     host = document.querySelector(`.record-player-row[data-player-id="${CSS.escape(backdrop.dataset.targetId)}"]`);
   }
@@ -27296,19 +27328,19 @@ function saveRecordImageUrlPopup() {
     closeRecordImageUrlPopup();
     return;
   }
-  const hidden = host.querySelector('.record-player-image, .record-gm-image');
+  const hidden = host.querySelector('.record-player-image, .record-gm-image, #rf-scenario-image');
   if (hidden) hidden.value = value;
   if (host.id === 'rf-gm-card') {
     syncRecordGmCard();
+  } else if (host.id === 'rf-custom-scenario-fields') {
+    syncRecordScenarioImageCard();
   } else {
     syncRecordPlayerRow(host);
   }
   closeRecordImageUrlPopup();
 }
 
-function onRecordImageFile(event) {
-  const file = event.target.files?.[0];
-  event.target.value = '';
+function setRecordImageFile(file) {
   if (!file || !/^image\//.test(file.type)) return;
   const reader = new FileReader();
   reader.onload = e => {
@@ -27318,6 +27350,29 @@ function onRecordImageFile(event) {
     saveRecordImageUrlPopup();
   };
   reader.readAsDataURL(file);
+}
+
+function onRecordImageFile(event) {
+  const file = event.target.files?.[0];
+  event.target.value = '';
+  setRecordImageFile(file);
+}
+
+function onRecordImagePaste(event) {
+  const imageItem = Array.from(event.clipboardData?.items || []).find(item => /^image\//.test(item.type));
+  const file = imageItem?.getAsFile();
+  if (file) {
+    event.preventDefault();
+    setRecordImageFile(file);
+    return;
+  }
+  const text = String(event.clipboardData?.getData('text/plain') || '').trim();
+  if (!text) return;
+  event.preventDefault();
+  const input = document.getElementById('record-image-url-popup-input');
+  if (!input) return;
+  input.value = text;
+  saveRecordImageUrlPopup();
 }
 
 function collectRecordPlayersData() {
@@ -27430,7 +27485,7 @@ function positionRecordHoverPopup(anchorEl, popup) {
 
 function renderRecordDetailContent(record) {
   const scenario = getRecordScenario(record);
-  const scenarioCard = String(scenario?.info?.sessionCard || '').trim();
+  const scenarioCard = String(scenario?.info?.sessionCard || record?.scenarioImage || '').trim();
   const dateTimeInfo = getRecordDateTimeInfo(record?.dateTime || record?.date);
   const noteHtml = (record?.notesHtml || recordPlainTextToHtml(record?.notes || '') || '').trim();
   const detailMeta = [
@@ -27590,6 +27645,7 @@ function openRecordForm(recordId) {
   const sessionTagInput = document.getElementById('rf-session-tag');
   const sessionTagEditorInput = document.getElementById('rf-session-tag-input');
   const customNameInput = document.getElementById('rf-custom-name');
+  const scenarioImageInput = document.getElementById('rf-scenario-image');
   const noteEditor = document.getElementById('rf-notes-html');
   const legacyNotes = document.getElementById('rf-notes');
   const playerList = document.getElementById('rf-player-list');
@@ -27604,6 +27660,7 @@ function openRecordForm(recordId) {
       dateInput.value = rec.dateTime || rec.date || today;
       sel.value = rec.scenarioId || '';
       customNameInput.value = rec.scenarioName || '';
+      if (scenarioImageInput) scenarioImageInput.value = rec.scenarioImage || '';
       if (gmInput) gmInput.value = rec.gm || rec.gmName || '';
       if (gmNameInput) gmNameInput.value = rec.gmName || rec.gm || '';
       if (gmPcInput) gmPcInput.value = rec.gmPcName || '';
@@ -27618,7 +27675,7 @@ function openRecordForm(recordId) {
   } else {
     dateInput.value = today;
     sel.value = '';
-    [customNameInput, gmInput, gmNameInput, gmPcInput, gmImageInput, ruleInput, roomLinkInput, sessionTagInput].forEach(input => { if (input) input.value = ''; });
+    [customNameInput, scenarioImageInput, gmInput, gmNameInput, gmPcInput, gmImageInput, ruleInput, roomLinkInput, sessionTagInput].forEach(input => { if (input) input.value = ''; });
     if (sessionTagEditorInput) sessionTagEditorInput.value = '';
     if (noteEditor) noteEditor.innerHTML = '';
     if (legacyNotes) legacyNotes.value = '';
@@ -27626,6 +27683,7 @@ function openRecordForm(recordId) {
 
   if (playerList && !playerList.children.length) addRecordPlayerRow();
   syncRecordGmCard();
+  syncRecordScenarioImageCard();
   if (sessionTagEditorInput) sessionTagEditorInput.value = '';
   renderRecordSessionTagEditor();
   if (durationInput) durationInput.value = '';
@@ -27680,6 +27738,7 @@ function saveRecord() {
     id: editingRecordId || mkId(),
     scenarioId,
     scenarioName,
+    scenarioImage: scenarioId ? '' : (document.getElementById('rf-scenario-image')?.value.trim() || ''),
     dateTime: document.getElementById('rf-datetime')?.value.trim() || '',
     gm: gmName,
     gmName: gmData.gmName,
