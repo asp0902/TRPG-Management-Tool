@@ -3766,11 +3766,11 @@ body.is-block-range-selecting * {
   display: block; width: 100%;
   border: none; outline: none; background: transparent;
   font-size: 17px; color: #888; margin-top: 4px; padding: 0;
-  line-height: 1.5; resize: none; overflow: hidden;
+  min-height: 1.5em; line-height: 1.5; overflow: hidden;
   white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit;
 }
-#i-subtitle.info-subtitle-input::placeholder,
-.body-display-subtitle::placeholder { color: #ddd; }
+#i-subtitle.info-subtitle-input:empty::before,
+.body-display-subtitle:empty::before { content: attr(data-ph); color: #ddd; pointer-events: none; }
 .info-subtitle-input {
   width: 100%; font-size: 14px;
   border: none; outline: none; background: transparent;
@@ -5886,7 +5886,6 @@ body.block-pointer-dragging {
   display: block; width: 100%; border: none; outline: none; background: transparent;
   font-size: 17px; color: #888; margin-top: 4px; padding: 0;
 }
-.body-display-subtitle::placeholder { color: #ddd; }
 .body-display-sep {
   margin-top: 14px; border-top: 2px solid #111;
 }
@@ -7537,7 +7536,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
                 <span class="info-title-css-badge" id="i-title-css-badge" title="CSS 서식 적용됨 (클릭하여 편집)" style="display:none" onclick="openInfoTitleCssPanel()">✦</span>
               </div>
               <div class="info-title-css-panel css-macro-field" id="info-title-css-panel"></div>
-              <textarea class="info-subtitle-input" id="i-subtitle" rows="1" placeholder="부제" oninput="syncScriptSubtitle(this);syncInfo()"></textarea>
+              <div class="info-subtitle-input" id="i-subtitle" contenteditable="true" data-ph="부제" oninput="syncScriptSubtitle(this);syncInfo()" spellcheck="false"></div>
               <input class="info-subtitle-input" id="i-writer" placeholder="라이터" oninput="syncInfo()" style="margin-top:4px">
             </div>
             <div class="session-card-wrap" id="card-wrap" onclick="document.getElementById('card-input').click()">
@@ -7607,8 +7606,8 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
                 onblur="updateBodyTitlePreview()" oncontextmenu="return openTitleCssCtxMenu(event)" spellcheck="false"></textarea>
               <div class="body-title-preview" id="body-title-preview" style="display:none"
                 onclick="focusBodyTitleInput()" oninput="syncBodyTitlePreviewEdit()" onblur="finishTitlePreviewEdit(this)" oncontextmenu="return openTitleCssCtxMenu(event)" contenteditable="false" spellcheck="false" title="클릭하여 편집"></div>
-              <textarea class="body-display-subtitle" id="body-display-subtitle" rows="1" placeholder="부제목을 입력하세요"
-                oninput="syncScriptSubtitle(this)"></textarea>
+              <div class="body-display-subtitle" id="body-display-subtitle" contenteditable="true" data-ph="부제목을 입력하세요"
+                oninput="syncScriptSubtitle(this)" spellcheck="false"></div>
               <div class="body-display-sep"></div>
             </div>
             <div class="blocks-container" id="blocks-container"></div>
@@ -11829,15 +11828,12 @@ function autoResize(el) {
 
 function syncScriptSubtitle(source) {
   if (!source) return;
-  autoResize(source);
+  const value = normalizeEditableHtml(source.innerHTML);
   const s = cur();
-  if (s?.info) s.info.subtitle = source.value;
+  if (s?.info) s.info.subtitle = value;
   const targetId = source.id === 'i-subtitle' ? 'body-display-subtitle' : 'i-subtitle';
   const target = document.getElementById(targetId);
-  if (target && target.value !== source.value) {
-    target.value = source.value;
-    autoResize(target);
-  }
+  if (target && target.innerHTML !== value) target.innerHTML = value;
 }
 
 function renderInfoFieldPreviewHtml(value) {
@@ -12115,9 +12111,8 @@ function loadBody(s) {
 function updateBodyHeader() {
   const s = cur(); if (!s) return;
   document.getElementById('body-display-title').value = s.title || '';
-  document.getElementById('body-display-subtitle').value = (s.info && s.info.subtitle) ? s.info.subtitle : '';
+  document.getElementById('body-display-subtitle').innerHTML = normalizeInfoEditableValue((s.info && s.info.subtitle) ? s.info.subtitle : '');
   autoResize(document.getElementById('body-display-title'));
-  autoResize(document.getElementById('body-display-subtitle'));
   updateBodyTitlePreview();
 }
 function updateBodyTitlePreview() {
