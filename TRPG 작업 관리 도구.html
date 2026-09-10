@@ -3163,6 +3163,11 @@ body.is-block-range-selecting * {
 }
 .block-text-ce:has(span[style*="font-family"]) { line-height: 1.6; }
 [contenteditable="true"] span[style*="font-family"] { line-height: inherit; }
+[contenteditable="true"] span[style*="background-color"] {
+  padding-inline: 0.15em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
 .block-text-ce:empty::before { content: attr(data-ph); color: #d1d5db; pointer-events: none; display: block; }
 [contenteditable] a, [contenteditable] a:visited {
   color: var(--callout-link-color, #1a1a1a);
