@@ -14,6 +14,26 @@ assert.match(exported, /sum\('\.sk-job'\)[\s\S]*?sum\('\.sk-interest'\)[\s\S]*?s
 assert.match(exported, /set\('\.sk-job-used'[\s\S]*?set\('\.sk-interest-used'[\s\S]*?set\('\.sk-growth-used'[\s\S]*?set\('\.sk-total'/);
 assert.match(html, /document\.addEventListener\('input'[\s\S]*?updateStandaloneCocSkills\(\)/);
 
+const backstoryTemplate = html.slice(html.indexOf("{ id: 'backstory'"), html.indexOf("  sw25:"));
+['appearance', 'injuriesScars', 'traits', 'phobiasObsessions', 'ideology', 'mythBooksSpellsArtifacts', 'importantPeople', 'encounters', 'meaningfulPlaces', 'strangeExperiences', 'treasuredPossessions', 'other'].forEach(fieldId => {
+  assert.match(backstoryTemplate, new RegExp("id: '" + fieldId + "'[^\\n]*autoGrow: true"), `${fieldId} 입력칸은 자동으로 높이가 늘어나야 합니다.`);
+});
+
+const backstoryTables = html.match(/const _COC7E_BACKSTORY_TABLES = \{[\s\S]*?\n\};/)?.[0];
+const randomBackstory = html.slice(html.indexOf('function getRandomCoc7eBackstoryText'), html.indexOf('function parseCocSheetNumber'));
+assert.ok(backstoryTables && randomBackstory, 'CoC 7판 백스토리 굴림 코드를 찾을 수 없습니다.');
+const deterministicMath = Object.create(Math);
+deterministicMath.random = () => 0;
+const randomContext = { Math: deterministicMath };
+vm.runInNewContext(`${backstoryTables}\n${randomBackstory}\nresult = {
+  traits: getRandomCoc7eBackstoryText('traits'),
+  ideology: getRandomCoc7eBackstoryText('ideology'),
+  importantPeople: getRandomCoc7eBackstoryText('importantPeople')
+};`, randomContext);
+assert.equal(randomContext.result.traits, '긍정적이고 낙천적임');
+assert.ok(!randomContext.result.ideology.startsWith('당신의 사상/신념은 무엇인가요?'));
+assert.equal(randomContext.result.importantPeople, '나 자신(!)\n\n갚을 은혜가 있습니다');
+
 const makeInput = (value, selector = '') => ({ value: String(value), matches: query => query.split(',').includes(selector) });
 const makeCell = () => ({ textContent: '' });
 const makeRow = (base, job, interest, growth, editableBase = false) => {

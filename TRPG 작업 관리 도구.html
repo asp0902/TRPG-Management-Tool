@@ -6452,11 +6452,11 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .ch-modal-delete { border: 1px solid #fca5a5; border-radius: 8px; background: #fff; color: #ef4444; cursor: pointer; padding: 8px 16px; font-size: 13px; font-family: inherit; }
 .ch-modal-delete:hover { background: #fef2f2; border-color: #f87171; color: #dc2626; }
 
-/* ─── CHARACTER SHEET MODAL ─── */
-.ch-sheet-backdrop { display: none; position: fixed; inset: 0; z-index: 950; background: rgba(17,17,17,0.35); align-items: flex-start; justify-content: center; padding: 20px; overflow-y: auto; }
+/* ─── CHARACTER SHEET PAGE ─── */
+.ch-sheet-backdrop { display: none; flex: 1; min-height: 0; background: var(--main-bg); align-items: stretch; overflow: hidden; }
 .ch-sheet-backdrop.open { display: flex; }
-.ch-sheet-modal { width: min(760px, 100%); background: #fff; border: 1px solid #e0e0e0; border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.18); display: flex; flex-direction: column; overflow: hidden; margin: auto; }
-.ch-sheet-modal.sheet-wide { width: min(1220px, 100%); max-width: calc(100vw - 40px); }
+.ch-sheet-modal { width: 100%; min-height: 0; background: #fff; display: flex; flex-direction: column; overflow: hidden; }
+.ch-sheet-modal.sheet-wide { width: 100%; max-width: none; }
 .ch-sheet-header { display: flex; align-items: center; gap: 14px; padding: 18px 24px; border-bottom: 1px solid #ebebeb; flex-shrink: 0; }
 .ch-sheet-header-info { flex: 1; min-width: 0; }
 .ch-sheet-title { font-size: 17px; font-weight: 800; color: #111; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -6471,7 +6471,8 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .ch-sheet-delete:hover { background: #fef2f2; border-color: #f87171; }
 .ch-sheet-close { background: none; border: 1px solid #e0e0e0; border-radius: 8px; cursor: pointer; font-size: 14px; color: #666; padding: 6px 12px; font-family: inherit; flex-shrink: 0; }
 .ch-sheet-close:hover { background: #f5f5f5; color: #111; }
-.ch-sheet-body { padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; max-height: calc(90vh - 80px); }
+.ch-sheet-body { width: min(760px, 100%); flex: 1; min-height: 0; align-self: center; padding: 20px 24px 32px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+.ch-sheet-modal.sheet-wide .ch-sheet-body { width: min(1220px, 100%); }
 .ch-sheet-no-template { text-align: center; padding: 48px 20px; color: #bbb; font-size: 14px; }
 /* Sheet section */
 .sh-section { border: 1px solid #ebebeb; border-radius: 10px; overflow: hidden; }
@@ -7223,11 +7224,10 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
   .css-macro-picker-head-actions { width: 100%; }
   .css-macro-picker-search { flex: 1; min-width: 0; }
 
-  .ch-sheet-backdrop { padding: 8px; }
+  .ch-sheet-backdrop { padding: 0; }
   .ch-sheet-modal,
   .ch-sheet-modal.sheet-wide {
-    width: 100%; max-width: 100%; max-height: calc(100dvh - 16px);
-    margin: 0; border-radius: 12px;
+    width: 100%; max-width: 100%; max-height: none;
   }
   .ch-sheet-header { padding: 12px; gap: 8px; }
   .ch-sheet-header-info { flex: 1 0 100%; }
@@ -8309,8 +8309,8 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
     </div>
   </div>
 
-  <!-- CHARACTER SHEET MODAL -->
-  <div id="ch-sheet-backdrop" class="ch-sheet-backdrop" onclick="if(event.target===this)closeCharacterSheet()">
+  <!-- CHARACTER SHEET PAGE -->
+  <div id="ch-sheet-backdrop" class="ch-sheet-backdrop">
     <div class="ch-sheet-modal" onclick="event.stopPropagation()">
       <div class="ch-sheet-header">
         <div class="ch-sheet-header-info">
@@ -8499,18 +8499,18 @@ const SHEET_TEMPLATES = {
       ]},
       { id: 'gearRelations', label: '장비와 소지품/관계', customType: 'coc7e-gear-relations', rowCount: 5 },
       { id: 'backstory', label: '백스토리', columns: 2, fields: [
-        { id: 'appearance', label: '겉보기', type: 'textarea', keepGridWidth: true },
-        { id: 'injuriesScars', label: '부상과 흉터', type: 'textarea', keepGridWidth: true },
-        { id: 'traits', label: '성격', type: 'textarea', keepGridWidth: true, rollTableKey: 'traits', placeholder: '당신의 성격은 어떤가요?' },
-        { id: 'phobiasObsessions', label: '공포증과 집착증', type: 'textarea', keepGridWidth: true },
-        { id: 'ideology', label: '사상/신념', type: 'textarea', keepGridWidth: true, rollTableKey: 'ideology', placeholder: '당신의 사상/신념은 무엇인가요?' },
-        { id: 'mythBooksSpellsArtifacts', label: '신화서/주문/유물', type: 'textarea', keepGridWidth: true },
-        { id: 'importantPeople', label: '중요한 사람들', type: 'textarea', keepGridWidth: true, rollTableKey: 'importantPeople', placeholder: '당신에게 중요한 사람은 누구인가요?' },
-        { id: 'encounters', label: '기이한 존재들과의 만남', type: 'textarea', keepGridWidth: true },
-        { id: 'meaningfulPlaces', label: '의미 있는 장소들', type: 'textarea', keepGridWidth: true, rollTableKey: 'meaningfulPlaces', placeholder: '당신에게 의미 있는 장소는 어디인가요?' },
-        { id: 'strangeExperiences', label: '이상한 경험', type: 'textarea', keepGridWidth: true },
-        { id: 'treasuredPossessions', label: '소중한 물건들', type: 'textarea', keepGridWidth: true, rollTableKey: 'treasuredPossessions', placeholder: '당신에게 있어서 소중한 물건은 무엇인가요?' },
-        { id: 'other', label: '기타', type: 'textarea', keepGridWidth: true },
+        { id: 'appearance', label: '겉보기', type: 'textarea', keepGridWidth: true, autoGrow: true },
+        { id: 'injuriesScars', label: '부상과 흉터', type: 'textarea', keepGridWidth: true, autoGrow: true },
+        { id: 'traits', label: '성격', type: 'textarea', keepGridWidth: true, autoGrow: true, rollTableKey: 'traits', placeholder: '당신의 성격은 어떤가요?' },
+        { id: 'phobiasObsessions', label: '공포증과 집착증', type: 'textarea', keepGridWidth: true, autoGrow: true },
+        { id: 'ideology', label: '사상/신념', type: 'textarea', keepGridWidth: true, autoGrow: true, rollTableKey: 'ideology', placeholder: '당신의 사상/신념은 무엇인가요?' },
+        { id: 'mythBooksSpellsArtifacts', label: '신화서/주문/유물', type: 'textarea', keepGridWidth: true, autoGrow: true },
+        { id: 'importantPeople', label: '중요한 사람들', type: 'textarea', keepGridWidth: true, autoGrow: true, rollTableKey: 'importantPeople', placeholder: '당신에게 중요한 사람은 누구인가요?' },
+        { id: 'encounters', label: '기이한 존재들과의 만남', type: 'textarea', keepGridWidth: true, autoGrow: true },
+        { id: 'meaningfulPlaces', label: '의미 있는 장소들', type: 'textarea', keepGridWidth: true, autoGrow: true, rollTableKey: 'meaningfulPlaces', placeholder: '당신에게 의미 있는 장소는 어디인가요?' },
+        { id: 'strangeExperiences', label: '이상한 경험', type: 'textarea', keepGridWidth: true, autoGrow: true },
+        { id: 'treasuredPossessions', label: '소중한 물건들', type: 'textarea', keepGridWidth: true, autoGrow: true, rollTableKey: 'treasuredPossessions', placeholder: '당신에게 있어서 소중한 물건은 무엇인가요?' },
+        { id: 'other', label: '기타', type: 'textarea', keepGridWidth: true, autoGrow: true },
       ]},
     ]
   },
@@ -11036,11 +11036,12 @@ function updateSidebarPrimaryAction() {
   const btn = document.getElementById('sidebar-new-main-btn');
   const folderBtn = document.getElementById('sidebar-folder-btn');
   if (!btn) return;
-  if (folderBtn) folderBtn.style.display = (currentPage === 'character' || currentPage === 'scenario' || currentPage === 'rulebook') ? 'none' : '';
+  const isCharacterContext = currentPage === 'character' || !!getCharacterSheetIdFromPage(currentPage);
+  if (folderBtn) folderBtn.style.display = (isCharacterContext || currentPage === 'scenario' || currentPage === 'rulebook') ? 'none' : '';
   if (currentPage === 'css-macro') {
     btn.textContent = '＋ 매크로';
     btn.title = '새 매크로 추가';
-  } else if (currentPage === 'character') {
+  } else if (isCharacterContext) {
     btn.textContent = '＋ 캐릭터';
     btn.title = '새 캐릭터 추가';
   } else if (currentPage === 'rulebook') {
@@ -11742,7 +11743,7 @@ function renderList() {
     renderRecordSidebar(el);
     return;
   }
-  if (currentPage === 'character') {
+  if (currentPage === 'character' || getCharacterSheetIdFromPage(currentPage)) {
     updateSidebarPrimaryAction();
     renderCharacterSidebar(el);
     return;
@@ -11784,7 +11785,7 @@ function createNew(folderId = '') {
     addCssMacroItem(folderId);
     return;
   }
-  if (currentPage === 'character') {
+  if (currentPage === 'character' || getCharacterSheetIdFromPage(currentPage)) {
     openCharacterModal();
     return;
   }
@@ -22485,6 +22486,18 @@ function refreshAfterImport(replaceMode = false) {
   } else {
     resetCssMacroHistory();
   }
+  openAppPages = normalizeAppPages(openAppPages).filter(page => {
+    const characterId = getCharacterSheetIdFromPage(page);
+    return !characterId || state.characters.some(character => character.id === characterId);
+  });
+  if (!openAppPages.length) openAppPages = ['script'];
+  saveOpenAppPages();
+  renderAppPageTabs();
+  const openCharacterId = getCharacterSheetIdFromPage(currentPage);
+  if (openCharacterId && !state.characters.some(character => character.id === openCharacterId)) {
+    switchPage('character');
+    return;
+  }
   loadCustomFonts();
   updateFontDropdown();
   const hasCurrentScenario = state.currentId && state.scenarios.some(scenario => scenario.id === state.currentId);
@@ -22501,6 +22514,10 @@ function refreshAfterImport(replaceMode = false) {
   if (currentPage === 'bookmark') renderBookmarkPage();
   if (currentPage === 'rulebook') renderRulebookPage();
   if (currentPage === 'character') renderCharacterPage();
+  if (openCharacterId) {
+    document.getElementById('ch-sheet-backdrop')?.classList.add('open');
+    renderCharacterSheetPage(openCharacterId);
+  }
 }
 function formatImportSummary(payload) {
   return `${payload.scenarios.length}개의 시나리오, ${payload.folders.length}개의 시나리오 폴더, ${payload.cssMacroFolders.length}개의 CSS 매크로 폴더, ${payload.records.length}개의 세션 기록, ${payload.catalog.length}개의 카탈로그 항목, ${payload.cssMacros.length}개의 매크로, ${payload.cssPopupDictionary.length}개의 CSS 팝업사전 항목, ${payload.bookmarks.length}개의 북마크, ${payload.rulebooks.length}개의 룰북, ${payload.characters.length}명의 캐릭터, ${payload.customFonts.length}개의 커스텀 폰트`;
@@ -29584,9 +29601,26 @@ const CSS_MACRO_PAGE_LABELS = {
   datasheet: 'DATA SHEET',
 };
 const APP_OPEN_PAGES_KEY = 'trpg-open-pages';
+const CHARACTER_SHEET_PAGE_PREFIX = 'character-sheet:';
+function getCharacterSheetPageId(characterId) {
+  return CHARACTER_SHEET_PAGE_PREFIX + encodeURIComponent(String(characterId || ''));
+}
+function getCharacterSheetIdFromPage(page) {
+  if (typeof page !== 'string' || !page.startsWith(CHARACTER_SHEET_PAGE_PREFIX)) return null;
+  try { return decodeURIComponent(page.slice(CHARACTER_SHEET_PAGE_PREFIX.length)) || null; }
+  catch (e) { return null; }
+}
+function getAppPageLabel(page) {
+  const characterId = getCharacterSheetIdFromPage(page);
+  if (!characterId) return CSS_MACRO_PAGE_LABELS[page] || '';
+  const character = state.characters.find(item => item.id === characterId);
+  return character?.name || '캐릭터 시트';
+}
 function normalizeAppPages(pages) {
   return Array.isArray(pages)
-    ? pages.filter((page, index) => page !== 'datasheet' && CSS_MACRO_PAGE_LABELS[page] && pages.indexOf(page) === index)
+    ? pages.filter((page, index) => page !== 'datasheet'
+      && (CSS_MACRO_PAGE_LABELS[page] || getCharacterSheetIdFromPage(page))
+      && pages.indexOf(page) === index)
     : [];
 }
 function loadOpenAppPages() {
@@ -29602,7 +29636,7 @@ function saveOpenAppPages() {
   localStorage.setItem(APP_OPEN_PAGES_KEY, JSON.stringify(normalizeAppPages(openAppPages)));
 }
 function ensureAppPageTab(page) {
-  if (!CSS_MACRO_PAGE_LABELS[page] || openAppPages.includes(page)) return;
+  if (!(CSS_MACRO_PAGE_LABELS[page] || getCharacterSheetIdFromPage(page)) || openAppPages.includes(page)) return;
   openAppPages.push(page);
   saveOpenAppPages();
 }
@@ -29617,11 +29651,12 @@ function renderAppPageTabs() {
   container.innerHTML = openAppPages.map(page => {
     const isActive = page === currentPage;
     const canClose = openAppPages.length > 1 || page !== 'script';
+    const label = getAppPageLabel(page);
     return '<div class="app-page-tab' + (isActive ? ' active' : '') + '" role="tab" tabindex="0"'
-      + ' aria-selected="' + isActive + '" data-page="' + page + '">'
-      + '<span class="app-page-tab-label">' + CSS_MACRO_PAGE_LABELS[page] + '</span>'
-      + (canClose ? '<button class="app-page-tab-close" type="button" data-page="' + page
-        + '" title="탭 닫기" aria-label="' + CSS_MACRO_PAGE_LABELS[page] + ' 탭 닫기"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>' : '')
+      + ' aria-selected="' + isActive + '" data-page="' + esc(page) + '">'
+      + '<span class="app-page-tab-label">' + esc(label) + '</span>'
+      + (canClose ? '<button class="app-page-tab-close" type="button" data-page="' + esc(page)
+        + '" title="탭 닫기" aria-label="' + esc(label) + ' 탭 닫기"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>' : '')
       + '</div>';
   }).join('');
   container.querySelector('.app-page-tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -29657,7 +29692,19 @@ const CSS_MACRO_PAGE_TITLES = {
 function switchPage(page) {
   // 데이터 시트는 _dsEditId 휘발성에 의존하므로 직접 진입 불가 → 룰북으로 리다이렉트
   if (page === 'datasheet' && !findDataSheet(_dsEditId)) page = 'rulebook';
+  let characterSheetId = getCharacterSheetIdFromPage(page);
+  if (characterSheetId && !state.characters.some(character => character.id === characterSheetId)) {
+    removeAppPageTab(page);
+    page = 'character';
+    characterSheetId = null;
+  }
   ensureAppPageTab(page);
+  if (_openCharacterSheetId && _openCharacterSheetId !== characterSheetId) {
+    closeCocCustomSkillModal();
+    closeDnd5eBuilder();
+  }
+  _openCharacterSheetId = characterSheetId;
+  if (characterSheetId) _chSidebarSelectedId = characterSheetId;
   currentPage = page;
   closeSidebarOnCompactViewport();
   renderAppPageTabs();
@@ -29665,9 +29712,9 @@ function switchPage(page) {
   if (page !== 'datasheet') localStorage.setItem('trpg-last-page', page);
   closeCssPopupDictionary();
   document.querySelectorAll('.page-dropdown-item').forEach(item => {
-    item.classList.toggle('active', item.dataset.page === page);
+    item.classList.toggle('active', item.dataset.page === (characterSheetId ? 'character' : page));
   });
-  document.getElementById('sidebar-logo-text').textContent = CSS_MACRO_PAGE_LABELS[page] || String(page || '').toUpperCase();
+  document.getElementById('sidebar-logo-text').textContent = characterSheetId ? 'CHARACTER' : (CSS_MACRO_PAGE_LABELS[page] || String(page || '').toUpperCase());
   document.getElementById('sidebar-logo-wrap').classList.remove('open');
 
   const isScript = page === 'script';
@@ -29682,6 +29729,7 @@ function switchPage(page) {
   document.getElementById('page-bookmark').style.display = page === 'bookmark' ? 'flex' : 'none';
   document.getElementById('page-rulebook').style.display = page === 'rulebook' ? 'flex' : 'none';
   document.getElementById('page-character').style.display = page === 'character' ? 'flex' : 'none';
+  document.getElementById('ch-sheet-backdrop').classList.toggle('open', !!characterSheetId);
   var pageDsEl = document.getElementById('page-datasheet');
   if (pageDsEl) pageDsEl.style.display = page === 'datasheet' ? 'flex' : 'none';
 
@@ -29690,6 +29738,8 @@ function switchPage(page) {
     updateScriptTopbarTitle();
   } else if (page === 'rulebook') {
     updateRulebookTopbarTitle();
+  } else if (characterSheetId) {
+    titleEl.textContent = getAppPageLabel(page);
   } else {
     titleEl.textContent = CSS_MACRO_PAGE_TITLES[page] || '';
   }
@@ -29711,6 +29761,7 @@ function switchPage(page) {
     } catch(e) { console.error('renderRulebookPage error:', e); }
   }
   if (page === 'character') { try { renderCharacterPage(); } catch(e) { console.error('renderCharacterPage error:', e); } }
+  if (characterSheetId) { try { renderCharacterSheetPage(characterSheetId); } catch(e) { console.error('renderCharacterSheetPage error:', e); } }
   if (page === 'datasheet') { try { ensureDataSheetHistory(_dsEditId); renderDataSheetEditor(); } catch(e) { console.error('renderDataSheetEditor error:', e); } }
 }
 
@@ -29780,6 +29831,12 @@ async function bootstrapApp() {
   await initGitHubSync();
   loadCustomFonts();
   updateFontDropdown();
+  openAppPages = normalizeAppPages(openAppPages).filter(page => {
+    const characterId = getCharacterSheetIdFromPage(page);
+    return !characterId || state.characters.some(character => character.id === characterId);
+  });
+  if (!openAppPages.length) openAppPages = ['script'];
+  saveOpenAppPages();
   resetCssMacroHistory();
   renderList();
   const _lastScriptView = loadLastScriptView();
@@ -29793,7 +29850,12 @@ async function bootstrapApp() {
   }
   // 마지막 페이지 복원
   const _lastPage = localStorage.getItem('trpg-last-page');
-  switchPage(_lastPage && CSS_MACRO_PAGE_LABELS[_lastPage] && _lastPage !== 'datasheet' ? _lastPage : 'script');
+  const _lastCharacterId = getCharacterSheetIdFromPage(_lastPage);
+  const _canRestoreLastPage = _lastPage !== 'datasheet' && (
+    CSS_MACRO_PAGE_LABELS[_lastPage]
+    || (_lastCharacterId && state.characters.some(character => character.id === _lastCharacterId))
+  );
+  switchPage(_canRestoreLastPage ? _lastPage : 'script');
   restoreScriptSidePanelWidths();
   await initAutoBackup();
 }
@@ -34121,7 +34183,7 @@ function openCharacterModal(id) {
   refreshCharacterModalInitiative();
   renderChModalTags();
   document.getElementById('ch-modal-backdrop').classList.add('open');
-  if (currentPage === 'character') renderList();
+  if (currentPage === 'character' || getCharacterSheetIdFromPage(currentPage)) renderList();
   setTimeout(() => document.getElementById('ch-name')?.focus(), 80);
 }
 
@@ -34352,6 +34414,7 @@ function saveCharacterModal() {
     _chSidebarSelectedId = newCh.id;
   }
   persist();
+  renderAppPageTabs();
   closeCharacterModal();
   renderList();
   renderCharacterPage();
@@ -34360,8 +34423,11 @@ function saveCharacterModal() {
 function deleteCharacter() {
   if (!_chEditId) return;
   if (!confirm('이 캐릭터를 삭제하시겠습니까?')) return;
-  if (_chSidebarSelectedId === _chEditId) _chSidebarSelectedId = null;
-  state.characters = state.characters.filter(c => c.id !== _chEditId);
+  const deletedId = _chEditId;
+  if (_chSidebarSelectedId === deletedId) _chSidebarSelectedId = null;
+  state.characters = state.characters.filter(c => c.id !== deletedId);
+  const sheetPage = getCharacterSheetPageId(deletedId);
+  if (openAppPages.includes(sheetPage)) closeAppPageTab(sheetPage);
   persist();
   closeCharacterModal();
   renderList();
@@ -34372,6 +34438,8 @@ function deleteCharacterById(id) {
   if (!confirm('이 캐릭터를 삭제하시겠습니까?')) return;
   if (_chSidebarSelectedId === id) _chSidebarSelectedId = null;
   state.characters = state.characters.filter(c => c.id !== id);
+  const sheetPage = getCharacterSheetPageId(id);
+  if (openAppPages.includes(sheetPage)) closeAppPageTab(sheetPage);
   persist();
   renderList();
   renderCharacterPage();
@@ -34641,13 +34709,18 @@ function syncCharacterSheets(ch) {
   });
 }
 
-// 캐릭터 시트 모달 열기
+// 캐릭터 시트를 앱 탭으로 열기
 function openCharacterSheet(id) {
+  var ch = state.characters.find(function(c) { return c.id === id; });
+  if (!ch) return;
+  switchPage(getCharacterSheetPageId(id));
+}
+
+function renderCharacterSheetPage(id) {
   var ch = state.characters.find(function(c) { return c.id === id; });
   if (!ch) return;
   _openCharacterSheetId = id;
   _chSidebarSelectedId = id;
-  if (currentPage === 'character') renderList();
   // 레거시 lazy 승격
   if (!Array.isArray(ch.sheets)) {
     ch.sheets = normalizeCharacterSheets(ch);
@@ -34663,10 +34736,10 @@ function openCharacterSheet(id) {
     subtitleEl.textContent = rbName || n.ruleName || '캐릭터 시트';
   }
   renderCharacterSheet(id);
-  document.getElementById('ch-sheet-backdrop').classList.add('open');
 }
 
 function closeCharacterSheet() {
+  var page = _openCharacterSheetId ? getCharacterSheetPageId(_openCharacterSheetId) : null;
   _openCharacterSheetId = null;
   closeCocCustomSkillModal();
   closeDnd5eBuilder();
@@ -34681,7 +34754,8 @@ function closeCharacterSheet() {
     cocoBtn.textContent = 'API';
     cocoBtn.style.display = 'none';
   }
-  document.getElementById('ch-sheet-backdrop').classList.remove('open');
+  if (page && openAppPages.includes(page)) closeAppPageTab(page);
+  else document.getElementById('ch-sheet-backdrop').classList.remove('open');
 }
 
 function deleteActiveCharacterSheet() {
@@ -36592,7 +36666,6 @@ const _COC7E_JOB_POINT_RULES = {
 };
 
 const _COC7E_BACKSTORY_TABLES = {
-  ideologyPrompt: '당신의 사상/신념은 무엇인가요?',
   ideology: [
     `그것이 무엇이든, 세계적인 기록을 남길 것입니다.\n(예: 올림픽 금메달, 노벨상, 기네스북)`,
     `무지는 죄입니다. 인류는 끊임없이 지식을 습득해야 합니다.`,
@@ -36615,7 +36688,6 @@ const _COC7E_BACKSTORY_TABLES = {
     `아름다움이 곧 진리입니다. ‘미’란 무엇일까요?`,
     `인간은 사회적인 동물이므로, 어딘가에 소속감을 느끼고 싶습니다.\n(예: 사회단체, 정기모임, 훌륭한 교우관계, 비밀단체의 회원)`,
   ],
-  importantPeoplePrompt: '당신에게 중요한 사람은 누구인가요?',
   importantPeople: [
     `나 자신(!)`,
     `부모\n(예: 어머니, 아버지, 계모)`,
@@ -36638,7 +36710,6 @@ const _COC7E_BACKSTORY_TABLES = {
     `함께 등장하는 동료 탐사자.\n하나를 선택하거나 무작위로 고르세요.`,
     `함께 등장하는 NPC.\n수호자에게 정해달라고 하세요.`,
   ],
-  importantReasonPrompt: '왜 중요한가요?',
   importantReason: [
     `갚을 은혜가 있습니다`,
     `배운 것이 있습니다`,
@@ -36651,7 +36722,6 @@ const _COC7E_BACKSTORY_TABLES = {
     `자신이 그 사람보다 나은 인간임을 증명하고 싶습니다`,
     `해를 끼친 사람에게 복수하고 싶습니다`,
   ],
-  meaningfulPlacesPrompt: '당신에게 의미 있는 장소는 어디인가요?',
   meaningfulPlaces: [
     `배움의 장소\n(예: 고등학교, 대학교, 커뮤니티 센터)`,
     `고향\n(예: 시골 마을, 도시, 다른 문화권의 수도)`,
@@ -36674,7 +36744,6 @@ const _COC7E_BACKSTORY_TABLES = {
     `단 한 번이라도 가고 싶은 장소\n(예: 에베레스트 정상, 해외, 돌아갈 수 없는 고향)`,
     `죽을 뻔 했던 곳\n(예: 고속도로, 배 위, 높은 건물)`,
   ],
-  treasuredPossessionsPrompt: '당신에게 있어서 소중한 물건은 무엇인가요?',
   treasuredPossessions: [
     `가장 높은 기능과 관련된 물건\n(예: 깃펜, 나침반, 위조 신분증)`,
     `값비싼 재산. 집, 차, 혹은 보석.`,
@@ -36697,7 +36766,6 @@ const _COC7E_BACKSTORY_TABLES = {
     `발견했지만 정체를 모르는 물건.\n해답을 찾고 있습니다.\n(예: 유품 속에서 찾은 출처불명의 파이프, 정원에서 파낸 이상한 은구슬)`,
     `중요한 사람과 공유했던 물건\n(예: 약혼반지, 교환 일기장, 성서, 악기)`,
   ],
-  traitsPrompt: '당신의 성격은 어떤가요?',
   traits: [
     `긍정적이고 낙천적임`,
     `장난기가 많음`,
@@ -36728,20 +36796,19 @@ function getRandomCoc7eBackstoryText(tableKey) {
     return list[Math.floor(Math.random() * list.length)] || '';
   }
   if (tableKey === 'ideology') {
-    return _COC7E_BACKSTORY_TABLES.ideologyPrompt + '\n' + pick(_COC7E_BACKSTORY_TABLES.ideology);
+    return pick(_COC7E_BACKSTORY_TABLES.ideology);
   }
   if (tableKey === 'importantPeople') {
-    return _COC7E_BACKSTORY_TABLES.importantPeoplePrompt + '\n' + pick(_COC7E_BACKSTORY_TABLES.importantPeople)
-      + '\n\n' + _COC7E_BACKSTORY_TABLES.importantReasonPrompt + '\n' + pick(_COC7E_BACKSTORY_TABLES.importantReason);
+    return pick(_COC7E_BACKSTORY_TABLES.importantPeople) + '\n\n' + pick(_COC7E_BACKSTORY_TABLES.importantReason);
   }
   if (tableKey === 'meaningfulPlaces') {
-    return _COC7E_BACKSTORY_TABLES.meaningfulPlacesPrompt + '\n' + pick(_COC7E_BACKSTORY_TABLES.meaningfulPlaces);
+    return pick(_COC7E_BACKSTORY_TABLES.meaningfulPlaces);
   }
   if (tableKey === 'treasuredPossessions') {
-    return _COC7E_BACKSTORY_TABLES.treasuredPossessionsPrompt + '\n' + pick(_COC7E_BACKSTORY_TABLES.treasuredPossessions);
+    return pick(_COC7E_BACKSTORY_TABLES.treasuredPossessions);
   }
   if (tableKey === 'traits') {
-    return _COC7E_BACKSTORY_TABLES.traitsPrompt + '\n' + pick(_COC7E_BACKSTORY_TABLES.traits);
+    return pick(_COC7E_BACKSTORY_TABLES.traits);
   }
   return '';
 }
