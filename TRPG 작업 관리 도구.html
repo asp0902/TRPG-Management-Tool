@@ -3814,6 +3814,12 @@ body.is-block-range-selecting * {
   background: #fff; outline: none; font-family: inherit;
   transition: border-color 0.2s; resize: vertical;
 }
+#i-rule {
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23777'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  padding-right: 32px;
+}
 .field textarea { resize: none; overflow: hidden; }
 .info-basic-textarea {
   min-height: 43px;
@@ -7541,7 +7547,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
               <input type="file" id="card-input" accept="image/*" style="display:none" onchange="onCardFile(event)">
             </div>
             <div class="section-heading">기본 정보</div>
-            <div class="info-grid">
+            <div class="info-grid" id="info-basic-grid">
               <div class="field"><label>룰 정보</label>
                 <select id="i-rule" onchange="syncInfo();updateInfoGridByRule()">
                   <option value="">—</option>
@@ -23624,6 +23630,7 @@ function handleFormatIndentShortcut(e) {
   if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
   const editable = e.target?.closest?.('textarea, [contenteditable="true"]');
   if (!editable || !editable.closest('#panel-info.active, #panel-body.active, #rb-chapter-body')) return;
+  if (editable.closest('#info-basic-grid')) return;
   e.preventDefault();
   lastFocusedTA = editable;
   if (editable.contentEditable === 'true') tbSaveCERange();

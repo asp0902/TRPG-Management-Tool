@@ -50,6 +50,18 @@ context.handleFormatIndentShortcut({ key: 'Tab', shiftKey: false, target: editor
 context.handleFormatIndentShortcut({ key: 'Tab', shiftKey: true, target: editor, preventDefault: () => calls.push('prevented') });
 assert.deepEqual(calls, ['prevented', 'range', 1, 'prevented', 'range', -1]);
 
+const basicInfoEditor = {
+  contentEditable: 'true',
+  closest(selector) {
+    if (selector.includes('contenteditable') || selector.includes('#panel-info') || selector === '#info-basic-grid') return this;
+    return null;
+  },
+};
+context.handleFormatIndentShortcut({ key: 'Tab', shiftKey: false, target: basicInfoEditor, preventDefault: () => calls.push('basic-prevented') });
+assert.deepEqual(calls, ['prevented', 'range', 1, 'prevented', 'range', -1], '기본 정보의 Tab 키는 기본 포커스 이동을 유지해야 합니다.');
+assert.match(html, /id="info-basic-grid"/, 'SCRIPT 기본 정보 그리드를 식별할 수 있어야 합니다.');
+assert.match(html, /#i-rule\s*\{[\s\S]*?background-position:\s*right 12px center;/, '룰 정보 화살표에 우측 여백을 둬야 합니다.');
+
 const shareLineFunction = html.match(/function _bnRectsShareLine\(a, b\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(shareLineFunction, '방향키 줄 경계 비교 함수를 찾을 수 없습니다.');
 const arrowContext = {};
