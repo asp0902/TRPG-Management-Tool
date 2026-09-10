@@ -13,6 +13,15 @@ assert.match(html, /sh-coc-stats-main \.sh-coc-misc-row \{ grid-template-columns
 assert.match(exported, /sum\('\.sk-job'\)[\s\S]*?sum\('\.sk-interest'\)[\s\S]*?sum\('\.sk-growth'\)/);
 assert.match(exported, /set\('\.sk-job-used'[\s\S]*?set\('\.sk-interest-used'[\s\S]*?set\('\.sk-growth-used'[\s\S]*?set\('\.sk-total'/);
 assert.match(html, /document\.addEventListener\('input'[\s\S]*?updateStandaloneCocSkills\(\)/);
+assert.match(html, /if \(tpl\.key === 'coc7e'\)[\s\S]*?skillsSection\.after\(financeSection\)/);
+assert.match(html, /\.sh-coc-skills-table \.sk-name-input\.is-emphasis \{ font-style: italic; \}/);
+
+const skillsPreset = html.match(/const _COC7E_SKILLS_PRESET = \[[\s\S]*?\n\];/)?.[0];
+assert.ok(skillsPreset, 'CoC 7판 기능 프리셋을 찾을 수 없습니다.');
+const skillsContext = {};
+vm.runInNewContext(`${skillsPreset}\nresult = _COC7E_SKILLS_PRESET;`, skillsContext);
+assert.equal(Array.from(skillsContext.result).find(skill => skill.id === 'sleight').name, '말재주');
+assert.match(html, /sk\.id === 'creditRating' \|\| sk\.id === 'cthulhuMythos'/);
 
 const backstoryTemplate = html.slice(html.indexOf("{ id: 'backstory'"), html.indexOf("  sw25:"));
 ['appearance', 'injuriesScars', 'traits', 'phobiasObsessions', 'ideology', 'mythBooksSpellsArtifacts', 'importantPeople', 'encounters', 'meaningfulPlaces', 'strangeExperiences', 'treasuredPossessions', 'other'].forEach(fieldId => {

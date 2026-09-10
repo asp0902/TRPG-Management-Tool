@@ -6683,6 +6683,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-coc-sanity-side { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; flex: 1 1 420px; }
 .sh-coc-chk-stack { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .sh-coc-misc-section { border-top: 1px solid #ebebeb; padding-top: 12px; margin-top: 10px; }
+.sh-sheet-content > .sh-coc-misc-section { padding-top: 0; margin-top: 0; }
 .sh-coc-misc-layout { display: grid; grid-template-columns: minmax(320px, 400px) minmax(360px, 1fr); gap: 14px; align-items: start; }
 .sh-coc-misc-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .sh-coc-stats-main .sh-coc-misc-row { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 16px; }
@@ -6800,6 +6801,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-coc-skills-table th:nth-child(9),
 .sh-coc-skills-table td:nth-child(9) { width: 28px; }
 .sh-coc-skills-table .sk-name-input { border: none; background: transparent; border-radius: 0; padding: 0 5px; text-align: left; width: 100%; max-width: 100%; height: 100%; display: block; }
+.sh-coc-skills-table .sk-name-input.is-emphasis { font-style: italic; }
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-table .sk-name-input { text-align: center; padding: 0 3px; }
 .sk-custom-table .sk-name-input.clickable { cursor: pointer; }
 .sk-num-input::-webkit-inner-spin-button, .sk-num-input::-webkit-outer-spin-button,
@@ -36224,6 +36226,12 @@ function renderCharacterSheet(chId) {
   }).join('');
 
   bodyEl.innerHTML = tabsWrap + '<div class="sh-sheet-content">' + sectionsHtml + '</div>';
+  if (tpl.key === 'coc7e') {
+    var financeSection = bodyEl.querySelector('.sh-coc-misc-section');
+    var skillsWrap = bodyEl.querySelector('.sh-coc-skills-wrap');
+    var skillsSection = skillsWrap && skillsWrap.closest('.sh-section');
+    if (financeSection && skillsSection) skillsSection.after(financeSection);
+  }
   requestAnimationFrame(function() {
     bodyEl.querySelectorAll('.sh-dnd-personality-textarea').forEach(autoResizeDnd5ePersonalityTextarea);
     bodyEl.querySelectorAll('.sh-field-textarea[data-auto-grow="1"]').forEach(autoResizeSheetTextarea);
@@ -36618,7 +36626,7 @@ const _COC7E_SKILLS_PRESET = [
   { id: 'mechRepair',      name: '기계수리',    base: 10 },
   { id: 'jump',            name: '도약',        base: 20 },
   { id: 'listen',          name: '듣기',        base: 20 },
-  { id: 'sleight',         name: '밀재주',      base: 5 },
+  { id: 'sleight',         name: '말재주',      base: 5 },
   { id: 'flatter',         name: '매혹',        base: 15 },
   { id: 'law',             name: '법률',        base: 5 },
   { id: 'disguise',        name: '변장',        base: 5 },
@@ -37827,7 +37835,7 @@ function renderCoc7eSkillsSection(sec, sectionData, sheetData, chId, sheetId) {
       : '<td class="sk-base-cell" data-coc-skill-base="' + esc(sk.id) + '">' + base + '</td>';
     return '<tr class="sk-row" data-skill-id="' + esc(sk.id) + '" data-base="' + base + '">'
       + '<td><input class="sk-chk" type="checkbox"' + (checked ? ' checked' : '') + ' onchange="' + esc(sf(sk.id + '_checked', true)) + '"></td>'
-      + '<td class="sk-name-cell"><input class="sk-name-input" type="text" value="' + esc(sk.name) + '" readonly tabindex="-1"></td>'
+      + '<td class="sk-name-cell"><input class="sk-name-input' + (sk.id === 'creditRating' || sk.id === 'cthulhuMythos' ? ' is-emphasis' : '') + '" type="text" value="' + esc(sk.name) + '" readonly tabindex="-1"></td>'
       + baseTd
       + '<td><input class="sk-num-input sk-job" type="number" value="' + esc(String(jobV)) + '" oninput="' + esc(sf(sk.id + '_job', false) + ';_onSkillInput(this)') + '"></td>'
       + '<td><input class="sk-num-input sk-interest" type="number" value="' + esc(String(intV)) + '" oninput="' + esc(sf(sk.id + '_interest', false) + ';_onSkillInput(this)') + '"></td>'
