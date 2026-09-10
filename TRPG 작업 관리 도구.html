@@ -5963,6 +5963,7 @@ body.block-pointer-dragging {
 .rulebook-item-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .rulebook-item-action-btn { border: none; background: none; cursor: pointer; font-size: 12px; color: #888; padding: 4px 8px; border-radius: 5px; font-family: inherit; }
 .rulebook-item-action-btn:hover { color: #111; background: #f0f0f0; }
+.rulebook-supple-actions .rulebook-item-action-btn:disabled { color: #ccc; background: none; cursor: default; }
 .rulebook-item-action-btn.del:hover { color: #ef4444; background: #fef2f2; }
 .rulebook-expand-btn { border: none; background: none; cursor: pointer; font-size: 11px; color: #bbb; padding: 4px 6px; border-radius: 5px; transition: transform 0.18s, color 0.15s; flex-shrink: 0; }
 .rulebook-expand-btn:hover { color: #555; background: #f0f0f0; }
@@ -30225,9 +30226,30 @@ function _migrateDataSheetCategoriesToFlat(ds) {
   });
 }
 
+function moveRulebookSupplement(id, direction) {
+  var item = state.rulebooks.find(function(rb) { return rb.id === id; });
+  if (!item || !item.parentId) return false;
+  var siblingIndexes = [];
+  state.rulebooks.forEach(function(rb, index) {
+    if (rb.parentId === item.parentId) siblingIndexes.push(index);
+  });
+  var current = siblingIndexes.findIndex(function(index) { return state.rulebooks[index].id === id; });
+  var target = current + (direction < 0 ? -1 : 1);
+  if (current < 0 || target < 0 || target >= siblingIndexes.length) return false;
+  var currentIndex = siblingIndexes[current];
+  var targetIndex = siblingIndexes[target];
+  var swapped = state.rulebooks[currentIndex];
+  state.rulebooks[currentIndex] = state.rulebooks[targetIndex];
+  state.rulebooks[targetIndex] = swapped;
+  persist();
+  renderRulebookPage();
+  renderList();
+  return true;
+}
+
 function _rbSuppleListHtml(supples, dataSheets) {
   var items = [];
-  (supples || []).forEach(function(s) {
+  (supples || []).forEach(function(s, sIndex) {
     var sThumb = s.image ? '<img src="' + esc(s.image) + '" alt="">' : '📄';
     var sTagsHtml = s.tags.map(function(t) { return '<span class="rulebook-supple-tag">' + esc(t) + '</span>'; }).join('');
     var sMemoHtml = s.memo ? '<div style="font-size:10px;color:#aaa;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(s.memo) + '</div>' : '';
@@ -30239,6 +30261,8 @@ function _rbSuppleListHtml(supples, dataSheets) {
       + sMemoHtml + sTagsWrap
       + '</div>'
       + '<div class="rulebook-supple-actions">'
+      + '<button type="button" class="rulebook-item-action-btn" title="위로 이동" aria-label="위로 이동" onclick="moveRulebookSupplement(\'' + s.id + '\',-1)"' + (sIndex === 0 ? ' disabled' : '') + '>↑</button>'
+      + '<button type="button" class="rulebook-item-action-btn" title="아래로 이동" aria-label="아래로 이동" onclick="moveRulebookSupplement(\'' + s.id + '\',1)"' + (sIndex === supples.length - 1 ? ' disabled' : '') + '>↓</button>'
       + '<button class="rulebook-item-action-btn" onclick="openRulebookModal(\'' + s.id + '\')">수정</button>'
       + '<button class="rulebook-item-action-btn del" onclick="deleteSupple(\'' + s.id + '\')">삭제</button>'
       + '</div>'
