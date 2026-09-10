@@ -14079,13 +14079,14 @@ function mkTextBlockEl(b, cid, ctx = {}) {
   if ((ctx.depth || 0) > 0) el.classList.add('block-child');
   el.dataset.id = b.id; el.dataset.cid = cid;
   el.dataset.depth = String(ctx.depth || 0);
-  el.draggable = true;
+  el.draggable = false;
 
   // 드래그 핸들
   const handle = document.createElement('span');
   handle.className = 'block-text-handle';
   handle.title = '드래그하여 순서 변경';
   handle.textContent = '⋮⋮';
+  handle.draggable = true;
 
   // CE
   const ce = document.createElement('div');
@@ -16620,12 +16621,13 @@ function mkDividerEl(b, cid, ctx = {}) {
   el.className = 'block block-text block-divider';
   if ((ctx.depth || 0) > 0) el.classList.add('block-child');
   el.dataset.id = b.id; el.dataset.cid = cid;
-  el.draggable = true;
+  el.draggable = false;
 
   const handle = document.createElement('span');
   handle.className = 'block-text-handle';
   handle.title = '드래그하여 순서 변경';
   handle.textContent = '⋮⋮';
+  handle.draggable = true;
 
   const preview = document.createElement('div');
   preview.className = 'divider-preview';
@@ -16755,7 +16757,7 @@ function mkBlockEl(b, cid, ctx = {}) {
   }
   el.dataset.id = b.id; el.dataset.cid = cid;
   el.dataset.depth = String(ctx.depth || 0);
-  el.draggable = true;
+  el.draggable = false;
 
   let bodyHtml = '';
   switch (b.type) {
@@ -16881,7 +16883,7 @@ function mkBlockEl(b, cid, ctx = {}) {
       bodyHtml = `
         <div class="callout-body callout-${ct}">
           <div class="callout-header">
-            <span class="callout-drag-handle" title="드래그하여 순서 변경">⋮⋮</span>
+            <span class="callout-drag-handle" title="드래그하여 순서 변경" draggable="true">⋮⋮</span>
             <span class="callout-type-icon" aria-hidden="true">${getCalloutTypeIconSvg(ct)}</span>
             ${calloutTypeTriggerHtml(ct, `el=>setCalloutType('${b.id}',el,'${cid}')`)}
             <input class="callout-title-inp" data-field="title" placeholder="" value="${esc(b.title||'')}"
@@ -16962,7 +16964,7 @@ function mkBlockEl(b, cid, ctx = {}) {
   }
 
   el.innerHTML = `
-    <span class="block-side-handle" title="드래그하여 순서 변경">⋮⋮</span>
+    <span class="block-side-handle" title="드래그하여 순서 변경" draggable="true">⋮⋮</span>
     <div class="block-body">${bodyHtml}</div>`;
   el.style.position = 'relative';
 
@@ -17110,7 +17112,7 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
   if ((ctx.depth || 0) > 0) el.classList.add('block-child');
   el.dataset.id = ending.id;
   el.dataset.cid = cid;
-  el.draggable = true;
+  el.draggable = false;
   el.addEventListener('dragstart', e => {
     beginBlockDrag(e, ending.id, cid, el);
   });
@@ -17120,7 +17122,7 @@ function mkEndingEl(ending, cid = 'blocks-container', ctx = {}) {
   el.addEventListener('drop', e => { e.preventDefault(); e.stopPropagation(); const position = getBlockDropPosition(e, el); clearBlockDropIndicator(el); dropBlock(ending.id, cid, position); });
   const collapsed = ending.collapsed ?? true;
   el.innerHTML = `
-    <span class="block-side-handle" title="드래그하여 순서 변경">⋮⋮</span>
+    <span class="block-side-handle" title="드래그하여 순서 변경" draggable="true">⋮⋮</span>
     <div class="block-body">
       <div class="ending-header ${collapsed ? '' : 'open'}">
         <span class="ending-toggle-icon">▶</span>
@@ -20761,6 +20763,7 @@ function updCalloutBody(blockId, val, cid) {
 // ─── DRAG & DROP ───
 let dragId = null, dragCid = null;
 let _blockPointerDragState = null;
+const BLOCK_DRAG_HANDLE_SELECTOR = '.block-side-handle, .block-text-handle, .callout-drag-handle';
 function supportsBlockPointerDrag() {
   return typeof window !== 'undefined' && 'PointerEvent' in window;
 }
@@ -20785,19 +20788,15 @@ function hasContentEditableDragSelection(target) {
 function isBlockEditTarget(target) {
   const node = target?.nodeType === Node.TEXT_NODE ? target.parentElement : target;
   if (!node) return false;
-  // 편집칸 안에서 시작한 드래그는 글자 선택이다. contenteditable 전체를 대상으로
-  // 잡아야 판정 결과칸·분기 항목 등 종류별로 빠뜨리지 않는다.
-  // 블록 이동은 좌측 그립과 ↑↓ 버튼으로 한다.
-  return !!node.closest?.('input, textarea, select, button, a, [contenteditable="true"], .block-actions, .branch-inner-block-actions');
+  return !node.closest?.(BLOCK_DRAG_HANDLE_SELECTOR);
 }
 function syncBlockDraggableState(root = document) {
   root.querySelectorAll?.('.block').forEach(el => {
-    el.draggable = true;
+    el.draggable = false;
   });
+  root.querySelectorAll?.(BLOCK_DRAG_HANDLE_SELECTOR).forEach(el => { el.draggable = true; });
 }
-// mousedown 시점에 클릭 위치를 판별해 draggable을 동적으로 토글한다.
-// - contenteditable 본문을 포함한 블록 내부에서 시작하면 → draggable=true → 드래그로 위치 이동
-// - input / 버튼 / 액션 영역에서 시작하면 → draggable=false → 네이티브 편집 동작 유지
+// 블록 내부 드래그는 텍스트 선택으로 유지하고, 전용 핸들만 위치 이동에 사용한다.
 // 또한 본문 영역(#panel-body) 안에서 블록 바깥을 클릭하면 선택을 해제한다.
 document.addEventListener('mousedown', e => {
   if (e.button !== 0) return;
@@ -20808,14 +20807,6 @@ document.addEventListener('mousedown', e => {
   syncBlockDraggableState();
 
   if (block) {
-    const canDragBlock = !isBlockEditTarget(e.target);
-    block.draggable = canDragBlock;
-    if (canDragBlock) {
-      document.querySelectorAll('.block').forEach(el => {
-        if (el !== block && el.contains(block)) el.draggable = false;
-      });
-    }
-
     if (!isBlockRangeStartTarget(e.target)) {
       clearBlockRangeSelection();
     }
@@ -20991,8 +20982,9 @@ document.addEventListener('keydown', e => {
 function resetBlockDragState() {
   document.querySelectorAll('.block').forEach(el => {
     el.classList.remove('dragging','drag-over','drag-over-before','drag-over-after','drag-over-inside');
-    el.draggable = true;
+    el.draggable = false;
   });
+  document.querySelectorAll(BLOCK_DRAG_HANDLE_SELECTOR).forEach(el => { el.draggable = true; });
   document.querySelectorAll('.block-gap.gap-open').forEach(el => el.classList.remove('gap-open'));
   document.body.classList.remove('block-drag-active');
   cancelBlockDropIndicator();
@@ -21083,14 +21075,16 @@ function beginBlockPointerDrag(e, blockId, cid, el) {
   if (e.button !== 0 || !blockId || !el) return;
   if (e.target?.closest?.('.block') !== el) return;
   if (isBlockEditTarget(e.target)) return;
+  const dragHandle = e.target.closest(BLOCK_DRAG_HANDLE_SELECTOR);
   el.draggable = false;
-  e.target?.closest?.('.block-side-handle')?.setAttribute('draggable', 'false');
+  dragHandle.draggable = false;
 
   _blockPointerDragState = {
     blockId,
     cid,
     el,
     pointerId: e.pointerId,
+    dragHandle,
     startX: e.clientX,
     startY: e.clientY,
     clone: null,
@@ -21432,8 +21426,8 @@ function handleBlockPointerDragEnd(e) {
     if (state.clone) state.clone.remove();
     state.el.style.removeProperty('visibility');
     state.el.classList.remove('dragging', 'block-drag-live-source');
-    state.el.draggable = true;
-    state.el.querySelector(':scope > .block-side-handle')?.setAttribute('draggable', 'true');
+    state.el.draggable = false;
+    state.dragHandle.draggable = true;
     return;
   }
 
@@ -21474,8 +21468,8 @@ function handleBlockPointerDragEnd(e) {
     state.el.style.removeProperty('transition');
     state.el.style.removeProperty('transform');
     delete state.el.dataset.blockPointerDropToken;
-    state.el.draggable = true;
-    state.el.querySelector(':scope > .block-side-handle')?.setAttribute('draggable', 'true');
+    state.el.draggable = false;
+    state.dragHandle.draggable = true;
 
     if (commitResult) {
       renderRootBlocksByCid(commitResult.rootCid);
