@@ -7372,7 +7372,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
       <div class="tb-sep"></div>
       <!-- 링크 / 인용 -->
       <button class="tb-btn" onclick="tbInsertLink()" title="링크"><i class="fa-solid fa-link"></i></button>
-      <button class="tb-btn" id="tb-quote-btn" onmousedown="tbCaptureFormatTarget()" onclick="tbInsertQuote()" title="인용"><i class="fa-solid fa-quote-left"></i></button>
+      <button class="tb-btn" id="tb-quote-btn" onmousedown="tbCaptureFormatTarget()" onclick="tbInsertQuote()" title="인용/해제"><i class="fa-solid fa-quote-left"></i></button>
       <div class="tb-sep"></div>
       <!-- 찾아 바꾸기 -->
       <button class="tb-btn" onclick="openFindReplace()" title="찾아 바꾸기 (Ctrl+H)"><i class="fa-solid fa-magnifying-glass"></i></button>
@@ -25175,6 +25175,46 @@ function openQuoteContextMenu(quoteEl, x, y) {
     },
   ]);
 }
+function tbRemoveQuote(root, quote) {
+  if (!root || !quote || !root.contains(quote)) return false;
+  const ctx = getQuoteBlockContext(quote);
+  const quoteId = quote.dataset.quoteId || '';
+  let promotedChildren = false;
+  if (ctx && quoteId) {
+    const quoteChildren = getQuoteChildrenMap(ctx.block, false);
+    const children = quoteChildren[quoteId];
+    if (Array.isArray(children) && children.length) {
+      if (!Array.isArray(ctx.block.children)) ctx.block.children = [];
+      ctx.block.children.push(...children);
+      promotedChildren = true;
+    }
+    delete quoteChildren[quoteId];
+    if (!Object.keys(quoteChildren).length) delete ctx.block.quoteChildren;
+  }
+
+  quote.querySelectorAll('.editor-quote-children, .editor-quote-children-anchor').forEach(node => {
+    if (node.closest('.editor-quote') === quote) node.remove();
+  });
+  const content = quote.querySelector(':scope > .editor-quote-content') || quote;
+  const nodes = Array.from(content.childNodes);
+  const fragment = document.createDocumentFragment();
+  nodes.forEach(node => fragment.appendChild(node));
+  if (!nodes.length) nodes.push(fragment.appendChild(document.createElement('br')));
+  quote.replaceWith(fragment);
+
+  const caret = document.createRange();
+  caret.setStartAfter(nodes[nodes.length - 1]);
+  caret.collapse(true);
+  const selection = window.getSelection();
+  if (selection) { selection.removeAllRanges(); selection.addRange(caret); }
+  lastFocusedTA = root;
+  savedCERange = caret.cloneRange();
+  savedFormatTarget = { type: 'ce', ta: root, range: caret.cloneRange() };
+  _savedFormatSel = null;
+  root.dispatchEvent(new Event('input', { bubbles: true }));
+  if (promotedChildren) renderRootBlocksByCid(ctx.cid);
+  return true;
+}
 function tbInsertQuote() {
   const target = tbResolveFormatTarget();
   const root = target?.type === 'ce' ? target.ta : (isCE() ? lastFocusedTA : null);
@@ -25187,7 +25227,7 @@ function tbInsertQuote() {
     range.collapse(false);
   }
   const existing = getQuoteForRange(root, range);
-  if (existing) return existing;
+  if (existing) return tbRemoveQuote(root, existing);
 
   const holder = document.createElement('div');
   if (!range.collapsed) holder.appendChild(range.cloneContents());

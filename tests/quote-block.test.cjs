@@ -7,9 +7,12 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도�
 
 assert.match(
   html,
-  /title="링크"[^>]*>[\s\S]*?<\/button>\s*<button[^>]*id="tb-quote-btn"[^>]*title="인용"/,
+  /title="링크"[^>]*>[\s\S]*?<\/button>\s*<button[^>]*id="tb-quote-btn"[^>]*title="인용\/해제"/,
   '인용 버튼은 링크 버튼 바로 뒤에 있어야 합니다.',
 );
+assert.match(html, /function tbRemoveQuote\(root, quote\)/, '인용 해제 함수가 필요합니다.');
+assert.match(html, /if \(existing\) return tbRemoveQuote\(root, existing\);/, '인용 버튼은 기존 인용을 해제해야 합니다.');
+assert.match(html, /ctx\.block\.children\.push\(\.\.\.children\)/, '인용 해제 시 하위 블록을 보존해야 합니다.');
 assert.match(html, /li\|blockquote\|b/, '정보 탭 저장값은 blockquote를 HTML로 복원해야 합니다.');
 assert.match(html, /function tbApplyQuoteBlockType\(root, range, tagName\)/, '인용 내부 문단 유형 적용 경로가 필요합니다.');
 assert.match(
