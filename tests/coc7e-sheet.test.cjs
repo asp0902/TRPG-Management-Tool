@@ -29,6 +29,11 @@ assert.match(html, /data-section-id="weapons"\]\s+:is\(th, td\):nth-child\(n\+4\
 assert.match(html, /data-section-id="weapons"\]\s+thead th \{ text-align: center; \}/);
 assert.match(html, /data-section-id="weapons"\]\s*> \.sh-section-hd \{ text-align: center; \}/);
 assert.match(html, /data-section-id="weapons"\]\s+tbody td \{ border-bottom: none; \}/);
+assert.match(html, /\.ch-sheet-modal\.sheet-wide-coc7e \{ overflow-x: auto; \}/);
+assert.match(html, /\.ch-sheet-modal\.sheet-wide-coc7e \.ch-sheet-body \{ width: 1220px; min-width: 1220px; max-width: 1220px;/);
+assert.match(html, /\.ch-sheet-modal\.sheet-wide-coc7e \.sh-section-hd,[\s\S]*?font-size: 14px; font-weight: 800; text-align: center;/);
+assert.match(html, /\.sh-coc-skills-table \.sk-row\.is-growth-selected > td \{ background: #e8f0ff; \}/);
+assert.match(html, /classList\.toggle\(\\"is-growth-selected\\",this\.checked\)/);
 
 const ledgerAmountFunctions = html.slice(html.indexOf('function normalizeCocWealthLedgerAmount'), html.indexOf('function buildCoc7eWealthCurrencyRow'));
 const ledgerAmountContext = {};
@@ -57,12 +62,26 @@ assert.match(html, /sk\.id === 'creditRating' \|\| sk\.id === 'cthulhuMythos'/);
 const supportSection = html.slice(html.indexOf('function renderCoc7eGearRelationsSection'), html.indexOf('// ── D&D 5판 캐릭터 빌더'));
 assert.match(supportSection, /listId === 'possessions' && rightFieldId === 'effect'/);
 assert.match(supportSection, /<textarea class="sh-coc-support-input sh-coc-support-textarea sh-field-textarea"[\s\S]*?data-auto-grow="1"[\s\S]*?autoResizeSheetTextarea\(this\)/);
+assert.match(supportSection, /deleteCocSupportRow/);
+assert.match(supportSection, /class="sh-coc-support-add"/);
+assert.match(supportSection, /class="sh-coc-support-del"/);
 assert.match(html, /\.sh-coc-support-input\.sh-coc-support-textarea \{[^}]*min-height: 31px;[^}]*overflow: hidden;/);
+assert.match(html, /customType: 'coc7e-gear-relations', rowCount: 3/);
 
 const backstoryTemplate = html.slice(html.indexOf("{ id: 'backstory'"), html.indexOf("  sw25:"));
 ['appearance', 'injuriesScars', 'traits', 'phobiasObsessions', 'ideology', 'mythBooksSpellsArtifacts', 'importantPeople', 'encounters', 'meaningfulPlaces', 'strangeExperiences', 'treasuredPossessions', 'other'].forEach(fieldId => {
   assert.match(backstoryTemplate, new RegExp("id: '" + fieldId + "'[^\\n]*autoGrow: true"), `${fieldId} 입력칸은 자동으로 높이가 늘어나야 합니다.`);
 });
+assert.match(html, /tpl\.key === 'coc7e' && sec\.id === 'backstory' \? ' sh-coc-backstory-grid'/);
+assert.match(html, /\.sh-coc-backstory-grid \{ row-gap: 18px; align-items: stretch; \}/);
+assert.match(html, /\.sh-coc-backstory-grid \.sh-field-textarea \{ flex: 1 1 auto; \}/);
+
+assert.match(html, /const title = ch\.name \|\| '캐릭터';/);
+assert.match(html, /function addStandaloneCocSkill\(button\)/);
+assert.match(html, /function addStandaloneCocLedgerRow\(button\)/);
+assert.match(html, /function addStandaloneCocSupportRow\(button\)/);
+assert.match(html, /\.sh-coc-skills-wrap table \{ table-layout:fixed; \}/);
+assert.match(html, /\.sk-add-btn'\)\.forEach\(el => el\.setAttribute\('onclick', 'addStandaloneCocSkill\(this\)'\)\)/);
 
 const eraNormalizer = html.match(/function normalizeCoc7eEraType\(value\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(eraNormalizer, 'CoC 시대 유형 정규화 함수를 찾을 수 없습니다.');
@@ -127,5 +146,24 @@ assert.equal(totals['.sk-growth-used'].textContent, 2);
 assert.equal(totals['.sk-total'].textContent, 37);
 assert.equal(totals['.sk-remain'].textContent, 123);
 assert.equal(rows[0].fields['.sk-final-cell'].textContent, 28);
+
+const supportFunctions = html.slice(html.indexOf('function getCoc7eSupportLegacyLines'), html.indexOf('function handleCocSupportCellKeydown'));
+const supportContext = {
+  state: { characters: [{ id: 'ch', sheets: [{
+    id: 'sheet', templateKey: 'coc7e', data: { gearRelations: {
+      equipment: [{ name: 'A', effect: '1' }, { name: 'B', effect: '2' }, { name: 'C', effect: '3' }],
+    } },
+  }] }] },
+  SHEET_TEMPLATES: { coc7e: { sections: [{ id: 'gearRelations', rowCount: 3 }] } },
+  persistCalls: 0,
+  renderCalls: 0,
+  setTimeout() {},
+};
+supportContext.persist = () => { supportContext.persistCalls += 1; };
+supportContext.renderCharacterSheet = () => { supportContext.renderCalls += 1; };
+vm.runInNewContext(`${supportFunctions}\ndeleteCocSupportRow('ch', 'sheet', 'gearRelations', 'equipment', 1);`, supportContext);
+assert.deepEqual(Array.from(supportContext.state.characters[0].sheets[0].data.gearRelations.equipment, row => row.name), ['A', 'C']);
+assert.equal(supportContext.persistCalls, 1);
+assert.equal(supportContext.renderCalls, 1);
 
 console.log('CoC 7e sheet checks: OK');

@@ -6462,6 +6462,8 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .ch-sheet-backdrop.open { display: flex; }
 .ch-sheet-modal { width: 100%; min-height: 0; background: #fff; display: flex; flex-direction: column; overflow: hidden; }
 .ch-sheet-modal.sheet-wide { width: 100%; max-width: none; }
+.ch-sheet-modal.sheet-wide-coc7e { overflow-x: auto; }
+.ch-sheet-modal.sheet-wide-coc7e .ch-sheet-body { width: 1220px; min-width: 1220px; max-width: 1220px; align-self: auto; margin-inline: auto; }
 .ch-sheet-header { display: flex; align-items: center; gap: 14px; padding: 18px 24px; border-bottom: 1px solid #ebebeb; flex-shrink: 0; }
 .ch-sheet-header-info { flex: 1; min-width: 0; }
 .ch-sheet-title { font-size: 17px; font-weight: 800; color: #111; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -6777,6 +6779,8 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sk-table th { background: #f5f5f5; padding: 3px 4px; font-size: 10px; font-weight: 700; color: #555; border: 1px solid #ddd; text-align: center; white-space: nowrap; }
 .sk-table td { padding: 2px 3px; border: 1px solid #eee; vertical-align: middle; text-align: center; }
 .sk-row:hover td { background: #f9f9f9; }
+.sh-coc-skills-table .sk-row.is-growth-selected > td { background: #e8f0ff; }
+.sh-coc-skills-table .sk-row.is-growth-selected :is(.sk-name-input, .sk-base-input, .sk-num-input) { background: #f5f8ff; }
 .sk-name-cell { text-align: left !important; white-space: nowrap; font-size: 11px; color: #333; padding: 0 !important; }
 .sk-base-cell { color: #666; font-size: 11px; }
 .sk-num-input { width: 100%; max-width: 100%; box-sizing: border-box; border: 1px solid #e4e4e4; border-radius: 3px; padding: 2px; font-size: 11px; text-align: center; font-family: inherit; background: #fff; outline: none; -moz-appearance: textfield; }
@@ -6826,7 +6830,9 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .coc-skill-modal-hint { font-size: 11px; line-height: 1.5; color: #888; }
 .sh-coc-support-panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
 .sh-coc-support-panel { border: 1px solid #ebebeb; border-radius: 10px; background: #fff; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
-.sh-coc-support-title { background: #f8f8f8; color: #555; font-size: 11px; font-weight: 700; text-align: center; letter-spacing: 0.06em; padding: 9px 12px; border-bottom: 1px solid #ebebeb; }
+.sh-coc-support-title { position: relative; background: #f8f8f8; color: #555; font-size: 11px; font-weight: 700; text-align: center; letter-spacing: 0.06em; padding: 9px 38px; border-bottom: 1px solid #ebebeb; }
+.sh-coc-support-add { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); width: 24px; height: 24px; border: 1px solid #d8d8d8; border-radius: 5px; background: #fff; color: #777; cursor: pointer; font: inherit; line-height: 1; }
+.sh-coc-support-add:hover { border-color: #999; color: #111; }
 .sh-coc-support-shell { flex: 1; display: flex; background: #fff; }
 .sh-coc-support-table { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; }
 .sh-coc-support-table th { background: #fafafa; padding: 5px 6px; font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; border: 1px solid #ebebeb; text-align: center; }
@@ -6836,8 +6842,25 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-coc-support-input.is-name { text-align: center; }
 .sh-coc-support-input.sh-coc-support-textarea { display: block; min-height: 31px; border: none; border-radius: 0; background: transparent; padding: 6px 8px; font-size: 12px; line-height: 1.5; resize: none; overflow: hidden; }
 .sh-coc-support-name-col { width: 108px; }
+.sh-coc-support-del-col { width: 28px; }
+.sh-coc-support-del { width: 100%; min-height: 31px; border: 0; background: none; color: #ccc; cursor: pointer; font-size: 13px; }
+.sh-coc-support-del:hover { color: #ef4444; background: #fef2f2; }
 @media (max-width: 1100px) { .sh-coc-support-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .sh-coc-support-panels { grid-template-columns: 1fr; } }
+.ch-sheet-modal.sheet-wide-coc7e .sh-section-hd,
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-support-title { font-size: 14px; font-weight: 800; text-align: center; }
+.ch-sheet-modal.sheet-wide-coc7e .ch-sheet-basic-wrap { flex-direction: row; }
+.ch-sheet-modal.sheet-wide-coc7e .ch-sheet-basic-portrait { width: 150px; max-width: none; aspect-ratio: auto; flex: 0 0 150px; align-self: stretch; }
+.ch-sheet-modal.sheet-wide-coc7e .sh-field-grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-stats-layout { grid-template-columns: minmax(0, 1fr) minmax(360px, 420px); }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-stats-layout .sh-coc-derived-section { border-top: none; border-left: 1px solid #ebebeb; padding-top: 0; padding-left: 14px; margin-top: 0; }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-attrs-grid { grid-template-columns: repeat(3, 1fr); }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-stats-main .sh-coc-misc-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-misc-layout { grid-template-columns: minmax(320px, 400px) minmax(360px, 1fr); }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-support-panels { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sh-coc-backstory-grid { row-gap: 18px; align-items: stretch; }
+.sh-coc-backstory-grid .sh-field { height: 100%; }
+.sh-coc-backstory-grid .sh-field-textarea { flex: 1 1 auto; }
 .sh-field-input { border: 1px solid #e4e4e4; border-radius: 6px; padding: 5px 8px; font-size: 13px; font-family: inherit; color: #222; outline: none; width: 100%; background: #fff; }
 .sh-field-input:focus { border-color: #111; }
 .sh-field-textarea { border: 1px solid #e4e4e4; border-radius: 6px; padding: 7px 8px; font-size: 13px; font-family: inherit; color: #222; outline: none; width: 100%; background: #fff; resize: vertical; min-height: 72px; line-height: 1.6; }
@@ -8503,7 +8526,7 @@ const SHEET_TEMPLATES = {
       ], defaultRows: [
         { name: '비무장', skill: '근접전(격투)', damage: '1D3', db: '+db', range: '-', attacks: '1', ammo: '-', malf: '-', era: '-' }
       ]},
-      { id: 'gearRelations', label: '장비와 소지품/관계', customType: 'coc7e-gear-relations', rowCount: 5 },
+      { id: 'gearRelations', label: '장비와 소지품/관계', customType: 'coc7e-gear-relations', rowCount: 3 },
       { id: 'backstory', label: '백스토리', columns: 2, fields: [
         { id: 'appearance', label: '겉보기', type: 'textarea', keepGridWidth: true, autoGrow: true },
         { id: 'injuriesScars', label: '부상과 흉터', type: 'textarea', keepGridWidth: true, autoGrow: true },
@@ -34931,10 +34954,19 @@ function exportCharacterSheetHtml() {
     });
   }
 
-  // 불필요한 UI 요소 제거 (탭 바, 삭제 버튼 등)
-  clone.querySelectorAll('.sh-tabs-wrap, .sh-repeat-del, .sh-repeat-add-row, .sh-coc-balance-add, .sk-add-btn, .sh-coc-balance-del, .sh-coc-balance-col-del, .sh-roll-hint').forEach(el => el.remove());
+  // 독립 HTML에서 작동할 CoC 행 추가 제어를 제외하고 편집 전용 UI를 제거한다.
+  const removableUi = isEditableCoc7e
+    ? '.sh-tabs-wrap, .sh-repeat-del, .sh-repeat-add-row, .sh-coc-balance-del, .sh-coc-balance-col-del, .sh-roll-hint'
+    : '.sh-tabs-wrap, .sh-repeat-del, .sh-repeat-add-row, .sh-coc-balance-add, .sk-add-btn, .sh-coc-balance-del, .sh-coc-balance-col-del, .sh-roll-hint';
+  clone.querySelectorAll(removableUi).forEach(el => el.remove());
+  if (isEditableCoc7e) {
+    clone.querySelectorAll('.sk-add-btn').forEach(el => el.setAttribute('onclick', 'addStandaloneCocSkill(this)'));
+    clone.querySelectorAll('.sh-coc-balance-add').forEach(el => el.setAttribute('onclick', 'addStandaloneCocLedgerRow(this)'));
+    clone.querySelectorAll('.sh-coc-support-add').forEach(el => el.setAttribute('onclick', 'addStandaloneCocSupportRow(this)'));
+    clone.querySelectorAll('.sh-coc-support-del').forEach(el => el.setAttribute('onclick', 'removeStandaloneCocSupportRow(this)'));
+  }
 
-  const title = (ch.name || '캐릭터') + ' 시트';
+  const title = ch.name || '캐릭터';
   const appStyles = document.querySelector('style')?.textContent || '';
   const editableStyles = isEditableCoc7e ? `
 .standalone-sheet-header { display:flex; align-items:center; gap:16px; margin-bottom:20px; border-bottom:3px solid #111; padding-bottom:10px; }
@@ -34946,13 +34978,15 @@ function exportCharacterSheetHtml() {
 .sh-coc-wealth-currency-symbol { text-align:center; }
 .sh-coc-wealth-rate-input { width:100%; }
 .sh-coc-skills-wrap { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; overflow:visible; }
-.sh-coc-skills-wrap > table, .sh-coc-skills-wrap > div, .sh-coc-skills-wrap > div > table { width:100%; min-width:0; }
+.sh-coc-skills-wrap > div, .sh-coc-skills-wrap table, .sk-custom-section { width:100%; min-width:0; }
+.sh-coc-skills-wrap table { table-layout:fixed; }
 .sh-coc-skills-table th, .sh-coc-skills-table td, .sh-coc-skills-table input { font-size:9px; padding-left:1px; padding-right:1px; }
 .sh-coc-skills-table th:nth-child(1), .sh-coc-skills-table td:nth-child(1) { width:18px; min-width:18px; max-width:18px; }
 .sh-coc-skills-table th:nth-child(2), .sh-coc-skills-table td:nth-child(2) { width:90px; min-width:90px; max-width:90px; }
 .sh-coc-skills-table th:nth-child(n+3):nth-child(-n+6), .sh-coc-skills-table td:nth-child(n+3):nth-child(-n+6) { width:24px; min-width:24px; max-width:24px; }
 .sh-coc-skills-table th:nth-child(n+7), .sh-coc-skills-table td:nth-child(n+7) { width:22px; min-width:22px; max-width:22px; }
-@media print { .standalone-sheet-save { display:none; } }` : '';
+.sh-section-hd, .sh-coc-support-title { font-size:14px; font-weight:800; text-align:center; }
+@media print { .standalone-sheet-save, .sk-add-btn, .sh-coc-balance-add, .sh-coc-support-add, .sh-coc-support-del { display:none!important; } }` : '';
   const eraThemeStyles = isEditableCoc7e ? `
 body[data-coc-era] { background:#dededb; color:#171717; color-scheme:light; }
 body[data-coc-era] .ch-sheet-body { width:min(1100px,100%); max-width:1100px; height:auto; overflow:visible; padding:28px; background-color:var(--coc-era-paper); border:4px solid var(--coc-era-accent); box-shadow:0 14px 40px rgba(0,0,0,.16); }
@@ -35027,15 +35061,85 @@ function updateStandaloneCocSkills() {
   set('.sk-total', jobUsed + interestUsed + growthUsed);
   set('.sk-remain', jobMax + interestMax + growthMax - jobUsed - interestUsed - growthUsed);
 }
+function syncStandaloneCocGrowthRows() {
+  document.querySelectorAll('.sk-chk').forEach(check => {
+    check.closest('.sk-row')?.classList.toggle('is-growth-selected', check.checked);
+  });
+}
+function addStandaloneCocSkill(button) {
+  const section = button.closest('.sh-section');
+  const host = button.closest('.sk-custom-section');
+  if (!section || !host) return;
+  let table = host.querySelector('.sk-custom-table');
+  if (!table) {
+    table = document.createElement('table');
+    table.className = 'sk-table sh-coc-skills-table sk-custom-table';
+    const sourceHead = section.querySelector('.sh-coc-skills-table thead');
+    table.innerHTML = (sourceHead ? sourceHead.outerHTML : '') + '<tbody></tbody>';
+    host.insertBefore(table, button);
+  }
+  const row = document.createElement('tr');
+  row.className = 'sk-row';
+  row.dataset.base = '0';
+  row.innerHTML = '<td><input class="sk-chk" type="checkbox"></td>'
+    + '<td class="sk-name-cell"><input class="sk-name-input" type="text"></td>'
+    + '<td><input class="sk-base-input" type="number"></td>'
+    + '<td><input class="sk-num-input sk-job" type="number"></td>'
+    + '<td><input class="sk-num-input sk-interest" type="number"></td>'
+    + '<td><input class="sk-num-input sk-growth" type="number"></td>'
+    + '<td class="sk-final-cell">0</td><td class="sk-half-cell">0</td><td class="sk-fifth-cell">0</td>';
+  table.tBodies[0].appendChild(row);
+  row.querySelector('.sk-name-input')?.focus();
+  updateStandaloneCocSkills();
+}
+function addStandaloneCocLedgerRow(button) {
+  const tbody = button.closest('.sh-coc-balance-panel')?.querySelector('tbody');
+  if (!tbody) return;
+  const row = document.createElement('tr');
+  row.innerHTML = '<td><input class="sh-coc-balance-input" type="text"></td>'
+    + '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" data-coc-ledger-field="income" type="text" inputmode="decimal"></td>'
+    + '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" data-coc-ledger-field="expense" type="text" inputmode="decimal"></td>'
+    + '<td><input class="sh-coc-balance-input sh-coc-balance-input-num" data-coc-ledger-field="balance" type="text" inputmode="decimal"></td>';
+  tbody.appendChild(row);
+  row.querySelector('input')?.focus();
+  updateStandaloneCocLedgerTotals();
+}
+function autoGrowStandaloneTextarea(textarea) {
+  textarea.style.height = 'auto';
+  textarea.style.height = textarea.scrollHeight + 'px';
+}
+function addStandaloneCocSupportRow(button) {
+  const panel = button.closest('.sh-coc-support-panel');
+  const tbody = panel?.querySelector('tbody');
+  if (!panel || !tbody) return;
+  const listId = panel.dataset.cocSupportPanel || '';
+  const rightControl = listId === 'possessions'
+    ? '<textarea class="sh-coc-support-input sh-coc-support-textarea sh-field-textarea" rows="1"></textarea>'
+    : '<input class="sh-coc-support-input" type="text">';
+  const row = document.createElement('tr');
+  row.innerHTML = '<td><input class="sh-coc-support-input is-name" type="text"></td><td>' + rightControl + '</td>'
+    + '<td class="sh-coc-support-del-col"><button type="button" class="sh-coc-support-del" title="행 삭제" aria-label="행 삭제" onclick="removeStandaloneCocSupportRow(this)">✕</button></td>';
+  tbody.appendChild(row);
+  const textarea = row.querySelector('textarea');
+  if (textarea) autoGrowStandaloneTextarea(textarea);
+  row.querySelector('input')?.focus();
+}
+function removeStandaloneCocSupportRow(button) {
+  button.closest('tr')?.remove();
+}
 document.addEventListener('input', event => {
   if (event.target.matches('.sk-base-input,.sk-job,.sk-interest,.sk-growth,.sk-job-max,.sk-interest-max,.sk-growth-max')) updateStandaloneCocSkills();
   if (event.target.matches('[data-coc-ledger-field]')) updateStandaloneCocLedgerTotals();
+  if (event.target.matches('.sh-coc-support-textarea')) autoGrowStandaloneTextarea(event.target);
 });
 document.addEventListener('change', event => {
   if (event.target.matches('[data-coc-era-select]')) updateStandaloneCocEraTheme(event.target.value);
+  if (event.target.matches('.sk-chk')) syncStandaloneCocGrowthRows();
 });
 updateStandaloneCocSkills();
 updateStandaloneCocLedgerTotals();
+syncStandaloneCocGrowthRows();
+document.querySelectorAll('.sh-coc-support-textarea').forEach(autoGrowStandaloneTextarea);
 updateStandaloneCocEraTheme(document.querySelector('[data-coc-era-select]')?.value || document.body.dataset.cocEra);
 function saveStandaloneCharacterSheet() {
   const copy = document.documentElement.cloneNode(true);
@@ -36328,7 +36432,8 @@ function renderCharacterSheet(chId) {
         return '<div class="sh-field"' + fieldStyle + '>' + labelHtml + inputHtml + levelHtml + '</div>';
       }).join('');
       var gridClass = 'sh-field-grid ' + colsClass + (sec.hasSeparator ? ' has-separator' : '')
-        + ((tpl.key === 'numenera' || tpl.key === 'cypher') && sec.id === 'basic' ? ' sh-cypher-family-basic' : '');
+        + ((tpl.key === 'numenera' || tpl.key === 'cypher') && sec.id === 'basic' ? ' sh-cypher-family-basic' : '')
+        + (tpl.key === 'coc7e' && sec.id === 'backstory' ? ' sh-coc-backstory-grid' : '');
       var hasRollable = (sec.fields || []).some(function(f) { return f.rollFormula; });
       var secTitleAttr = sec.tooltip ? ' title="' + esc(sec.tooltip) + '"' : '';
       var secHdHtml;
@@ -37995,8 +38100,8 @@ function renderCoc7eSkillsSection(sec, sectionData, sheetData, chId, sheetId) {
     var baseTd = (sk.editableBase && !sk.derivedBase)
       ? '<td><input class="sk-base-input" type="number" value="' + esc(String(savedBase)) + '" oninput="' + esc(sf(sk.id + '_base', false) + ';_onSkillInput(this)') + '"></td>'
       : '<td class="sk-base-cell" data-coc-skill-base="' + esc(sk.id) + '">' + base + '</td>';
-    return '<tr class="sk-row" data-skill-id="' + esc(sk.id) + '" data-base="' + base + '">'
-      + '<td><input class="sk-chk" type="checkbox"' + (checked ? ' checked' : '') + ' onchange="' + esc(sf(sk.id + '_checked', true)) + '"></td>'
+    return '<tr class="sk-row' + (checked ? ' is-growth-selected' : '') + '" data-skill-id="' + esc(sk.id) + '" data-base="' + base + '">'
+      + '<td><input class="sk-chk" type="checkbox"' + (checked ? ' checked' : '') + ' onchange="' + esc(sf(sk.id + '_checked', true) + ';this.closest(\"tr\").classList.toggle(\"is-growth-selected\",this.checked)') + '"></td>'
       + '<td class="sk-name-cell"><input class="sk-name-input' + (sk.id === 'creditRating' || sk.id === 'cthulhuMythos' ? ' is-emphasis' : '') + '" type="text" value="' + esc(sk.name) + '" readonly tabindex="-1"></td>'
       + baseTd
       + '<td><input class="sk-num-input sk-job" type="number" value="' + esc(String(jobV)) + '" oninput="' + esc(sf(sk.id + '_job', false) + ';_onSkillInput(this)') + '"></td>'
@@ -38022,8 +38127,8 @@ function renderCoc7eSkillsSection(sec, sectionData, sheetData, chId, sheetId) {
     var cc = !!sectionData['c' + ci2 + '_checked'];
     var cfin = (parseInt(cb) || 0) + (parseInt(cj) || 0) + (parseInt(cit) || 0) + (parseInt(cg) || 0);
     var editH = 'openCocCustomSkillModal(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + ci2 + ')';
-    customRows += '<tr class="sk-row">'
-      + '<td><input class="sk-chk" type="checkbox"' + (cc ? ' checked' : '') + ' onchange="' + esc(sf('c' + ci2 + '_checked', true)) + '"></td>'
+    customRows += '<tr class="sk-row' + (cc ? ' is-growth-selected' : '') + '">'
+      + '<td><input class="sk-chk" type="checkbox"' + (cc ? ' checked' : '') + ' onchange="' + esc(sf('c' + ci2 + '_checked', true) + ';this.closest(\"tr\").classList.toggle(\"is-growth-selected\",this.checked)') + '"></td>'
       + '<td class="sk-name-cell"><input class="sk-name-input auto-size clickable" type="text" value="' + esc(String(cn)) + '" readonly onclick="' + esc(editH) + '" title="클릭하여 기능 수정"></td>'
       + '<td><input class="sk-base-input" type="number" value="' + esc(String(cb)) + '" oninput="' + esc(sf('c' + ci2 + '_base', false) + ';_onSkillInput(this)') + '"></td>'
       + '<td><input class="sk-num-input sk-job" type="number" value="' + esc(String(cj)) + '" oninput="' + esc(sf('c' + ci2 + '_job', false) + ';_onSkillInput(this)') + '"></td>'
@@ -38115,7 +38220,8 @@ function saveCoc7eSupportCell(chId, sheetId, sectionId, listId, rowIdx, fieldId,
   if (!sheet) return;
   if (!sheet.data || typeof sheet.data !== 'object') sheet.data = {};
   if (!sheet.data[sectionId] || typeof sheet.data[sectionId] !== 'object' || Array.isArray(sheet.data[sectionId])) sheet.data[sectionId] = {};
-  if (!Array.isArray(sheet.data[sectionId][listId])) sheet.data[sectionId][listId] = [];
+  var hasStoredRows = Array.isArray(sheet.data[sectionId][listId]);
+  if (!hasStoredRows) sheet.data[sectionId][listId] = [];
   if (!sheet.data[sectionId][listId][rowIdx] || typeof sheet.data[sectionId][listId][rowIdx] !== 'object') sheet.data[sectionId][listId][rowIdx] = {};
   sheet.data[sectionId][listId][rowIdx][fieldId] = value;
   persist();
@@ -38132,14 +38238,13 @@ function addCocSupportRow(chId, sheetId, sectionId, listId, focusFieldId) {
   var tpl = SHEET_TEMPLATES[sheet.templateKey];
   var sec = tpl ? (tpl.sections || []).find(function(s) { return s.id === sectionId; }) : null;
   var minRows = parseInt(sec && sec.rowCount, 10);
-  if (isNaN(minRows) || minRows < 1) minRows = 5;
+  if (isNaN(minRows) || minRows < 1) minRows = 3;
   var rows = sheet.data[sectionId][listId];
-  if (!rows.length) {
+  if (!hasStoredRows) {
     if (listId === 'equipment') rows = sheet.data[sectionId][listId] = getCoc7eEquipmentRows(sheet.data[sectionId], minRows);
     else if (listId === 'possessions') rows = sheet.data[sectionId][listId] = getCoc7ePossessionRows(sheet.data[sectionId], minRows);
     else rows = sheet.data[sectionId][listId] = getCoc7eRelationRows(sheet.data[sectionId], minRows);
   }
-  while (rows.length < minRows) rows.push(listId === 'relations' ? { name: '', note: '' } : { name: '', effect: '' });
   rows.push(listId === 'relations' ? { name: '', note: '' } : { name: '', effect: '' });
   var newIdx = rows.length - 1;
   persist();
@@ -38148,6 +38253,29 @@ function addCocSupportRow(chId, sheetId, sectionId, listId, focusFieldId) {
     var target = document.querySelector('[data-coc-support-list="' + listId + '"][data-coc-support-row="' + newIdx + '"][data-coc-support-field="' + (focusFieldId || 'name') + '"]');
     if (target) target.focus();
   }, 0);
+}
+
+function deleteCocSupportRow(chId, sheetId, sectionId, listId, rowIdx) {
+  var ch = state.characters.find(function(c) { return c.id === chId; });
+  if (!ch) return;
+  var sheet = (ch.sheets || []).find(function(s) { return s.id === sheetId; });
+  if (!sheet) return;
+  if (!sheet.data || typeof sheet.data !== 'object') sheet.data = {};
+  var sectionData = sheet.data[sectionId];
+  if (!sectionData || typeof sectionData !== 'object' || Array.isArray(sectionData)) sectionData = sheet.data[sectionId] = {};
+  var tpl = SHEET_TEMPLATES[sheet.templateKey];
+  var sec = tpl ? (tpl.sections || []).find(function(s) { return s.id === sectionId; }) : null;
+  var minRows = parseInt(sec && sec.rowCount, 10);
+  if (isNaN(minRows) || minRows < 1) minRows = 3;
+  var currentCount = Array.isArray(sectionData[listId]) ? sectionData[listId].length : minRows;
+  var rows = listId === 'equipment'
+    ? getCoc7eEquipmentRows(sectionData, currentCount)
+    : (listId === 'possessions' ? getCoc7ePossessionRows(sectionData, currentCount) : getCoc7eRelationRows(sectionData, currentCount));
+  if (rowIdx < 0 || rowIdx >= rows.length) return;
+  rows.splice(rowIdx, 1);
+  sectionData[listId] = rows;
+  persist();
+  renderCharacterSheet(chId);
 }
 
 function handleCocSupportCellKeydown(event, chId, sheetId, sectionId, listId, rowIdx, fieldId) {
@@ -38160,9 +38288,9 @@ function handleCocSupportCellKeydown(event, chId, sheetId, sectionId, listId, ro
   var tpl = SHEET_TEMPLATES[sheet.templateKey];
   var sec = tpl ? (tpl.sections || []).find(function(s) { return s.id === sectionId; }) : null;
   var minRows = parseInt(sec && sec.rowCount, 10);
-  if (isNaN(minRows) || minRows < 1) minRows = 5;
+  if (isNaN(minRows) || minRows < 1) minRows = 3;
   var arr = Array.isArray(sectionData[listId]) ? sectionData[listId] : [];
-  var displayCount = Math.max(minRows, arr.length);
+  var displayCount = Array.isArray(sectionData[listId]) ? arr.length : minRows;
   if (rowIdx !== displayCount - 1) return;
   event.preventDefault();
   addCocSupportRow(chId, sheetId, sectionId, listId, 'name');
@@ -38171,21 +38299,16 @@ function handleCocSupportCellKeydown(event, chId, sheetId, sectionId, listId, ro
 function renderCoc7eGearRelationsSection(sec, sectionData, chId, sheetId) {
   sectionData = (sectionData && typeof sectionData === 'object' && !Array.isArray(sectionData)) ? sectionData : {};
   var secId = sec.id;
-  var rowCount = parseInt(sec.rowCount, 10);
-  if (isNaN(rowCount) || rowCount < 1) rowCount = 5;
-  rowCount = Math.max(
-    rowCount,
-    Array.isArray(sectionData.equipment) ? sectionData.equipment.length : 0,
-    Array.isArray(sectionData.possessions) ? sectionData.possessions.length : 0,
-    Array.isArray(sectionData.relations) ? sectionData.relations.length : 0
-  );
-  var equipmentRows = getCoc7eEquipmentRows(sectionData, rowCount);
-  var possessionRows = getCoc7ePossessionRows(sectionData, rowCount);
-  var relationRows = getCoc7eRelationRows(sectionData, rowCount);
+  var minRows = parseInt(sec.rowCount, 10);
+  if (isNaN(minRows) || minRows < 1) minRows = 3;
+  var equipmentRows = getCoc7eEquipmentRows(sectionData, Array.isArray(sectionData.equipment) ? sectionData.equipment.length : minRows);
+  var possessionRows = getCoc7ePossessionRows(sectionData, Array.isArray(sectionData.possessions) ? sectionData.possessions.length : minRows);
+  var relationRows = getCoc7eRelationRows(sectionData, Array.isArray(sectionData.relations) ? sectionData.relations.length : minRows);
   function buildSupportPanel(title, leftLabel, rightLabel, listId, rows, rightFieldId) {
     var rowHtml = rows.map(function(row, idx) {
       var nameHandler = 'saveCoc7eSupportCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',' + idx + ',' + JSON.stringify('name') + ',this.value)';
       var rightHandler = 'saveCoc7eSupportCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',' + idx + ',' + JSON.stringify(rightFieldId) + ',this.value)';
+      var deleteHandler = 'deleteCocSupportRow(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',' + idx + ')';
       var keyHandler = 'handleCocSupportCellKeydown(event,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',' + idx + ',' + JSON.stringify(rightFieldId) + ')';
       var isAutoGrowEffect = listId === 'possessions' && rightFieldId === 'effect';
       var rightControl = isAutoGrowEffect
@@ -38194,12 +38317,14 @@ function renderCoc7eGearRelationsSection(sec, sectionData, chId, sheetId) {
       return '<tr>'
         + '<td><input class="sh-coc-support-input is-name" type="text" value="' + esc(String(row.name || '')) + '" data-coc-support-list="' + esc(listId) + '" data-coc-support-row="' + idx + '" data-coc-support-field="name" oninput="' + esc(nameHandler) + '" spellcheck="false"></td>'
         + '<td>' + rightControl + '</td>'
+        + '<td class="sh-coc-support-del-col"><button type="button" class="sh-coc-support-del" title="행 삭제" aria-label="행 삭제" onclick="' + esc(deleteHandler) + '">✕</button></td>'
         + '</tr>';
     }).join('');
-    return '<div class="sh-coc-support-panel">'
-      + '<div class="sh-coc-support-title">' + esc(title) + '</div>'
+    var addHandler = 'addCocSupportRow(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(listId) + ',"name")';
+    return '<div class="sh-coc-support-panel" data-coc-support-panel="' + esc(listId) + '">'
+      + '<div class="sh-coc-support-title"><span>' + esc(title) + '</span><button type="button" class="sh-coc-support-add" data-coc-support-list="' + esc(listId) + '" title="행 추가" aria-label="' + esc(title) + ' 행 추가" onclick="' + esc(addHandler) + '">＋</button></div>'
       + '<div class="sh-coc-support-shell">'
-        + '<table class="sh-coc-support-table"><thead><tr><th class="sh-coc-support-name-col">' + esc(leftLabel) + '</th><th>' + esc(rightLabel) + '</th></tr></thead><tbody>' + rowHtml + '</tbody></table>'
+        + '<table class="sh-coc-support-table"><thead><tr><th class="sh-coc-support-name-col">' + esc(leftLabel) + '</th><th>' + esc(rightLabel) + '</th><th class="sh-coc-support-del-col"></th></tr></thead><tbody>' + rowHtml + '</tbody></table>'
       + '</div>'
     + '</div>';
   }
