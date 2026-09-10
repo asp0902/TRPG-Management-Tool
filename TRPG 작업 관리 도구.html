@@ -18,7 +18,7 @@
 
 body {
   font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
-  display: flex; height: 100vh; overflow: hidden;
+  display: flex; height: 100vh; height: 100dvh; overflow: hidden;
   background: var(--main-bg); color: var(--text);
   font-size: 14px; line-height: 1.5;
 }
@@ -7071,6 +7071,162 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
   pointer-events: none; opacity: 0; transition: opacity 0.2s, transform 0.2s;
 }
 .toast-msg.show { opacity: 1; transform: translate(-50%, -10px); }
+
+/* ─── COMPACT LAYOUT ─── */
+.sidebar-mobile-close,
+.sidebar-scrim { display: none; }
+
+@media (max-width: 900px) {
+  #sidebar {
+    position: fixed; inset: 0 auto 0 0; z-index: 1100;
+    width: min(280px, 86vw); min-width: min(280px, 86vw);
+    transform: translateX(0);
+    transition: transform 0.2s;
+    box-shadow: 10px 0 28px rgba(0,0,0,0.2);
+  }
+  #sidebar.collapsed {
+    width: min(280px, 86vw); min-width: min(280px, 86vw);
+    transform: translateX(-100%); box-shadow: none;
+  }
+  .sidebar-mobile-close {
+    display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px;
+    border: 1px solid #333; border-radius: 5px; background: transparent;
+    color: #aaa; cursor: pointer; font: inherit; font-size: 15px;
+  }
+  .sidebar-mobile-close:hover { color: #fff; border-color: #666; }
+  .sidebar-scrim {
+    display: block; position: fixed; inset: 0; z-index: 1090;
+    background: rgba(0,0,0,0.28); opacity: 1; transition: opacity 0.2s;
+  }
+  #sidebar.collapsed + .sidebar-scrim { opacity: 0; pointer-events: none; }
+  #main, #workspace, #content { min-width: 0; }
+  #main { width: 100%; }
+  #workspace { position: relative; }
+  #toc-panel,
+  #memo-panel {
+    position: absolute; top: 0; bottom: 0; z-index: 80;
+    width: min(260px, calc(100% - 44px)) !important; min-width: 0 !important;
+    box-shadow: 8px 0 24px rgba(0,0,0,0.12);
+  }
+  #toc-panel { left: 0; }
+  #memo-panel { right: 44px; box-shadow: -8px 0 24px rgba(0,0,0,0.12); }
+  #right-panel { width: 44px; min-width: 44px; }
+  .panel-resize-handle { display: none; }
+  .panel-inner { padding: 24px 24px 56px; }
+  .ch-sheet-modal.sheet-wide { max-width: 100%; }
+  .ch-sheet-header { flex-wrap: wrap; }
+}
+
+@media (max-width: 640px) {
+  #topbar { height: 48px; padding: 0 12px; gap: 6px; }
+  .topbar-title { min-width: 0; font-size: 13px; }
+  .tab-btn { padding: 5px 10px; }
+  #topbar .btn { padding-inline: 10px; }
+  .app-page-tab { width: 132px; max-width: 44vw; }
+  .panel-inner { padding: 18px 14px 48px; }
+  .info-title-input,
+  .body-display-title { font-size: 24px; }
+
+  .catalog-toolbar,
+  .css-macro-toolbar,
+  .bookmark-toolbar {
+    align-items: stretch; flex-direction: column; padding: 12px 14px; gap: 9px;
+  }
+  .catalog-toolbar-right,
+  .css-macro-toolbar-right,
+  .bookmark-toolbar-right,
+  .rulebook-toolbar-right,
+  .character-toolbar-right {
+    width: 100%; min-width: 0;
+  }
+  .catalog-search,
+  .css-macro-search,
+  .bookmark-search,
+  .rulebook-search,
+  .character-search {
+    flex: 1; width: auto; min-width: 0;
+  }
+  .css-macro-content { padding: 18px 14px 32px; }
+  .bookmark-filter-wrap { padding: 12px 14px 0; }
+  .bookmark-grid-wrap { padding: 14px 14px 24px; }
+  .bookmark-grid { grid-template-columns: minmax(0, 1fr); }
+  .rulebook-wrap,
+  .character-wrap { padding: 18px 14px; }
+
+  .record-inner { padding: 16px 0 24px 14px; }
+  .record-top {
+    align-items: stretch; flex-direction: column; gap: 9px;
+    margin-bottom: 14px; padding-right: 14px;
+  }
+  .record-top-actions { width: 100%; min-width: 0; }
+  .record-search { flex: 1; width: auto; min-width: 0; }
+  .record-list { padding-right: 14px; }
+
+  .rb-detail-header { padding: 8px 10px; gap: 8px; }
+  .rb-detail-main { flex-direction: column; }
+  .rb-chapter-toc {
+    width: 100% !important; min-width: 0 !important; max-height: 32vh;
+    border-right: 0; border-bottom: 1px solid var(--border);
+  }
+  .rb-chapter-body { padding: 16px 14px 48px; }
+
+  .ds-editor-header,
+  .ds-format-toolbar { overflow-x: auto; }
+  .ds-editor-header { padding: 8px 10px; }
+  .ds-editor-title-input { min-width: 140px; }
+  .ds-editor-sub { display: none; }
+  .ds-format-toolbar { padding: 7px 10px; }
+  .ds-format-toolbar-left,
+  .ds-format-toolbar-group { flex-shrink: 0; }
+  .ds-editor-body { padding: 12px 10px 40px; }
+
+  .record-form-modal,
+  .rb-modal-backdrop,
+  .ch-modal-backdrop,
+  .css-popup-dictionary-backdrop,
+  .css-macro-picker-backdrop { padding: 8px; }
+  .record-form-dialog { width: 100%; max-height: calc(100dvh - 16px); }
+  .rb-modal,
+  .ch-modal { max-height: calc(100dvh - 16px); padding: 18px; }
+  .css-popup-dictionary-head,
+  .css-macro-picker-head { flex-wrap: wrap; padding: 14px; }
+  .css-popup-dictionary-body,
+  .css-macro-picker-body { padding: 14px; }
+  .css-macro-picker-head-actions { width: 100%; }
+  .css-macro-picker-search { flex: 1; min-width: 0; }
+
+  .ch-sheet-backdrop { padding: 8px; }
+  .ch-sheet-modal,
+  .ch-sheet-modal.sheet-wide {
+    width: 100%; max-width: 100%; max-height: calc(100dvh - 16px);
+    margin: 0; border-radius: 12px;
+  }
+  .ch-sheet-header { padding: 12px; gap: 8px; }
+  .ch-sheet-header-info { flex: 1 0 100%; }
+  .ch-sheet-header > button { padding: 6px 10px; font-size: 12px; }
+  .ch-sheet-body { flex: 1; min-height: 0; max-height: none; padding: 12px; gap: 12px; }
+
+  .catalog-links-popover { width: min(360px, calc(100vw - 16px)); }
+  .toast-msg { max-width: calc(100vw - 24px); text-align: center; }
+}
+
+@media (max-width: 480px) {
+  .character-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (hover: none) {
+  .scenario-folder-btn,
+  .scenario-item-actions,
+  .tb-variation-copy-btn,
+  .block-gap,
+  #blocks-container .block.block-roll > .block-side-handle,
+  .rb-chapter-item-subadd,
+  .rb-chapter-item-del,
+  #rb-blocks-container .block.block-text > .block-text-handle,
+  #rb-blocks-container .block > .block-side-handle,
+  .ds-col-del,
+  .ds-row-num-del { opacity: 1; }
+}
 </style>
 </head>
 <body>
@@ -7092,6 +7248,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
           <div class="page-dropdown-item" data-page="character">CHARACTER</div>
         </div>
       </div>
+      <button type="button" class="sidebar-mobile-close" onclick="closeSidebarOnCompactViewport()" aria-label="사이드바 닫기" title="사이드바 닫기">✕</button>
     </div>
     <div class="sidebar-header-actions">
       <button class="sidebar-new-btn" id="sidebar-new-main-btn" onclick="createNew()">＋ 시나리오</button>
@@ -7106,6 +7263,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
     <input type="file" id="import-input" accept=".json" style="display:none" onchange="importAll(event)">
   </div>
 </div>
+<div class="sidebar-scrim" onclick="closeSidebarOnCompactViewport()" aria-hidden="true"></div>
 
 <!-- MAIN -->
 <div id="main">
@@ -22589,6 +22747,13 @@ function stopResizeMemoPop() {
   _memoResize = null;
 }
 
+const compactSidebarMedia = window.matchMedia('(max-width: 900px)');
+function syncSidebarForViewport(event = compactSidebarMedia) {
+  document.getElementById('sidebar')?.classList.toggle('collapsed', event.matches);
+}
+function closeSidebarOnCompactViewport() {
+  if (compactSidebarMedia.matches) document.getElementById('sidebar')?.classList.add('collapsed');
+}
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -29020,6 +29185,7 @@ function switchPage(page) {
   if (page === 'datasheet' && !findDataSheet(_dsEditId)) page = 'rulebook';
   ensureAppPageTab(page);
   currentPage = page;
+  closeSidebarOnCompactViewport();
   renderAppPageTabs();
   // datasheet는 새로고침 후 복구 불가하므로 last-page에 저장하지 않음
   if (page !== 'datasheet') localStorage.setItem('trpg-last-page', page);
@@ -29156,6 +29322,7 @@ async function bootstrapApp() {
   restoreScriptSidePanelWidths();
   await initAutoBackup();
 }
+syncSidebarForViewport();
 bootstrapApp().catch(err => {
   console.error('bootstrap failed:', err);
   alert('저장 데이터를 불러오는 데 실패했습니다: ' + (err?.message || err));
@@ -29186,6 +29353,7 @@ document.addEventListener('mousedown', function(e) {
   if (wrap && !wrap.contains(e.target)) wrap.classList.remove('open');
 });
 window.addEventListener('resize', restoreScriptSidePanelWidths);
+compactSidebarMedia.addEventListener('change', syncSidebarForViewport);
 document.getElementById('rf-scenario').addEventListener('change', updateCustomNameRow);
 
 setInterval(() => { if (currentPage === 'script' && state.currentId) { syncInfo({ commit: false }); persist(); } }, 60000);
