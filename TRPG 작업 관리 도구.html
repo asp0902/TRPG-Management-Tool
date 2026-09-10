@@ -5198,7 +5198,7 @@ body.block-pointer-dragging {
 }
 .branch-inner-block-header {
   display: flex; align-items: center; gap: 6px;
-  padding: 5px 10px; border-bottom: 1px solid #f0f0f0;
+  padding: 10px; border-bottom: 1px solid #f0f0f0;
   background: #fafafa; border-radius: 7px 7px 0 0;
 }
 .branch-inner-block-label {
@@ -5350,9 +5350,9 @@ body.block-pointer-dragging {
   display: flex;
   flex-direction: column;
   min-height: 24px;
-  /* 항목 사이 여백. 각 항목에도 상하 패딩이 있어 4px면 줄 간격이 본문보다 넓어진다. */
+  /* 목록 8px + 텍스트 행 2px로 헤더와 같은 10px 외곽 여백을 만든다. */
   gap: 2px;
-  padding: 4px 0 6px;
+  padding: 8px 0;
 }
 .bib-item {
   position: relative;
@@ -5361,7 +5361,7 @@ body.block-pointer-dragging {
 .bib-item-text {
   display: flex; flex-wrap: wrap; align-items: flex-start; column-gap: 4px; row-gap: 0;
   width: 100%; min-width: 0; box-sizing: border-box;
-  padding: 2px 14px;
+  padding: 2px 10px;
 }
 /* 분기 항목 안의 콜아웃은 자식 들여쓰기·좌우 여백을 없애 본문 글자와 같은 선에 맞춘다 */
 .bib-item-text > .block-children-wrap {
