@@ -3766,6 +3766,8 @@ body.is-block-range-selecting * {
   display: block; width: 100%;
   border: none; outline: none; background: transparent;
   font-size: 17px; color: #888; margin-top: 4px; padding: 0;
+  line-height: 1.5; resize: none; overflow: hidden;
+  white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit;
 }
 #i-subtitle.info-subtitle-input::placeholder,
 .body-display-subtitle::placeholder { color: #ddd; }
@@ -7529,7 +7531,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
                 <span class="info-title-css-badge" id="i-title-css-badge" title="CSS 서식 적용됨 (클릭하여 편집)" style="display:none" onclick="openInfoTitleCssPanel()">✦</span>
               </div>
               <div class="info-title-css-panel css-macro-field" id="info-title-css-panel"></div>
-              <input class="info-subtitle-input" id="i-subtitle" placeholder="부제" oninput="syncInfo()">
+              <textarea class="info-subtitle-input" id="i-subtitle" rows="1" placeholder="부제" oninput="syncScriptSubtitle(this);syncInfo()"></textarea>
               <input class="info-subtitle-input" id="i-writer" placeholder="라이터" oninput="syncInfo()" style="margin-top:4px">
             </div>
             <div class="session-card-wrap" id="card-wrap" onclick="document.getElementById('card-input').click()">
@@ -7599,8 +7601,8 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
                 onblur="updateBodyTitlePreview()" oncontextmenu="return openTitleCssCtxMenu(event)" spellcheck="false"></textarea>
               <div class="body-title-preview" id="body-title-preview" style="display:none"
                 onclick="focusBodyTitleInput()" oninput="syncBodyTitlePreviewEdit()" onblur="finishTitlePreviewEdit(this)" oncontextmenu="return openTitleCssCtxMenu(event)" contenteditable="false" spellcheck="false" title="클릭하여 편집"></div>
-              <input class="body-display-subtitle" id="body-display-subtitle" placeholder="부제목을 입력하세요"
-                oninput="const s=cur();if(s&&s.info)s.info.subtitle=this.value;">
+              <textarea class="body-display-subtitle" id="body-display-subtitle" rows="1" placeholder="부제목을 입력하세요"
+                oninput="syncScriptSubtitle(this)"></textarea>
               <div class="body-display-sep"></div>
             </div>
             <div class="blocks-container" id="blocks-container"></div>
@@ -11819,6 +11821,19 @@ function autoResize(el) {
   el.style.height = el.scrollHeight + 'px';
 }
 
+function syncScriptSubtitle(source) {
+  if (!source) return;
+  autoResize(source);
+  const s = cur();
+  if (s?.info) s.info.subtitle = source.value;
+  const targetId = source.id === 'i-subtitle' ? 'body-display-subtitle' : 'i-subtitle';
+  const target = document.getElementById(targetId);
+  if (target && target.value !== source.value) {
+    target.value = source.value;
+    autoResize(target);
+  }
+}
+
 function renderInfoFieldPreviewHtml(value) {
   const raw = String(value || '').replace(/\r\n?/g, '\n');
   if (!raw) return '';
@@ -12096,6 +12111,7 @@ function updateBodyHeader() {
   document.getElementById('body-display-title').value = s.title || '';
   document.getElementById('body-display-subtitle').value = (s.info && s.info.subtitle) ? s.info.subtitle : '';
   autoResize(document.getElementById('body-display-title'));
+  autoResize(document.getElementById('body-display-subtitle'));
   updateBodyTitlePreview();
 }
 function updateBodyTitlePreview() {
