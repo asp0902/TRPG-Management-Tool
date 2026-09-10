@@ -8482,7 +8482,7 @@ const SHEET_TEMPLATES = {
         { id: 'residence', label: '거주지', type: 'text' },
         { id: 'occupationType', label: '직업 유형', type: 'select', options: ['기타', '간호사', '건 몰', '건달', '건축가', '고고학자', '곡예사', '골동품상', '골동품 연구가', '과학자', '광부', '광신자', '교수', '교주', '기술자', '기자', '노조 활동가', '농부', '대학생/인턴', '도둑', '도박사', '등반가', '디자이너', '디프로그래머', '딜레탕트', '떠돌이', '리포터', '매춘부', '맹수사냥꾼', '미술가', '밀수꾼', '밀주업자', '바텐더', '박물관 큐레이터', '배우', '벌목꾼', '범죄자', '법의학자', '변호사', '병사', '병원 보조원', '복서/레슬러', '부랑자', '부족민', '비서', '비행사', '사기꾼', '사립탐정', '사서', '사육사', '사진가', '사진기자', '서적상', '선교사', '선원', '선출직 공무원', '성직자', '소방관', '스턴트맨/스턴트우먼', '스파이', '신비학자', '신사/숙녀', '심령학자', '심리학자/정신분석가', '약사', '엔지니어', '연구실 조수', '연구자', '연방 요원', '연예인', '연주자', '외신 기자', '운동선수', '운전사', '웨이터/웨이트리스', '위조업자', '은행강도', '의사', '인부', '자객', '자연 애호가', '작가', '잠수부', '장교', '장물아비', '장의사', '장인', '전속 기사', '점장', '정신감정사', '정신과 의사', '정신병원 직원', '조련사', '조종사', '조직폭력배', '집사/하인', '카우걸/카우보이', '컴퓨터 테크니션/프로그래머/해커', '탐광인', '탐험가', '택시 운전사', '판매원', '판사', '편집자', '폭력배', '하녀', '하인', '해커', '현상금 사냥꾼', '형사/경관', '화이트 칼라 노동자', '회계사', '회사 탐정'] },
         { id: 'occupation', label: '직업', type: 'text' },
-        { id: 'eraType', label: '시대 유형', type: 'text' },
+        { id: 'eraType', label: '시대 유형', type: 'select', options: ['1920년대', '현대', '기타'] },
         { id: 'eraItem', label: '시대', type: 'text' },
       ]},
       { id: 'stats', label: '특성치', customType: 'coc7e-stats' },
@@ -34857,6 +34857,7 @@ function exportCharacterSheetHtml() {
   const bodyEl = document.getElementById('ch-sheet-body');
   const clone = bodyEl.cloneNode(true);
   const isEditableCoc7e = activeSheet.templateKey === 'coc7e';
+  const cocEraType = isEditableCoc7e ? normalizeCoc7eEraType(activeSheet.data?.basic?.eraType) : '';
 
   if (isEditableCoc7e) {
     const sourceFields = bodyEl.querySelectorAll('input, select, textarea');
@@ -34926,10 +34927,38 @@ function exportCharacterSheetHtml() {
 .sh-coc-skills-table th:nth-child(n+3):nth-child(-n+6), .sh-coc-skills-table td:nth-child(n+3):nth-child(-n+6) { width:24px; min-width:24px; max-width:24px; }
 .sh-coc-skills-table th:nth-child(n+7), .sh-coc-skills-table td:nth-child(n+7) { width:22px; min-width:22px; max-width:22px; }
 @media print { .standalone-sheet-save { display:none; } }` : '';
+  const eraThemeStyles = isEditableCoc7e ? `
+body[data-coc-era] { background:#dededb; color:#171717; color-scheme:light; }
+body[data-coc-era] .ch-sheet-body { width:min(1100px,100%); max-width:1100px; height:auto; overflow:visible; padding:28px; background-color:var(--coc-era-paper); border:4px solid var(--coc-era-accent); box-shadow:0 14px 40px rgba(0,0,0,.16); }
+body[data-coc-era] .standalone-sheet-header { border-bottom-color:var(--coc-era-accent); }
+body[data-coc-era] .standalone-sheet-title { flex:1; min-width:0; }
+body[data-coc-era] .standalone-sheet-header h1 { margin:6px 0 0; }
+body[data-coc-era] .standalone-era-label { display:inline-block; padding:5px 12px; color:#fff; background:var(--coc-era-accent); font-size:12px; font-weight:800; letter-spacing:.04em; }
+body[data-coc-era] .standalone-sheet-save { color:#fff; background:var(--coc-era-accent); border-color:var(--coc-era-accent); }
+body[data-coc-era] .sh-section { background:rgba(255,255,255,.86); border-color:var(--coc-era-line); border-radius:4px; }
+body[data-coc-era] .sh-section-hd { color:#fff; background:var(--coc-era-accent); border-bottom-color:var(--coc-era-accent); text-align:center; }
+body[data-coc-era="1920년대"] { --coc-era-accent:#5d5c48; --coc-era-line:#9b987b; --coc-era-paper:#f2eee1; }
+body[data-coc-era="1920년대"] .ch-sheet-body { border:8px double var(--coc-era-accent); border-radius:2px; background-image:repeating-linear-gradient(0deg,rgba(74,70,50,.025) 0 1px,transparent 1px 5px); box-shadow:inset 0 0 0 2px #b5b096,0 14px 40px rgba(0,0,0,.16); }
+body[data-coc-era="현대"] { --coc-era-accent:#0b4b32; --coc-era-line:#789476; --coc-era-paper:#edf3e5; }
+body[data-coc-era="현대"] .ch-sheet-body { border:8px solid var(--coc-era-accent); border-radius:28px; background-image:repeating-linear-gradient(135deg,rgba(11,75,50,.025) 0 1px,transparent 1px 18px); box-shadow:inset 0 0 0 2px #8ba183,0 14px 40px rgba(0,0,0,.16); }
+body[data-coc-era="현대"] .sh-section { border-radius:10px; }
+body[data-coc-era="기타"] { --coc-era-accent:#252a31; --coc-era-line:#c8ccd1; --coc-era-paper:#fff; }
+@media(max-width:720px) { body[data-coc-era] { padding:12px; } body[data-coc-era] .ch-sheet-body { padding:16px; } }
+@media print { body[data-coc-era] { background:#fff; print-color-adjust:exact; -webkit-print-color-adjust:exact; } body[data-coc-era] .ch-sheet-body { box-shadow:none; } }` : '';
+  const eraLabel = cocEraType === '기타' ? '기타 시대 탐사자' : cocEraType + ' 탐사자';
   const headerHtml = isEditableCoc7e
-    ? `<div class="standalone-sheet-header"><h1>${esc(title)}</h1><button type="button" class="ch-sheet-save standalone-sheet-save" onclick="saveStandaloneCharacterSheet()">저장</button></div>`
+    ? `<div class="standalone-sheet-header"><div class="standalone-sheet-title"><span class="standalone-era-label">${esc(eraLabel)}</span><h1>${esc(title)}</h1></div><button type="button" class="ch-sheet-save standalone-sheet-save" onclick="saveStandaloneCharacterSheet()">저장</button></div>`
     : `<h1 style="margin-bottom:20px;border-bottom:3px solid #111;padding-bottom:10px;">${esc(title)}</h1>`;
   const saveScript = isEditableCoc7e ? `<script>
+function normalizeStandaloneCocEra(value) {
+  return ['1920년대', '현대', '기타'].includes(value) ? value : '1920년대';
+}
+function updateStandaloneCocEraTheme(value) {
+  const era = normalizeStandaloneCocEra(value);
+  document.body.dataset.cocEra = era;
+  const label = document.querySelector('.standalone-era-label');
+  if (label) label.textContent = era === '기타' ? '기타 시대 탐사자' : era + ' 탐사자';
+}
 function updateStandaloneCocSkills() {
   const section = document.querySelector('.sh-coc-skills-section-hdr')?.closest('.sh-section');
   if (!section) return;
@@ -34965,7 +34994,11 @@ function updateStandaloneCocSkills() {
 document.addEventListener('input', event => {
   if (event.target.matches('.sk-base-input,.sk-job,.sk-interest,.sk-growth,.sk-job-max,.sk-interest-max,.sk-growth-max')) updateStandaloneCocSkills();
 });
+document.addEventListener('change', event => {
+  if (event.target.matches('[data-coc-era-select]')) updateStandaloneCocEraTheme(event.target.value);
+});
 updateStandaloneCocSkills();
+updateStandaloneCocEraTheme(document.querySelector('[data-coc-era-select]')?.value || document.body.dataset.cocEra);
 function saveStandaloneCharacterSheet() {
   const copy = document.documentElement.cloneNode(true);
   const currentFields = document.querySelectorAll('input, select, textarea');
@@ -34997,9 +35030,9 @@ function saveStandaloneCharacterSheet() {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${esc(title)}</title>
-<style>${appStyles} body { background:#fff; padding:40px; height:auto; overflow:auto; } .ch-sheet-body { max-width:1000px; margin:0 auto; } ${editableStyles} @media print { body { padding:0; } }</style>
+<style>${appStyles} body { background:#fff; padding:40px; height:auto; overflow:auto; } .ch-sheet-body { max-width:1000px; margin:0 auto; } ${editableStyles} ${eraThemeStyles} @media print { body { padding:0; } }</style>
 </head>
-<body><div class="ch-sheet-body">${headerHtml}<div class="sh-sheet-content">${clone.querySelector('.sh-sheet-content').innerHTML}</div></div>${saveScript}</body>
+<body${isEditableCoc7e ? ` data-coc-era="${esc(cocEraType)}"` : ''}><div class="ch-sheet-body">${headerHtml}<div class="sh-sheet-content">${clone.querySelector('.sh-sheet-content').innerHTML}</div></div>${saveScript}</body>
 </html>`;
 
   const blob = new Blob([htmlContent], { type: 'text/html' });
@@ -36226,7 +36259,8 @@ function renderCharacterSheet(chId) {
             var opts = f.options.map(function(o) {
               return '<option value="' + esc(o) + '"' + (o === val ? ' selected' : '') + '>' + esc(o) + '</option>';
             }).join('');
-            inputHtml = '<select class="sh-field-input" onchange="' + esc(onInput) + '">' + opts + '</select>';
+            var eraSelectAttr = tpl.key === 'coc7e' && sec.id === 'basic' && f.id === 'eraType' ? ' data-coc-era-select="1"' : '';
+            inputHtml = '<select class="sh-field-input"' + eraSelectAttr + ' onchange="' + esc(onInput) + '">' + opts + '</select>';
         } else {
             inputHtml = '<input class="sh-field-input" type="' + (f.type === 'number' ? 'number' : 'text') + '" value="' + esc(String(val)) + '" oninput="' + esc(onInput) + '">';
         }
@@ -36987,7 +37021,8 @@ function getCoc7eWealthTier(creditRating) {
 function calcCoc7eWealthInfo(creditRating, eraType, statsData) {
   var cr = parseCocSheetNumber(creditRating);
   var tier = getCoc7eWealthTier(cr);
-  var isModern = String(eraType || '').trim() === '현대';
+  var normalizedEraType = normalizeCoc7eEraType(eraType);
+  var isModern = normalizedEraType === '현대';
   statsData = (statsData && typeof statsData === 'object' && !Array.isArray(statsData)) ? statsData : {};
   var rates = {
     usd: getCoc7eWealthRateValue(statsData.wealthRateDollar, 1),
@@ -36996,7 +37031,7 @@ function calcCoc7eWealthInfo(creditRating, eraType, statsData) {
   };
   var info = {
     creditRating: cr,
-    eraType: isModern ? '현대' : '1920년대',
+    eraType: normalizedEraType,
     desc: '',
     rates: rates,
     spendingLevel: { usd: '', krw: '', jpy: '' },
@@ -37129,8 +37164,16 @@ function getCoc7eJobPointBonus(occupationType, statsData) {
   return edu2;
 }
 
+function normalizeCoc7eEraType(value) {
+  var era = String(value || '').trim();
+  if (era === '1920년대' || era === '현대' || era === '기타') return era;
+  return era ? '기타' : '1920년대';
+}
+
 function normalizeCoc7eSheetData(sheetData) {
   sheetData = (sheetData && typeof sheetData === 'object' && !Array.isArray(sheetData)) ? sheetData : {};
+  if (!sheetData.basic || typeof sheetData.basic !== 'object' || Array.isArray(sheetData.basic)) sheetData.basic = {};
+  sheetData.basic.eraType = normalizeCoc7eEraType(sheetData.basic.eraType);
   if (!sheetData.stats || typeof sheetData.stats !== 'object' || Array.isArray(sheetData.stats)) sheetData.stats = {};
   if (sheetData.stats.insaneBurst === undefined || sheetData.stats.insaneBurst === '') sheetData.stats.insaneBurst = '없음';
   if (sheetData.stats.remainingTime === undefined) sheetData.stats.remainingTime = '';

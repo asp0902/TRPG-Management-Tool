@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
 const stats = html.slice(html.indexOf('function renderCoc7eStatsSection'), html.indexOf('// CoC 7판 기능 프리셋'));
 const exportedHtml = process.env.COC7E_EXPORTED_HTML ? fs.readFileSync(process.env.COC7E_EXPORTED_HTML, 'utf8') : html;
-const exported = exportedHtml.slice(exportedHtml.indexOf('function updateStandaloneCocSkills'), exportedHtml.indexOf('function saveStandaloneCharacterSheet'));
+const exported = exportedHtml.slice(exportedHtml.indexOf('function normalizeStandaloneCocEra'), exportedHtml.indexOf('function saveStandaloneCharacterSheet'));
 
 assert.match(stats, /sh-coc-stats-main[\s\S]*?attrsHtml[\s\S]*?miscRow[\s\S]*?sh-coc-derived-section/);
 assert.match(html, /sh-coc-stats-main \.sh-coc-misc-row \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\); margin-top: 16px; \}/);
@@ -16,6 +16,10 @@ assert.match(html, /document\.addEventListener\('input'[\s\S]*?updateStandaloneC
 assert.match(html, /if \(tpl\.key === 'coc7e'\)[\s\S]*?skillsSection\.after\(financeSection\)/);
 assert.match(html, /\.sh-coc-skills-table \.sk-name-input\.is-emphasis \{ font-style: italic; \}/);
 assert.match(html, /target\.closest\('#ch-sheet-body'\)\) return true/);
+assert.match(html, /id: 'eraType', label: '시대 유형', type: 'select', options: \['1920년대', '현대', '기타'\]/);
+assert.match(html, /data-coc-era-select="1"/);
+assert.match(html, /body\[data-coc-era="1920년대"\][\s\S]*?body\[data-coc-era="현대"\][\s\S]*?body\[data-coc-era="기타"\]/);
+assert.match(html, /function updateStandaloneCocEraTheme\(value\)[\s\S]*?document\.body\.dataset\.cocEra = era/);
 assert.match(html, /data-section-id="weapons"\]\s+:is\(th, td\):nth-child\(n\+4\):nth-child\(-n\+8\)\s*\{\s*width: 56px; min-width: 56px; max-width: 56px;/);
 assert.match(html, /data-section-id="weapons"\]\s+thead th \{ text-align: center; \}/);
 assert.match(html, /data-section-id="weapons"\]\s*> \.sh-section-hd \{ text-align: center; \}/);
@@ -43,6 +47,12 @@ const backstoryTemplate = html.slice(html.indexOf("{ id: 'backstory'"), html.ind
 ['appearance', 'injuriesScars', 'traits', 'phobiasObsessions', 'ideology', 'mythBooksSpellsArtifacts', 'importantPeople', 'encounters', 'meaningfulPlaces', 'strangeExperiences', 'treasuredPossessions', 'other'].forEach(fieldId => {
   assert.match(backstoryTemplate, new RegExp("id: '" + fieldId + "'[^\\n]*autoGrow: true"), `${fieldId} 입력칸은 자동으로 높이가 늘어나야 합니다.`);
 });
+
+const eraNormalizer = html.match(/function normalizeCoc7eEraType\(value\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(eraNormalizer, 'CoC 시대 유형 정규화 함수를 찾을 수 없습니다.');
+const eraContext = {};
+vm.runInNewContext(`${eraNormalizer}\nresult = ['', '1920년대', '현대', '기타', '1890년대'].map(normalizeCoc7eEraType);`, eraContext);
+assert.deepEqual(Array.from(eraContext.result), ['1920년대', '1920년대', '현대', '기타', '기타']);
 
 const backstoryTables = html.match(/const _COC7E_BACKSTORY_TABLES = \{[\s\S]*?\n\};/)?.[0];
 const randomBackstory = html.slice(html.indexOf('function getRandomCoc7eBackstoryText'), html.indexOf('function parseCocSheetNumber'));
@@ -88,6 +98,7 @@ const context = {
   document: {
     querySelector: () => ({ closest: () => section }),
     addEventListener: (type, handler) => { if (type === 'input') inputHandler = handler; },
+    body: { dataset: {} },
   },
 };
 vm.runInNewContext(exported, context);
