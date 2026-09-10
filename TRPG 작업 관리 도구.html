@@ -7586,7 +7586,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
             </div>
             <div class="section-heading">시나리오 정보</div>
             <div class="info-grid">
-              <div class="field full"><label>개요</label><div class="info-ce" id="i-overview" contenteditable="true" data-ph="시나리오 개요" oninput="syncInfo()"></div></div>
+              <div class="field full"><label>개요</label><div class="info-ce" id="i-overview" contenteditable="true" data-ph="시나리오 개요" oninput="syncInfo()" oncontextmenu="return openInfoEditableContextMenu(event)"></div></div>
               <div class="field full" id="field-insane-handout" style="display:none"><label>핸드아웃</label><div class="info-ce" id="i-handout" contenteditable="true" data-ph="핸드아웃" oninput="syncInfo()"></div></div>
               <div class="field full"><label>진상</label><div class="info-ce" id="i-truth" contenteditable="true" data-ph="사건의 진상 (GM 전용)" oninput="syncInfo()"></div></div>
               <div class="field full"><label>주의사항</label><div class="info-ce" id="i-cautions" contenteditable="true" data-ph="플레이어에게 전달할 주의사항" oninput="syncInfo()"></div></div>
@@ -15223,6 +15223,14 @@ function tbGetVariationCtxItems(e) {
   return items;
 }
 
+function openInfoEditableContextMenu(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const items = tbGetVariationCtxItems(event);
+  if (items.length) tbShowCtxMenu(event.clientX, event.clientY, items);
+  return false;
+}
+
 function tbResolveVariationRange(root, x, y) {
   let range = null;
   const sel = window.getSelection();
@@ -15405,7 +15413,8 @@ function tbGetVariationHost(root) {
   return root.closest('.bib-roll-result')
     || root.closest('.branch-inner-block')
     || root.closest('.roll-sub')
-    || root.closest('.block[data-id]');
+    || root.closest('.block[data-id]')
+    || root.closest('.field');
 }
 
 function tbGetVariationPanel(root) {
