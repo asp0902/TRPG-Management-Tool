@@ -13,6 +13,7 @@ assert.match(
 assert.match(html, /function tbRemoveQuote\(root, quote\)/, '인용 해제 함수가 필요합니다.');
 assert.match(html, /if \(existing\) return tbRemoveQuote\(root, existing\);/, '인용 버튼은 기존 인용을 해제해야 합니다.');
 assert.match(html, /ctx\.block\.children\.push\(\.\.\.children\)/, '인용 해제 시 하위 블록을 보존해야 합니다.');
+assert.match(html, /label: '인용 블록 삭제',[\s\S]*?danger: true,[\s\S]*?deleteQuoteBlock\(quoteEl\)/, '인용 메뉴에 삭제 기능이 필요합니다.');
 assert.match(html, /li\|blockquote\|b/, '정보 탭 저장값은 blockquote를 HTML로 복원해야 합니다.');
 assert.match(html, /function tbApplyQuoteBlockType\(root, range, tagName\)/, '인용 내부 문단 유형 적용 경로가 필요합니다.');
 assert.match(
@@ -68,5 +69,32 @@ const context = {
 };
 vm.runInNewContext(`${colorFunction}; result = [getQuoteTextColor('#ffffff'), getQuoteTextColor('#303238')];`, context);
 assert.deepEqual(Array.from(context.result), ['#202124', '#f5f5f5']);
+
+const deleteFunction = html.match(/function deleteQuoteBlock\(quoteEl\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(deleteFunction, '인용 블록 삭제 함수를 찾을 수 없습니다.');
+const editable = { events: 0, focused: false, dispatchEvent() { this.events += 1; } };
+const block = { quoteChildren: { quote1: [{ id: 'child1' }] } };
+const quote = {
+  dataset: { quoteId: 'quote1' },
+  removed: false,
+  closest: () => editable,
+  remove() { this.removed = true; },
+};
+const deleteContext = {
+  confirm: () => true,
+  getQuoteBlockContext: () => ({ block }),
+  getQuoteChildrenMap: target => target.quoteChildren,
+  Event: function Event(type) { this.type = type; },
+  placeCaretAtEnd: target => { target.focused = true; },
+  lastFocusedTA: null,
+  savedCERange: {},
+  savedFormatTarget: {},
+  _savedFormatSel: {},
+};
+vm.runInNewContext(`${deleteFunction}; result = deleteQuoteBlock(quote);`, { ...deleteContext, quote });
+assert.equal(quote.removed, true, '인용 DOM을 제거해야 합니다.');
+assert.equal(block.quoteChildren, undefined, '인용 하위 블록 데이터도 제거해야 합니다.');
+assert.equal(editable.events, 1, '삭제 결과를 저장해야 합니다.');
+assert.equal(editable.focused, true, '삭제 후 편집기로 커서를 돌려야 합니다.');
 
 console.log('quote block checks: OK');

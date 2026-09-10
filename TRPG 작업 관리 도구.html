@@ -25161,19 +25161,41 @@ function makeQuoteChildInsertCtxItem(quoteEl, insertionRange = getQuoteChildInse
 }
 function openQuoteContextMenu(quoteEl, x, y) {
   const childItem = makeQuoteChildInsertCtxItem(quoteEl, getQuoteChildInsertRange(quoteEl));
-  if (!childItem) {
-    openQuoteBackgroundPicker(quoteEl);
-    return;
-  }
-  tbShowCtxMenu(x, y, [
-    childItem,
-    { sep: true },
+  const items = childItem ? [childItem, { sep: true }] : [];
+  items.push(
     {
       icon: '<i class="fa-solid fa-fill-drip"></i>',
       label: '배경색',
       action: () => openQuoteBackgroundPicker(quoteEl),
     },
-  ]);
+    { sep: true },
+    {
+      icon: '<i class="fa-solid fa-trash"></i>',
+      label: '인용 블록 삭제',
+      danger: true,
+      action: () => deleteQuoteBlock(quoteEl),
+    },
+  );
+  tbShowCtxMenu(x, y, items);
+}
+function deleteQuoteBlock(quoteEl) {
+  const editable = quoteEl?.closest?.('[contenteditable="true"]');
+  if (!quoteEl || !editable || !confirm('이 인용 블록을 삭제할까요?\n본문과 하위 블록이 모두 삭제됩니다.')) return false;
+  const ctx = getQuoteBlockContext(quoteEl);
+  const quoteId = quoteEl.dataset.quoteId || '';
+  if (ctx && quoteId) {
+    const quoteChildren = getQuoteChildrenMap(ctx.block, false);
+    delete quoteChildren[quoteId];
+    if (!Object.keys(quoteChildren).length) delete ctx.block.quoteChildren;
+  }
+  quoteEl.remove();
+  lastFocusedTA = editable;
+  savedCERange = null;
+  savedFormatTarget = null;
+  _savedFormatSel = null;
+  editable.dispatchEvent(new Event('input', { bubbles: true }));
+  placeCaretAtEnd(editable);
+  return true;
 }
 function tbRemoveQuote(root, quote) {
   if (!root || !quote || !root.contains(quote)) return false;
@@ -25294,7 +25316,7 @@ document.addEventListener('click', event => {
 document.addEventListener('contextmenu', event => {
   const quote = event.target?.closest?.('.editor-quote');
   const childHost = event.target?.closest?.('.editor-quote-children');
-  if (!quote || childHost?.closest?.('.editor-quote') === quote || !makeQuoteChildInsertCtxItem(quote)) return;
+  if (!quote || childHost?.closest?.('.editor-quote') === quote || !quote.closest?.('[contenteditable="true"]')) return;
   event.preventDefault();
   event.stopPropagation();
   event.stopImmediatePropagation?.();
