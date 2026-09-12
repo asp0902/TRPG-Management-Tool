@@ -4477,6 +4477,14 @@ body.block-drag-active .block-gap-line {
   display: flex; align-items: stretch; flex-wrap: wrap;
 }
 .block:hover { box-shadow: none; }
+.has-block-tag { position: relative; padding-left: 24px !important; }
+.block-tag-marker { position: absolute; left: 3px; top: 6px; width: 18px; height: 20px; padding: 0; border: 0; background: transparent; cursor: pointer; font-size: 14px; z-index: 3; }
+.block-tag-dialog { width: 300px; max-width: calc(100vw - 24px); border: 1px solid #ddd; border-radius: 8px; padding: 16px; }
+.block-tag-dialog::backdrop { background: #0003; }
+.block-tag-dialog form { display: grid; gap: 12px; }
+.block-tag-dialog label { display: grid; gap: 6px; }
+.block-tag-dialog input[type="text"] { width: 100%; box-sizing: border-box; padding: 8px; }
+.block-tag-dialog footer { display: flex; gap: 8px; justify-content: flex-end; }
 .has-block-memo { position: relative; }
 .has-block-memo::before {
   content: '';
@@ -14643,6 +14651,11 @@ function tbGetScenarioMemoCtxItems(withSeparator = false, blockRef = null) {
     label: '메모 추가',
     action: () => addMemo(blockRef),
   }];
+  if (blockRef?.blockId) items.push({
+    icon: '<i class="fa-solid fa-tag"></i>',
+    label: '태그 설정',
+    action: () => openBlockTagEditor(blockRef),
+  });
   return withSeparator ? [...items, { sep: true }] : items;
 }
 
@@ -16081,11 +16094,13 @@ function sanitizeImportedEditableHtml(value) {
     .replace(/(?:\s|<br\s*\/?>)+$/i, '');
 }
 function stripTransientEditableUi(value) {
-  if (typeof value !== 'string' || (!value.includes('editor-quote-children') && !value.includes('editor-quote-menu-btn') && !value.includes('has-block-memo'))) return value;
+  if (typeof value !== 'string' || (!value.includes('editor-quote-children') && !value.includes('editor-quote-menu-btn') && !value.includes('has-block-memo') && !value.includes('block-tag'))) return value;
   const wrap = document.createElement('div');
   wrap.innerHTML = value;
   wrap.querySelectorAll('.editor-quote-children').forEach(node => node.remove());
   wrap.querySelectorAll('.editor-quote-menu-btn').forEach(node => node.remove());
+  wrap.querySelectorAll('.block-tag-marker').forEach(node => node.remove());
+  wrap.querySelectorAll('.has-block-tag').forEach(node => node.classList.remove('has-block-tag'));
   wrap.querySelectorAll('.has-block-memo').forEach(node => {
     node.classList.remove('has-block-memo');
     node.removeAttribute('data-memo-count');
@@ -22984,6 +22999,68 @@ function syncFormatMemoButton() {
 // ═══════════════════════════════════════════════
 // MEMO
 // ═══════════════════════════════════════════════
+function openBlockTagEditor(blockRef) {
+  const owner = getMemoOwner();
+  if (!owner || !blockRef?.blockId) return;
+  const ref = mkMemo(blockRef).blockRef;
+  const key = JSON.stringify([ref.cid, ref.chapterId || '', ref.blockId]);
+  const tag = owner.blockTags?.[key];
+  document.querySelector('.block-tag-dialog')?.remove();
+  const dialog = document.createElement('dialog');
+  dialog.className = 'block-tag-dialog';
+  dialog.setAttribute('aria-label', '태그 설정');
+  dialog.innerHTML = `<form>
+    <strong>태그 설정</strong>
+    <label>태그명<input type="text" name="name" maxlength="80" required></label>
+    <label>태그 색상<input type="color" name="color" value="#dc2626"></label>
+    <footer><button type="button" data-delete>삭제</button><button type="button" data-cancel>취소</button><button type="submit">저장</button></footer>
+  </form>`;
+  const form = dialog.querySelector('form');
+  form.elements.name.value = tag?.name || '';
+  form.elements.color.value = /^#[0-9a-f]{6}$/i.test(tag?.color || '') ? tag.color : '#dc2626';
+  const finish = () => {
+    recordChange('block', 'block-tag', { cid: ref.cid });
+    renderBlockMemoMarkers(ref.cid);
+    dialog.close();
+  };
+  form.onsubmit = event => {
+    event.preventDefault();
+    const name = form.elements.name.value.trim();
+    if (!name) return;
+    owner.blockTags ||= {};
+    owner.blockTags[key] = { name, color: form.elements.color.value, blockRef: ref };
+    finish();
+  };
+  dialog.querySelector('[data-delete]').disabled = !tag;
+  dialog.querySelector('[data-delete]').onclick = () => { delete owner.blockTags[key]; finish(); };
+  dialog.querySelector('[data-cancel]').onclick = () => dialog.close();
+  dialog.onclose = () => dialog.remove();
+  document.body.appendChild(dialog);
+  dialog.showModal();
+}
+function renderBlockTags(container, cid) {
+  container.querySelectorAll('.block-tag-marker').forEach(el => el.remove());
+  container.querySelectorAll('.has-block-tag').forEach(el => el.classList.remove('has-block-tag'));
+  Object.values(getMemoOwner()?.blockTags || {}).forEach(tag => {
+    const ref = tag?.blockRef;
+    if (!ref?.blockId || ref.cid !== cid || (ref.chapterId && ref.chapterId !== String(currentChapterId || ''))) return;
+    const id = CSS.escape(String(ref.blockId));
+    const target = container.querySelector(`.block[data-id="${id}"], .editor-quote[data-quote-id="${id}"], .roll-sub[data-roll-result-id="${id}"], .branch-choice[data-branch-id="${id}"], .bib-item[data-item-id="${id}"], .bib-roll-result[data-item-result-id="${id}"], .bib-roll-result[data-bib-result-id="${id}"], .branch-inner-block[data-ib-id="${id}"]`);
+    if (!target) return;
+    const marker = document.createElement('button');
+    marker.type = 'button';
+    marker.className = 'block-tag-marker';
+    marker.contentEditable = 'false';
+    marker.title = String(tag.name || '');
+    marker.setAttribute('aria-label', `태그: ${tag.name || ''}`);
+    marker.style.color = /^#[0-9a-f]{6}$/i.test(tag.color || '') ? tag.color : '#dc2626';
+    marker.innerHTML = '<i class="fa-solid fa-tag" aria-hidden="true"></i>';
+    marker.onmousedown = event => { event.preventDefault(); event.stopPropagation(); };
+    marker.onclick = event => { event.stopPropagation(); openBlockTagEditor(ref); };
+    target.classList.add('has-block-tag');
+    target.appendChild(marker);
+  });
+}
 function getMemoOwner() {
   return currentPage === 'rulebook' ? curRb() : cur();
 }
@@ -23057,6 +23134,7 @@ function renderBlockMemoMarkers(cid = currentPage === 'rulebook' ? 'rb-blocks-co
   if (currentPage !== 'script' && currentPage !== 'rulebook') return;
   const container = document.getElementById(cid);
   if (!container) return;
+  renderBlockTags(container, cid);
   container.querySelectorAll('.has-block-memo').forEach(el => {
     el.classList.remove('has-block-memo');
     delete el.dataset.memoCount;
@@ -30370,6 +30448,7 @@ function normalizeRulebookEntry(rb, opts = {}) {
     image: rb.image || '',
     memo: rb.memo || '',
     memos: Array.isArray(rb.memos) ? rb.memos : [],
+    blockTags: rb.blockTags && typeof rb.blockTags === 'object' ? rb.blockTags : {},
     content: rb.content || '',
     rbBlocks: normalizeBlockTree(Array.isArray(rb.rbBlocks) ? rb.rbBlocks : [], opts),
     chapters: Array.isArray(rb.chapters) ? rb.chapters : [],

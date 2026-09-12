@@ -177,6 +177,7 @@ const memoMarkerContainer = {
   querySelector: selector => selector.includes('data-id="block-id"') ? memoMarkerTarget : null,
 };
 const memoMarkerContext = {
+  renderBlockTags: () => {},
   currentPage: 'script',
   currentChapterId: null,
   CSS: { escape: value => value },
