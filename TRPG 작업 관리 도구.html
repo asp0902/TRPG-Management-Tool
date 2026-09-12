@@ -6171,9 +6171,10 @@ body.block-pointer-dragging {
   box-shadow: 0 12px 30px rgba(0,0,0,0.18);
 }
 .rb-inline-note-editor-title { font-size: 12px; font-weight: 800; color: #111; margin-bottom: 7px; }
-.rb-inline-note-editor textarea {
+.rb-inline-note-editor-body {
   width: 100%;
   min-height: 72px;
+  max-height: 240px;
   border: 1px solid #dcdcdc;
   border-radius: 6px;
   padding: 7px 8px;
@@ -6181,10 +6182,13 @@ body.block-pointer-dragging {
   font-size: 12px;
   line-height: 1.5;
   outline: none;
-  resize: vertical;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   box-sizing: border-box;
 }
-.rb-inline-note-editor textarea:focus { border-color: #111; }
+.rb-inline-note-editor-body:empty::before { content: attr(data-placeholder); color: #aaa; pointer-events: none; }
+.rb-inline-note-editor-body:focus { border-color: #111; }
 .rb-inline-note-editor-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
 .rb-inline-note-editor button {
   border: 1px solid #ddd;
@@ -14744,14 +14748,14 @@ function rbEnsureInlineMemoEditor() {
   editor.className = 'rb-inline-note-editor';
   editor.innerHTML = `
     <div class="rb-inline-note-editor-title">메모 추가</div>
-    <textarea spellcheck="false" placeholder="메모를 입력하세요"></textarea>
+    <div class="rb-inline-note-editor-body" contenteditable="true" spellcheck="false" data-placeholder="메모를 입력하세요" aria-label="메모 내용"></div>
     <div class="rb-inline-note-editor-actions">
       <button type="button" class="rb-inline-note-cancel">취소</button>
       <button type="button" class="rb-inline-note-save">저장</button>
     </div>`;
   editor.querySelector('.rb-inline-note-cancel').onclick = () => rbCloseInlineMemoEditor();
   editor.querySelector('.rb-inline-note-save').onclick = () => rbSaveInlineMemoEditor();
-  editor.querySelector('textarea').addEventListener('keydown', event => {
+  editor.querySelector('.rb-inline-note-editor-body').addEventListener('keydown', event => {
     if (event.key === 'Escape') {
       event.preventDefault();
       rbCloseInlineMemoEditor();
@@ -14782,9 +14786,8 @@ function rbPositionFloatingAtPoint(el, x, y) {
 
 function rbOpenInlineMemoEditor(options = {}) {
   const editor = rbEnsureInlineMemoEditor();
-  const textarea = editor.querySelector('textarea');
+  const body = editor.querySelector('.rb-inline-note-editor-body');
   const title = editor.querySelector('.rb-inline-note-editor-title');
-  const noteText = options.noteEl?.dataset?.rbNote || '';
   rbInlineMemoEditorState = {
     mode: options.mode || 'add',
     editable: options.editable || null,
@@ -14792,11 +14795,10 @@ function rbOpenInlineMemoEditor(options = {}) {
     noteEl: options.noteEl || null,
   };
   if (title) title.textContent = options.mode === 'edit' ? '메모 수정' : '메모 추가';
-  if (textarea) textarea.value = noteText;
+  if (body) body.innerHTML = rbGetInlineMemoHtml(options.noteEl);
   rbPositionFloatingAtPoint(editor, options.clientX, options.clientY);
   setTimeout(() => {
-    textarea?.focus();
-    textarea?.setSelectionRange(textarea.value.length, textarea.value.length);
+    if (body) placeCaretAtEnd(body);
   }, 0);
   setTimeout(() => {
     if (rbInlineMemoEditorCloseHandler) {
@@ -14804,7 +14806,7 @@ function rbOpenInlineMemoEditor(options = {}) {
       rbInlineMemoEditorCloseHandler = null;
     }
     rbInlineMemoEditorCloseHandler = event => {
-      if (editor.contains(event.target) || event.target.closest?.('.tb-ctx-menu')) return;
+      if (editor.contains(event.target) || tbIsFormatUtility(event.target) || event.target.closest?.('.tb-ctx-menu')) return;
       rbCloseInlineMemoEditor();
     };
     document.addEventListener('mousedown', rbInlineMemoEditorCloseHandler);
@@ -14833,10 +14835,26 @@ function rbStripInlineMemoMarksFromFragment(fragment) {
   return fragment;
 }
 
-function rbCreateInlineMemoEl(note) {
+function rbGetInlineMemoHtml(noteEl) {
+  if (!noteEl) return '';
+  if (noteEl.dataset.rbNoteHtml !== undefined) return sanitizeCssMacroPreviewHtml(noteEl.dataset.rbNoteHtml);
+  const wrap = document.createElement('div');
+  wrap.textContent = noteEl.dataset.rbNote || '';
+  return wrap.innerHTML.replace(/\r?\n/g, '<br>');
+}
+
+function rbSetInlineMemoContent(noteEl, noteHtml) {
+  const cleanHtml = sanitizeCssMacroPreviewHtml(noteHtml);
+  const wrap = document.createElement('div');
+  wrap.innerHTML = cleanHtml;
+  noteEl.dataset.rbNote = String(wrap.innerText || wrap.textContent || '').trim();
+  noteEl.dataset.rbNoteHtml = cleanHtml;
+}
+
+function rbCreateInlineMemoEl(noteHtml) {
   const span = document.createElement('span');
   span.className = 'rb-inline-note';
-  span.dataset.rbNote = note;
+  rbSetInlineMemoContent(span, noteHtml);
   span.setAttribute('role', 'note');
   return span;
 }
@@ -14846,7 +14864,7 @@ function rbNotifyInlineMemoChanged(editable) {
   editable.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-function rbApplyInlineMemo(editable, range, note) {
+function rbApplyInlineMemo(editable, range, noteHtml) {
   if (!editable || !range || !tbRangeInsideRoot(range, editable)) {
     alert('메모를 적용할 선택 영역을 찾지 못했어요.');
     return false;
@@ -14856,7 +14874,7 @@ function rbApplyInlineMemo(editable, range, note) {
     alert('메모를 추가할 텍스트를 먼저 선택해주세요.');
     return false;
   }
-  const span = rbCreateInlineMemoEl(note);
+  const span = rbCreateInlineMemoEl(noteHtml);
   const fragment = rbStripInlineMemoMarksFromFragment(range.extractContents());
   span.appendChild(fragment);
   range.insertNode(span);
@@ -14873,9 +14891,9 @@ function rbApplyInlineMemo(editable, range, note) {
   return true;
 }
 
-function rbUpdateInlineMemo(noteEl, note) {
+function rbUpdateInlineMemo(noteEl, noteHtml) {
   if (!noteEl) return false;
-  noteEl.dataset.rbNote = note;
+  rbSetInlineMemoContent(noteEl, noteHtml);
   rbNotifyInlineMemoChanged(noteEl.closest('[contenteditable="true"]'));
   rbShowInlineMemoPopup(noteEl);
   return true;
@@ -14893,17 +14911,18 @@ function rbRemoveInlineMemo(noteEl) {
 function rbSaveInlineMemoEditor() {
   const state = rbInlineMemoEditorState;
   const editor = document.getElementById('rb-inline-note-editor');
-  const textarea = editor?.querySelector('textarea');
-  const note = String(textarea?.value || '').trim();
-  if (!state || !textarea) return;
-  if (!note) {
+  const body = editor?.querySelector('.rb-inline-note-editor-body');
+  const noteHtml = sanitizeCssMacroPreviewHtml(body?.innerHTML || '').trim();
+  const noteText = String(body?.innerText || body?.textContent || '').trim();
+  if (!state || !body) return;
+  if (!noteText) {
     alert('메모 내용을 입력해주세요.');
-    textarea.focus();
+    body.focus();
     return;
   }
   const applied = state.noteEl
-    ? rbUpdateInlineMemo(state.noteEl, note)
-    : rbApplyInlineMemo(state.editable, state.range, note);
+    ? rbUpdateInlineMemo(state.noteEl, noteHtml)
+    : rbApplyInlineMemo(state.editable, state.range, noteHtml);
   if (applied) rbCloseInlineMemoEditor();
 }
 
@@ -14934,10 +14953,10 @@ function rbPositionInlineMemoPopup(anchorEl, popup) {
 }
 
 function rbShowInlineMemoPopup(noteEl) {
-  const note = noteEl?.dataset?.rbNote || '';
-  if (!note) return;
+  const noteHtml = rbGetInlineMemoHtml(noteEl);
+  if (!noteHtml) return;
   const popup = rbEnsureInlineMemoPopup();
-  popup.textContent = note;
+  popup.innerHTML = noteHtml;
   rbInlineMemoHoverTarget = noteEl;
   rbPositionInlineMemoPopup(noteEl, popup);
 }
@@ -24635,7 +24654,7 @@ function tbIsTextField(el) {
   return ['text','number','search',''].includes(el.type || '');
 }
 function tbIsFormatUtility(el) {
-  return !!el?.closest?.('#format-bar,#cp-panel,#font-picker-backdrop');
+  return !!el?.closest?.('#format-bar,#cp-panel,#font-picker-backdrop,#link-insert-backdrop,#link-insert-dialog');
 }
 function tbSelectionRangeForText(el) {
   const len = typeof el?.value === 'string' ? el.value.length : 0;

@@ -215,6 +215,11 @@ assert.deepEqual(Array.from(context.result), ['#202124', '#f5f5f5']);
 assert.equal(context.accent, '#ed6262', '인용 라벨은 배경색과 같은 계열의 대비색이어야 합니다.');
 assert.match(html, /quoteEl\.style\.borderLeftColor = getQuoteAccentColor\(color\)/, '배경색 변경 시 왼쪽 라벨 색상도 함께 바꿔야 합니다.');
 assert.match(html, /if \(centered\) \{\s*if \(lastFocusedTA\) lastFocusedTA\.blur\(\);\s*setTimeout\(\(\) => document\.getElementById\('cp-hex'\)\.focus\(\), 30\);\s*\}/, '텍스트 색상 패널은 선택 영역의 포커스를 빼앗으면 안 됩니다.');
+assert.match(html, /class="rb-inline-note-editor-body" contenteditable="true"/, '선택 영역 메모 입력칸은 시각적 서식을 지원해야 합니다.');
+assert.match(html, /body\.innerHTML = rbGetInlineMemoHtml\(options\.noteEl\)/, '기존 메모 서식을 편집기에 복원해야 합니다.');
+assert.match(html, /rbSetInlineMemoContent\(noteEl, noteHtml\)/, '메모의 서식 HTML과 일반 텍스트를 함께 저장해야 합니다.');
+assert.match(html, /popup\.innerHTML = noteHtml/, '메모 팝업에 저장된 서식을 렌더링해야 합니다.');
+assert.match(html, /editor\.contains\(event\.target\) \|\| tbIsFormatUtility\(event\.target\)/, '서식 도구 사용 중 메모 편집기가 닫히면 안 됩니다.');
 
 const deleteFunction = html.match(/function deleteQuoteBlock\(quoteEl\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(deleteFunction, '인용 블록 삭제 함수를 찾을 수 없습니다.');
