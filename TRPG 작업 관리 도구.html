@@ -7482,7 +7482,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
       <div class="tb-sep"></div>
       <!-- 찾아 바꾸기 -->
       <button class="tb-btn" onclick="openFindReplace()" title="찾아 바꾸기 (Ctrl+H)"><i class="fa-solid fa-magnifying-glass"></i></button>
-      <button type="button" class="tb-btn rb-detail-memo-toggle" id="rb-detail-memo-toggle" onclick="toggleRulebookMemo()" title="메모장" aria-label="메모장"><i class="fa-regular fa-note-sticky"></i></button>
+      <button type="button" class="tb-btn" id="format-memo-toggle" onclick="toggleFormatMemo()" title="메모장" aria-label="메모장"><i class="fa-regular fa-note-sticky"></i></button>
     </div>
     <div class="fb-body" id="fb-body">
       <textarea class="fb-textarea" id="fb-input" placeholder="/desc [내용](#&quot;style= font-weight:bold;)" oninput="fbPreview();fbAutoResize(this)"></textarea>
@@ -22780,8 +22780,7 @@ function syncFormatBarVisibility() {
     );
   const rulebookChapterActive = currentPage === 'rulebook' && !!currentChapterId;
   bar.classList.toggle('visible', scriptTabActive || rulebookChapterActive);
-  const rulebookMemoButton = document.getElementById('rb-detail-memo-toggle');
-  if (rulebookMemoButton) rulebookMemoButton.style.display = rulebookChapterActive ? '' : 'none';
+  syncFormatMemoButton();
 }
 
 function getScriptSidePanelElement(type) {
@@ -22946,6 +22945,7 @@ function toggleMemo() {
   const btn = document.getElementById('rp-memo-btn');
   const isHidden = panel.classList.toggle('hidden');
   btn?.classList.toggle('rp-item-active', !isHidden);
+  syncFormatMemoButton();
   if (!isHidden) {
     applyScriptSidePanelWidth('memo', loadScriptSidePanelWidth('memo'));
     renderMemoPanel();
@@ -22953,14 +22953,22 @@ function toggleMemo() {
 }
 function toggleRulebookMemo() {
   const panel = document.getElementById('rb-memo-panel');
-  const btn = document.getElementById('rb-detail-memo-toggle');
   if (!panel) return;
   const isHidden = panel.classList.toggle('hidden');
-  btn?.classList.toggle('active', !isHidden);
+  syncFormatMemoButton();
   if (!isHidden) {
     applyScriptSidePanelWidth('rulebookMemo', loadScriptSidePanelWidth('rulebookMemo'));
     renderMemoPanel();
   }
+}
+function toggleFormatMemo() {
+  if (currentPage === 'rulebook') toggleRulebookMemo();
+  else if (currentPage === 'script') toggleMemo();
+}
+function syncFormatMemoButton() {
+  const button = document.getElementById('format-memo-toggle');
+  const panel = document.getElementById(currentPage === 'rulebook' ? 'rb-memo-panel' : 'memo-panel');
+  button?.classList.toggle('active', !!panel && !panel.classList.contains('hidden'));
 }
 // ═══════════════════════════════════════════════
 // MEMO
