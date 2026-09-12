@@ -3195,7 +3195,7 @@ body.is-block-range-selecting * {
   margin: 4px 0 !important;
   clear: both;
 }
-[contenteditable="true"] span[style*="font-family"] { line-height: 0; }
+[contenteditable="true"] span[style*="font-family"]:not(:has(:is(br, div, p, li, ul, ol, blockquote, h1, h2, h3, h4))) { line-height: 0; }
 [contenteditable="true"][style*="Nanum Myeongjo"],
 [contenteditable="true"] [style*="Nanum Myeongjo"] {
   -webkit-text-stroke: 0.15px currentColor;
