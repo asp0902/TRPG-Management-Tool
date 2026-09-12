@@ -6080,14 +6080,6 @@ body.block-pointer-dragging {
 .rb-detail-hd-info { min-width: 0; flex: 1; }
 .rb-detail-title { font-size: 15px; font-weight: 800; color: #111; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rb-detail-sub { font-size: 11px; color: #aaa; margin-top: 1px; }
-.rb-detail-memo-toggle {
-  width: 30px; height: 30px; padding: 0; flex-shrink: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--border); border-radius: 6px;
-  background: #fff; color: #777; cursor: pointer; font-size: 13px;
-}
-.rb-detail-memo-toggle:hover,
-.rb-detail-memo-toggle.active { background: #f0f0f0; color: #111; }
 .rb-detail-main { flex: 1; display: flex; overflow: hidden; min-height: 0; }
 /* Chapter TOC sidebar */
 .rb-chapter-toc { position: relative; width: 180px; min-width: 160px; flex-shrink: 0; background: #fafafa; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
@@ -7482,6 +7474,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
       <div class="tb-sep"></div>
       <!-- 찾아 바꾸기 -->
       <button class="tb-btn" onclick="openFindReplace()" title="찾아 바꾸기 (Ctrl+H)"><i class="fa-solid fa-magnifying-glass"></i></button>
+      <button type="button" class="tb-btn rb-detail-memo-toggle" id="rb-detail-memo-toggle" onclick="toggleRulebookMemo()" title="메모장" aria-label="메모장"><i class="fa-regular fa-note-sticky"></i></button>
     </div>
     <div class="fb-body" id="fb-body">
       <textarea class="fb-textarea" id="fb-input" placeholder="/desc [내용](#&quot;style= font-weight:bold;)" oninput="fbPreview();fbAutoResize(this)"></textarea>
@@ -8143,7 +8136,6 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
           <div class="rb-detail-title" id="rb-detail-title"></div>
           <div class="rb-detail-sub" id="rb-detail-sub"></div>
         </div>
-        <button type="button" class="rb-detail-memo-toggle" id="rb-detail-memo-toggle" onclick="toggleRulebookMemo()" title="메모장" aria-label="메모장"><i class="fa-regular fa-note-sticky"></i></button>
       </div>
       <div class="rb-detail-main">
         <!-- 목차 (챕터 목록) -->
@@ -22761,6 +22753,8 @@ function syncFormatBarVisibility() {
     );
   const rulebookChapterActive = currentPage === 'rulebook' && !!currentChapterId;
   bar.classList.toggle('visible', scriptTabActive || rulebookChapterActive);
+  const rulebookMemoButton = document.getElementById('rb-detail-memo-toggle');
+  if (rulebookMemoButton) rulebookMemoButton.style.display = rulebookChapterActive ? '' : 'none';
 }
 
 function getScriptSidePanelElement(type) {
