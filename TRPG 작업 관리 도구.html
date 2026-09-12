@@ -4473,24 +4473,18 @@ body.block-drag-active .block-gap-line {
 .block:hover { box-shadow: none; }
 .has-block-memo { position: relative; }
 .has-block-memo::before {
-  content: '\f249  ' attr(data-memo-count);
+  content: '';
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 0;
+  right: 0;
   z-index: 5;
   box-sizing: border-box;
-  padding: 2px 5px;
-  border: 1px solid #eadb91;
-  border-radius: 4px;
-  background: #fff8d6;
-  color: #7a5a00;
-  font-family: "Font Awesome 6 Free", sans-serif;
-  font-size: 10px;
-  font-weight: 400;
-  line-height: 1.2;
+  width: 10px;
+  height: 10px;
+  background: #e53935;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
   pointer-events: none;
 }
-.editor-quote.has-block-memo::before { right: 38px; }
 /* 드롭 위치 표시는 before/after의 inset box-shadow로만 한다 (border는 2px 레이아웃
    시프트를 일으켜 드래그가 버벅인다). */
 .block.dragging { opacity: 0.45; }
