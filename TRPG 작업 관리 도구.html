@@ -8155,6 +8155,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
             <button class="memo-panel-add-btn" onclick="addMemo()" title="메모 추가">+</button>
           </div>
           <div class="memo-list" id="rb-memo-list"></div>
+          <div class="panel-resize-handle panel-resize-handle-left" onmousedown="startScriptSidePanelResize(event, 'rulebookMemo')" title="메모장 폭 조절"></div>
         </div>
       </div>
     </div>
@@ -9146,6 +9147,7 @@ const SCRIPT_TOC_OPEN_KEY = 'trpg-script-toc-open';
 const SCRIPT_SIDE_PANEL_WIDTH_KEYS = {
   toc: 'trpg-script-toc-width',
   memo: 'trpg-script-memo-width',
+  rulebookMemo: 'trpg-rulebook-memo-width',
 };
 const SCRIPT_SIDE_PANEL_DEFAULT_WIDTH = 200;
 const SCRIPT_SIDE_PANEL_MIN_WIDTH = 160;
@@ -22722,6 +22724,7 @@ function syncFormatBarVisibility() {
 }
 
 function getScriptSidePanelElement(type) {
+  if (type === 'rulebookMemo') return document.getElementById('rb-memo-panel');
   return document.getElementById(type === 'memo' ? 'memo-panel' : 'toc-panel');
 }
 function isScriptBodyTabActive() {
@@ -22778,6 +22781,7 @@ function applyScriptSidePanelWidth(type, width, options = {}) {
 function restoreScriptSidePanelWidths() {
   applyScriptSidePanelWidth('toc', loadScriptSidePanelWidth('toc'));
   applyScriptSidePanelWidth('memo', loadScriptSidePanelWidth('memo'));
+  applyScriptSidePanelWidth('rulebookMemo', loadScriptSidePanelWidth('rulebookMemo'));
   applyRulebookTocWidth(loadRulebookTocWidth());
 }
 let _scriptSidePanelResize = null;
@@ -22798,9 +22802,9 @@ function startScriptSidePanelResize(ev, type) {
 function onScriptSidePanelResize(ev) {
   if (!_scriptSidePanelResize) return;
   const deltaX = ev.clientX - _scriptSidePanelResize.startX;
-  const nextWidth = _scriptSidePanelResize.type === 'memo'
-    ? _scriptSidePanelResize.startWidth - deltaX
-    : _scriptSidePanelResize.startWidth + deltaX;
+  const nextWidth = _scriptSidePanelResize.type === 'toc'
+    ? _scriptSidePanelResize.startWidth + deltaX
+    : _scriptSidePanelResize.startWidth - deltaX;
   applyScriptSidePanelWidth(_scriptSidePanelResize.type, nextWidth);
 }
 function stopScriptSidePanelResize() {
@@ -22892,7 +22896,10 @@ function toggleRulebookMemo() {
   if (!panel) return;
   const isHidden = panel.classList.toggle('hidden');
   btn?.classList.toggle('active', !isHidden);
-  if (!isHidden) renderMemoPanel();
+  if (!isHidden) {
+    applyScriptSidePanelWidth('rulebookMemo', loadScriptSidePanelWidth('rulebookMemo'));
+    renderMemoPanel();
+  }
 }
 // ═══════════════════════════════════════════════
 // MEMO

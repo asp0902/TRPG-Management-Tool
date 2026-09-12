@@ -107,8 +107,20 @@ assert.equal(memoMenuContext.items.length, 0, '블록 편집기가 아닌 페이
 
 assert.match(html, /id="rb-detail-memo-toggle"[^>]*onclick="toggleRulebookMemo\(\)"/, 'RULEBOOK 상세 화면에 메모장 버튼이 있어야 합니다.');
 assert.match(html, /id="rb-memo-panel"[\s\S]*?id="rb-memo-list"/, 'RULEBOOK 메모 패널과 목록이 있어야 합니다.');
+assert.match(html, /id="rb-memo-panel"[\s\S]*?startScriptSidePanelResize\(event, 'rulebookMemo'\)/, 'RULEBOOK 메모 패널에 폭 조절 핸들이 있어야 합니다.');
+assert.match(html, /rulebookMemo: 'trpg-rulebook-memo-width'/, 'RULEBOOK 메모 패널 폭을 별도 저장해야 합니다.');
+assert.match(html, /applyScriptSidePanelWidth\('rulebookMemo', loadScriptSidePanelWidth\('rulebookMemo'\)\)/, 'RULEBOOK 메모 패널을 열 때 저장된 폭을 복원해야 합니다.');
 assert.match(html, /memos: Array\.isArray\(rb\.memos\) \? rb\.memos : \[\]/, 'RULEBOOK 메모 데이터가 정규화되어야 합니다.');
 assert.match(html, /currentPage === 'rulebook' \? 'rb-memo-list' : 'memo-list'/, '페이지별 메모 목록을 구분해야 합니다.');
+
+const sidePanelResizeFunction = html.match(/function onScriptSidePanelResize\(ev\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(sidePanelResizeFunction, '패널 폭 조절 함수를 찾을 수 없습니다.');
+const sidePanelResizeContext = {
+  _scriptSidePanelResize: { type: 'rulebookMemo', startX: 500, startWidth: 200 },
+  applyScriptSidePanelWidth: (type, width) => { sidePanelResizeContext.result = { type, width }; },
+};
+vm.runInNewContext(`${sidePanelResizeFunction}; onScriptSidePanelResize({ clientX: 450 });`, sidePanelResizeContext);
+assert.deepEqual(sidePanelResizeContext.result, { type: 'rulebookMemo', width: 250 }, 'RULEBOOK 우측 메모 패널을 왼쪽으로 드래그하면 폭이 늘어야 합니다.');
 
 const memoOwnerStart = html.indexOf('function getMemoOwner()');
 const memoOwnerEnd = html.indexOf('\nfunction deleteMemo(', memoOwnerStart);
