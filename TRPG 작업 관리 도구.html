@@ -6164,6 +6164,10 @@ body.block-pointer-dragging {
   z-index: 10060;
   display: none;
   width: 270px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  box-sizing: border-box;
+  overflow: auto;
   padding: 10px;
   border: 1px solid #d8d8d8;
   border-radius: 8px;
@@ -6173,8 +6177,8 @@ body.block-pointer-dragging {
 .rb-inline-note-editor-title { font-size: 12px; font-weight: 800; color: #111; margin-bottom: 7px; }
 .rb-inline-note-editor-body {
   width: 100%;
-  min-height: 72px;
-  max-height: 240px;
+  min-height: min(72px, calc(100dvh - 100px));
+  max-height: min(240px, calc(100dvh - 100px));
   border: 1px solid #dcdcdc;
   border-radius: 6px;
   padding: 7px 8px;
@@ -14784,6 +14788,13 @@ function rbEnsureInlineMemoEditor() {
     }
   });
   document.body.appendChild(editor);
+  const keepInViewport = () => {
+    if (editor.style.display === 'none') return;
+    const rect = editor.getBoundingClientRect();
+    rbPositionFloatingAtPoint(editor, rect.left, rect.top - 6);
+  };
+  new ResizeObserver(keepInViewport).observe(editor);
+  window.addEventListener('resize', keepInViewport);
   return editor;
 }
 
