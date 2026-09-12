@@ -86,15 +86,44 @@ assert.ok(memoMenuFunction, '시나리오 메모 메뉴 함수를 찾을 수 없
 let memoAddCount = 0;
 const memoMenuContext = {
   currentPage: 'script',
-  addScenarioMemo: () => { memoAddCount += 1; },
+  addMemo: () => { memoAddCount += 1; },
 };
 vm.runInNewContext(`${memoMenuFunction}; items = tbGetScenarioMemoCtxItems();`, memoMenuContext);
 assert.equal(memoMenuContext.items[0]?.label, '메모 추가', 'SCRIPT 블록 메뉴에 메모 추가 항목이 있어야 합니다.');
 memoMenuContext.items[0].action();
-assert.equal(memoAddCount, 1, '메모 추가 항목은 기존 시나리오 메모 생성 기능을 실행해야 합니다.');
+assert.equal(memoAddCount, 1, '메모 추가 항목은 공용 메모 생성 기능을 실행해야 합니다.');
 memoMenuContext.currentPage = 'rulebook';
 vm.runInNewContext('items = tbGetScenarioMemoCtxItems();', memoMenuContext);
-assert.equal(memoMenuContext.items.length, 0, 'RULEBOOK 인라인 메모와 시나리오 메모가 섞이면 안 됩니다.');
+assert.equal(memoMenuContext.items[0]?.label, '메모 추가', 'RULEBOOK 블록 메뉴에도 메모 추가 항목이 있어야 합니다.');
+memoMenuContext.items[0].action();
+assert.equal(memoAddCount, 2, 'RULEBOOK 메모 추가도 공용 메모 생성 기능을 실행해야 합니다.');
+memoMenuContext.currentPage = 'character';
+vm.runInNewContext('items = tbGetScenarioMemoCtxItems();', memoMenuContext);
+assert.equal(memoMenuContext.items.length, 0, '블록 편집기가 아닌 페이지에는 메모 메뉴를 노출하면 안 됩니다.');
+
+assert.match(html, /id="rb-detail-memo-toggle"[^>]*onclick="toggleRulebookMemo\(\)"/, 'RULEBOOK 상세 화면에 메모장 버튼이 있어야 합니다.');
+assert.match(html, /id="rb-memo-panel"[\s\S]*?id="rb-memo-list"/, 'RULEBOOK 메모 패널과 목록이 있어야 합니다.');
+assert.match(html, /memos: Array\.isArray\(rb\.memos\) \? rb\.memos : \[\]/, 'RULEBOOK 메모 데이터가 정규화되어야 합니다.');
+assert.match(html, /currentPage === 'rulebook' \? 'rb-memo-list' : 'memo-list'/, '페이지별 메모 목록을 구분해야 합니다.');
+
+const memoOwnerStart = html.indexOf('function getMemoOwner()');
+const memoOwnerEnd = html.indexOf('\nfunction deleteMemo(', memoOwnerStart);
+assert.ok(memoOwnerStart >= 0 && memoOwnerEnd > memoOwnerStart, '공용 메모 저장 함수를 찾을 수 없습니다.');
+const rulebookOwner = { id: 'rulebook', memos: [] };
+const scenarioOwner = { id: 'scenario', memos: [] };
+const memoOwnerContext = {
+  currentPage: 'rulebook',
+  state: { scenarios: [scenarioOwner], rulebooks: [rulebookOwner] },
+  curRb: () => rulebookOwner,
+  cur: () => scenarioOwner,
+  mkId: () => 'memo-id',
+  persist: () => {},
+  renderMemoPanel: () => {},
+  openMemoPop: () => {},
+};
+vm.runInNewContext(`${html.slice(memoOwnerStart, memoOwnerEnd)}; addMemo();`, memoOwnerContext);
+assert.equal(rulebookOwner.memos.length, 1, 'RULEBOOK에서 만든 메모는 해당 룰북에 저장되어야 합니다.');
+assert.equal(scenarioOwner.memos.length, 0, 'RULEBOOK 메모가 시나리오에 섞이면 안 됩니다.');
 
 [
   'tbBuildBlockCtxMenu',

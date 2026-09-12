@@ -2874,14 +2874,16 @@ tr.ct-row-end .ct-select:focus {
 .toc-empty { font-size: 11px; color: #ccc; padding: 8px 14px; }
 
 /* ─── MEMO PANEL ─── */
-#memo-panel {
+#memo-panel,
+#rb-memo-panel {
   position: relative;
   width: 200px; min-width: 160px; flex-shrink: 0;
   background: #fafafa; border-left: 1px solid var(--border);
   overflow-y: auto; display: flex; flex-direction: column;
   padding: 10px 0;
 }
-#memo-panel.hidden { display: none; }
+#memo-panel.hidden,
+#rb-memo-panel.hidden { display: none; }
 .memo-panel-header {
   font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
   color: #aaa; padding: 0 14px 8px; text-transform: uppercase;
@@ -6048,6 +6050,14 @@ body.block-pointer-dragging {
 .rb-detail-hd-info { min-width: 0; flex: 1; }
 .rb-detail-title { font-size: 15px; font-weight: 800; color: #111; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rb-detail-sub { font-size: 11px; color: #aaa; margin-top: 1px; }
+.rb-detail-memo-toggle {
+  width: 30px; height: 30px; padding: 0; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: #fff; color: #777; cursor: pointer; font-size: 13px;
+}
+.rb-detail-memo-toggle:hover,
+.rb-detail-memo-toggle.active { background: #f0f0f0; color: #111; }
 .rb-detail-main { flex: 1; display: flex; overflow: hidden; min-height: 0; }
 /* Chapter TOC sidebar */
 .rb-chapter-toc { position: relative; width: 180px; min-width: 160px; flex-shrink: 0; background: #fafafa; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
@@ -7169,13 +7179,16 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
   #main { width: 100%; }
   #workspace { position: relative; }
   #toc-panel,
-  #memo-panel {
+  #memo-panel,
+  #rb-memo-panel {
     position: absolute; top: 0; bottom: 0; z-index: 80;
     width: min(260px, calc(100% - 44px)) !important; min-width: 0 !important;
     box-shadow: 8px 0 24px rgba(0,0,0,0.12);
   }
   #toc-panel { left: 0; }
   #memo-panel { right: 44px; box-shadow: -8px 0 24px rgba(0,0,0,0.12); }
+  .rb-detail-main { position: relative; }
+  #rb-memo-panel { right: 0; box-shadow: -8px 0 24px rgba(0,0,0,0.12); }
   #right-panel { width: 44px; min-width: 44px; }
   .panel-resize-handle { display: none; }
   .panel-inner { padding: 24px 24px 56px; }
@@ -7683,7 +7696,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
     <div id="memo-panel" class="hidden">
       <div class="memo-panel-header">
         <span>메모장</span>
-        <button class="memo-panel-add-btn" onclick="addScenarioMemo()" title="메모 추가">+</button>
+        <button class="memo-panel-add-btn" onclick="addMemo()" title="메모 추가">+</button>
       </div>
       <div class="memo-list" id="memo-list"></div>
       <div class="panel-resize-handle panel-resize-handle-left" onmousedown="startScriptSidePanelResize(event, 'memo')" title="메모장 폭 조절"></div>
@@ -8096,6 +8109,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
           <div class="rb-detail-title" id="rb-detail-title"></div>
           <div class="rb-detail-sub" id="rb-detail-sub"></div>
         </div>
+        <button type="button" class="rb-detail-memo-toggle" id="rb-detail-memo-toggle" onclick="toggleRulebookMemo()" title="메모장" aria-label="메모장"><i class="fa-regular fa-note-sticky"></i></button>
       </div>
       <div class="rb-detail-main">
         <!-- 목차 (챕터 목록) -->
@@ -8120,6 +8134,13 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
               <button class="body-add-btn" onclick="openInsertPopup(this,'rb-blocks-container',((curChapter()||{}).blocks||[]).length)">＋ 블록 추가</button>
             </div>
           </div>
+        </div>
+        <div id="rb-memo-panel" class="hidden">
+          <div class="memo-panel-header">
+            <span>메모장</span>
+            <button class="memo-panel-add-btn" onclick="addMemo()" title="메모 추가">+</button>
+          </div>
+          <div class="memo-list" id="rb-memo-list"></div>
         </div>
       </div>
     </div>
@@ -10135,7 +10156,10 @@ function renderCurrentRulebookDetailState(preferredChapterId = currentChapterId)
     document.getElementById('format-bar').classList.remove('visible');
     renderRbChapterList();
   }
-  if (currentPage === 'rulebook') renderList();
+  if (currentPage === 'rulebook') {
+    renderList();
+    renderMemoPanel();
+  }
 }
 function applyRulebookHistorySnapshot(snapshot, focusTarget) {
   const rbId = currentRulebookId;
@@ -14554,11 +14578,11 @@ function tbShowCtxMenu(x, y, items, opts = {}) {
 }
 
 function tbGetScenarioMemoCtxItems(withSeparator = false) {
-  if (currentPage !== 'script') return [];
+  if (currentPage !== 'script' && currentPage !== 'rulebook') return [];
   const items = [{
     icon: '<i class="fa-regular fa-note-sticky"></i>',
     label: '메모 추가',
-    action: () => addScenarioMemo(),
+    action: () => addMemo(),
   }];
   return withSeparator ? [...items, { sep: true }] : items;
 }
@@ -14643,7 +14667,7 @@ function rbGetInlineMemoCtxItems(e, cid = '') {
     if (range) {
       items.push({
         icon: '📝',
-        label: '메모 추가',
+        label: '선택 영역 메모 추가',
         action: () => rbOpenInlineMemoEditor({
           mode: 'add',
           editable,
@@ -22848,32 +22872,45 @@ function toggleMemo() {
     renderMemoPanel();
   }
 }
+function toggleRulebookMemo() {
+  const panel = document.getElementById('rb-memo-panel');
+  const btn = document.getElementById('rb-detail-memo-toggle');
+  if (!panel) return;
+  const isHidden = panel.classList.toggle('hidden');
+  btn?.classList.toggle('active', !isHidden);
+  if (!isHidden) renderMemoPanel();
+}
 // ═══════════════════════════════════════════════
 // MEMO
 // ═══════════════════════════════════════════════
-function getMemos() {
-  const s = cur();
-  if (!s) return [];
-  if (!Array.isArray(s.memos)) s.memos = [];
-  return s.memos;
+function getMemoOwner() {
+  return currentPage === 'rulebook' ? curRb() : cur();
+}
+function getMemoOwnerById(memoId) {
+  return [...state.scenarios, ...state.rulebooks].find(owner =>
+    Array.isArray(owner.memos) && owner.memos.some(memo => memo.id === memoId)
+  ) || null;
+}
+function getMemos(owner = getMemoOwner()) {
+  if (!owner) return [];
+  if (!Array.isArray(owner.memos)) owner.memos = [];
+  return owner.memos;
 }
 function mkMemo() {
   return { id: mkId(), title: '새 메모', body: '' };
 }
-function addScenarioMemo() {
-  const s = cur(); if (!s) return;
-  if (!Array.isArray(s.memos)) s.memos = [];
+function addMemo() {
+  const owner = getMemoOwner(); if (!owner) return;
   const memo = mkMemo();
-  s.memos.push(memo);
+  getMemos(owner).push(memo);
   persist();
   renderMemoPanel();
   openMemoPop(memo.id);
 }
-function deleteScenarioMemo(memoId, ev) {
+function deleteMemo(memoId, ev) {
   if (ev) { ev.stopPropagation(); }
-  const s = cur(); if (!s) return;
-  if (!Array.isArray(s.memos)) return;
-  s.memos = s.memos.filter(m => m.id !== memoId);
+  const owner = getMemoOwnerById(memoId); if (!owner) return;
+  owner.memos = owner.memos.filter(m => m.id !== memoId);
   persist();
   renderMemoPanel();
   // Close popup if open
@@ -22897,7 +22934,8 @@ function syncMemoUiToScenario() {
   });
 }
 function renderMemoPanel() {
-  const list = document.getElementById('memo-list'); if (!list) return;
+  const list = document.getElementById(currentPage === 'rulebook' ? 'rb-memo-list' : 'memo-list');
+  if (!list) return;
   const memos = getMemos();
 
   if (!memos.length) {
@@ -22930,7 +22968,7 @@ function renderMemoPanel() {
 
       <button class="memo-item-del"
         type="button"
-        onclick="deleteScenarioMemo('${m.id}', event)"
+        onclick="deleteMemo('${m.id}', event)"
         title="삭제">×</button>
     </div>
   `).join('');
@@ -22991,7 +23029,7 @@ function onMemoListDrop(ev, targetMemoId) {
 
   if (!sourceMemoId || sourceMemoId === targetMemoId) return;
 
-  reorderScenarioMemo(sourceMemoId, targetMemoId, placeAfter);
+  reorderMemo(sourceMemoId, targetMemoId, placeAfter);
 }
 
 function onMemoListDragEnd() {
@@ -23004,22 +23042,22 @@ function clearMemoListDragClasses() {
     .forEach(el => el.classList.remove('dragging', 'drag-over-top', 'drag-over-bottom'));
 }
 
-function reorderScenarioMemo(sourceMemoId, targetMemoId, placeAfter = false) {
-  const s = cur(); if (!s || !Array.isArray(s.memos)) return;
+function reorderMemo(sourceMemoId, targetMemoId, placeAfter = false) {
+  const owner = getMemoOwnerById(sourceMemoId); if (!owner || !Array.isArray(owner.memos)) return;
 
-  const from = s.memos.findIndex(m => m.id === sourceMemoId);
-  const to = s.memos.findIndex(m => m.id === targetMemoId);
+  const from = owner.memos.findIndex(m => m.id === sourceMemoId);
+  const to = owner.memos.findIndex(m => m.id === targetMemoId);
 
   if (from < 0 || to < 0 || from === to) return;
 
-  const [moved] = s.memos.splice(from, 1);
+  const [moved] = owner.memos.splice(from, 1);
 
-  let insertAt = s.memos.findIndex(m => m.id === targetMemoId);
+  let insertAt = owner.memos.findIndex(m => m.id === targetMemoId);
   if (insertAt < 0) {
-    s.memos.push(moved);
+    owner.memos.push(moved);
   } else {
     if (placeAfter) insertAt += 1;
-    s.memos.splice(insertAt, 0, moved);
+    owner.memos.splice(insertAt, 0, moved);
   }
 
   persist();
@@ -23028,8 +23066,8 @@ function reorderScenarioMemo(sourceMemoId, targetMemoId, placeAfter = false) {
 let _memoZTop = 700;
 function getNextMemoZ() { return ++_memoZTop; }
 function openMemoPop(memoId) {
-  const s = cur(); if (!s) return;
-  const memo = (s.memos || []).find(m => m.id === memoId); if (!memo) return;
+  const owner = getMemoOwnerById(memoId); if (!owner) return;
+  const memo = owner.memos.find(m => m.id === memoId); if (!memo) return;
   // Bring existing to front if already open
   const existing = document.getElementById('memo-pop-' + memoId);
   if (existing) { existing.style.zIndex = getNextMemoZ(); return; }
@@ -23091,8 +23129,8 @@ function pinMemoPop(memoId) {
   else el.style.zIndex = getNextMemoZ();
 }
 function saveMemoPop(memoId) {
-  const s = cur(); if (!s) return;
-  const memo = (s.memos || []).find(m => m.id === memoId); if (!memo) return;
+  const owner = getMemoOwnerById(memoId); if (!owner) return;
+  const memo = owner.memos.find(m => m.id === memoId); if (!memo) return;
   const titleEl = document.getElementById('memo-pop-title-' + memoId);
   const bodyEl = document.getElementById('memo-pop-body-' + memoId);
   if (titleEl) memo.title = titleEl.value;
@@ -29882,6 +29920,7 @@ function switchPage(page) {
   if (page === 'rulebook') {
     try {
       renderRulebookPage();
+      renderMemoPanel();
       // 챕터가 열려 있으면 서식 도구 복원
       syncFormatBarVisibility();
     } catch(e) { console.error('renderRulebookPage error:', e); }
@@ -30136,6 +30175,7 @@ function normalizeRulebookEntry(rb, opts = {}) {
     tags: Array.isArray(rb.tags) ? rb.tags : [],
     image: rb.image || '',
     memo: rb.memo || '',
+    memos: Array.isArray(rb.memos) ? rb.memos : [],
     content: rb.content || '',
     rbBlocks: normalizeBlockTree(Array.isArray(rb.rbBlocks) ? rb.rbBlocks : [], opts),
     chapters: Array.isArray(rb.chapters) ? rb.chapters : [],
@@ -30412,10 +30452,12 @@ function renderRulebookPage() {
     cores = cores.filter(function(rb) {
       return rb.title.toLowerCase().includes(q)
         || rb.memo.toLowerCase().includes(q)
+        || rb.memos.some(function(m) { return ((m.title || '') + ' ' + (m.body || '')).toLowerCase().includes(q); })
         || rb.tags.some(function(t) { return t.toLowerCase().includes(q); })
         || (suppleMap[rb.id] || []).some(function(s) {
           return s.title.toLowerCase().includes(q)
             || s.memo.toLowerCase().includes(q)
+            || s.memos.some(function(m) { return ((m.title || '') + ' ' + (m.body || '')).toLowerCase().includes(q); })
             || s.tags.some(function(t) { return t.toLowerCase().includes(q); });
         })
         || (dataSheetMap[rb.id] || []).some(function(ds) {
@@ -33643,7 +33685,10 @@ function openRulebookDetail(id) {
   if (chapters.length > 0) {
     rbSelectChapter(chapters[0].id);
   }
-  if (currentPage === 'rulebook') renderList();
+  if (currentPage === 'rulebook') {
+    renderList();
+    renderMemoPanel();
+  }
 }
 
 function closeRulebookDetail() {
