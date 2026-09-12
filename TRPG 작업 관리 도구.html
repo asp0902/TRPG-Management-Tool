@@ -2537,7 +2537,7 @@ tr.ct-row-end .ct-select:focus {
 .editor-quote > .editor-quote-children,
 .editor-quote > .editor-quote-content .editor-quote-children {
   --child-indent: 0px;
-  width: 100%; max-width: 100%; margin: 8px 0 0; padding-top: 6px;
+  width: calc(100% + 20px); max-width: calc(100% + 20px); margin: 8px 0 0; padding-top: 6px;
   border-top: 1px solid rgba(127,127,127,.35); color: inherit;
 }
 .editor-quote > .editor-quote-children > .block.block-text > .block-text-ce,
@@ -3712,6 +3712,7 @@ body.is-block-range-selecting * {
 /* 하위 블록: 좌우 10px inset은 block-body가 맡는다 (같은 콜아웃 안 기본 블록과 동일) */
 .block-child .column-grid { margin: 12px 0; }
 .block-child .block-body:has(> .column-grid) { padding: 0 10px; }
+.editor-quote-children .block-body:has(> .column-grid) { white-space: normal; }
 /* 테스트: 자식 단 나누기 블록 상하 여백 */
 .block-child:has(> .block-body > .column-grid) { margin: 2px 0; }
 .column-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }

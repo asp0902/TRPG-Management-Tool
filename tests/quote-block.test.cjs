@@ -65,6 +65,8 @@ assert.match(
   /openQuoteContextMenu\(quote, event\.clientX, event\.clientY, event\);\s*\}, true\);/,
   '인용 블록 우클릭 메뉴는 선택 텍스트 컨텍스트를 전달해야 합니다.',
 );
+assert.match(html, /\.editor-quote > \.editor-quote-children,[\s\S]*?width: calc\(100% \+ 20px\); max-width: calc\(100% \+ 20px\)/, '인용 하위 블록의 좌우 외곽 여백이 같아야 합니다.');
+assert.match(html, /\.editor-quote-children \.block-body:has\(> \.column-grid\) \{ white-space: normal; \}/, '인용 내부 단 나누기에서 템플릿 공백이 높이를 만들면 안 됩니다.');
 
 const quoteMenuFunction = html.match(/function openQuoteContextMenu\(quoteEl, x, y, event = null\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(quoteMenuFunction, '인용 블록 메뉴 함수를 찾을 수 없습니다.');
