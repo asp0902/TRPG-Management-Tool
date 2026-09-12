@@ -14750,8 +14750,8 @@ function rbEnsureInlineMemoEditor() {
     <div class="rb-inline-note-editor-title">메모 추가</div>
     <div class="rb-inline-note-editor-body" contenteditable="true" spellcheck="false" data-placeholder="메모를 입력하세요" aria-label="메모 내용"></div>
     <div class="rb-inline-note-editor-actions">
-      <button type="button" class="rb-inline-note-cancel">취소</button>
       <button type="button" class="rb-inline-note-save">저장</button>
+      <button type="button" class="rb-inline-note-cancel">취소</button>
     </div>`;
   editor.querySelector('.rb-inline-note-cancel').onclick = () => rbCloseInlineMemoEditor();
   editor.querySelector('.rb-inline-note-save').onclick = () => rbSaveInlineMemoEditor();
