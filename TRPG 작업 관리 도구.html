@@ -24930,7 +24930,8 @@ function tbFontFamily(fontFamily) {
         const currentLine = editable.value.substring(lineStart, start);
         isIndented = currentLine.startsWith('\u3000') || currentLine.startsWith('\t') || currentLine.match(/^ {1,4}/);
       } else { // contenteditable
-        isIndented = document.queryCommandState('indent'); // Use native command state for contenteditable
+        const orderedListItem = tbOrderedListItemFromNode(parent, editable);
+        isIndented = Number(orderedListItem?.dataset.listIndent || 0) > 0 || document.queryCommandState('indent');
       }
       if (indentBtn) indentBtn.classList.toggle('active', isIndented);
       if (outdentBtn) outdentBtn.classList.toggle('active', isIndented);
@@ -25228,6 +25229,38 @@ function tbIndentTextInput(ta, dir) {
     Math.max(blockStart, end - removedTotal)
   );
 }
+function tbOrderedListItemFromNode(node, root) {
+  const el = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+  const item = el?.closest?.('li');
+  return item && root.contains(item) && item.parentElement?.tagName === 'OL' ? item : null;
+}
+function tbIndentOrderedListRange(root, range, dir) {
+  const first = tbOrderedListItemFromNode(range?.startContainer, root);
+  const last = tbOrderedListItemFromNode(range?.endContainer, root);
+  if (!first || !last || first.parentElement !== last.parentElement) return false;
+
+  const items = Array.from(first.parentElement.children).filter(item => item.tagName === 'LI');
+  const from = items.indexOf(first);
+  const to = items.indexOf(last);
+  if (from < 0 || to < 0) return false;
+
+  let changed = false;
+  items.slice(Math.min(from, to), Math.max(from, to) + 1).forEach(item => {
+    const current = Math.max(0, parseInt(item.dataset.listIndent, 10) || 0);
+    const next = Math.max(0, current + (dir > 0 ? 1 : -1));
+    if (next === current) return;
+    if (next) {
+      item.dataset.listIndent = String(next);
+      item.style.setProperty('margin-inline-start', `${next}em`);
+    } else {
+      delete item.dataset.listIndent;
+      item.style.removeProperty('margin-inline-start');
+    }
+    changed = true;
+  });
+  if (changed) root.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+}
 function tbIndent(dir) {
   const selection = window.getSelection();
   const liveRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
@@ -25240,12 +25273,12 @@ function tbIndent(dir) {
   if (target.contentEditable === 'true') {
     if (liveRange && tbRangeInsideRoot(liveRange, target)) savedCERange = liveRange.cloneRange();
     else if (captured?.ta === target && captured.range && tbRangeInsideRoot(captured.range, target)) savedCERange = captured.range.cloneRange();
-    // 현재 선택 영역이 리스트(ul 또는 ol) 내부라면 브라우저 기본 명령으로 들여쓰기/내어쓰기 수행
+    const listRange = liveRange && tbRangeInsideRoot(liveRange, target) ? liveRange : captured?.range;
+    if (listRange && tbIndentOrderedListRange(target, listRange, dir)) return;
+    // 글머리 목록은 기존 중첩 동작을 유지한다.
     const sel = selection;
     if (sel && sel.rangeCount > 0) {
-      // document.queryCommandState('insertUnorderedList') 또는 'insertOrderedList'로 현재 리스트 상태 확인
-      // 이전에 사용하던 node?.closest?.('li') 대신 더 정확하게 리스트 상태를 판단합니다.
-      if (document.queryCommandState('insertUnorderedList') || document.queryCommandState('insertOrderedList')) {
+      if (document.queryCommandState('insertUnorderedList')) {
         document.execCommand(dir > 0 ? 'indent' : 'outdent', false, null);
         target.dispatchEvent(new Event('input', { bubbles: true }));
         return;

@@ -108,6 +108,41 @@ assert.equal(
 const indentStart = html.indexOf('function tbIndent(dir) {');
 const indentEnd = html.indexOf('function tbGetCEFormatRange', indentStart);
 const indentFunction = html.slice(indentStart, indentEnd).trim();
+assert.doesNotMatch(indentFunction, /queryCommandState\('insertOrderedList'\)/, '번호 목록은 브라우저 중첩 들여쓰기를 사용하면 안 됩니다.');
+
+const listIndentStart = html.indexOf('function tbOrderedListItemFromNode');
+const listIndentEnd = html.indexOf('function tbIndent(dir) {', listIndentStart);
+const listIndentFunctions = html.slice(listIndentStart, listIndentEnd).trim();
+assert.ok(listIndentFunctions, '번호 목록 시각적 들여쓰기 함수를 찾을 수 없습니다.');
+const listItems = Array.from({ length: 4 }, () => ({
+  nodeType: 1,
+  tagName: 'LI',
+  dataset: {},
+  style: {
+    values: {},
+    setProperty(name, value) { this.values[name] = value; },
+    removeProperty(name) { delete this.values[name]; },
+  },
+  closest(selector) { return selector === 'li' ? this : null; },
+}));
+const orderedList = { tagName: 'OL', children: listItems };
+listItems.forEach(item => { item.parentElement = orderedList; });
+let listInputEvents = 0;
+const listRoot = { contains: item => listItems.includes(item), dispatchEvent: () => { listInputEvents += 1; } };
+const listRange = {
+  startContainer: { nodeType: 3, parentElement: listItems[1] },
+  endContainer: { nodeType: 3, parentElement: listItems[3] },
+};
+const listContext = { Node: { ELEMENT_NODE: 1 }, Event: function Event() {} };
+vm.runInNewContext(listIndentFunctions, listContext);
+assert.equal(listContext.tbIndentOrderedListRange(listRoot, listRange, 1), true);
+assert.deepEqual(listItems.map(item => item.dataset.listIndent || '0'), ['0', '1', '1', '1']);
+assert.deepEqual(listItems.map(item => item.style.values['margin-inline-start'] || ''), ['', '1em', '1em', '1em']);
+assert.deepEqual(Array.from(orderedList.children), listItems, '번호 목록의 항목 순서를 변경하면 안 됩니다.');
+listContext.tbIndentOrderedListRange(listRoot, listRange, -1);
+assert.deepEqual(listItems.map(item => item.dataset.listIndent || '0'), ['0', '0', '0', '0']);
+assert.equal(listInputEvents, 2);
+
 const selectedEditor = { contentEditable: 'true', isConnected: true };
 const liveRange = {
   commonAncestorContainer: {
@@ -125,6 +160,7 @@ const indentContext = {
   savedFormatTarget: null,
   savedCERange: null,
   tbRangeInsideRoot: () => true,
+  tbIndentOrderedListRange: () => false,
   tbIndentContentEditable: target => indentTargets.push(target),
   tbIndentTextInput: () => assert.fail('contenteditable을 일반 입력칸으로 처리했습니다.'),
 };
