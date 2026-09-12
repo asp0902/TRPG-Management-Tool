@@ -23911,8 +23911,10 @@ function cpOpenPanel(mode, color, options = {}) {
     panel.style.left = left + 'px';
     panel.style.top = (rect.bottom + 4) + 'px';
   }
-  if (lastFocusedTA) lastFocusedTA.blur();
-  setTimeout(() => document.getElementById('cp-hex').focus(), 30);
+  if (centered) {
+    if (lastFocusedTA) lastFocusedTA.blur();
+    setTimeout(() => document.getElementById('cp-hex').focus(), 30);
+  }
 }
 
 function cpRenderPalette() {

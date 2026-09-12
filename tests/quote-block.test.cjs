@@ -214,6 +214,7 @@ vm.runInNewContext(`${colorFunction}\n${accentFunction}; result = [getQuoteTextC
 assert.deepEqual(Array.from(context.result), ['#202124', '#f5f5f5']);
 assert.equal(context.accent, '#ed6262', '인용 라벨은 배경색과 같은 계열의 대비색이어야 합니다.');
 assert.match(html, /quoteEl\.style\.borderLeftColor = getQuoteAccentColor\(color\)/, '배경색 변경 시 왼쪽 라벨 색상도 함께 바꿔야 합니다.');
+assert.match(html, /if \(centered\) \{\s*if \(lastFocusedTA\) lastFocusedTA\.blur\(\);\s*setTimeout\(\(\) => document\.getElementById\('cp-hex'\)\.focus\(\), 30\);\s*\}/, '텍스트 색상 패널은 선택 영역의 포커스를 빼앗으면 안 됩니다.');
 
 const deleteFunction = html.match(/function deleteQuoteBlock\(quoteEl\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(deleteFunction, '인용 블록 삭제 함수를 찾을 수 없습니다.');
