@@ -160,6 +160,7 @@ assert.deepEqual(JSON.parse(JSON.stringify(rulebookOwner.memos[1].blockRef)), {
 assert.match(html, /class="memo-item-source"[\s\S]*?sourceLabel/, '메모 목록에 소속 블록을 표시해야 합니다.');
 assert.match(html, /\.has-block-memo::before[\s\S]*?width: 10px;[\s\S]*?height: 10px;[\s\S]*?background: #e53935;[\s\S]*?clip-path: polygon\(0 0, 100% 0, 100% 100%\)/, '메모가 연결된 블록에 우상단 빨간 삼각형을 표시해야 합니다.');
 assert.doesNotMatch(html, /\.editor-quote\.has-block-memo::before\s*\{\s*right:/, '인용 메모 마커도 실제 우상단 모서리에 있어야 합니다.');
+assert.match(html, /\.block\.block-chapter\.has-block-memo::before\s*\{\s*top:\s*4px;\s*right:\s*4px;/, '소제목 메모 마커는 둥근 모서리 안쪽에 표시해야 합니다.');
 assert.match(html, /renderBlockMemoMarkers\(cid\);/, '블록을 다시 렌더한 뒤 메모 마커를 복원해야 합니다.');
 assert.match(html, /const memos = getMemos\(\);\s*renderBlockMemoMarkers\(\);/, '메모 추가·삭제 후 마커를 즉시 갱신해야 합니다.');
 assert.match(html, /querySelectorAll\('\.has-block-memo'\)[\s\S]*?removeAttribute\('data-memo-count'\)/, '인용 저장값에서 메모 마커 UI 속성을 제거해야 합니다.');
