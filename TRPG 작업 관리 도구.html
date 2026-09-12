@@ -4480,18 +4480,29 @@ body.block-drag-active .block-gap-line {
 .has-block-tag { position: relative; overflow: visible !important; }
 .block-tag-marker { position: absolute; left: -24px; top: 6px; width: 18px; height: 20px; padding: 0; border: 0; background: transparent; cursor: pointer; font-size: 14px; z-index: 3; }
 .block-tag-marker > i { display: inline-block; transform: rotate(135deg); }
-.block-tag-dialog { width: 300px; max-width: calc(100vw - 24px); border: 1px solid #ddd; border-radius: 8px; padding: 16px; }
+.block-tag-dialog { width: 320px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); overflow: auto; box-sizing: border-box; margin: auto; border: 1px solid var(--border); border-radius: 8px; padding: 20px; background: #fff; color: #222; font-family: inherit; font-size: 12px; box-shadow: 0 16px 48px #0002; }
 .block-tag-dialog::backdrop { background: #0003; }
-.block-tag-dialog form { display: grid; gap: 12px; }
-.block-tag-dialog label { display: grid; gap: 6px; }
-.block-tag-dialog input[type="text"] { width: 100%; box-sizing: border-box; padding: 8px; }
-.block-tag-dialog input[type="color"] { width: 32px; height: 32px; padding: 2px; box-sizing: border-box; cursor: pointer; }
+.block-tag-dialog form { display: grid; gap: 16px; }
+.block-tag-dialog form > strong { font-size: 16px; font-weight: 800; }
+.block-tag-dialog label { display: grid; gap: 8px; color: #666; font-weight: 600; }
+.block-tag-dialog input[type="text"] { width: 100%; height: 36px; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border); border-radius: 5px; font: inherit; color: #222; background: #fff; }
+.block-tag-dialog input[type="text"]:focus { outline: none; border-color: #333; box-shadow: 0 0 0 2px #0000000a; }
+.block-tag-dialog input[type="color"] { appearance: none; width: 36px; height: 36px; padding: 4px; box-sizing: border-box; cursor: pointer; background: #fff; border: 1px solid var(--border); border-radius: 6px; transition: border-color .15s; }
+.block-tag-dialog input[type="color"]:hover { border-color: #777; }
+.block-tag-dialog input[type="color"]:focus-visible { outline: 2px solid #333; outline-offset: 2px; }
 .block-tag-dialog input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
-.block-tag-dialog input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 0; }
-.block-tag-dialog input[type="color"]::-moz-color-swatch { border: 0; border-radius: 0; }
-.block-tag-dialog footer { display: flex; gap: 8px; justify-content: flex-end; }
-.block-tag-recent-colors { display: flex; flex-wrap: wrap; gap: 6px; }
-.block-tag-recent-colors button { width: 24px; height: 24px; padding: 0; border: 1px solid #888; border-radius: 0; cursor: pointer; }
+.block-tag-dialog input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 2px; }
+.block-tag-dialog input[type="color"]::-moz-color-swatch { border: 0; border-radius: 2px; }
+.block-tag-dialog footer { display: flex; gap: 8px; justify-content: flex-end; border-top: 1px solid #eee; padding-top: 16px; }
+.block-tag-dialog footer .btn { min-height: 34px; padding: 7px 14px; }
+.block-tag-dialog footer .btn-primary { font-weight: 700; }
+.block-tag-dialog footer [data-delete] { margin-right: auto; color: #777; border-color: transparent; padding-inline: 8px; }
+.block-tag-dialog footer [data-delete]:hover:not(:disabled) { color: #c62828; background: #fff2f2; }
+.block-tag-dialog footer [data-delete]:disabled { opacity: .35; cursor: default; }
+.block-tag-dialog [data-recent-colors] > div:first-child { color: #666; font-weight: 600; margin-bottom: 8px; }
+.block-tag-recent-colors { display: flex; flex-wrap: wrap; gap: 8px; }
+.block-tag-recent-colors button { width: 24px; height: 24px; padding: 0; border: 1px solid #0002; border-radius: 4px; cursor: pointer; box-shadow: inset 0 0 0 2px #fff; }
+.block-tag-recent-colors button:hover { outline: 1px solid #888; outline-offset: 2px; }
 .block-tag-recent-colors button:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
 .has-block-memo { position: relative; }
 .has-block-memo::before {
@@ -23033,7 +23044,7 @@ function openBlockTagEditor(blockRef) {
     <label>태그명<input type="text" name="name" maxlength="80" required></label>
     <label>태그 색상<input type="color" name="color" value="#dc2626"></label>
     <div data-recent-colors hidden><div>최근 색상</div><div class="block-tag-recent-colors" role="group" aria-label="최근 태그 색상"></div></div>
-    <footer><button type="button" data-delete>삭제</button><button type="button" data-cancel>취소</button><button type="submit">저장</button></footer>
+    <footer><button type="button" class="btn" data-delete><i class="fa-regular fa-trash-can" aria-hidden="true"></i> 삭제</button><button type="button" class="btn" data-cancel>취소</button><button type="submit" class="btn btn-primary">저장</button></footer>
   </form>`;
   const form = dialog.querySelector('form');
   form.elements.name.value = tag?.name || '';
