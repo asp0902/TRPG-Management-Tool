@@ -3194,6 +3194,10 @@ body.is-block-range-selecting * {
   clear: both;
 }
 [contenteditable="true"] span[style*="font-family"] { line-height: inherit; }
+[contenteditable="true"][style*="Nanum Myeongjo"],
+[contenteditable="true"] [style*="Nanum Myeongjo"] {
+  -webkit-text-stroke: 0.15px currentColor;
+}
 [contenteditable="true"] span[style*="background-color"] {
   padding-inline: 0.15em;
   -webkit-box-decoration-break: clone;

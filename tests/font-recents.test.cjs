@@ -11,6 +11,7 @@ assert.match(html, /customFonts: state\.customFonts,[\s\S]*?recentFonts: state\.
 assert.match(html, /async function bootstrapApp\(\) \{\s*await load\(\);\s*await initGitHubSync\(\);\s*loadCustomFonts\(\);\s*updateFontDropdown\(\);/, '로컬·GitHub 저장 데이터를 읽은 뒤 글꼴 목록을 복원해야 합니다.');
 assert.doesNotMatch(html, /\.block-text-ce:has\(span\[style\*="font-family"\]\)\s*\{\s*line-height:/, '부분 글꼴 때문에 편집기 전체 줄간격이 바뀌면 안 됩니다.');
 assert.match(html, /\[contenteditable="true"\] span\[style\*="font-family"\]\s*\{\s*line-height:\s*inherit;/, '부분 글꼴은 편집기의 줄간격을 그대로 따라야 합니다.');
+assert.match(html, /\[contenteditable="true"\]\[style\*="Nanum Myeongjo"\],[\s\S]*?-webkit-text-stroke:\s*0\.15px currentColor;/, 'Nanum Myeongjo의 가는 획을 편집 영역에서 보강해야 합니다.');
 
 const normalizeFunction = html.match(/function normalizeFontNameForCompare\(name\) \{[\s\S]*?\n\}/)?.[0];
 const uniqueFunction = html.match(/function uniqueFontNames\(list\) \{[\s\S]*?\n\}/)?.[0];
