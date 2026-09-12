@@ -4471,6 +4471,20 @@ body.block-drag-active .block-gap-line {
 .bip-item-icon { font-size: 13px; width: 16px; text-align: center; color: #888; flex-shrink: 0; }
 
 /* ─── BLOCK ─── */
+.handout-title { width: 100%; border: 0; border-bottom: 1px solid var(--border); padding: 8px 0 12px; margin-bottom: 16px; font: inherit; font-size: 16px; font-weight: 700; background: transparent; }
+.handout-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.handout-column { min-width: 0; }
+.handout-column + .handout-column { border-left: 1px solid var(--border); padding-left: 20px; }
+.handout-column h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+.handout-column .block-ce { min-height: 88px; margin-bottom: 14px; }
+.handout-preview-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.handout-preview-head span { margin-right: auto; font-size: 11px; font-weight: 700; color: #888; }
+.handout-preview-head .btn { width: 30px; height: 30px; padding: 0; }
+.handout-preview { min-height: 100px; border: 1px solid var(--border); border-radius: 5px; padding: 12px; overflow: auto; margin-bottom: 12px; }
+.handout-preview > img { display: block; max-width: 100%; max-height: 280px; object-fit: contain; margin: 0 auto 8px; }
+.handout-column > label { display: grid; gap: 8px; color: #888; font-size: 11px; font-weight: 700; }
+.handout-macro { width: 100%; min-height: 112px; box-sizing: border-box; resize: vertical; padding: 10px; border: 1px solid var(--border); border-radius: 5px; font: 12px/1.5 monospace; color: #333; background: #fafafa; }
+@media (max-width: 640px) { .handout-columns { min-width: 480px; } .block-handout > .block-body { overflow-x: auto; } }
 .block {
   background: #fff; border: 1px solid #e8e8e8; border-radius: 7px;
   transition: box-shadow 0.12s ease, opacity 0.15s ease; position: relative;
@@ -7807,6 +7821,9 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 
       <hr class="rp-sep">
 
+      <button class="rp-item" onclick="addBlock('handout')" title="핸드아웃 추가">
+        <div class="rp-icon"><i class="fa-solid fa-file-lines"></i></div>
+      </button>
       <button class="rp-item" onclick="rpMoveUp()" title="위로 이동">
         <div class="rp-icon"><i class="fa-solid fa-arrow-up"></i></div>
       </button>
@@ -8562,6 +8579,7 @@ const BTYPES = [
   { id:'column',  label:'단 나누기',  color:'#64748b' },
   { id:'divider', label:'구분선',     color:'#374151' },
   { id:'image',   label:'이미지',     color:'#4b5563' },
+  { id: 'handout', label: '핸드아웃', color: '#475569' },
 ];
 const DEFAULT_SPEAKER_NAME = '화자';
 const DEFAULT_SPEECH_COLOR = '#0369a1';
@@ -12571,6 +12589,11 @@ function createBlockData(typeId) {
   };
 
   if (typeId === 'toggle') b.collapsed = false;
+  if (typeId === 'handout') {
+    b.secretContent = '';
+    b.publicImage = ''; b.secretImage = '';
+    b.publicMacro = ''; b.secretMacro = '';
+  }
   if (typeId === 'column') {
     b.columnCount = 2;
     b.columns = ['', '', ''];
@@ -16997,6 +17020,49 @@ function mkDividerEl(b, cid, ctx = {}) {
   return el;
 }
 
+function getHandoutPreviewHtml(b, side) {
+  const src = b[side + 'Image'] || '';
+  return (isRenderableImageSrc(src) ? `<img src="${esc(src)}" alt="${side === 'public' ? '공개' : '비밀'} 핸드아웃 이미지">` : '')
+    + renderCssMacroPreviewHtml(b[side + 'Macro'] || '');
+}
+function getHandoutBlockHtml(b, cid) {
+  return `<input class="handout-title" aria-label="핸드아웃 제목" placeholder="핸드아웃 제목" value="${esc(b.title || '')}" oninput="upd('${b.id}','title',this.value,'${cid}')">
+    <div class="handout-columns">${['public', 'secret'].map(side => {
+      const label = side === 'public' ? '공개' : '비밀';
+      const field = side === 'public' ? 'content' : 'secretContent';
+      return `<section class="handout-column" data-handout-side="${side}">
+        <h3>${label}</h3>
+        <div class="block-ce" contenteditable="true" data-field="${field}" data-ph="${label} 내용" aria-label="핸드아웃 ${label} 내용" oninput="upd('${b.id}','${field}',this.innerHTML,'${cid}')"></div>
+        <div class="handout-preview-head"><span>PREVIEW</span>
+          <button type="button" class="btn" data-handout-image-edit title="${label} 이미지 추가/변경" aria-label="${label} 이미지 추가/변경"><i class="fa-solid fa-image" aria-hidden="true"></i></button>
+          <button type="button" class="btn" data-handout-image-delete title="${label} 이미지 삭제" aria-label="${label} 이미지 삭제" ${b[side + 'Image'] ? '' : 'disabled'}><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>
+        </div>
+        <div class="handout-preview css-macro-preview-body">${getHandoutPreviewHtml(b, side)}</div>
+        <label>CSS MACRO<textarea class="handout-macro" aria-label="${label} CSS MACRO" onfocus="lastFocusedTA=this" spellcheck="false">${esc(b[side + 'Macro'] || '')}</textarea></label>
+      </section>`;
+    }).join('')}</div>`;
+}
+function bindHandoutBlock(el, b, cid) {
+  el.querySelectorAll('[data-handout-side]').forEach(column => {
+    const side = column.dataset.handoutSide;
+    const refresh = () => {
+      column.querySelector('.handout-preview').innerHTML = getHandoutPreviewHtml(b, side);
+      column.querySelector('[data-handout-image-delete]').disabled = !b[side + 'Image'];
+    };
+    const setImage = src => {
+      b[side + 'Image'] = isRenderableImageSrc(src) ? src : '';
+      commitBlockTreeChange(`handout:${b.id}:${side}:image`, cid);
+      refresh();
+    };
+    column.querySelector('[data-handout-image-edit]').onclick = () => openImageBlockModal(setImage, b[side + 'Image'] || '', !!b[side + 'Image']);
+    column.querySelector('[data-handout-image-delete]').onclick = () => setImage('');
+    column.querySelector('.handout-macro').oninput = event => {
+      b[side + 'Macro'] = event.target.value;
+      commitBlockTreeChange(`handout:${b.id}:${side}:macro`, cid);
+      refresh();
+    };
+  });
+}
 function mkBlockEl(b, cid, ctx = {}) {
   if (b.type === 'text') return mkTextBlockEl(b, cid, ctx);
   if (b.type === 'divider') return mkDividerEl(b, cid, ctx);
@@ -17006,7 +17072,7 @@ function mkBlockEl(b, cid, ctx = {}) {
   if (b.type === 'toggle' && typeof b.collapsed !== 'boolean') b.collapsed = false;
   const def = bdef(b.type);
   const el = document.createElement('div');
-  const typeClass = { callout:'block-callout', chapter:'block-chapter', speech:'block-speech', roll:'block-roll', branch:'block-branch', image:'block-image' };
+  const typeClass = { callout:'block-callout', chapter:'block-chapter', speech:'block-speech', roll:'block-roll', branch:'block-branch', image:'block-image', handout:'block-handout' };
   el.className = typeClass[b.type] ? `block ${typeClass[b.type]}` : 'block';
   if ((ctx.depth || 0) > 0) el.classList.add('block-child');
   el.style.setProperty('--bc', def.color);
@@ -17025,6 +17091,9 @@ function mkBlockEl(b, cid, ctx = {}) {
 
   let bodyHtml = '';
   switch (b.type) {
+    case 'handout':
+      bodyHtml = getHandoutBlockHtml(b, cid);
+      break;
     case 'chapter': {
       const chSubColor = b.chSubColor || '#fafafa';
       const chBgColor  = b.chBgColor  || '#2a2a2a';
@@ -17257,6 +17326,7 @@ function mkBlockEl(b, cid, ctx = {}) {
   if (b.type === 'toggle') {
     syncScriptToggleBlockUI(el, !!b.collapsed);
   }
+  if (b.type === 'handout') bindHandoutBlock(el, b, cid);
   if (b.type === 'roll') {
     applyRollPreviewColors(b, el);
 
@@ -19084,6 +19154,7 @@ function addEnding() {
 
 // ─── 블록 삽입 팝업 ───
 const BIP_ICONS = {
+  handout: '<i class="fa-solid fa-file-lines"></i>',
   text:    '<i class="fa-solid fa-bars"></i>',
   intro:   '<i class="fa-solid fa-play"></i>',
   speech:  '<i class="fa-solid fa-message"></i>',
