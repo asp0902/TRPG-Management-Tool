@@ -4490,6 +4490,9 @@ body.block-drag-active .block-gap-line {
 .block-tag-dialog input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 0; }
 .block-tag-dialog input[type="color"]::-moz-color-swatch { border: 0; border-radius: 0; }
 .block-tag-dialog footer { display: flex; gap: 8px; justify-content: flex-end; }
+.block-tag-recent-colors { display: flex; flex-wrap: wrap; gap: 6px; }
+.block-tag-recent-colors button { width: 24px; height: 24px; padding: 0; border: 1px solid #888; border-radius: 0; cursor: pointer; }
+.block-tag-recent-colors button:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
 .has-block-memo { position: relative; }
 .has-block-memo::before {
   content: '';
@@ -23004,6 +23007,17 @@ function syncFormatMemoButton() {
 // ═══════════════════════════════════════════════
 // MEMO
 // ═══════════════════════════════════════════════
+function getRecentBlockTagColors(color) {
+  let colors = [];
+  try { colors = JSON.parse(localStorage.getItem('trpg-recent-block-tag-colors') || '[]'); } catch (_) {}
+  colors = [...new Set([color, ...(Array.isArray(colors) ? colors : [])]
+    .filter(value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value))
+    .map(value => value.toLowerCase()))].slice(0, 12);
+  if (color) {
+    try { localStorage.setItem('trpg-recent-block-tag-colors', JSON.stringify(colors)); } catch (_) {}
+  }
+  return colors;
+}
 function openBlockTagEditor(blockRef) {
   const owner = getMemoOwner();
   if (!owner || !blockRef?.blockId) return;
@@ -23018,11 +23032,23 @@ function openBlockTagEditor(blockRef) {
     <strong>태그 설정</strong>
     <label>태그명<input type="text" name="name" maxlength="80" required></label>
     <label>태그 색상<input type="color" name="color" value="#dc2626"></label>
+    <div data-recent-colors hidden><div>최근 색상</div><div class="block-tag-recent-colors" role="group" aria-label="최근 태그 색상"></div></div>
     <footer><button type="button" data-delete>삭제</button><button type="button" data-cancel>취소</button><button type="submit">저장</button></footer>
   </form>`;
   const form = dialog.querySelector('form');
   form.elements.name.value = tag?.name || '';
   form.elements.color.value = /^#[0-9a-f]{6}$/i.test(tag?.color || '') ? tag.color : '#dc2626';
+  const recentColors = getRecentBlockTagColors();
+  dialog.querySelector('[data-recent-colors]').hidden = !recentColors.length;
+  recentColors.forEach(color => {
+    const swatch = document.createElement('button');
+    swatch.type = 'button';
+    swatch.style.backgroundColor = color;
+    swatch.title = color;
+    swatch.setAttribute('aria-label', `태그 색상 ${color}`);
+    swatch.onclick = () => { form.elements.color.value = color; };
+    dialog.querySelector('.block-tag-recent-colors').appendChild(swatch);
+  });
   const finish = () => {
     recordChange('block', 'block-tag', { cid: ref.cid });
     renderBlockMemoMarkers(ref.cid);
@@ -23034,6 +23060,7 @@ function openBlockTagEditor(blockRef) {
     if (!name) return;
     owner.blockTags ||= {};
     owner.blockTags[key] = { name, color: form.elements.color.value, blockRef: ref };
+    getRecentBlockTagColors(form.elements.color.value);
     finish();
   };
   dialog.querySelector('[data-delete]').disabled = !tag;

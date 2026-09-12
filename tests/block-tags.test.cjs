@@ -27,3 +27,17 @@ assert.equal(markers[0].style.color, '#2563eb');
 markers[0].onclick({ stopPropagation() {} });
 assert.equal(edited, ref, 'Clicking a tag must edit the same block');
 console.log('block tag checks: OK');
+const recentColorsFunction = html.match(/function getRecentBlockTagColors\(color\) \{[\s\S]*?\n\}/)[0];
+let storedColors = JSON.stringify(['#ABCDEF', '#abcdef', 'invalid', '#123456']);
+const recentContext = { localStorage: {
+  getItem: () => storedColors,
+  setItem: (_key, value) => { storedColors = value; },
+} };
+vm.createContext(recentContext);
+vm.runInContext(recentColorsFunction, recentContext);
+assert.deepEqual(Array.from(vm.runInContext("getRecentBlockTagColors('#123456')", recentContext)), ['#123456', '#abcdef']);
+assert.deepEqual(JSON.parse(storedColors), ['#123456', '#abcdef']);
+storedColors = '{invalid json';
+assert.equal(vm.runInContext('getRecentBlockTagColors().length', recentContext), 0);
+storedColors = JSON.stringify(Array.from({ length: 20 }, (_, i) => '#' + i.toString(16).padStart(6, '0')));
+assert.equal(vm.runInContext('getRecentBlockTagColors().length', recentContext), 12);
