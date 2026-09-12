@@ -10,7 +10,7 @@ assert.match(html, /class="tb-font-menu-section">모든 글꼴</, '글꼴 메뉴
 assert.match(html, /customFonts: state\.customFonts,[\s\S]*?recentFonts: state\.recentFonts,/, '최근 글꼴을 앱 저장 데이터에 포함해야 합니다.');
 assert.match(html, /async function bootstrapApp\(\) \{\s*await load\(\);\s*await initGitHubSync\(\);\s*loadCustomFonts\(\);\s*updateFontDropdown\(\);/, '로컬·GitHub 저장 데이터를 읽은 뒤 글꼴 목록을 복원해야 합니다.');
 assert.doesNotMatch(html, /\.block-text-ce:has\(span\[style\*="font-family"\]\)\s*\{\s*line-height:/, '부분 글꼴 때문에 편집기 전체 줄간격이 바뀌면 안 됩니다.');
-assert.match(html, /\[contenteditable="true"\] span\[style\*="font-family"\]\s*\{\s*line-height:\s*1;/, '부분 글꼴은 주변 줄 높이를 늘리면 안 됩니다.');
+assert.match(html, /\[contenteditable="true"\] span\[style\*="font-family"\]\s*\{\s*line-height:\s*inherit;/, '부분 글꼴은 편집기의 줄간격을 그대로 따라야 합니다.');
 
 const normalizeFunction = html.match(/function normalizeFontNameForCompare\(name\) \{[\s\S]*?\n\}/)?.[0];
 const uniqueFunction = html.match(/function uniqueFontNames\(list\) \{[\s\S]*?\n\}/)?.[0];
