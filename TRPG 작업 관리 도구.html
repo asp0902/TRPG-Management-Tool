@@ -4526,9 +4526,9 @@ body.block-pointer-dragging {
 #blocks-container .block.block-roll > .block-side-handle:active { cursor: grabbing; }
 /* 본문 영역 */
 .block-body { flex: 1; padding: 8px 12px; min-width: 0; }
-/* 우상단 플로팅 액션 */
+/* 본문을 가리지 않도록 일반 블록의 플로팅 액션을 우측 거터에 배치 */
 .block-actions {
-  position: absolute; top: 4px; left: auto; right: 4px; bottom: auto;
+  position: absolute; top: 4px; left: 100%; right: auto; bottom: auto;
   display: flex; align-items: center; gap: 1px;
   padding: 1px 4px; z-index: 6; white-space: nowrap;
 }
@@ -5828,6 +5828,7 @@ body.block-pointer-dragging {
 .block.block-ending .btcp-textarea { background: #fff; color: #333; border-color: #3a3a3a; }
 .block.block-ending > .block-actions {
   top: 6px;
+  left: auto;
   right: 8px;
 }
 .block.block-ending > .block-actions > .block-act {

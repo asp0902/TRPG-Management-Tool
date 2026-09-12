@@ -21,5 +21,10 @@ assert.match(
   /function syncBlockDraggableState[\s\S]*?el\.draggable = false;[\s\S]*?BLOCK_DRAG_HANDLE_SELECTOR[\s\S]*?el\.draggable = true;/,
   '블록은 드래그 불가, 전용 핸들은 드래그 가능 상태로 동기화해야 합니다.',
 );
+assert.match(
+  html,
+  /\.block-actions\s*\{\s*position:\s*absolute;\s*top:\s*4px;\s*left:\s*100%;\s*right:\s*auto;/,
+  '일반 블록의 플로팅 메뉴는 텍스트를 가리지 않는 우측 거터에 있어야 합니다.',
+);
 
 console.log('block drag selection checks: OK');
