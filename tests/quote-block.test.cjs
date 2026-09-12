@@ -220,6 +220,7 @@ assert.match(html, /body\.innerHTML = rbGetInlineMemoHtml\(options\.noteEl\)/, '
 assert.match(html, /rbSetInlineMemoContent\(noteEl, noteHtml\)/, '메모의 서식 HTML과 일반 텍스트를 함께 저장해야 합니다.');
 assert.match(html, /popup\.innerHTML = noteHtml/, '메모 팝업에 저장된 서식을 렌더링해야 합니다.');
 assert.match(html, /editor\.contains\(event\.target\) \|\| tbIsFormatUtility\(event\.target\)/, '서식 도구 사용 중 메모 편집기가 닫히면 안 됩니다.');
+assert.match(html, /\.tb-font-menu\s*\{[\s\S]*?z-index:\s*10061/, '메모 편집기 위에서 글꼴 목록을 선택할 수 있어야 합니다.');
 
 const deleteFunction = html.match(/function deleteQuoteBlock\(quoteEl\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(deleteFunction, '인용 블록 삭제 함수를 찾을 수 없습니다.');
