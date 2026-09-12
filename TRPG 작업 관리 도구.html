@@ -14553,6 +14553,16 @@ function tbShowCtxMenu(x, y, items, opts = {}) {
   setTimeout(() => document.addEventListener('mousedown', _ctxMenuCloseHandler), 0);
 }
 
+function tbGetScenarioMemoCtxItems(withSeparator = false) {
+  if (currentPage !== 'script') return [];
+  const items = [{
+    icon: '<i class="fa-regular fa-note-sticky"></i>',
+    label: '메모 추가',
+    action: () => addScenarioMemo(),
+  }];
+  return withSeparator ? [...items, { sep: true }] : items;
+}
+
 function tbBuildBlockCtxMenu(e, id, cid, cssItem = null, extraItems = [], deleteAction = null, deleteLabel = '블록 삭제') {
   const infoForPaste = getBlockArrayInfo(id, cid);
   const pasteTargetKey = makeBlockTargetKeyForArrayInfo(infoForPaste);
@@ -14580,6 +14590,7 @@ function tbBuildBlockCtxMenu(e, id, cid, cssItem = null, extraItems = [], delete
   const inlineMemoItems = rbGetInlineMemoCtxItems(e, cid);
   const middleItems = [
     ...tbGetVariationCtxItems(e),
+    ...tbGetScenarioMemoCtxItems(),
     ...inlineMemoItems,
     ...(cssItem ? [cssItem] : []),
     ...(extraItems || []),
@@ -18427,6 +18438,7 @@ function buildRollResultCtxMenu(blockId, resultId, cid) {
         })),
     },
     { sep: true },
+    ...tbGetScenarioMemoCtxItems(true),
     { heading: '결과 타입' },
     ...typeItems,
     { sep: true },
@@ -18566,6 +18578,11 @@ function openEndingFieldCtxMenu(e, endingId, field, cid = 'blocks-container') {
     if (items.length) items.push({ sep: true });
     items.push(...inlineMemoItems);
   }
+  const scenarioMemoItems = tbGetScenarioMemoCtxItems();
+  if (scenarioMemoItems.length) {
+    if (items.length) items.push({ sep: true });
+    items.push(...scenarioMemoItems);
+  }
   if (items.length) items.push({ sep: true });
   items.push({
     icon: '✦',
@@ -18697,6 +18714,7 @@ function buildBranchConnectMenu(blockId, branchId, cid) {
       })
     : [{ label: '연결할 내용 블록이 없습니다', disabled: true }];
   return [
+    ...tbGetScenarioMemoCtxItems(true),
     { heading: '블록 연결' },
     ...items,
     { sep: true },
@@ -20101,6 +20119,7 @@ function openIbRollItemCtxMenu(e, blockId, ibId, itemId, cid) {
     { icon: '↑', label: '위로 이동', action: () => moveIbItem(blockId, ibId, itemId, 'up', cid) },
     { icon: '↓', label: '아래로 이동', action: () => moveIbItem(blockId, ibId, itemId, 'down', cid) },
     ...(variationItems.length ? [{ sep: true }, ...variationItems, { sep: true }] : [{ sep: true }]),
+    ...tbGetScenarioMemoCtxItems(true),
     ...buildIbRollCtxMenu(blockId, ibId, itemId, cid),
     ...(item && itemEl ? [{ sep: true }, makeChildInsertCtxItem(item, itemEl, cid, e)] : []),
     { sep: true },
@@ -20128,6 +20147,7 @@ function openIbRollResultCtxMenu(e, blockId, ibId, itemId, resultIdx, cid) {
   const items = [
     ...variationItems,
     ...(variationItems.length ? [{ sep: true }] : []),
+    ...tbGetScenarioMemoCtxItems(true),
     { heading: '결과 타입' },
     ...typeItems,
     { sep: true },
@@ -20225,6 +20245,7 @@ function openIbItemCalloutCtxMenu(e, blockId, ibId, itemId, cid) {
   const items = [
     ...variationItems,
     ...(variationItems.length ? [{ sep: true }] : []),
+    ...tbGetScenarioMemoCtxItems(true),
     { icon: '＋', label: '하위 콜아웃 추가', action: () => addIbNestedCallout(blockId, ibId, itemId, cid) },
     { icon: '🎲', label: '판정 추가', action: () => addIbCalloutRoll(blockId, ibId, itemId, cid) },
     ...(calloutItem && calloutItemEl ? [makeChildInsertCtxItem(calloutItem, calloutItemEl, cid, e)] : []),
@@ -20448,6 +20469,7 @@ function openBranchInnerBlockCtxMenu(e, blockId, ibId, cid) {
     { icon: '↓', label: '아래로 이동', disabled: !canMoveDown, action: () => moveBranchInnerBlock(blockId, ibId, 'down', cid) },
     ...(variationItems.length ? [{ sep: true }, ...variationItems] : []),
     { sep: true },
+    ...tbGetScenarioMemoCtxItems(true),
     ...(childInsert ? [childInsert] : []),
   ];
   tbShowCtxMenu(e.clientX, e.clientY, items);
@@ -20484,6 +20506,7 @@ function buildBranchInnerRollCtxMenu(blockId, ibId, cid) {
   if (!isBranchInnerRollBlock(innerBlock)) return [];
   normalizeEmbeddedRollBlock(innerBlock);
   return [
+    ...tbGetScenarioMemoCtxItems(true),
     { icon: `<span style="display:inline-block;width:10px;height:10px;border-radius:999px;background:${innerBlock.rollColorStart || '#0dd4d9'};border:1px solid rgba(0,0,0,0.18);vertical-align:middle;flex-shrink:0"></span>`, label: '시작 색상 변경', action: () => openBranchInnerRollColorPicker(blockId, ibId, 'rollColorStart', cid, document.querySelector(`.branch-inner-block[data-ib-id="${ibId}"]`)) },
     { icon: `<span style="display:inline-block;width:10px;height:10px;border-radius:999px;background:${innerBlock.rollColorEnd || '#fb8d5c'};border:1px solid rgba(0,0,0,0.18);vertical-align:middle;flex-shrink:0"></span>`, label: '끝 색상 변경', action: () => openBranchInnerRollColorPicker(blockId, ibId, 'rollColorEnd', cid, document.querySelector(`.branch-inner-block[data-ib-id="${ibId}"]`)) },
     { sep: true },
@@ -20533,6 +20556,7 @@ function openBranchIbRollResultCtxMenu(e, blockId, ibId, resultIdx, cid) {
   const items = [
     ...variationItems,
     ...(variationItems.length ? [{ sep: true }] : []),
+    ...tbGetScenarioMemoCtxItems(true),
     { heading: '결과 타입' },
     ...typeItems,
     { sep: true },
@@ -25616,6 +25640,7 @@ function makeQuoteChildInsertCtxItem(quoteEl, insertionRange = getQuoteChildInse
 function openQuoteContextMenu(quoteEl, x, y, event = null) {
   const items = event ? tbGetVariationCtxItems(event) : [];
   if (items.length) items.push({ sep: true });
+  items.push(...tbGetScenarioMemoCtxItems(true));
   const childItem = makeQuoteChildInsertCtxItem(quoteEl, getQuoteChildInsertRange(quoteEl));
   if (childItem) items.push(childItem, { sep: true });
   items.push(

@@ -73,11 +73,47 @@ vm.runInNewContext(`${quoteMenuFunction}; openQuoteContextMenu(quote, 10, 20, ev
   quote: {},
   event: {},
   tbGetVariationCtxItems: () => [{ label: '개변 추가' }],
+  tbGetScenarioMemoCtxItems: () => [{ label: '메모 추가' }],
   getQuoteChildInsertRange: () => null,
   makeQuoteChildInsertCtxItem: () => null,
   tbShowCtxMenu: (_x, _y, items) => { quoteMenuItems = items; },
 });
 assert.equal(quoteMenuItems[0].label, '개변 추가', '인용 블록 메뉴 첫 항목에 개변 기능이 있어야 합니다.');
+assert.ok(quoteMenuItems.some(item => item.label === '메모 추가'), '인용 블록 메뉴에 메모 추가 기능이 있어야 합니다.');
+
+const memoMenuFunction = html.match(/function tbGetScenarioMemoCtxItems\(withSeparator = false\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(memoMenuFunction, '시나리오 메모 메뉴 함수를 찾을 수 없습니다.');
+let memoAddCount = 0;
+const memoMenuContext = {
+  currentPage: 'script',
+  addScenarioMemo: () => { memoAddCount += 1; },
+};
+vm.runInNewContext(`${memoMenuFunction}; items = tbGetScenarioMemoCtxItems();`, memoMenuContext);
+assert.equal(memoMenuContext.items[0]?.label, '메모 추가', 'SCRIPT 블록 메뉴에 메모 추가 항목이 있어야 합니다.');
+memoMenuContext.items[0].action();
+assert.equal(memoAddCount, 1, '메모 추가 항목은 기존 시나리오 메모 생성 기능을 실행해야 합니다.');
+memoMenuContext.currentPage = 'rulebook';
+vm.runInNewContext('items = tbGetScenarioMemoCtxItems();', memoMenuContext);
+assert.equal(memoMenuContext.items.length, 0, 'RULEBOOK 인라인 메모와 시나리오 메모가 섞이면 안 됩니다.');
+
+[
+  'tbBuildBlockCtxMenu',
+  'buildRollResultCtxMenu',
+  'openEndingFieldCtxMenu',
+  'buildBranchConnectMenu',
+  'openIbRollItemCtxMenu',
+  'openIbRollResultCtxMenu',
+  'openIbItemCalloutCtxMenu',
+  'openBranchInnerBlockCtxMenu',
+  'buildBranchInnerRollCtxMenu',
+  'openBranchIbRollResultCtxMenu',
+  'openQuoteContextMenu',
+].forEach(name => {
+  const start = html.indexOf(`function ${name}(`);
+  const end = html.indexOf('\nfunction ', start + 1);
+  assert.ok(start >= 0, `${name} 함수를 찾을 수 없습니다.`);
+  assert.match(html.slice(start, end < 0 ? html.length : end), /tbGetScenarioMemoCtxItems\([^)]*\)/, `${name}에 메모 추가 경로가 필요합니다.`);
+});
 
 const colorFunction = html.match(/function getQuoteTextColor\(background\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(colorFunction, '인용 글자색 계산 함수를 찾을 수 없습니다.');
