@@ -152,6 +152,31 @@ assert.deepEqual(JSON.parse(JSON.stringify(rulebookOwner.memos[1].blockRef)), {
   chapterId: 'chapter-id',
 }, '우클릭 메모는 소속 블록 정보를 저장해야 합니다.');
 assert.match(html, /class="memo-item-source"[\s\S]*?sourceLabel/, '메모 목록에 소속 블록을 표시해야 합니다.');
+assert.match(html, /\.has-block-memo::before[\s\S]*?attr\(data-memo-count\)/, '메모가 연결된 블록에 우상단 마커를 표시해야 합니다.');
+assert.match(html, /renderBlockMemoMarkers\(cid\);/, '블록을 다시 렌더한 뒤 메모 마커를 복원해야 합니다.');
+assert.match(html, /const memos = getMemos\(\);\s*renderBlockMemoMarkers\(\);/, '메모 추가·삭제 후 마커를 즉시 갱신해야 합니다.');
+assert.match(html, /querySelectorAll\('\.has-block-memo'\)[\s\S]*?removeAttribute\('data-memo-count'\)/, '인용 저장값에서 메모 마커 UI 속성을 제거해야 합니다.');
+
+const memoMarkerFunction = html.match(/function renderBlockMemoMarkers\(cid = currentPage === 'rulebook' \? 'rb-blocks-container' : 'blocks-container'\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(memoMarkerFunction, '블록 메모 마커 함수를 찾을 수 없습니다.');
+const memoMarkerTarget = { dataset: {}, classList: { add(value) { this.value = value; } } };
+const memoMarkerContainer = {
+  querySelectorAll: () => [],
+  querySelector: selector => selector.includes('data-id="block-id"') ? memoMarkerTarget : null,
+};
+const memoMarkerContext = {
+  currentPage: 'script',
+  currentChapterId: null,
+  CSS: { escape: value => value },
+  document: { getElementById: () => memoMarkerContainer },
+  getMemos: () => [
+    { blockRef: { blockId: 'block-id', cid: 'blocks-container' } },
+    { blockRef: { blockId: 'block-id', cid: 'blocks-container' } },
+  ],
+};
+vm.runInNewContext(`${memoMarkerFunction}; renderBlockMemoMarkers();`, memoMarkerContext);
+assert.equal(memoMarkerTarget.classList.value, 'has-block-memo', '연결된 블록에 메모 마커 클래스를 추가해야 합니다.');
+assert.equal(memoMarkerTarget.dataset.memoCount, '2', '블록에 연결된 메모 개수를 표시해야 합니다.');
 
 [
   'tbBuildBlockCtxMenu',

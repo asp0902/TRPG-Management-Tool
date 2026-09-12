@@ -4469,6 +4469,26 @@ body.block-drag-active .block-gap-line {
   display: flex; align-items: stretch; flex-wrap: wrap;
 }
 .block:hover { box-shadow: none; }
+.has-block-memo { position: relative; }
+.has-block-memo::before {
+  content: '\f249  ' attr(data-memo-count);
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 5;
+  box-sizing: border-box;
+  padding: 2px 5px;
+  border: 1px solid #eadb91;
+  border-radius: 4px;
+  background: #fff8d6;
+  color: #7a5a00;
+  font-family: "Font Awesome 6 Free", sans-serif;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.2;
+  pointer-events: none;
+}
+.editor-quote.has-block-memo::before { right: 38px; }
 /* 드롭 위치 표시는 before/after의 inset box-shadow로만 한다 (border는 2px 레이아웃
    시프트를 일으켜 드래그가 버벅인다). */
 .block.dragging { opacity: 0.45; }
@@ -13316,6 +13336,7 @@ function renderBlocks(blocks, cid) {
   if (typeof applyPageDefaultLineHeightToContainer === 'function') {
     applyPageDefaultLineHeightToContainer(cid);
   }
+  renderBlockMemoMarkers(cid);
 
   if (cid === 'blocks-container') {
     renderToc(blocks);
@@ -16016,10 +16037,14 @@ function sanitizeImportedEditableHtml(value) {
     .replace(/(?:\s|<br\s*\/?>)+$/i, '');
 }
 function stripTransientEditableUi(value) {
-  if (typeof value !== 'string' || !value.includes('editor-quote-children')) return value;
+  if (typeof value !== 'string' || (!value.includes('editor-quote-children') && !value.includes('has-block-memo'))) return value;
   const wrap = document.createElement('div');
   wrap.innerHTML = value;
   wrap.querySelectorAll('.editor-quote-children').forEach(node => node.remove());
+  wrap.querySelectorAll('.has-block-memo').forEach(node => {
+    node.classList.remove('has-block-memo');
+    node.removeAttribute('data-memo-count');
+  });
   return wrap.innerHTML;
 }
 function normalizeEditableHtml(value) {
@@ -22973,10 +22998,43 @@ function getMemoBlockLabel(memo) {
   const block = getGenericBlockById(ref.blockId, cid) || getGenericBlockById(ref.rootBlockId || ref.blockId, cid);
   return `블록 · ${block ? rbGetTocTitleFromBlock(block, 1) : (ref.label || '연결된 블록')}`;
 }
+function renderBlockMemoMarkers(cid = currentPage === 'rulebook' ? 'rb-blocks-container' : 'blocks-container') {
+  if (currentPage !== 'script' && currentPage !== 'rulebook') return;
+  const container = document.getElementById(cid);
+  if (!container) return;
+  container.querySelectorAll('.has-block-memo').forEach(el => {
+    el.classList.remove('has-block-memo');
+    delete el.dataset.memoCount;
+  });
+  const targets = new Map();
+  getMemos().forEach(memo => {
+    const ref = memo?.blockRef;
+    if (!ref?.blockId || (ref.cid || 'blocks-container') !== cid) return;
+    if (cid === 'rb-blocks-container' && ref.chapterId && String(ref.chapterId) !== String(currentChapterId || '')) return;
+    const blockId = CSS.escape(String(ref.blockId));
+    const rootBlockId = CSS.escape(String(ref.rootBlockId || ref.blockId));
+    const target = container.querySelector([
+      `.block[data-id="${blockId}"]`,
+      `.editor-quote[data-quote-id="${blockId}"]`,
+      `.roll-sub[data-roll-result-id="${blockId}"]`,
+      `.branch-choice[data-branch-id="${blockId}"]`,
+      `.bib-item[data-item-id="${blockId}"]`,
+      `.bib-roll-result[data-item-result-id="${blockId}"]`,
+      `.bib-roll-result[data-bib-result-id="${blockId}"]`,
+      `.branch-inner-block[data-ib-id="${blockId}"]`,
+    ].join(',')) || container.querySelector(`.block[data-id="${rootBlockId}"]`);
+    if (target) targets.set(target, (targets.get(target) || 0) + 1);
+  });
+  targets.forEach((count, target) => {
+    target.classList.add('has-block-memo');
+    target.dataset.memoCount = String(count);
+  });
+}
 function renderMemoPanel() {
   const list = document.getElementById(currentPage === 'rulebook' ? 'rb-memo-list' : 'memo-list');
   if (!list) return;
   const memos = getMemos();
+  renderBlockMemoMarkers();
 
   if (!memos.length) {
     list.innerHTML = '<div class="memo-empty">메모 없음</div>';
