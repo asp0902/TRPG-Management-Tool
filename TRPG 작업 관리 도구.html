@@ -4477,13 +4477,18 @@ body.block-drag-active .block-gap-line {
   display: flex; align-items: stretch; flex-wrap: wrap;
 }
 .block:hover { box-shadow: none; }
-.has-block-tag { position: relative; padding-left: 24px !important; }
-.block-tag-marker { position: absolute; left: 3px; top: 6px; width: 18px; height: 20px; padding: 0; border: 0; background: transparent; cursor: pointer; font-size: 14px; z-index: 3; }
+.has-block-tag { position: relative; overflow: visible !important; }
+.block-tag-marker { position: absolute; left: -24px; top: 6px; width: 18px; height: 20px; padding: 0; border: 0; background: transparent; cursor: pointer; font-size: 14px; z-index: 3; }
+.block-tag-marker > i { display: inline-block; transform: rotate(135deg); }
 .block-tag-dialog { width: 300px; max-width: calc(100vw - 24px); border: 1px solid #ddd; border-radius: 8px; padding: 16px; }
 .block-tag-dialog::backdrop { background: #0003; }
 .block-tag-dialog form { display: grid; gap: 12px; }
 .block-tag-dialog label { display: grid; gap: 6px; }
 .block-tag-dialog input[type="text"] { width: 100%; box-sizing: border-box; padding: 8px; }
+.block-tag-dialog input[type="color"] { width: 32px; height: 32px; padding: 2px; box-sizing: border-box; cursor: pointer; }
+.block-tag-dialog input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.block-tag-dialog input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 0; }
+.block-tag-dialog input[type="color"]::-moz-color-swatch { border: 0; border-radius: 0; }
 .block-tag-dialog footer { display: flex; gap: 8px; justify-content: flex-end; }
 .has-block-memo { position: relative; }
 .has-block-memo::before {
