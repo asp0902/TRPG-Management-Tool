@@ -66,6 +66,7 @@ assert.match(
   '인용 블록 우클릭 메뉴는 선택 텍스트 컨텍스트를 전달해야 합니다.',
 );
 assert.match(html, /\.editor-quote > \.editor-quote-children,[\s\S]*?width: calc\(100% \+ 20px\); max-width: calc\(100% \+ 20px\)/, '인용 하위 블록의 좌우 외곽 여백이 같아야 합니다.');
+assert.match(html, /\.editor-quote-children:has\(> \.block > \.block-body > \.column-grid\) \{ border-top: 0; \}/, '인용 내부 단 나누기 위에는 자동 구분선을 표시하면 안 됩니다.');
 assert.match(html, /\.editor-quote-children \.block-body:has\(> \.column-grid\) \{ white-space: normal; \}/, '인용 내부 단 나누기에서 템플릿 공백이 높이를 만들면 안 됩니다.');
 assert.match(html, /\.editor-quote-children \.column-cell \{ padding-block: 6px; \}/, '인용 내부 각 단의 상하 여백은 좁게 유지해야 합니다.');
 
