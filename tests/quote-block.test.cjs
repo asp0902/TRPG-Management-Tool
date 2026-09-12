@@ -74,6 +74,7 @@ vm.runInNewContext(`${quoteMenuFunction}; openQuoteContextMenu(quote, 10, 20, ev
   event: {},
   tbGetVariationCtxItems: () => [{ label: '개변 추가' }],
   tbGetScenarioMemoCtxItems: () => [{ label: '메모 추가' }],
+  getQuoteBlockContext: () => null,
   getQuoteChildInsertRange: () => null,
   makeQuoteChildInsertCtxItem: () => null,
   tbShowCtxMenu: (_x, _y, items) => { quoteMenuItems = items; },
@@ -81,17 +82,20 @@ vm.runInNewContext(`${quoteMenuFunction}; openQuoteContextMenu(quote, 10, 20, ev
 assert.equal(quoteMenuItems[0].label, '개변 추가', '인용 블록 메뉴 첫 항목에 개변 기능이 있어야 합니다.');
 assert.ok(quoteMenuItems.some(item => item.label === '메모 추가'), '인용 블록 메뉴에 메모 추가 기능이 있어야 합니다.');
 
-const memoMenuFunction = html.match(/function tbGetScenarioMemoCtxItems\(withSeparator = false\) \{[\s\S]*?\n\}/)?.[0];
+const memoMenuFunction = html.match(/function tbGetScenarioMemoCtxItems\(withSeparator = false, blockRef = null\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(memoMenuFunction, '시나리오 메모 메뉴 함수를 찾을 수 없습니다.');
 let memoAddCount = 0;
+let memoBlockRef = null;
 const memoMenuContext = {
   currentPage: 'script',
-  addMemo: () => { memoAddCount += 1; },
+  addMemo: blockRef => { memoAddCount += 1; memoBlockRef = blockRef; },
 };
-vm.runInNewContext(`${memoMenuFunction}; items = tbGetScenarioMemoCtxItems();`, memoMenuContext);
+vm.runInNewContext(`${memoMenuFunction}; items = tbGetScenarioMemoCtxItems(false, { blockId: 'child', rootBlockId: 'root', cid: 'blocks-container' });`, memoMenuContext);
 assert.equal(memoMenuContext.items[0]?.label, '메모 추가', 'SCRIPT 블록 메뉴에 메모 추가 항목이 있어야 합니다.');
 memoMenuContext.items[0].action();
 assert.equal(memoAddCount, 1, '메모 추가 항목은 공용 메모 생성 기능을 실행해야 합니다.');
+assert.equal(memoBlockRef.blockId, 'child', '우클릭한 블록 ID를 메모 생성 기능에 전달해야 합니다.');
+assert.equal(memoBlockRef.rootBlockId, 'root', '상위 블록 ID를 메모 생성 기능에 전달해야 합니다.');
 memoMenuContext.currentPage = 'rulebook';
 vm.runInNewContext('items = tbGetScenarioMemoCtxItems();', memoMenuContext);
 assert.equal(memoMenuContext.items[0]?.label, '메모 추가', 'RULEBOOK 블록 메뉴에도 메모 추가 항목이 있어야 합니다.');
@@ -117,13 +121,25 @@ const memoOwnerContext = {
   curRb: () => rulebookOwner,
   cur: () => scenarioOwner,
   mkId: () => 'memo-id',
+  currentChapterId: 'chapter-id',
+  getGenericBlockById: () => ({ type: 'text', content: '연결된 블록' }),
+  rbGetTocTitleFromBlock: () => '연결된 블록',
   persist: () => {},
   renderMemoPanel: () => {},
   openMemoPop: () => {},
 };
-vm.runInNewContext(`${html.slice(memoOwnerStart, memoOwnerEnd)}; addMemo();`, memoOwnerContext);
-assert.equal(rulebookOwner.memos.length, 1, 'RULEBOOK에서 만든 메모는 해당 룰북에 저장되어야 합니다.');
+vm.runInNewContext(`${html.slice(memoOwnerStart, memoOwnerEnd)}; addMemo(); addMemo({ blockId: 'child', rootBlockId: 'root', cid: 'rb-blocks-container' });`, memoOwnerContext);
+assert.equal(rulebookOwner.memos.length, 2, 'RULEBOOK에서 만든 메모는 해당 룰북에 저장되어야 합니다.');
 assert.equal(scenarioOwner.memos.length, 0, 'RULEBOOK 메모가 시나리오에 섞이면 안 됩니다.');
+assert.equal(rulebookOwner.memos[0].blockRef, undefined, '상단 추가 버튼의 메모는 페이지 메모로 유지해야 합니다.');
+assert.deepEqual(JSON.parse(JSON.stringify(rulebookOwner.memos[1].blockRef)), {
+  blockId: 'child',
+  rootBlockId: 'root',
+  cid: 'rb-blocks-container',
+  label: '연결된 블록',
+  chapterId: 'chapter-id',
+}, '우클릭 메모는 소속 블록 정보를 저장해야 합니다.');
+assert.match(html, /class="memo-item-source"[\s\S]*?sourceLabel/, '메모 목록에 소속 블록을 표시해야 합니다.');
 
 [
   'tbBuildBlockCtxMenu',
@@ -141,7 +157,7 @@ assert.equal(scenarioOwner.memos.length, 0, 'RULEBOOK 메모가 시나리오에 
   const start = html.indexOf(`function ${name}(`);
   const end = html.indexOf('\nfunction ', start + 1);
   assert.ok(start >= 0, `${name} 함수를 찾을 수 없습니다.`);
-  assert.match(html.slice(start, end < 0 ? html.length : end), /tbGetScenarioMemoCtxItems\([^)]*\)/, `${name}에 메모 추가 경로가 필요합니다.`);
+  assert.match(html.slice(start, end < 0 ? html.length : end), /tbGetScenarioMemoCtxItems\([^,]+,\s*\{\s*blockId:/, `${name}에서 우클릭한 블록 ID를 메모에 전달해야 합니다.`);
 });
 
 const colorFunction = html.match(/function getQuoteTextColor\(background\) \{[\s\S]*?\n\}/)?.[0];

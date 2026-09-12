@@ -2981,10 +2981,24 @@ tr.ct-row-end .ct-select:focus {
   color: #bbb;
 }
 
-.memo-item-title {
+.memo-item-copy {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.memo-item-title {
+  min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memo-item-source {
+  overflow: hidden;
+  color: #999;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -14577,12 +14591,12 @@ function tbShowCtxMenu(x, y, items, opts = {}) {
   setTimeout(() => document.addEventListener('mousedown', _ctxMenuCloseHandler), 0);
 }
 
-function tbGetScenarioMemoCtxItems(withSeparator = false) {
+function tbGetScenarioMemoCtxItems(withSeparator = false, blockRef = null) {
   if (currentPage !== 'script' && currentPage !== 'rulebook') return [];
   const items = [{
     icon: '<i class="fa-regular fa-note-sticky"></i>',
     label: '메모 추가',
-    action: () => addMemo(),
+    action: () => addMemo(blockRef),
   }];
   return withSeparator ? [...items, { sep: true }] : items;
 }
@@ -14614,7 +14628,7 @@ function tbBuildBlockCtxMenu(e, id, cid, cssItem = null, extraItems = [], delete
   const inlineMemoItems = rbGetInlineMemoCtxItems(e, cid);
   const middleItems = [
     ...tbGetVariationCtxItems(e),
-    ...tbGetScenarioMemoCtxItems(),
+    ...tbGetScenarioMemoCtxItems(false, { blockId: id, rootBlockId: id, cid }),
     ...inlineMemoItems,
     ...(cssItem ? [cssItem] : []),
     ...(extraItems || []),
@@ -18462,7 +18476,7 @@ function buildRollResultCtxMenu(blockId, resultId, cid) {
         })),
     },
     { sep: true },
-    ...tbGetScenarioMemoCtxItems(true),
+    ...tbGetScenarioMemoCtxItems(true, { blockId: resultId, rootBlockId: blockId, cid }),
     { heading: '결과 타입' },
     ...typeItems,
     { sep: true },
@@ -18602,7 +18616,7 @@ function openEndingFieldCtxMenu(e, endingId, field, cid = 'blocks-container') {
     if (items.length) items.push({ sep: true });
     items.push(...inlineMemoItems);
   }
-  const scenarioMemoItems = tbGetScenarioMemoCtxItems();
+  const scenarioMemoItems = tbGetScenarioMemoCtxItems(false, { blockId: endingId, rootBlockId: endingId, cid });
   if (scenarioMemoItems.length) {
     if (items.length) items.push({ sep: true });
     items.push(...scenarioMemoItems);
@@ -18738,7 +18752,7 @@ function buildBranchConnectMenu(blockId, branchId, cid) {
       })
     : [{ label: '연결할 내용 블록이 없습니다', disabled: true }];
   return [
-    ...tbGetScenarioMemoCtxItems(true),
+    ...tbGetScenarioMemoCtxItems(true, { blockId: branchId, rootBlockId: blockId, cid }),
     { heading: '블록 연결' },
     ...items,
     { sep: true },
@@ -20143,7 +20157,7 @@ function openIbRollItemCtxMenu(e, blockId, ibId, itemId, cid) {
     { icon: '↑', label: '위로 이동', action: () => moveIbItem(blockId, ibId, itemId, 'up', cid) },
     { icon: '↓', label: '아래로 이동', action: () => moveIbItem(blockId, ibId, itemId, 'down', cid) },
     ...(variationItems.length ? [{ sep: true }, ...variationItems, { sep: true }] : [{ sep: true }]),
-    ...tbGetScenarioMemoCtxItems(true),
+    ...tbGetScenarioMemoCtxItems(true, { blockId: itemId, rootBlockId: blockId, cid }),
     ...buildIbRollCtxMenu(blockId, ibId, itemId, cid),
     ...(item && itemEl ? [{ sep: true }, makeChildInsertCtxItem(item, itemEl, cid, e)] : []),
     { sep: true },
@@ -20171,7 +20185,7 @@ function openIbRollResultCtxMenu(e, blockId, ibId, itemId, resultIdx, cid) {
   const items = [
     ...variationItems,
     ...(variationItems.length ? [{ sep: true }] : []),
-    ...tbGetScenarioMemoCtxItems(true),
+    ...tbGetScenarioMemoCtxItems(true, { blockId: result.id, rootBlockId: blockId, cid }),
     { heading: '결과 타입' },
     ...typeItems,
     { sep: true },
@@ -20269,7 +20283,7 @@ function openIbItemCalloutCtxMenu(e, blockId, ibId, itemId, cid) {
   const items = [
     ...variationItems,
     ...(variationItems.length ? [{ sep: true }] : []),
-    ...tbGetScenarioMemoCtxItems(true),
+    ...tbGetScenarioMemoCtxItems(true, { blockId: itemId, rootBlockId: blockId, cid }),
     { icon: '＋', label: '하위 콜아웃 추가', action: () => addIbNestedCallout(blockId, ibId, itemId, cid) },
     { icon: '🎲', label: '판정 추가', action: () => addIbCalloutRoll(blockId, ibId, itemId, cid) },
     ...(calloutItem && calloutItemEl ? [makeChildInsertCtxItem(calloutItem, calloutItemEl, cid, e)] : []),
@@ -20493,7 +20507,7 @@ function openBranchInnerBlockCtxMenu(e, blockId, ibId, cid) {
     { icon: '↓', label: '아래로 이동', disabled: !canMoveDown, action: () => moveBranchInnerBlock(blockId, ibId, 'down', cid) },
     ...(variationItems.length ? [{ sep: true }, ...variationItems] : []),
     { sep: true },
-    ...tbGetScenarioMemoCtxItems(true),
+    ...tbGetScenarioMemoCtxItems(true, { blockId: ibId, rootBlockId: blockId, cid }),
     ...(childInsert ? [childInsert] : []),
   ];
   tbShowCtxMenu(e.clientX, e.clientY, items);
@@ -20530,7 +20544,7 @@ function buildBranchInnerRollCtxMenu(blockId, ibId, cid) {
   if (!isBranchInnerRollBlock(innerBlock)) return [];
   normalizeEmbeddedRollBlock(innerBlock);
   return [
-    ...tbGetScenarioMemoCtxItems(true),
+    ...tbGetScenarioMemoCtxItems(true, { blockId: ibId, rootBlockId: blockId, cid }),
     { icon: `<span style="display:inline-block;width:10px;height:10px;border-radius:999px;background:${innerBlock.rollColorStart || '#0dd4d9'};border:1px solid rgba(0,0,0,0.18);vertical-align:middle;flex-shrink:0"></span>`, label: '시작 색상 변경', action: () => openBranchInnerRollColorPicker(blockId, ibId, 'rollColorStart', cid, document.querySelector(`.branch-inner-block[data-ib-id="${ibId}"]`)) },
     { icon: `<span style="display:inline-block;width:10px;height:10px;border-radius:999px;background:${innerBlock.rollColorEnd || '#fb8d5c'};border:1px solid rgba(0,0,0,0.18);vertical-align:middle;flex-shrink:0"></span>`, label: '끝 색상 변경', action: () => openBranchInnerRollColorPicker(blockId, ibId, 'rollColorEnd', cid, document.querySelector(`.branch-inner-block[data-ib-id="${ibId}"]`)) },
     { sep: true },
@@ -20580,7 +20594,7 @@ function openBranchIbRollResultCtxMenu(e, blockId, ibId, resultIdx, cid) {
   const items = [
     ...variationItems,
     ...(variationItems.length ? [{ sep: true }] : []),
-    ...tbGetScenarioMemoCtxItems(true),
+    ...tbGetScenarioMemoCtxItems(true, { blockId: result.id, rootBlockId: blockId, cid }),
     { heading: '결과 타입' },
     ...typeItems,
     { sep: true },
@@ -22896,12 +22910,24 @@ function getMemos(owner = getMemoOwner()) {
   if (!Array.isArray(owner.memos)) owner.memos = [];
   return owner.memos;
 }
-function mkMemo() {
-  return { id: mkId(), title: '새 메모', body: '' };
+function mkMemo(blockRef = null) {
+  const memo = { id: mkId(), title: '새 메모', body: '' };
+  if (!blockRef?.blockId) return memo;
+  const cid = blockRef.cid === 'rb-blocks-container' ? 'rb-blocks-container' : 'blocks-container';
+  const rootBlockId = String(blockRef.rootBlockId || blockRef.blockId);
+  const sourceBlock = getGenericBlockById(String(blockRef.blockId), cid) || getGenericBlockById(rootBlockId, cid);
+  memo.blockRef = {
+    blockId: String(blockRef.blockId),
+    rootBlockId,
+    cid,
+    label: sourceBlock ? rbGetTocTitleFromBlock(sourceBlock, 1) : '블록',
+  };
+  if (cid === 'rb-blocks-container' && currentChapterId) memo.blockRef.chapterId = String(currentChapterId);
+  return memo;
 }
-function addMemo() {
+function addMemo(blockRef = null) {
   const owner = getMemoOwner(); if (!owner) return;
-  const memo = mkMemo();
+  const memo = mkMemo(blockRef);
   getMemos(owner).push(memo);
   persist();
   renderMemoPanel();
@@ -22933,6 +22959,13 @@ function syncMemoUiToScenario() {
     if (bodyEl && bodyEl.innerHTML !== (memo.body || '')) bodyEl.innerHTML = memo.body || '';
   });
 }
+function getMemoBlockLabel(memo) {
+  const ref = memo?.blockRef;
+  if (!ref?.blockId) return '';
+  const cid = ref.cid || 'blocks-container';
+  const block = getGenericBlockById(ref.blockId, cid) || getGenericBlockById(ref.rootBlockId || ref.blockId, cid);
+  return `블록 · ${block ? rbGetTocTitleFromBlock(block, 1) : (ref.label || '연결된 블록')}`;
+}
 function renderMemoPanel() {
   const list = document.getElementById(currentPage === 'rulebook' ? 'rb-memo-list' : 'memo-list');
   if (!list) return;
@@ -22943,7 +22976,9 @@ function renderMemoPanel() {
     return;
   }
 
-  list.innerHTML = memos.map(m => `
+  list.innerHTML = memos.map(m => {
+    const sourceLabel = getMemoBlockLabel(m);
+    return `
     <div class="memo-item"
       data-memo-id="${m.id}"
       ondragover="onMemoListDragOver(event, '${m.id}')"
@@ -22963,7 +22998,10 @@ function renderMemoPanel() {
         type="button"
         onclick="openMemoPop('${m.id}')">
         <span class="memo-item-icon"><i class="fa-regular fa-note-sticky"></i></span>
-        <span class="memo-item-title">${esc(m.title || '제목 없음')}</span>
+        <span class="memo-item-copy">
+          <span class="memo-item-title">${esc(m.title || '제목 없음')}</span>
+          ${sourceLabel ? `<span class="memo-item-source" title="${esc(sourceLabel)}">${esc(sourceLabel)}</span>` : ''}
+        </span>
       </button>
 
       <button class="memo-item-del"
@@ -22971,7 +23009,8 @@ function renderMemoPanel() {
         onclick="deleteMemo('${m.id}', event)"
         title="삭제">×</button>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 let _memoListDragId = null;
@@ -25676,9 +25715,15 @@ function makeQuoteChildInsertCtxItem(quoteEl, insertionRange = getQuoteChildInse
   };
 }
 function openQuoteContextMenu(quoteEl, x, y, event = null) {
+  const quoteContext = getQuoteBlockContext(quoteEl);
+  const quoteId = quoteEl?.dataset?.quoteId || quoteContext?.block?.id || '';
   const items = event ? tbGetVariationCtxItems(event) : [];
   if (items.length) items.push({ sep: true });
-  items.push(...tbGetScenarioMemoCtxItems(true));
+  items.push(...tbGetScenarioMemoCtxItems(true, {
+    blockId: quoteId,
+    rootBlockId: quoteContext?.block?.id || quoteId,
+    cid: quoteContext?.cid || 'blocks-container',
+  }));
   const childItem = makeQuoteChildInsertCtxItem(quoteEl, getQuoteChildInsertRange(quoteEl));
   if (childItem) items.push(childItem, { sep: true });
   items.push(
