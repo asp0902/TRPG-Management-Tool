@@ -2525,13 +2525,15 @@ tr.ct-row-end .ct-select:focus {
   border-radius: 5px; background: #303238; color: #f5f5f5; line-height: 1.6;
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
-.editor-quote::after {
-  content: '\22ee'; position: absolute; top: 0; right: 4px; bottom: 0; width: 30px;
-  display: flex; align-items: center; justify-content: center; color: currentColor;
-  font-size: 19px; line-height: 1; opacity: 0.62; pointer-events: none;
+.editor-quote-menu-btn {
+  display: none; position: absolute; top: 50%; right: 4px; transform: translateY(-50%);
+  width: 30px; height: 30px; padding: 0; border: 0; border-radius: 4px;
+  align-items: center; justify-content: center; background: transparent; color: inherit;
+  font: inherit; font-size: 19px; line-height: 1; opacity: 0.62; cursor: pointer;
 }
-[contenteditable="true"] .editor-quote::after { cursor: pointer; pointer-events: auto; }
-[contenteditable="true"] .editor-quote:hover::after { opacity: 0.9; }
+[contenteditable="true"] .editor-quote-menu-btn { display: flex; }
+.editor-quote-menu-btn:hover { background: rgba(127,127,127,.16); opacity: 0.95; }
+.editor-quote-menu-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; opacity: 0.95; }
 .editor-quote > :first-child { margin-top: 0; }
 .editor-quote > :last-child { margin-bottom: 0; }
 .editor-quote > .editor-quote-children,
@@ -13438,6 +13440,24 @@ function getQuoteChildrenMap(block, create = true) {
   return block.quoteChildren;
 }
 
+function hydrateQuoteMenuButtons(root = document) {
+  const quotes = [];
+  if (root.matches?.('.editor-quote')) quotes.push(root);
+  root.querySelectorAll?.('.editor-quote').forEach(quote => quotes.push(quote));
+  quotes.forEach(quote => {
+    if (Array.from(quote.children).some(child => child.classList.contains('editor-quote-menu-btn'))) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'editor-quote-menu-btn';
+    button.contentEditable = 'false';
+    button.title = '인용 블록 메뉴';
+    button.setAttribute('aria-label', '인용 블록 메뉴');
+    button.setAttribute('aria-haspopup', 'menu');
+    button.textContent = '⋮';
+    quote.appendChild(button);
+  });
+}
+
 function hydrateQuoteChildBlocks(blockEl, block, cid, depth = 0) {
   const quoteChildren = getQuoteChildrenMap(block, false);
 
@@ -16050,10 +16070,11 @@ function sanitizeImportedEditableHtml(value) {
     .replace(/(?:\s|<br\s*\/?>)+$/i, '');
 }
 function stripTransientEditableUi(value) {
-  if (typeof value !== 'string' || (!value.includes('editor-quote-children') && !value.includes('has-block-memo'))) return value;
+  if (typeof value !== 'string' || (!value.includes('editor-quote-children') && !value.includes('editor-quote-menu-btn') && !value.includes('has-block-memo'))) return value;
   const wrap = document.createElement('div');
   wrap.innerHTML = value;
   wrap.querySelectorAll('.editor-quote-children').forEach(node => node.remove());
+  wrap.querySelectorAll('.editor-quote-menu-btn').forEach(node => node.remove());
   wrap.querySelectorAll('.has-block-memo').forEach(node => {
     node.classList.remove('has-block-memo');
     node.removeAttribute('data-memo-count');
@@ -25896,6 +25917,7 @@ function tbRemoveQuote(root, quote) {
   quote.querySelectorAll('.editor-quote-children, .editor-quote-children-anchor').forEach(node => {
     if (node.closest('.editor-quote') === quote) node.remove();
   });
+  quote.querySelectorAll(':scope > .editor-quote-menu-btn').forEach(node => node.remove());
   const content = quote.querySelector(':scope > .editor-quote-content') || quote;
   const nodes = Array.from(content.childNodes);
   const fragment = document.createDocumentFragment();
@@ -25974,25 +25996,18 @@ function openQuoteBackgroundPicker(quoteEl) {
   };
   cpOpenPanel('quote-bg', color, { centered: true });
 }
-function isQuoteMenuHit(event, quoteEl) {
-  const rect = quoteEl?.getBoundingClientRect?.();
-  return !!rect && event.clientX >= rect.right - 38 && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
-}
 document.addEventListener('mousedown', event => {
-  const quote = event.target?.closest?.('.editor-quote');
-  const childHost = event.target?.closest?.('.editor-quote-children');
-  if (childHost?.closest?.('.editor-quote') === quote) return;
-  if (quote?.closest?.('[contenteditable="true"]') && isQuoteMenuHit(event, quote)) event.preventDefault();
+  if (event.target?.closest?.('.editor-quote-menu-btn')) event.preventDefault();
 });
 document.addEventListener('click', event => {
-  const quote = event.target?.closest?.('.editor-quote');
-  const childHost = event.target?.closest?.('.editor-quote-children');
-  if (childHost?.closest?.('.editor-quote') === quote) return;
-  if (!quote?.closest?.('[contenteditable="true"]') || !isQuoteMenuHit(event, quote)) return;
+  const button = event.target?.closest?.('.editor-quote-menu-btn');
+  const quote = button?.closest?.('.editor-quote');
+  if (!quote?.closest?.('[contenteditable="true"]')) return;
   event.preventDefault();
   event.stopPropagation();
-  openQuoteContextMenu(quote, event.clientX, event.clientY);
-});
+  const rect = button.getBoundingClientRect();
+  openQuoteContextMenu(quote, rect.right, rect.bottom);
+}, true);
 document.addEventListener('contextmenu', event => {
   const quote = event.target?.closest?.('.editor-quote');
   const childHost = event.target?.closest?.('.editor-quote-children');
@@ -39867,12 +39882,14 @@ function disableSpellcheck(root) {
   });
 }
 disableSpellcheck(document);
+hydrateQuoteMenuButtons(document);
 new MutationObserver(mutations => {
   for (const m of mutations) {
     m.addedNodes.forEach(node => {
       if (node.nodeType !== 1) return;
       if (node.matches('[contenteditable], textarea')) { node.spellcheck = false; node.setAttribute('spellcheck','false'); }
       disableSpellcheck(node);
+      hydrateQuoteMenuButtons(node);
     });
   }
 }).observe(document.body, { childList: true, subtree: true });

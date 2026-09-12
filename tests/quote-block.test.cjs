@@ -10,6 +10,10 @@ assert.match(
   /title="링크"[^>]*>[\s\S]*?<\/button>\s*<button[^>]*id="tb-quote-btn"[^>]*title="인용\/해제"/,
   '인용 버튼은 링크 버튼 바로 뒤에 있어야 합니다.',
 );
+assert.match(html, /function hydrateQuoteMenuButtons\(root = document\)/, '인용 블록 메뉴 버튼을 공용 렌더링해야 합니다.');
+assert.match(html, /button\.title = '인용 블록 메뉴';[\s\S]*?button\.setAttribute\('aria-label', '인용 블록 메뉴'\);[\s\S]*?button\.setAttribute\('aria-haspopup', 'menu'\);/, '인용 블록 메뉴 버튼의 역할을 툴팁과 접근성 이름으로 알려야 합니다.');
+assert.match(html, /wrap\.querySelectorAll\('\.editor-quote-menu-btn'\)\.forEach\(node => node\.remove\(\)\)/, '인용 블록 메뉴 버튼은 편집 원문에 저장되면 안 됩니다.');
+assert.match(html, /const button = event\.target\?\.closest\?\.\('\.editor-quote-menu-btn'\);[\s\S]*?openQuoteContextMenu\(quote, rect\.right, rect\.bottom\);\s*\}, true\);/, '인용 블록 메뉴 버튼은 상위 블록의 클릭 차단보다 먼저 해당 인용 메뉴를 열어야 합니다.');
 assert.match(html, /function tbRemoveQuote\(root, quote\)/, '인용 해제 함수가 필요합니다.');
 assert.match(html, /if \(existing\) return tbRemoveQuote\(root, existing\);/, '인용 버튼은 기존 인용을 해제해야 합니다.');
 assert.match(html, /ctx\.block\.children\.push\(\.\.\.children\)/, '인용 해제 시 하위 블록을 보존해야 합니다.');
