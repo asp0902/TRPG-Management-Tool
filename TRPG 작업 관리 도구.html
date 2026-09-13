@@ -17043,11 +17043,11 @@ function getHandoutBlockHtml(b, cid) {
         <h3>${label} 정보</h3>
         <div class="block-ce" contenteditable="true" data-field="${field}" data-ph="${label} 내용" aria-label="핸드아웃 ${label} 내용" oninput="upd('${b.id}','${field}',this.innerHTML,'${cid}')"></div>
     <div class="handout-shared" id="handout-${side}-${esc(b.id)}" hidden>
-      <details class="handout-fold"><summary>CSS MACRO</summary>
-        <textarea class="handout-macro" rows="1" aria-label="핸드아웃 ${label} CSS MACRO" onfocus="lastFocusedTA=this" spellcheck="false">${esc(getHandoutSideValue(b, side, 'Macro'))}</textarea>
-      </details>
       <details class="handout-fold"><summary>PREVIEW</summary>
       <div class="handout-preview css-macro-preview-body">${getHandoutPreviewHtml(b, side)}</div>
+      </details>
+      <details class="handout-fold"><summary>CSS MACRO</summary>
+        <textarea class="handout-macro" rows="1" aria-label="핸드아웃 ${label} CSS MACRO" onfocus="lastFocusedTA=this" spellcheck="false">${esc(getHandoutSideValue(b, side, 'Macro'))}</textarea>
       </details>
     </div></section>`;
     }).join('')}</div>`;

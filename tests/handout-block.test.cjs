@@ -41,7 +41,7 @@ assert.ok(rendered.includes('id="handout-public-test" hidden'));
 assert.ok(rendered.includes('id="handout-secret-test" hidden'));
 assert.equal((rendered.match(/<details class="handout-fold">/g) || []).length, 4);
 assert.ok(!rendered.includes('<details class="handout-fold" open>'));
-assert.ok(rendered.indexOf('<summary>CSS MACRO</summary>') < rendered.indexOf('<summary>PREVIEW</summary>'));
+assert.ok(rendered.indexOf('<summary>PREVIEW</summary>') < rendered.indexOf('<summary>CSS MACRO</summary>'));
 assert.ok(!rendered.includes('data-handout-image-edit'));
 assert.ok(!rendered.includes('data-handout-image-delete'));
 assert.ok(extract('bindHandoutBlock').includes('btcpAutoResize(macro)'));
