@@ -39,7 +39,8 @@ assert.equal((rendered.match(/class="handout-preview css-macro-preview-body"/g) 
 assert.ok(rendered.includes('aria-expanded="false"'));
 assert.ok(rendered.includes('id="handout-public-test" hidden'));
 assert.ok(rendered.includes('id="handout-secret-test" hidden'));
-assert.equal((rendered.match(/<details class="handout-fold" open>/g) || []).length, 4);
+assert.equal((rendered.match(/<details class="handout-fold">/g) || []).length, 4);
+assert.ok(!rendered.includes('<details class="handout-fold" open>'));
 assert.ok(rendered.indexOf('<summary>CSS MACRO</summary>') < rendered.indexOf('<summary>PREVIEW</summary>'));
 assert.ok(!rendered.includes('data-handout-image-edit'));
 assert.ok(!rendered.includes('data-handout-image-delete'));
