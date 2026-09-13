@@ -17040,7 +17040,7 @@ function getHandoutBlockHtml(b, cid) {
       const label = side === 'public' ? '공개' : '비밀';
       const field = side === 'public' ? 'content' : 'secretContent';
       return `<section class="handout-column" data-handout-side="${side}">
-        <h3>${label}</h3>
+        <h3>${label} 정보</h3>
         <div class="block-ce" contenteditable="true" data-field="${field}" data-ph="${label} 내용" aria-label="핸드아웃 ${label} 내용" oninput="upd('${b.id}','${field}',this.innerHTML,'${cid}')"></div>
     <div class="handout-shared" id="handout-${side}-${esc(b.id)}" hidden>
       <details class="handout-fold"><summary>CSS MACRO</summary>
