@@ -28,3 +28,5 @@ assert.match(
 );
 
 console.log('block drag selection checks: OK');
+assert.match(html, /#panel-body > \.panel-inner, #rb-chapter-body \{ padding-right: 150px; \}/,
+  '편집 영역에 우측 플로팅 메뉴 공간을 확보해야 합니다.');
