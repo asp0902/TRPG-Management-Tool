@@ -4476,21 +4476,20 @@ body.block-drag-active .block-gap-line {
 .handout-toggle { width: 30px; height: 30px; padding: 0; }
 .handout-toggle[aria-expanded="true"] i { transform: rotate(180deg); }
 .handout-shared { border-top: 1px solid var(--border); padding-top: 12px; }
-.handout-shared:not([hidden]) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.handout-preview-pane { min-width: 0; display: flex; flex-direction: column; }
+.handout-shared:not([hidden]) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.handout-fold { min-width: 0; }
+.handout-fold > summary { cursor: pointer; padding: 6px 0; color: #888; font-size: 11px; font-weight: 700; }
+.handout-fold[open] > summary { margin-bottom: 8px; }
 .handout-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .handout-column { min-width: 0; }
 .handout-column + .handout-column { border-left: 1px solid var(--border); padding-left: 20px; }
 .handout-column h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); text-align: center; }
 .handout-column .block-ce { min-height: 88px; margin-bottom: 14px; }
 .handout-column:has(> .handout-shared[hidden]) > .block-ce { min-height: 1.7em; margin-bottom: 0; }
-.handout-preview-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.handout-preview-head span { margin-right: auto; font-size: 11px; font-weight: 700; color: #888; }
+.handout-preview-head { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
 .handout-preview-head .btn { width: 30px; height: 30px; padding: 0; }
 .handout-preview { flex: 1; min-height: 120px; border: 1px solid var(--border); border-radius: 5px; padding: 12px; overflow: auto; }
 .handout-preview > img { display: block; max-width: 100%; max-height: 280px; object-fit: contain; margin: 0 auto 8px; }
-.handout-shared > label { min-width: 0; display: grid; grid-template-rows: 30px minmax(120px, 1fr); align-items: stretch; gap: 8px; color: #888; font-size: 11px; font-weight: 700; }
-.handout-shared > label > span { align-self: center; }
 .handout-macro { width: 100%; min-height: 112px; box-sizing: border-box; resize: vertical; padding: 10px; border: 1px solid var(--border); border-radius: 5px; font: 12px/1.5 monospace; color: #333; background: #fafafa; }
 @media (max-width: 640px) { .handout-columns { min-width: 480px; } .block-handout > .block-body { overflow-x: auto; } }
 .block {
@@ -17046,14 +17045,16 @@ function getHandoutBlockHtml(b, cid) {
         <h3>${label}</h3>
         <div class="block-ce" contenteditable="true" data-field="${field}" data-ph="${label} 내용" aria-label="핸드아웃 ${label} 내용" oninput="upd('${b.id}','${field}',this.innerHTML,'${cid}')"></div>
     <div class="handout-shared" id="handout-${side}-${esc(b.id)}" hidden>
-      <div class="handout-preview-pane">
-      <div class="handout-preview-head"><span>PREVIEW</span>
+      <details class="handout-fold" open><summary>CSS MACRO</summary>
+        <textarea class="handout-macro" aria-label="핸드아웃 ${label} CSS MACRO" onfocus="lastFocusedTA=this" spellcheck="false">${esc(getHandoutSideValue(b, side, 'Macro'))}</textarea>
+      </details>
+      <details class="handout-fold" open><summary>PREVIEW</summary>
+      <div class="handout-preview-head">
         <button type="button" class="btn" data-handout-image-edit title="이미지 추가/변경" aria-label="핸드아웃 ${label} 이미지 추가/변경"><i class="fa-solid fa-image" aria-hidden="true"></i></button>
         <button type="button" class="btn" data-handout-image-delete title="이미지 삭제" aria-label="핸드아웃 ${label} 이미지 삭제" ${getHandoutSideValue(b, side, 'Image') ? '' : 'disabled'}><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>
       </div>
       <div class="handout-preview css-macro-preview-body">${getHandoutPreviewHtml(b, side)}</div>
-      </div>
-      <label><span>CSS MACRO</span><textarea class="handout-macro" aria-label="핸드아웃 ${label} CSS MACRO" onfocus="lastFocusedTA=this" spellcheck="false">${esc(getHandoutSideValue(b, side, 'Macro'))}</textarea></label>
+      </details>
     </div></section>`;
     }).join('')}</div>`;
 }
