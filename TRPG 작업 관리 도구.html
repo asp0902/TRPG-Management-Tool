@@ -17027,60 +17027,62 @@ function mkDividerEl(b, cid, ctx = {}) {
   return el;
 }
 
-function getHandoutSharedValue(b, field) {
-  return b['handout' + field] ?? (b['public' + field] || b['secret' + field] || '');
+function getHandoutSideValue(b, side, field) {
+  return b[side + field] ?? b['handout' + field] ?? '';
 }
-function getHandoutPreviewHtml(b) {
-  const src = getHandoutSharedValue(b, 'Image');
+function getHandoutPreviewHtml(b, side) {
+  const src = getHandoutSideValue(b, side, 'Image');
   return (isRenderableImageSrc(src) ? `<img src="${esc(src)}" alt="핸드아웃 이미지">` : '')
-    + renderCssMacroPreviewHtml(getHandoutSharedValue(b, 'Macro'));
+    + renderCssMacroPreviewHtml(getHandoutSideValue(b, side, 'Macro'));
 }
 function getHandoutBlockHtml(b, cid) {
   return `<div class="handout-header"><input class="handout-title" aria-label="핸드아웃 제목" placeholder="핸드아웃 제목" value="${esc(b.title || '')}" oninput="upd('${b.id}','title',this.value,'${cid}')">
-      <button type="button" class="btn handout-toggle" aria-label="핸드아웃 PREVIEW 및 CSS MACRO 펼치기" title="PREVIEW / CSS MACRO" aria-expanded="false" aria-controls="handout-shared-${esc(b.id)}"><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button></div>
+      <button type="button" class="btn handout-toggle" aria-label="핸드아웃 PREVIEW 및 CSS MACRO 펼치기" title="PREVIEW / CSS MACRO" aria-expanded="false" aria-controls="handout-public-${esc(b.id)} handout-secret-${esc(b.id)}"><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button></div>
     <div class="handout-columns">${['public', 'secret'].map(side => {
       const label = side === 'public' ? '공개' : '비밀';
       const field = side === 'public' ? 'content' : 'secretContent';
       return `<section class="handout-column" data-handout-side="${side}">
         <h3>${label}</h3>
         <div class="block-ce" contenteditable="true" data-field="${field}" data-ph="${label} 내용" aria-label="핸드아웃 ${label} 내용" oninput="upd('${b.id}','${field}',this.innerHTML,'${cid}')"></div>
-      </section>`;
-    }).join('')}</div>
-    <div class="handout-shared" id="handout-shared-${esc(b.id)}" hidden>
+    <div class="handout-shared" id="handout-${side}-${esc(b.id)}" hidden>
       <div class="handout-preview-pane">
       <div class="handout-preview-head"><span>PREVIEW</span>
-        <button type="button" class="btn" data-handout-image-edit title="이미지 추가/변경" aria-label="핸드아웃 이미지 추가/변경"><i class="fa-solid fa-image" aria-hidden="true"></i></button>
-        <button type="button" class="btn" data-handout-image-delete title="이미지 삭제" aria-label="핸드아웃 이미지 삭제" ${getHandoutSharedValue(b, 'Image') ? '' : 'disabled'}><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>
+        <button type="button" class="btn" data-handout-image-edit title="이미지 추가/변경" aria-label="핸드아웃 ${label} 이미지 추가/변경"><i class="fa-solid fa-image" aria-hidden="true"></i></button>
+        <button type="button" class="btn" data-handout-image-delete title="이미지 삭제" aria-label="핸드아웃 ${label} 이미지 삭제" ${getHandoutSideValue(b, side, 'Image') ? '' : 'disabled'}><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>
       </div>
-      <div class="handout-preview css-macro-preview-body">${getHandoutPreviewHtml(b)}</div>
+      <div class="handout-preview css-macro-preview-body">${getHandoutPreviewHtml(b, side)}</div>
       </div>
-      <label><span>CSS MACRO</span><textarea class="handout-macro" aria-label="핸드아웃 CSS MACRO" onfocus="lastFocusedTA=this" spellcheck="false">${esc(getHandoutSharedValue(b, 'Macro'))}</textarea></label>
-    </div>`;
+      <label><span>CSS MACRO</span><textarea class="handout-macro" aria-label="핸드아웃 ${label} CSS MACRO" onfocus="lastFocusedTA=this" spellcheck="false">${esc(getHandoutSideValue(b, side, 'Macro'))}</textarea></label>
+    </div></section>`;
+    }).join('')}</div>`;
 }
 function bindHandoutBlock(el, b, cid) {
-    const column = el.querySelector('.handout-shared');
     const toggle = el.querySelector('.handout-toggle');
     toggle.onclick = () => {
-      column.hidden = !column.hidden;
-      toggle.setAttribute('aria-expanded', String(!column.hidden));
-      toggle.setAttribute('aria-label', `핸드아웃 PREVIEW 및 CSS MACRO ${column.hidden ? '펼치기' : '접기'}`);
+      const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+      el.querySelectorAll('.handout-shared').forEach(pane => { pane.hidden = !expanded; });
+      toggle.setAttribute('aria-expanded', String(expanded));
+      toggle.setAttribute('aria-label', `핸드아웃 PREVIEW 및 CSS MACRO ${expanded ? '접기' : '펼치기'}`);
     };
+    el.querySelectorAll('[data-handout-side]').forEach(column => {
+    const side = column.dataset.handoutSide;
     const refresh = () => {
-      column.querySelector('.handout-preview').innerHTML = getHandoutPreviewHtml(b);
-      column.querySelector('[data-handout-image-delete]').disabled = !getHandoutSharedValue(b, 'Image');
+      column.querySelector('.handout-preview').innerHTML = getHandoutPreviewHtml(b, side);
+      column.querySelector('[data-handout-image-delete]').disabled = !getHandoutSideValue(b, side, 'Image');
     };
     const setImage = src => {
-      b.handoutImage = isRenderableImageSrc(src) ? src : '';
-      commitBlockTreeChange(`handout:${b.id}:image`, cid);
+      b[side + 'Image'] = isRenderableImageSrc(src) ? src : '';
+      commitBlockTreeChange(`handout:${b.id}:${side}:image`, cid);
       refresh();
     };
-    column.querySelector('[data-handout-image-edit]').onclick = () => openImageBlockModal(setImage, getHandoutSharedValue(b, 'Image'), !!getHandoutSharedValue(b, 'Image'));
+    column.querySelector('[data-handout-image-edit]').onclick = () => openImageBlockModal(setImage, getHandoutSideValue(b, side, 'Image'), !!getHandoutSideValue(b, side, 'Image'));
     column.querySelector('[data-handout-image-delete]').onclick = () => setImage('');
     column.querySelector('.handout-macro').oninput = event => {
-      b.handoutMacro = event.target.value;
-      commitBlockTreeChange(`handout:${b.id}:macro`, cid);
+      b[side + 'Macro'] = event.target.value;
+      commitBlockTreeChange(`handout:${b.id}:${side}:macro`, cid);
       refresh();
     };
+    });
 }
 function mkBlockEl(b, cid, ctx = {}) {
   if (b.type === 'text') return mkTextBlockEl(b, cid, ctx);
