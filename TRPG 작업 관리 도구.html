@@ -4480,6 +4480,8 @@ body.block-drag-active .block-gap-line {
 .handout-fold { min-width: 0; }
 .handout-fold > summary { cursor: pointer; padding: 3px 0; color: #888; font-size: 11px; font-weight: 700; }
 .handout-fold[open] > summary { margin-bottom: 2px; }
+.handout-fold > summary { position: relative; padding-right: 28px; }
+.handout-macro-copy { position: absolute; right: 0; top: 0; width: 24px; height: 24px; padding: 0; }
 .handout-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .handout-column { min-width: 0; }
 .handout-column + .handout-column { border-left: 1px solid var(--border); padding-left: 20px; }
@@ -17046,7 +17048,7 @@ function getHandoutBlockHtml(b, cid) {
       <details class="handout-fold"><summary>PREVIEW</summary>
       <div class="handout-preview css-macro-preview-body">${getHandoutPreviewHtml(b, side)}</div>
       </details>
-      <details class="handout-fold"><summary>CSS MACRO</summary>
+      <details class="handout-fold"><summary>CSS MACRO<button type="button" class="btn handout-macro-copy" title="CSS MACRO 복사" aria-label="핸드아웃 ${label} CSS MACRO 복사"><i class="fa-solid fa-copy" aria-hidden="true"></i></button></summary>
         <textarea class="handout-macro" rows="1" aria-label="핸드아웃 ${label} CSS MACRO" onfocus="lastFocusedTA=this" spellcheck="false">${esc(getHandoutSideValue(b, side, 'Macro'))}</textarea>
       </details>
     </div></section>`;
@@ -17067,6 +17069,22 @@ function bindHandoutBlock(el, b, cid) {
       column.querySelector('.handout-preview').innerHTML = getHandoutPreviewHtml(b, side);
     };
     const macro = column.querySelector('.handout-macro');
+    column.querySelector('.handout-macro-copy').onclick = async event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const button = event.currentTarget;
+      try {
+        await _copyTextWithFallback(macro.value);
+        button.title = '복사 완료';
+        button.querySelector('i').className = 'fa-solid fa-check';
+        setTimeout(() => {
+          button.title = 'CSS MACRO 복사';
+          button.querySelector('i').className = 'fa-solid fa-copy';
+        }, 1200);
+      } catch (error) {
+        alert('복사하지 못했습니다. 클립보드 접근 권한을 확인해 주세요.');
+      }
+    };
     macro.closest('details').ontoggle = event => {
       if (event.currentTarget.open) btcpAutoResize(macro);
     };
