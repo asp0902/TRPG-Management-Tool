@@ -4483,6 +4483,7 @@ body.block-drag-active .block-gap-line {
 .handout-column + .handout-column { border-left: 1px solid var(--border); padding-left: 20px; }
 .handout-column h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); text-align: center; }
 .handout-column .block-ce { min-height: 88px; margin-bottom: 14px; }
+.handout-column:has(> .handout-shared[hidden]) > .block-ce { min-height: 1.7em; margin-bottom: 0; }
 .handout-preview-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .handout-preview-head span { margin-right: auto; font-size: 11px; font-weight: 700; color: #888; }
 .handout-preview-head .btn { width: 30px; height: 30px; padding: 0; }
