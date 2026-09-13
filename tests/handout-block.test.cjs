@@ -41,4 +41,7 @@ assert.ok(rendered.includes('id="handout-public-test" hidden'));
 assert.ok(rendered.includes('id="handout-secret-test" hidden'));
 assert.equal((rendered.match(/<details class="handout-fold" open>/g) || []).length, 4);
 assert.ok(rendered.indexOf('<summary>CSS MACRO</summary>') < rendered.indexOf('<summary>PREVIEW</summary>'));
+assert.ok(!rendered.includes('data-handout-image-edit'));
+assert.ok(!rendered.includes('data-handout-image-delete'));
+assert.ok(extract('bindHandoutBlock').includes('btcpAutoResize(macro)'));
 console.log('handout block checks: OK');
