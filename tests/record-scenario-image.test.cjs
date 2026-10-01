@@ -10,7 +10,7 @@ assert.match(html, /id="rf-scenario-image"/);
 assert.match(html, /onpaste="onRecordImagePaste\(event\)"/);
 assert.match(html, /targetType = host\.id === 'rf-gm-card' \? 'gm' : \(host\.id === 'rf-custom-scenario-fields' \? 'scenario' : 'player'\)/);
 assert.match(html, /scenarioCard = String\(scenario\?\.info\?\.sessionCard \|\| record\?\.scenarioImage \|\| ''\)/);
-assert.match(html, /scenarioImage: scenarioId \? '' : \(document\.getElementById\('rf-scenario-image'\)\?\.value\.trim\(\) \|\| ''\)/);
+assert.match(html, /scenarioImage: document\.getElementById\('rf-scenario-image'\)\?\.value\.trim\(\) \|\| ''/);
 
 const source = html.slice(html.indexOf('function mkRecordEntry'), html.indexOf('function normalizeRecordEntry'));
 const context = {
@@ -23,6 +23,7 @@ const context = {
   extractBlockPlainText: value => value,
   normalizeRecordDateValue: value => value,
   formatRecordSessionTags: () => '',
+  normalizeRecordTimelineEvents: value => Array.isArray(value) ? value : [],
   result: null,
 };
 vm.runInNewContext(`${source}\nresult = mkRecordEntry({ scenarioName: '직접 시나리오', scenarioImage: 'data:image/png;base64,AA==' });`, context);
@@ -33,6 +34,7 @@ const thumb = { innerHTML: '' };
 const host = {
   id: 'rf-custom-scenario-fields',
   dataset: {},
+  isConnected: true,
   querySelector: () => hidden,
 };
 const backdrop = { dataset: {}, style: {} };

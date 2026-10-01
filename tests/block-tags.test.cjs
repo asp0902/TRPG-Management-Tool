@@ -27,6 +27,29 @@ assert.equal(markers[0].style.color, '#2563eb');
 markers[0].onclick({ stopPropagation() {} });
 assert.equal(edited, ref, 'Clicking a tag must edit the same block');
 console.log('block tag checks: OK');
+const picker = html.match(/function openBlockTagColorPicker\(input\) \{[\s\S]*?\n\}/)[0];
+const colorForm = { elements: { color: {}, hex: {} } };
+const cancel = {};
+const colorDialog = {
+  setAttribute() {}, showModal() {}, close() { this.onclose(); }, remove() {},
+  querySelector: selector => selector === 'form' ? colorForm : selector === '[data-cancel]' ? cancel : { appendChild() {} },
+};
+const colorInput = { value: '#123456' };
+vm.runInNewContext(`${picker}; openBlockTagColorPicker(input);`, {
+  input: colorInput, CP_PRESETS: [], getRecentBlockTagColors: () => [],
+  document: { createElement: () => colorDialog, body: { appendChild() {} } },
+});
+colorForm.elements.color.value = '#abcdef';
+colorForm.elements.color.oninput();
+assert.equal(colorInput.value, '#123456', 'Draft must not change the tag color');
+cancel.onclick();
+assert.equal(colorInput.value, '#123456', 'Cancel preserves the original color');
+colorForm.elements.hex.value = 'invalid';
+colorForm.onsubmit({ preventDefault() {} });
+assert.equal(colorInput.value, '#123456', 'Invalid colors must not commit');
+colorForm.elements.hex.value = '#abcdef';
+colorForm.onsubmit({ preventDefault() {} });
+assert.equal(colorInput.value, '#abcdef', 'Confirm commits the chosen color');
 const recentColorsFunction = html.match(/function getRecentBlockTagColors\(color\) \{[\s\S]*?\n\}/)[0];
 let storedColors = JSON.stringify(['#ABCDEF', '#abcdef', 'invalid', '#123456']);
 const recentContext = { localStorage: {

@@ -32,11 +32,13 @@ assert.match(html, /\.sh-sheet-content > \.sh-coc-misc-section \{ border-top: no
 assert.match(html, /\.sh-coc-wealth-title \{ min-height: 33px; padding: 4px 12px; justify-content: center;/);
 assert.match(html, /\.sh-coc-balance-title \{ min-height: 33px; padding: 4px 12px;/);
 assert.match(html, /\.sh-coc-misc-select option \{ text-align: center; \}/);
-assert.match(html, /\.sh-coc-wealth-currency-cell,[\s\S]*?\.sh-coc-wealth-currency-value \{[^}]*grid-template-columns: 1\.25em minmax\(0, 1fr\);[^}]*gap: 6px;/);
+assert.match(html, /\.sh-coc-wealth-currency-cell \{[^}]*grid-template-columns: 1\.25em minmax\(0, 1fr\);[^}]*gap: 6px;/);
+assert.match(html, /\.sh-coc-wealth-currency-value \{[^}]*display: inline-flex;[^}]*justify-content: center;[^}]*max-width: 100%;[^}]*white-space: nowrap;/);
+assert.match(html, /\.sh-coc-wealth-value-cell \{[^}]*padding-inline: 4px;/);
 assert.match(stats, /function wealthValueCell\(value, extraCls\)[\s\S]*?buildCoc7eWealthValueHtml\(value\)/);
 assert.match(html, /function setWealthValue\(selector, value\)[\s\S]*?el\.innerHTML = buildCoc7eWealthValueHtml\(value\)/);
 assert.match(html, /setWealthValue\('\.sh-coc-wealth-spending-usd', derived\.wealth\.spendingLevel\.usd\)/);
-assert.match(html, /data-section-id="weapons"\]\s+:is\(th, td\):nth-child\(n\+4\):nth-child\(-n\+8\)\s*\{\s*width: 56px; min-width: 56px; max-width: 56px;/);
+assert.match(html, /data-section-id="weapons"\]\s*\{ table-layout: fixed; \}/);
 assert.match(html, /data-section-id="weapons"\]\s+thead th \{ text-align: center; \}/);
 assert.match(html, /data-section-id="weapons"\]\s*> \.sh-section-hd \{ text-align: center; \}/);
 assert.match(html, /data-section-id="weapons"\]\s+tbody td \{ border-bottom: none; \}/);
@@ -46,6 +48,12 @@ assert.match(html, /\.ch-sheet-modal\.sheet-wide-coc7e \.sh-section-hd,[\s\S]*?f
 assert.match(html, /\.sh-coc-skills-table \.sk-row\.is-growth-selected > td \{ background: #ececec; \}/);
 assert.match(html, /\.sk-chk \{ display: block; margin: 0 auto; cursor: pointer; \}/);
 assert.match(html, /classList\.toggle\(\\"is-growth-selected\\",this\.checked\)/);
+assert.match(html, /tpl\.key === 'numenera' \|\| tpl\.key === 'cypher' \|\| tpl\.key === 'coc7e'/);
+assert.match(html, /\.sh-coc-attrs-grid \{[^}]*repeat\(3, minmax\(0, 1fr\)\)/);
+assert.match(html, /\.sh-coc-skills-table \.is-negative \{ color: #dc2626 !important; \}/);
+assert.match(html, /function openCocSkillMemoMenu\(event, chId, sheetId, sectionId, fieldId, skillName\)/);
+assert.match(html, /--coc-skill-name-width:' \+ Math\.max\(18, getCoc7eSkillNameColumnWidth\(sectionData\)\) \+ 'ch/);
+assert.match(html, /name: '비무장'[^\n]*era: ''/);
 
 const ledgerAmountFunctions = html.slice(html.indexOf('function normalizeCocWealthLedgerAmount'), html.indexOf('function buildCoc7eWealthCurrencyRow'));
 const ledgerAmountContext = {};

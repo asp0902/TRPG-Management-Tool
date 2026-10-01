@@ -114,7 +114,7 @@ vm.runInNewContext('items = tbGetScenarioMemoCtxItems();', memoMenuContext);
 assert.equal(memoMenuContext.items.length, 0, '블록 편집기가 아닌 페이지에는 메모 메뉴를 노출하면 안 됩니다.');
 
 assert.match(html, /id="format-memo-toggle"[^>]*onclick="toggleFormatMemo\(\)"/, '공용 서식 툴바에 메모장 버튼이 있어야 합니다.');
-assert.match(html, /title="찾아 바꾸기 \(Ctrl\+H\)"[\s\S]*?<\/button>\s*<button[^>]*id="format-memo-toggle"/, '메모장 버튼은 찾아 바꾸기 버튼 바로 오른쪽에 있어야 합니다.');
+assert.match(html, /title="찾아 바꾸기 \(Ctrl\+Shift\+F\)"[\s\S]*?<\/button>\s*<button[^>]*id="format-memo-toggle"/, '메모장 버튼은 찾아 바꾸기 버튼 바로 오른쪽에 있어야 합니다.');
 assert.match(html, /function toggleFormatMemo\(\) \{[\s\S]*?currentPage === 'rulebook'[\s\S]*?toggleRulebookMemo\(\)[\s\S]*?currentPage === 'script'[\s\S]*?toggleMemo\(\)/, '메모장 버튼은 현재 SCRIPT 또는 RULEBOOK 메모 목록을 열어야 합니다.');
 assert.match(html, /id="rb-memo-panel"[\s\S]*?id="rb-memo-list"/, 'RULEBOOK 메모 패널과 목록이 있어야 합니다.');
 assert.match(html, /id="rb-memo-panel"[\s\S]*?startScriptSidePanelResize\(event, 'rulebookMemo'\)/, 'RULEBOOK 메모 패널에 폭 조절 핸들이 있어야 합니다.');
