@@ -4442,13 +4442,8 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   --child-indent: 6px;
   margin-top: 4px;
 }
-.toggle-content-wrap > .block-children-wrap > .block.block-branch {
-  width: calc(100% - var(--child-indent));
-  max-width: calc(100% - var(--child-indent));
-  margin-right: var(--child-indent);
-}
-/* 토글 안 단 나누기: 좌측 --child-indent 만큼 우측도 줄여 좌우 대칭 */
-.toggle-content-wrap > .block-children-wrap > .block:has(> .block-body > .column-grid) {
+/* 토글 안 상자형 하위 블록: 좌측 --child-indent 만큼 우측도 줄여 좌우 대칭 */
+.toggle-content-wrap > .block-children-wrap > .block:is(.block-branch, .block-roll, .block-image, .block-handout, .block-speech, .block-chapter, :has(> .block-body > .column-grid)) {
   width: calc(100% - var(--child-indent));
   max-width: calc(100% - var(--child-indent));
   margin-right: var(--child-indent);
