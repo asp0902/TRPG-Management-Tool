@@ -18,7 +18,7 @@ context.moveCocWeaponRow('c', 's', 0, 2);
 assert.equal(saves, 2);
 assert.equal(renders, 2);
 vm.runInContext(html.match(/function toggleCocWeaponDetail\([^]*?\n\}/)[0], context);
-const detail = { hidden: true };
+const detail = { hidden: true, querySelector: () => ({ value: '' }) };
 const toggle = { closest: () => ({ nextElementSibling: detail }), setAttribute(key, value) { this[key] = value; } };
 context.toggleCocWeaponDetail(toggle);
 assert.equal(detail.hidden, false);

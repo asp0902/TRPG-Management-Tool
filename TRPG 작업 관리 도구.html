@@ -7064,6 +7064,8 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sk-name-cell { text-align: left !important; white-space: nowrap; font-size: 11px; color: #333; padding: 0 !important; }
 .sk-base-cell { color: #666; font-size: 11px; }
 .sk-num-input { width: 100%; max-width: 100%; box-sizing: border-box; border: 1px solid #e4e4e4; border-radius: 3px; padding: 2px; font-size: 11px; text-align: center; font-family: inherit; background: #fff; outline: none; -moz-appearance: textfield; }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-block { width: fit-content; max-width: 100%; margin-inline: auto; }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-section-hdr { width: 0; min-width: 100%; box-sizing: border-box; }
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-wrap { justify-content: center; flex-wrap: nowrap; overflow-x: visible; --coc-skill-name-width: 130px; }
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-table { table-layout: fixed; }
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-table th:nth-child(2),
@@ -7256,15 +7258,15 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="skills"] td:nth-child(10) { width: 240px; }
 .sh-repeat-table[data-template-key="coc7e"][data-section-id="weapons"] thead th { text-align: center; }
 .sh-repeat-table[data-template-key="coc7e"][data-section-id="weapons"] { table-layout: fixed; }
+.sh-repeat-table[data-template-key="coc7e"][data-section-id="weapons"] { --coc-weapon-chk-gap: 6.5px; }
 .sh-repeat-section[data-template-key="coc7e"][data-section-id="weapons"] > .sh-section-hd { text-align: center; }
 .sh-coc-db-menu .tb-ctx-icon { display: none; }
 .sh-coc-db-menu .tb-ctx-item { padding: 6px 0; }
 .sh-coc-db-menu .tb-ctx-main, .sh-coc-db-menu .tb-ctx-label { width: 100%; text-align: center; justify-content: center; }
 .sh-coc-weapon-name { display: flex; align-items: center; }
 .sh-coc-weapon-name input { min-width: 0; }
-.sh-coc-weapon-detail-toggle { flex: 0 0 24px; width: 24px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; cursor: pointer; }
-.sh-coc-weapon-detail-toggle::before { content: ''; width: 11px; height: 11px; border: 1px solid #222; background: #fff; }
-.sh-coc-weapon-detail-toggle.has-content::before { background: #111; }
+.sh-coc-weapon-detail-toggle { flex: none; margin: 0 var(--coc-weapon-chk-gap) 0 5.5px; cursor: pointer; }
+.sh-repeat-table[data-template-key="coc7e"][data-section-id="weapons"] td[colspan] > label { display: block; padding-left: calc(5.5px + 13px + var(--coc-weapon-chk-gap)); }
 .sh-repeat-table[data-template-key="coc7e"][data-section-id="weapons"] td:nth-child(4) select { appearance: none; -webkit-appearance: none; background-image: none; text-align: center; text-align-last: center; padding-inline: 6px; }
 .sh-repeat-table[data-template-key="coc7e"][data-section-id="weapons"] td:nth-child(4) option { text-align: center; text-align-last: center; padding-inline: 0; text-indent: -12px; }
 .sh-repeat-table[data-template-key="coc7e"][data-section-id="weapons"] tbody td { border-bottom: none; }
@@ -39489,7 +39491,7 @@ function renderCharacterSheet(chId) {
           var handler = 'saveSheetRepeatCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + rowIdx + ',' + JSON.stringify(f.id) + ',this.value)';
           var extraAttr = '';
           if (isCocWeapons && f.id === 'name') {
-            return '<td><div class="sh-coc-weapon-name"><button type="button" class="sh-coc-weapon-detail-toggle' + (String(row.era || '').trim() ? ' has-content' : '') + '" aria-expanded="false" aria-label="특성 펼치기" title="특성 펼치기" onclick="toggleCocWeaponDetail(this)"></button><input class="sh-repeat-input" value="' + esc(String(val)) + '" oninput="' + esc(handler) + '"></div></td>';
+            return '<td><div class="sh-coc-weapon-name"><input type="checkbox" class="sh-coc-weapon-detail-toggle"' + (String(row.era || '').trim() ? ' checked' : '') + ' aria-expanded="false" aria-label="특성 펼치기" title="특성 펼치기" onclick="toggleCocWeaponDetail(this)"><input class="sh-repeat-input" value="' + esc(String(val)) + '" oninput="' + esc(handler) + '"></div></td>';
           }
           if (isCocWeapons && f.id === 'db') {
             var dbHandler = 'openCocWeaponDbMenu(event,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + rowIdx + ')';
@@ -39531,7 +39533,7 @@ function renderCharacterSheet(chId) {
         var effectHandler = 'saveSheetRepeatCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + rowIdx + ',' + JSON.stringify(detailKey) + ',this.value);autoResizeSheetTextarea(this)';
         var effectRow = isInsaneAbilities || isInsaneRelations ? '<tr class="is-ability-effect" hidden><td colspan="4"><textarea class="sh-field-textarea auto-grow" rows="1" data-auto-grow="1" aria-label="' + (isInsaneRelations ? '관계 메모' : '어빌리티 효과') + '" oninput="' + esc(effectHandler) + '">' + esc(String(row[detailKey] || '')) + '</textarea></td></tr>' : '';
         if (isCocWeapons) {
-          var traitHandler = 'saveSheetRepeatCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',"weapons",' + rowIdx + ',"era",this.value);this.closest("tr").previousElementSibling.querySelector(".sh-coc-weapon-detail-toggle").classList.toggle("has-content",!!this.value.trim())';
+          var traitHandler = 'saveSheetRepeatCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',"weapons",' + rowIdx + ',"era",this.value);this.closest("tr").previousElementSibling.querySelector(".sh-coc-weapon-detail-toggle").checked=!!this.value.trim()';
           effectRow = '<tr hidden><td colspan="9"><label>특성<input class="sh-repeat-input" value="' + esc(String(row.era || '')) + '" oninput="' + esc(traitHandler) + '"></label></td></tr>';
         }
         var moveButtons = isCocWeapons ? [-1, 1].map(function(direction) {
@@ -41693,12 +41695,12 @@ function renderCoc7eSkillsSection(sec, sectionData, sheetData, chId, sheetId) {
 
   return '<div class="sh-section">'
     + '<div class="sh-section-hd rollable" onclick="toggleCoc7eSkillGuide()">' + esc(sec.label) + '</div>'
-    + '<div class="sh-section-body">' + guideHtml + headerHtml
+    + '<div class="sh-section-body">' + guideHtml + '<div class="sh-coc-skills-block">' + headerHtml
     + '<div class="sk-tables-wrap sh-coc-skills-wrap" style="--coc-skill-name-width:' + Math.max(18, getCoc7eSkillNameColumnWidth(sectionData)) + 'ch">'
     + makeTable(_COC7E_SKILLS_PRESET.slice(0, 18))
     + makeTable(_COC7E_SKILLS_PRESET.slice(18, 36))
     + '<div>' + makeTable(_COC7E_SKILLS_PRESET.slice(36)) + customSection + '</div>'
-    + '</div></div></div>';
+    + '</div></div></div></div>';
 }
 
 function getCoc7eSupportLegacyLines(value) {
@@ -43041,6 +43043,7 @@ function toggleCocWeaponDetail(button) {
   button.setAttribute('aria-expanded', String(!row.hidden));
   button.title = row.hidden ? '특성 펼치기' : '특성 접기';
   button.setAttribute('aria-label', button.title);
+  button.checked = !!row.querySelector('input').value.trim();
 }
 function openCocWeaponDbMenu(event, chId, sheetId, rowIdx) {
   event.stopPropagation();
