@@ -5,7 +5,7 @@ const html = fs.readFileSync('TRPG 작업 관리 도구.html', 'utf8');
 
 assert.match(html, /\.tb-block-type-wrap \{[\s\S]*?width: 82px; height: 24px; flex: 0 0 82px;/);
 assert.match(html, /\.tb-block-type-trigger \{[\s\S]*?justify-content: center;[\s\S]*?width: 82px; height: 24px;/);
-assert.match(html, /\.tb-block-type-trigger \.tb-control-chevron \{ position: absolute; right: 5px;/);
+assert.match(html, /\.tb-block-type-trigger \.tb-control-chevron \{ position: absolute; right: 6px;/);
 assert.match(html, /\.tb-block-type-menu \{[\s\S]*?width: 82px;/);
 assert.match(html, /\.tb-block-type-option \{[\s\S]*?justify-content: center;[\s\S]*?height: 26px;[\s\S]*?font-size: 11px;[\s\S]*?text-align: center;/);
 assert.match(html, /id="tb-block-type-label">단락<\/span><i class="fa-solid fa-chevron-down tb-control-chevron"/);

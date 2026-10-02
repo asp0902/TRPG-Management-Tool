@@ -46,7 +46,7 @@ body {
   display: inline-flex; align-items: center; gap: 5px;
 }
 .sidebar-logo-arrow {
-  font-size: 8px; color: #555; transition: transform 0.15s; margin-top: 1px;
+  font-size: 8px; color: #555; transition: transform 0.15s; margin-top: 1px; margin-right: 1px;
 }
 .sidebar-logo-wrap.open .sidebar-logo-arrow { transform: rotate(180deg); }
 .page-dropdown {
@@ -172,7 +172,7 @@ select.ct-input { width: 100%; }
 .ct-select {
   appearance: none; -webkit-appearance: none; cursor: pointer; text-align: center;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23bbb'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 10px center; padding-right: 24px !important;
+  background-repeat: no-repeat; background-position: right 11px center; padding-right: 25px !important;
 }
 .ct-select:focus { background-color: #fff; }
 .ct-note-dot {
@@ -2804,6 +2804,7 @@ tr.ct-row-end .ct-select:focus {
 }
 .tb-font-trigger-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
 .tb-control-chevron { justify-self: center; font-size: 9px; color: #777; pointer-events: none; }
+.tb-font-trigger .tb-control-chevron { transform: translateX(-1px); }
 .tb-font-menu {
   display: none; position: fixed; z-index: 10061; width: 230px; max-height: 420px;
   overflow-y: auto; padding: 3px 0; background: #fff; border: 1px solid #bbb;
@@ -2835,7 +2836,7 @@ tr.ct-row-end .ct-select:focus {
   cursor: pointer;
 }
 .tb-block-type-trigger > span { min-width: 0; text-align: center; white-space: nowrap; }
-.tb-block-type-trigger .tb-control-chevron { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); }
+.tb-block-type-trigger .tb-control-chevron { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
 .tb-block-type-trigger:focus { border-color: #000; outline: none; }
 .tb-block-type-menu {
   position: fixed; z-index: 10062; width: 82px; padding: 2px 0; margin: 0;
@@ -2858,7 +2859,7 @@ tr.ct-row-end .ct-select:focus {
   padding: 0 18px 0 4px; text-align: center; text-align-last: center;
   background-color: transparent; background-image: none;
 }
-.tb-lh-wrap .tb-control-chevron { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); }
+.tb-lh-wrap .tb-control-chevron { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
 /* 꽉 찬 사각형 아이콘이라 잉크가 1px 위로 쏠려 보여 보정한다 */
 #tb-table-btn i { position: relative; top: 1px; }
 #format-toc-toggle i, #format-memo-toggle i {
@@ -3964,8 +3965,8 @@ body.is-block-range-selecting * {
 #i-rule {
   appearance: none; -webkit-appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23777'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 12px center;
-  padding-right: 32px;
+  background-repeat: no-repeat; background-position: right 13px center;
+  padding-right: 33px;
 }
 .field textarea { resize: none; overflow: hidden; }
 .info-basic-textarea {
@@ -6511,7 +6512,7 @@ body.block-pointer-dragging {
 .ds-format-btn:hover:not(:disabled) { background: #f2f2f2; color: #111; }
 .ds-format-btn.active, .ds-format-btn.open { background: #111; border-color: #111; color: #fff; }
 .ds-format-btn:disabled { color: #cfcfcf; cursor: not-allowed; background: #fafafa; }
-.ds-format-caret { font-size: 8px; opacity: 0.72; }
+.ds-format-caret { font-size: 8px; opacity: 0.72; margin-right: 2px; }
 .ds-format-menu { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 10520; min-width: 128px; padding: 5px; background: #fff; border: 1px solid #d8d8d8; border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,0.16); }
 .ds-format-menu.open { display: flex; flex-direction: column; gap: 2px; }
 .ds-format-option { border: none; background: transparent; color: #333; border-radius: 6px; min-height: 30px; padding: 6px 9px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-family: inherit; text-align: left; }
@@ -7333,7 +7334,7 @@ tr:hover > .sh-coc-weapon-actions > *, tr:focus-within > .sh-coc-weapon-actions 
 .sh-sheet-insane .sh-section, .sh-sheet-insane input:not([role="switch"]), .sh-sheet-insane select, .sh-sheet-insane textarea, .sh-sheet-insane .sh-repeat-add-btn, .sh-sheet-insane .isp-skill, .sh-sheet-insane .isp-head, .sh-sheet-insane .ch-sheet-basic-portrait { border-radius: 0; }
 .sh-sheet-insane .sh-section-hd { padding-top: 4px; padding-bottom: 4px; }
 .sh-sheet-insane .ib-row:not(.ib-vitals) input { text-align: center; }
-.sh-sheet-insane [data-section-id="abilities"] select.sh-repeat-input { padding-left: 3px; padding-right: 19px; background-size: 10px; background-position: right 5px center; }
+.sh-sheet-insane [data-section-id="abilities"] select.sh-repeat-input { padding-left: 3px; padding-right: 20px; background-size: 10px; background-position: right 6px center; }
 .is-ability-effect[hidden] { display: none; }
 .is-ability-effect textarea { width: 100%; }
 .sh-sheet-insane [data-section-id="abilities"] tbody td { border-bottom: none; }
@@ -7342,7 +7343,7 @@ tr:hover > .sh-coc-weapon-actions > *, tr:focus-within > .sh-coc-weapon-actions 
 .sh-sheet-insane [data-section-id="missionSecret"] .sh-field-grid { flex: 1; }
 .sh-sheet-insane [data-section-id="missionSecret"] .sh-field { display: flex; flex-direction: column; }
 .sh-sheet-insane [data-section-id="missionSecret"] textarea { flex: 1; }
-.sh-sheet-insane [data-section-id="abilities"] select { appearance: none; text-align: center; text-align-last: center; padding-left: 8px; padding-right: 26px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23666' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; background-size: 12px; }
+.sh-sheet-insane [data-section-id="abilities"] select { appearance: none; text-align: center; text-align-last: center; padding-left: 8px; padding-right: 27px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23666' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; background-size: 12px; }
 .sh-insane-basic .ib-row.ib-vitals { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .ib-vitals > * { grid-column: auto; }
 .sh-insane-basic .ib-vitals .ib-field { min-width: 0; width: auto; flex: none; }
@@ -7542,8 +7543,8 @@ tr:hover > .sh-coc-weapon-actions > *, tr:focus-within > .sh-coc-weapon-actions 
 select:not(.ct-select) {
   appearance: none; -webkit-appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23777'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 10px center; background-size: 10px 6px;
-  padding-right: 26px;
+  background-repeat: no-repeat; background-position: right 11px center; background-size: 10px 6px;
+  padding-right: 27px;
 }
 select.sh-field-input,
 .sh-coc-misc-select { height: 32px; }
