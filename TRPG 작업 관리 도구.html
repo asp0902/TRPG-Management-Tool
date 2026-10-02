@@ -3044,6 +3044,9 @@ tr.ct-row-end .ct-select:focus {
   box-sizing: border-box;
 }
 
+/* 부연설명 없는 항목은 한 줄이라 핸들을 세로 가운데에 둔다 */
+.memo-item:not(:has(.memo-item-source)) .memo-item-drag { align-items: center; padding: 0; }
+
 .memo-item-drag:hover {
   color: #777;
   background: #e8e8e8;
