@@ -27284,7 +27284,8 @@ function tbIndentContentEditable(root, dir) {
   let changed = false;
   for (let i = lineBoundaries.length - 1; i >= 0; i--) {
     const rawBoundary = lineBoundaries[i];
-    const boundaryIndex = tbSkipIndentMarkers(nextHtml, rawBoundary, markerHtmls);
+    // 접힌 커서가 줄 맨 앞이면 들여쓰기를 커서 앞에 넣어 커서가 들여쓰기 뒤에 오게 한다.
+    const boundaryIndex = dir > 0 && wasCollapsed ? rawBoundary : tbSkipIndentMarkers(nextHtml, rawBoundary, markerHtmls);
 
     if (dir > 0) {
       nextHtml = `${nextHtml.slice(0, boundaryIndex)}${indentUnit}${nextHtml.slice(boundaryIndex)}`;
