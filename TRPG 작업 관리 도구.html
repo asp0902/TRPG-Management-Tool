@@ -7093,6 +7093,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-coc-skills-table td:nth-child(9) { width: 28px; }
 .sh-coc-skills-table .sk-name-input { border: none; background: transparent; border-radius: 0; padding: 0 5px; text-align: left; width: 100%; max-width: 100%; height: 100%; display: block; }
 .sh-coc-skills-table .sk-name-input.is-emphasis { font-style: italic; }
+.sh-coc-skills-table .sk-name-input.has-memo { font-weight: 700; text-decoration: underline dotted; cursor: pointer; }
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-table .sk-name-input { text-align: center; padding: 0 1px; }
 .sk-custom-table .sk-name-input.clickable { cursor: pointer; }
 .sk-num-input::-webkit-inner-spin-button, .sk-num-input::-webkit-outer-spin-button,
@@ -8879,7 +8880,7 @@ select.sh-field-input,
     <div class="ch-modal" onclick="event.stopPropagation()">
       <div class="ch-modal-heading" id="coc-custom-skill-heading">다른 기능 추가</div>
       <div class="ch-modal-field">
-        <div class="ch-modal-label req">기능 이름</div>
+        <div class="ch-modal-label req">기능명</div>
         <input class="ch-modal-input" id="coc-custom-skill-name" placeholder="예) 언어(라틴어)" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();saveCocCustomSkillModal();}">
       </div>
       <div class="coc-skill-modal-hint">이름에 따라 기본 수치가 자동 입력됩니다. 예: 언어, 과학, 예술/공예, 생존술</div>
@@ -41525,7 +41526,28 @@ function cocSkillScoreClass(value) {
 function setCocNegativeScore(element, value) {
   if (element) element.classList.toggle('is-negative', Number(value) < 0);
 }
-function openCocSkillMemoMenu(event, chId, sheetId, sectionId, fieldId, skillName) {
+function cocSkillNameClick(chId, sheetId, sectionId, fieldId, customIdx, anchor) {
+  var ch = state.characters.find(function(c) { return c.id === chId; });
+  var sheet = (ch && ch.sheets || []).find(function(s) { return s.id === sheetId; });
+  var memo = String(sheet && sheet.data && sheet.data[sectionId] && sheet.data[sectionId][fieldId + '_memo'] || '');
+  if (!memo.trim()) {
+    if (customIdx !== undefined) openCocCustomSkillModal(chId, sheetId, sectionId, customIdx);
+    return;
+  }
+  var popup = rbEnsureInlineMemoPopup();
+  popup.textContent = memo;
+  rbPositionInlineMemoPopup(anchor, popup);
+  var close = function(e) {
+    if (e.type === 'keydown' ? e.key !== 'Escape' : (e.target === anchor || popup.contains(e.target))) return;
+    popup.style.display = 'none';
+    document.removeEventListener('mousedown', close, true);
+    document.removeEventListener('keydown', close, true);
+  };
+  document.addEventListener('mousedown', close, true);
+  document.addEventListener('keydown', close, true);
+}
+
+function openCocSkillMemoMenu(event, chId, sheetId, sectionId, fieldId, skillName, customIdx) {
   event.preventDefault();
   event.stopPropagation();
   var ch = state.characters.find(function(c) { return c.id === chId; });
@@ -41547,7 +41569,11 @@ function openCocSkillMemoMenu(event, chId, sheetId, sectionId, fieldId, skillNam
       persist();
       renderCharacterSheet(chId);
     } },
-  ]);
+  ].concat(customIdx === undefined ? [] : [
+    { icon: '<i class="fa-regular fa-pen-to-square"></i>', label: '기능 수정', action: function() {
+      openCocCustomSkillModal(chId, sheetId, sectionId, customIdx);
+    } },
+  ]));
   return false;
 }
 
@@ -41587,7 +41613,7 @@ function renderCoc7eSkillsSection(sec, sectionData, sheetData, chId, sheetId) {
     + '</div></div>'
     + '</div>';
 
-  var colHdr = '<tr><th>성장</th><th>기능 이름</th><th>기본</th><th>직업</th><th>관심</th><th>성장</th><th>최종</th><th>1/2</th><th>1/5</th></tr>';
+  var colHdr = '<tr><th>성장</th><th>기능명</th><th>기본</th><th>직업</th><th>관심</th><th>성장</th><th>최종</th><th>1/2</th><th>1/5</th></tr>';
 
   function skRow(sk) {
     var base = getCoc7ePresetSkillBase(sk, sectionData, sheetData);
@@ -41601,12 +41627,13 @@ function renderCoc7eSkillsSection(sec, sectionData, sheetData, chId, sheetId) {
     var fifth = Math.floor(fin / 5);
     var memo = String(sectionData[sk.id + '_memo'] || '');
     var memoH = 'openCocSkillMemoMenu(event,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(sk.id) + ',' + JSON.stringify(sk.name) + ')';
+    var memoClickH = 'cocSkillNameClick(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(sk.id) + ',undefined,this)';
     var baseTd = (sk.editableBase && !sk.derivedBase)
       ? '<td><input class="sk-base-input" type="number" value="' + esc(String(savedBase)) + '" oninput="' + esc(sf(sk.id + '_base', false) + ';_onSkillInput(this)') + '"></td>'
       : '<td class="sk-base-cell" data-coc-skill-base="' + esc(sk.id) + '">' + base + '</td>';
     return '<tr class="sk-row' + (checked ? ' is-growth-selected' : '') + '" data-skill-id="' + esc(sk.id) + '" data-base="' + base + '">'
       + '<td><input class="sk-chk" type="checkbox"' + (checked ? ' checked' : '') + ' onchange="' + esc(sf(sk.id + '_checked', true) + ';this.closest(\"tr\").classList.toggle(\"is-growth-selected\",this.checked)') + '"></td>'
-      + '<td class="sk-name-cell" oncontextmenu="return ' + esc(memoH) + '"><input class="sk-name-input' + (sk.id === 'creditRating' || sk.id === 'cthulhuMythos' ? ' is-emphasis' : '') + '" type="text" value="' + esc(sk.name) + '" readonly tabindex="-1" title="' + esc(memo || '우클릭하여 메모 삽입') + '"></td>'
+      + '<td class="sk-name-cell" oncontextmenu="return ' + esc(memoH) + '"><input class="sk-name-input' + (sk.id === 'creditRating' || sk.id === 'cthulhuMythos' ? ' is-emphasis' : '') + (memo.trim() ? ' has-memo' : '') + '" type="text" value="' + esc(sk.name) + '" readonly tabindex="-1"' + (memo.trim() ? ' onclick="' + esc(memoClickH) + '"' : '') + ' title="' + esc(memo.trim() ? '클릭하여 메모 보기 · 우클릭하여 메모 편집' : '우클릭하여 메모 삽입') + '"></td>'
       + baseTd
       + '<td><input class="sk-num-input sk-job" type="number" value="' + esc(String(jobV)) + '" oninput="' + esc(sf(sk.id + '_job', false) + ';_onSkillInput(this)') + '"></td>'
       + '<td><input class="sk-num-input sk-interest" type="number" value="' + esc(String(intV)) + '" oninput="' + esc(sf(sk.id + '_interest', false) + ';_onSkillInput(this)') + '"></td>'
@@ -41632,12 +41659,12 @@ function renderCoc7eSkillsSection(sec, sectionData, sheetData, chId, sheetId) {
     var cfin = (parseInt(cb) || 0) + (parseInt(cj) || 0) + (parseInt(cit) || 0) + (parseInt(cg) || 0);
     var chalf = Math.floor(cfin / 2);
     var cfifth = Math.floor(cfin / 5);
-    var editH = 'openCocCustomSkillModal(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + ci2 + ')';
     var cmemo = String(sectionData['c' + ci2 + '_memo'] || '');
-    var cmemoH = 'openCocSkillMemoMenu(event,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify('c' + ci2) + ',' + JSON.stringify(cn || '기능') + ')';
+    var cmemoH = 'openCocSkillMemoMenu(event,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify('c' + ci2) + ',' + JSON.stringify(cn || '기능') + ',' + ci2 + ')';
+    var cclickH = 'cocSkillNameClick(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify('c' + ci2) + ',' + ci2 + ',this)';
     customRows += '<tr class="sk-row' + (cc ? ' is-growth-selected' : '') + '">'
       + '<td><input class="sk-chk" type="checkbox"' + (cc ? ' checked' : '') + ' onchange="' + esc(sf('c' + ci2 + '_checked', true) + ';this.closest(\"tr\").classList.toggle(\"is-growth-selected\",this.checked)') + '"></td>'
-      + '<td class="sk-name-cell" oncontextmenu="return ' + esc(cmemoH) + '"><input class="sk-name-input auto-size clickable" type="text" value="' + esc(String(cn)) + '" readonly onclick="' + esc(editH) + '" title="' + esc(cmemo || '클릭하여 기능 수정 · 우클릭하여 메모 삽입') + '"></td>'
+      + '<td class="sk-name-cell" oncontextmenu="return ' + esc(cmemoH) + '"><input class="sk-name-input auto-size clickable' + (cmemo.trim() ? ' has-memo' : '') + '" type="text" value="' + esc(String(cn)) + '" readonly onclick="' + esc(cclickH) + '" title="' + esc(cmemo.trim() ? '클릭하여 메모 보기 · 우클릭하여 기능 수정/메모 편집' : '클릭하여 기능 수정 · 우클릭하여 메모 삽입') + '"></td>'
       + '<td><input class="sk-base-input" type="number" value="' + esc(String(cb)) + '" oninput="' + esc(sf('c' + ci2 + '_base', false) + ';_onSkillInput(this)') + '"></td>'
       + '<td><input class="sk-num-input sk-job" type="number" value="' + esc(String(cj)) + '" oninput="' + esc(sf('c' + ci2 + '_job', false) + ';_onSkillInput(this)') + '"></td>'
       + '<td><input class="sk-num-input sk-interest" type="number" value="' + esc(String(cit)) + '" oninput="' + esc(sf('c' + ci2 + '_interest', false) + ';_onSkillInput(this)') + '"></td>'
@@ -41648,7 +41675,7 @@ function renderCoc7eSkillsSection(sec, sectionData, sheetData, chId, sheetId) {
       + '</tr>';
   }
   var addH = 'openCocCustomSkillModal(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ')';
-  var colHdrCustom = '<tr><th>성장</th><th>기능 이름</th><th>기본</th><th>직업</th><th>관심</th><th>성장</th><th>최종</th><th>1/2</th><th>1/5</th></tr>';
+  var colHdrCustom = '<tr><th>성장</th><th>기능명</th><th>기본</th><th>직업</th><th>관심</th><th>성장</th><th>최종</th><th>1/2</th><th>1/5</th></tr>';
   var customSection = '<div class="sk-custom-section"><div class="sk-custom-divider"></div>'
     + (customCount > 0 ? '<table class="sk-table sh-coc-skills-table sk-custom-table"><thead>' + colHdrCustom + '</thead><tbody>' + customRows + '</tbody></table>' : '')
     + '<button class="sk-add-btn" onclick="' + esc(addH) + '">＋ 기능 추가</button></div>';

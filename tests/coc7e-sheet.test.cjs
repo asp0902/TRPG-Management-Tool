@@ -51,7 +51,7 @@ assert.match(html, /classList\.toggle\(\\"is-growth-selected\\",this\.checked\)/
 assert.match(html, /tpl\.key === 'numenera' \|\| tpl\.key === 'cypher' \|\| tpl\.key === 'coc7e'/);
 assert.match(html, /\.sh-coc-attrs-grid \{[^}]*repeat\(3, minmax\(0, 1fr\)\)/);
 assert.match(html, /\.sh-coc-skills-table \.is-negative \{ color: #dc2626 !important; \}/);
-assert.match(html, /function openCocSkillMemoMenu\(event, chId, sheetId, sectionId, fieldId, skillName\)/);
+assert.match(html, /function openCocSkillMemoMenu\(event, chId, sheetId, sectionId, fieldId, skillName, customIdx\)/);
 assert.match(html, /--coc-skill-name-width:' \+ Math\.max\(18, getCoc7eSkillNameColumnWidth\(sectionData\)\) \+ 'ch/);
 assert.match(html, /name: '비무장'[^\n]*era: ''/);
 
