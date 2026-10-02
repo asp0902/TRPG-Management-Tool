@@ -3828,7 +3828,9 @@ body.is-block-range-selecting * {
 }
 /* 하위 블록: 좌우 10px inset은 block-body가 맡는다 (같은 콜아웃 안 기본 블록과 동일) */
 .block-child .column-grid { margin: 12px 0; }
-.block-child .block-body:has(> .column-grid) { padding: 0 10px; }
+.block-child .block-body:has(> .column-grid) { padding: 0 12px; }
+/* 카드→입력칸 좌우를 상하(8+6=14)에 맞춤 */
+.block-body:has(> .column-grid) { padding-inline: 14px; }
 .editor-quote-children .block-body:has(> .column-grid) { white-space: normal; }
 .editor-quote-children .column-cell { padding-block: 6px; }
 /* 테스트: 자식 단 나누기 블록 상하 여백 */
@@ -4452,6 +4454,12 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   margin-top: 4px;
 }
 .toggle-content-wrap > .block-children-wrap > .block.block-branch {
+  width: calc(100% - var(--child-indent));
+  max-width: calc(100% - var(--child-indent));
+  margin-right: var(--child-indent);
+}
+/* 토글 안 단 나누기: 좌측 --child-indent 만큼 우측도 줄여 좌우 대칭 */
+.toggle-content-wrap > .block-children-wrap > .block:has(> .block-body > .column-grid) {
   width: calc(100% - var(--child-indent));
   max-width: calc(100% - var(--child-indent));
   margin-right: var(--child-indent);
