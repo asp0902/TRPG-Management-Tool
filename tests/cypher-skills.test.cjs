@@ -50,7 +50,7 @@ assert.match(html, /data-section-id="cyphers"\]\s+td:nth-child\(2\) \{ width: 52
 assert.match(html, /data-section-id="cyphers"\]\s+td:nth-child\(6\) \{ width: 40px; min-width: 40px; max-width: 40px;/);
 assert.match(html, /data-section-id="cyphers"\]\s+td:nth-child\(4\) \{ width: 104px; \}/);
 assert.match(html, /isCompletedCypherRow[\s\S]*?class="is-complete"/);
-assert.match(html, /tbody tr\.is-complete \.sh-repeat-input \{ color: (?:#999|var\(--k-[a-z]+-999999[a-z-]*\)); text-decoration: line-through; \}/);
+assert.match(html, /tbody tr\.is-complete \.sh-repeat-input \{ color: #999; text-decoration: line-through; \}/);
 assert.match(html, /data-section-id="cyphers"\]\s+tbody td \{ border-bottom: none; \}/);
 assert.match(html, /isCypherItems = tpl\.key === 'cypher' && sec\.id === 'cyphers'/);
 assert.match(html, /sh-cypher-count[\s\S]*?rows\.length[\s\S]*?aria-label="사이퍼 제한 개수"/);

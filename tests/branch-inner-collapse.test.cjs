@@ -7,7 +7,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도�
 assert.match(html, /\.branch-inner-block-label \{\s*flex: 1; font-size: 14px;/);
 assert.match(html, /\.branch-inner-block-header \{[\s\S]*?padding: 9px 10px;/);
 assert.match(html, /\.branch-inner-content-block > \.branch-inner-block-header > \.branch-inner-block-label \{\s*font-size: 13px;\s*height: 24px;\s*line-height: 24px;/);
-assert.match(html, /\.branch-inner-content-block:not\(\.is-collapsed\) > \.branch-inner-block-header > \.branch-inner-block-label \{\s*color: var\(--k-dfg-000000\);/);
+assert.match(html, /\.branch-inner-content-block:not\(\.is-collapsed\) > \.branch-inner-block-header > \.branch-inner-block-label \{\s*color: #000;/);
 assert.match(html, /class="branch-inner-block branch-inner-content-block\$\{ib\.collapsed \? ' is-collapsed' : ''\}"/);
 assert.match(html, /\.branch-inner-block\.is-collapsed > \.bib-items \{ display: none; \}/);
 assert.match(html, /\.branch-inner-content-block \+ \.branch-inner-content-block \{ margin-top: -1px; \}/);

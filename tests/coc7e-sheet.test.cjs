@@ -45,7 +45,7 @@ assert.match(html, /data-section-id="weapons"\]\s+tbody td \{ border-bottom: non
 assert.match(html, /\.ch-sheet-modal\.sheet-wide-coc7e \{ overflow-x: auto; \}/);
 assert.match(html, /\.ch-sheet-modal\.sheet-wide-coc7e \.ch-sheet-body \{ width: 1220px; min-width: 1220px; max-width: 1220px;/);
 assert.match(html, /\.ch-sheet-modal\.sheet-wide-coc7e \.sh-section-hd,[\s\S]*?font-size: 14px; font-weight: 800; text-align: center;/);
-assert.match(html, /\.sh-coc-skills-table \.sk-row\.is-growth-selected > td \{ background: (?:#ececec|var\(--k-[a-z]+-ececec[a-z-]*\)); \}/);
+assert.match(html, /\.sh-coc-skills-table \.sk-row\.is-growth-selected > td \{ background: #ececec; \}/);
 assert.match(html, /\.sk-chk \{ display: block; margin: 0 auto; cursor: pointer; \}/);
 assert.match(html, /classList\.toggle\(\\"is-growth-selected\\",this\.checked\)/);
 assert.match(html, /tpl\.key === 'numenera' \|\| tpl\.key === 'cypher' \|\| tpl\.key === 'coc7e'/);
