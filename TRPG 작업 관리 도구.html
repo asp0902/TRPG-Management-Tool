@@ -6,6 +6,9 @@
 <title>TRPG 작업 관리 도구</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
 <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<script>
+try { if (localStorage.getItem('trpg-theme') === 'night') document.documentElement.setAttribute('data-theme', 'night'); } catch (e) {}
+</script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -14,6 +17,43 @@
   --main-bg: #f5f5f5;
   --border: #e2e2e2;
   --text: #111111;
+  /* 의미 기반 색. 밝은 값은 기존 색 그대로이고, 밤 테마는 아래 html[data-theme="night"]에서 값만 바꾼다. */
+  --surface: #ffffff;
+  --surface-high: #f0f0f0;
+  --text-muted: #666666;
+  --accent: #111111;
+  --accent-text: #ffffff;
+  --select: #e0e0e0;
+  --danger: #ef4444;
+  --doc-surface: #ffffff;
+  --doc-surface-high: #f5f5f5;
+  --doc-text: #111111;
+  /* 사이드바 전용 단계 색(어두운 바탕 위 글자·면·선) */
+  --sb-t1: #ffffff; --sb-t2: #dddddd; --sb-t2b: #cccccc; --sb-t3: #aaaaaa; --sb-t3b: #8f8f8f;
+  --sb-t4: #888888; --sb-t5: #666666; --sb-t6: #555555; --sb-t7: #444444;
+  --sb-hover: #1a1a1a; --sb-hover2: #1e1e1e; --sb-chip: #242424; --sb-pop: #1c1c1c; --sb-pop-hover: #262626;
+  --sb-active: #2a2a2a; --sb-bar: #ffffff; --sb-glow: none;
+  --sb-line: #222222; --sb-bd: #333333; --sb-bd2: #2a2a2a; --sb-bd-hover: #666666; --sb-bd-hover2: #555555;
+}
+html[data-theme="night"] {
+  /* --main-bg / --border / --text 는 본문 영역을 이전하는 후속 단계에서 밤 값을 넣는다(지금은 사이드바만 적용). */
+  --sidebar-bg: linear-gradient(180deg, #0e1626 0%, #15213a 100%);
+  --surface: #15213a;
+  --surface-high: #1d2c4a;
+  --text-muted: #9aa8c0;
+  --accent: #d4af6a;
+  --accent-text: #0e1626;
+  --select: #1d2c4a;
+  --danger: #ef4444;
+  --doc-surface: #f3ead6;
+  --doc-surface-high: #e9dcc0;
+  --doc-text: #2a2418;
+  --sb-t1: #e6ecf5; --sb-t2: #d3dbea; --sb-t2b: #c3cde0; --sb-t3: #9aa8c0; --sb-t3b: #92a0ba;
+  --sb-t4: #8a98b2; --sb-t5: #8290ab; --sb-t6: #7d8ba6; --sb-t7: #6d7b97;
+  --sb-hover: rgba(212, 175, 106, 0.05); --sb-hover2: rgba(212, 175, 106, 0.08); --sb-chip: #1d2c4a;
+  --sb-pop: #15213a; --sb-pop-hover: #1d2c4a;
+  --sb-active: #1d2c4a; --sb-bar: #d4af6a; --sb-glow: inset 0 0 18px rgba(212, 175, 106, 0.22);
+  --sb-line: rgba(184, 145, 79, 0.7); --sb-bd: #2b3b5c; --sb-bd2: #2b3b5c; --sb-bd-hover: #b8914f; --sb-bd-hover2: #b8914f;
 }
 
 body {
@@ -32,37 +72,43 @@ body {
 }
 #sidebar.collapsed { width: 0; min-width: 0; }
 .sidebar-header {
-  padding: 14px 14px 12px; border-bottom: 1px solid #222;
+  padding: 14px 14px 12px; border-bottom: 1px solid var(--sb-line);
   display: flex; flex-direction: column; align-items: stretch; gap: 8px;
 }
 .sidebar-header-row {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
 .sidebar-header-actions { display: flex; gap: 6px; }
-.sidebar-logo { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; color: #fff; white-space: nowrap; }
+.sidebar-theme-btn {
+  margin-left: auto; width: 24px; height: 24px; display: grid; place-items: center; flex: 0 0 24px;
+  border: 1px solid var(--sb-bd); border-radius: 5px; background: transparent;
+  color: var(--sb-t3); cursor: pointer; font: inherit; font-size: 13px; line-height: 1;
+}
+.sidebar-theme-btn:hover { color: var(--sb-t1); border-color: var(--sb-bd-hover); }
+.sidebar-logo { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; color: var(--sb-t1); white-space: nowrap; }
 /* ─── 페이지 드롭다운 ─── */
 .sidebar-logo-wrap {
   position: relative; cursor: pointer; user-select: none;
   display: inline-flex; align-items: center; gap: 5px;
 }
 .sidebar-logo-arrow {
-  font-size: 8px; color: #555; transition: transform 0.15s; margin-top: 1px; margin-right: 1px;
+  font-size: 8px; color: var(--sb-t6); transition: transform 0.15s; margin-top: 1px; margin-right: 1px;
 }
 .sidebar-logo-wrap.open .sidebar-logo-arrow { transform: rotate(180deg); }
 .page-dropdown {
   position: absolute; top: calc(100% + 10px); left: 0; z-index: 400;
-  background: #1c1c1c; border: 1px solid #333; border-radius: 8px;
+  background: var(--sb-pop); border: 1px solid var(--sb-bd); border-radius: 8px;
   box-shadow: 0 6px 20px rgba(0,0,0,0.5);
   display: none; flex-direction: column; overflow: hidden; min-width: 110px;
 }
 .sidebar-logo-wrap.open .page-dropdown { display: flex; }
 .page-dropdown-item {
   padding: 9px 14px; font-size: 11px; font-weight: 800;
-  letter-spacing: 0.1em; color: #555; cursor: pointer;
+  letter-spacing: 0.1em; color: var(--sb-t6); cursor: pointer;
   transition: color 0.1s, background 0.1s;
 }
-.page-dropdown-item:hover { background: #262626; color: #ddd; }
-.page-dropdown-item.active { color: #fff; }
+.page-dropdown-item:hover { background: var(--sb-pop-hover); color: var(--sb-t2); }
+.page-dropdown-item.active { color: var(--sb-t1); }
 /* ─── 앱 페이지 ─── */
 #page-scenario, #page-css-macro, #page-bookmark, #page-rulebook, #page-character, #page-datasheet {
   display: none; flex: 1; flex-direction: column; overflow-y: auto;
@@ -2356,44 +2402,44 @@ tr.ct-row-end .ct-select:focus {
   background: #fff2f2;
 }
 .sidebar-new-btn {
-  background: none; border: 1px solid #333; color: #888;
+  background: none; border: 1px solid var(--sb-bd); color: var(--sb-t4);
   padding: 4px 0; border-radius: 4px; cursor: pointer; font-size: 11px;
   white-space: nowrap; transition: all 0.15s; flex: 1;
 }
-.sidebar-new-btn:hover { border-color: #666; color: #fff; }
+.sidebar-new-btn:hover { border-color: var(--sb-bd-hover); color: var(--sb-t1); }
 .scenario-list { flex: 1; overflow-y: auto; padding: 6px 0 10px; }
 .scenario-list-empty {
   padding: 10px 14px;
   font-size: 12px;
-  color: #666;
+  color: var(--sb-t5);
 }
 .scenario-folder { margin-bottom: 4px; }
 .scenario-folder-head {
   padding: 6px 14px; display: flex; align-items: center; gap: 6px;
   cursor: pointer; transition: background 0.1s;
 }
-.scenario-folder-head:hover { background: #1a1a1a; }
-.scenario-folder-head.active { background: #2a2a2a; border-left: 3px solid #fff; padding-left: 11px; }
+.scenario-folder-head:hover { background: var(--sb-hover); }
+.scenario-folder-head.active { background: var(--sb-active); border-left: 3px solid var(--sb-bar); padding-left: 11px; box-shadow: var(--sb-glow); }
 .scenario-folder-toggle {
-  width: 12px; flex: 0 0 12px; font-size: 10px; color: #666;
+  width: 12px; flex: 0 0 12px; font-size: 10px; color: var(--sb-t5);
   text-align: center; transition: transform 0.15s, color 0.1s;
 }
 .scenario-folder:not(.collapsed) .scenario-folder-toggle {
-  transform: rotate(90deg); color: #aaa;
+  transform: rotate(90deg); color: var(--sb-t3);
 }
 .scenario-folder-name {
   flex: 1; min-width: 0;
-  font-size: 11px; font-weight: 700; color: #ddd;
+  font-size: 11px; font-weight: 700; color: var(--sb-t2);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .scenario-folder-actions { display: flex; align-items: center; gap: 2px; }
 .scenario-folder-btn {
-  background: none; border: none; color: #555; cursor: pointer;
+  background: none; border: none; color: var(--sb-t6); cursor: pointer;
   padding: 2px 4px; font-size: 11px; border-radius: 3px;
   opacity: 0; transition: opacity 0.1s, color 0.1s, background 0.1s;
 }
 .scenario-folder-head:hover .scenario-folder-btn { opacity: 1; }
-.scenario-folder-btn:hover { color: #fff; background: #242424; }
+.scenario-folder-btn:hover { color: var(--sb-t1); background: var(--sb-chip); }
 .scenario-folder-children { display: flex; flex-direction: column; }
 .scenario-folder.collapsed .scenario-folder-children { display: none; }
 .record-sidebar-date-group { display: flex; flex-direction: column; }
@@ -2401,7 +2447,7 @@ tr.ct-row-end .ct-select:focus {
   padding: 8px 14px 4px 31px;
   font-size: 11px;
   font-weight: 700;
-  color: #8f8f8f;
+  color: var(--sb-t3b);
   letter-spacing: 0.04em;
 }
 .record-sidebar-date-children { display: flex; flex-direction: column; }
@@ -2413,17 +2459,17 @@ tr.ct-row-end .ct-select:focus {
   transition: background 0.1s;
 }
 .scenario-folder .scenario-item { padding-left: 31px; }
-.scenario-item:hover { background: #1e1e1e; }
-.scenario-item.active { background: #2a2a2a; border-left-color: #fff; }
+.scenario-item:hover { background: var(--sb-hover2); }
+.scenario-item.active { background: var(--sb-active); border-left-color: var(--sb-bar); box-shadow: var(--sb-glow); }
 .scenario-item-main {
   flex: 1; min-width: 0;
   display: flex; align-items: center; gap: 6px;
 }
 .scenario-item-name {
-  font-size: 12px; color: #aaa;
+  font-size: 12px; color: var(--sb-t3);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
 }
-.scenario-item.active .scenario-item-name { color: #fff; }
+.scenario-item.active .scenario-item-name { color: var(--sb-t1); }
 .scenario-item-actions {
   display: flex; align-items: center; gap: 2px;
   opacity: 0; transition: opacity 0.1s;
@@ -2431,20 +2477,20 @@ tr.ct-row-end .ct-select:focus {
 .scenario-item:hover .scenario-item-actions { opacity: 1; }
 .scenario-item-move,
 .scenario-item-del {
-  background: none; border: none; color: #444; cursor: pointer;
+  background: none; border: none; color: var(--sb-t7); cursor: pointer;
   padding: 2px 5px; font-size: 13px; border-radius: 3px;
   transition: color 0.1s, background 0.1s;
 }
-.scenario-item-move:hover { color: #fff; background: #242424; }
-.scenario-item-del:hover { color: #ef4444; }
+.scenario-item-move:hover { color: var(--sb-t1); background: var(--sb-chip); }
+.scenario-item-del:hover { color: var(--danger); }
 .sidebar-footer {
-  padding: 10px 14px; border-top: 1px solid #222; display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px 14px; border-top: 1px solid var(--sb-line); display: flex; flex-wrap: wrap; gap: 6px;
 }
 .sidebar-footer button {
-  flex: 1 1 calc(33.333% - 4px); background: none; border: 1px solid #2a2a2a; color: #666;
+  flex: 1 1 calc(33.333% - 4px); background: none; border: 1px solid var(--sb-bd2); color: var(--sb-t5);
   padding: 5px 0; border-radius: 4px; cursor: pointer; font-size: 11px; transition: all 0.15s;
 }
-.sidebar-footer button:hover { border-color: #555; color: #ccc; }
+.sidebar-footer button:hover { border-color: var(--sb-bd-hover2); color: var(--sb-t2b); }
 .sidebar-footer button.active { border-color: #16a34a; color: #bbf7d0; background: rgba(22,163,74,0.12); }
 .sidebar-footer #github-sync-btn.active { border-color: #2563eb; color: #bfdbfe; background: rgba(37,99,235,0.14); }
 .sidebar-footer #github-sync-btn.error { border-color: #dc2626; color: #fecaca; background: rgba(220,38,38,0.12); }
@@ -7586,10 +7632,10 @@ select.sh-field-input,
   }
   .sidebar-mobile-close {
     display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px;
-    border: 1px solid #333; border-radius: 5px; background: transparent;
-    color: #aaa; cursor: pointer; font: inherit; font-size: 15px;
+    border: 1px solid var(--sb-bd); border-radius: 5px; background: transparent;
+    color: var(--sb-t3); cursor: pointer; font: inherit; font-size: 15px;
   }
-  .sidebar-mobile-close:hover { color: #fff; border-color: #666; }
+  .sidebar-mobile-close:hover { color: var(--sb-t1); border-color: var(--sb-bd-hover); }
   .sidebar-scrim {
     display: block; position: fixed; inset: 0; z-index: 1090;
     background: rgba(0,0,0,0.28); opacity: 1; transition: opacity 0.2s;
@@ -7748,6 +7794,7 @@ select.sh-field-input,
           <div class="page-dropdown-item" data-page="character">CHARACTER</div>
         </div>
       </div>
+      <button type="button" class="sidebar-theme-btn" id="theme-toggle" onclick="toggleTheme()" aria-pressed="false" aria-label="밤 테마 켜기" title="밤 테마">☾</button>
       <button type="button" class="sidebar-mobile-close" onclick="closeSidebarOnCompactViewport()" aria-label="사이드바 닫기" title="사이드바 닫기">✕</button>
     </div>
     <div class="sidebar-header-actions">
@@ -24907,6 +24954,23 @@ function closeSidebarOnCompactViewport() {
   if (compactSidebarMedia.matches) document.getElementById('sidebar')?.classList.add('collapsed');
 }
 function toggleSidebar() { document.getElementById('sidebar').classList.toggle('collapsed'); }
+function syncThemeButton() {
+  const night = document.documentElement.getAttribute('data-theme') === 'night';
+  const button = document.getElementById('theme-toggle');
+  if (!button) return;
+  button.textContent = night ? '☀' : '☾';
+  button.setAttribute('aria-pressed', String(night));
+  button.setAttribute('aria-label', night ? '밤 테마 끄기' : '밤 테마 켜기');
+  button.title = night ? '밝은 테마로' : '밤 테마';
+}
+function toggleTheme() {
+  const night = document.documentElement.getAttribute('data-theme') !== 'night';
+  if (night) document.documentElement.setAttribute('data-theme', 'night');
+  else document.documentElement.removeAttribute('data-theme');
+  try { localStorage.setItem('trpg-theme', night ? 'night' : 'light'); } catch (e) {}
+  syncThemeButton();
+}
+syncThemeButton();
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ═══════════════════════════════════════════════
