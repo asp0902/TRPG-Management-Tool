@@ -21,7 +21,7 @@ assert.match(html, /function closeFindReplace\(\) \{[\s\S]*?frClearFindHighlight
 assert.doesNotMatch(html, /window\.find\(term/);
 assert.match(html, /e\.shiftKey && !e\.altKey && e\.key\.toLowerCase\(\) === 'f'/);
 assert.match(html, /\.fr-format-wrap > \.fr-row select, \.fr-format-wrap > \.fr-row input\[type="number"\] \{ height: 30\.6667px; box-sizing: border-box; \}/);
-assert.match(html, /#fr-panel #fr-format-font, #fr-panel #fr-format-size \{[\s\S]*?border: 1px solid #e4e4e4; border-radius: 5px;[\s\S]*?text-align: center;/);
+assert.match(html, /#fr-panel #fr-format-font, #fr-panel #fr-format-size \{[\s\S]*?border: 1px solid (?:#e4e4e4|var\(--k-[a-z]+-e4e4e4[a-z-]*\)); border-radius: 5px;[\s\S]*?text-align: center;/);
 assert.match(html, /#fr-panel #fr-format-font \{ padding: 0 26px 0 0; text-align-last: center; text-indent: 13px; \}/);
 assert.match(html, /#fr-panel #fr-format-size \{ width: 68px; padding: 0; \}/);
 assert.match(html, /#fr-panel \.fr-format-color \{ width: 30\.6667px; height: 30\.6667px; aspect-ratio: 1;/);
