@@ -3295,6 +3295,9 @@ body.is-block-range-selecting * {
   text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
 }
 [contenteditable] a:hover { opacity: 0.7; }
+/* 링크 안쪽 글자에 색을 지정하면 밑줄은 <a> 색으로 그려져 글자색과 어긋난다. 색이 들어간 링크는 안쪽 색 요소가 자기 색으로 밑줄을 긋게 한다. */
+[contenteditable] a:has(span[style^="color"], span[style*="; color"], font[color]) { text-decoration: none; }
+[contenteditable] a span[style^="color"], [contenteditable] a span[style*="; color"], [contenteditable] a font[color] { text-decoration: underline; text-underline-offset: 2px; }
 .callout-basic { --callout-link-color: #374151; }
 .callout-info  { --callout-link-color: #16a34a; }
 .callout-warn  { --callout-link-color: #b45309; }
