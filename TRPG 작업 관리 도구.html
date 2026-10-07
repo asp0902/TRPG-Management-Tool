@@ -3288,6 +3288,9 @@ body.is-block-range-selecting * {
 }
 [contenteditable="true"] span[style*="background-color"] {
   padding-inline: 0.15em;
+  /* 인라인 배경은 글꼴 영역 전체를 칠해 위쪽이 넉넉해 보인다. 위쪽 1px만 마스크로 걷어낸다(저장 HTML 불변, clone으로 줄마다 동일). */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 1px, #000 1px);
+  mask-image: linear-gradient(to bottom, transparent 1px, #000 1px);
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
