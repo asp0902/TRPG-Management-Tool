@@ -15,7 +15,7 @@ assert.match(html, /state\.customBulletSymbols\.push\(symbol\)[\s\S]*?persist\(\
 assert.match(html, /\[\.\.\.TB_PRESET_BULLETS, \.\.\.tbGetCustomBulletSymbols\(\)\.filter\(/);
 assert.match(html, /\.tb-bullet-preset \{[^}]*padding: 0 6px;/);
 assert.doesNotMatch(html, /tb-bullet-default-label/);
-assert.match(html, /preset\.append\(symbolEl, linesEl\)/);
+assert.match(html, /preset\.append\(symbolEl\)/);
 assert.ok((html.match(/customBulletSymbols:/g) || []).length >= 6, '사용자 글머리 기호는 state, 저장, 백업, 가져오기에 포함되어야 합니다.');
 assert.match(html, /#cp-native \{[\s\S]*?width: 28px; height: 28px;[\s\S]*?box-sizing: border-box/);
 assert.match(html, /\.cp-icon-btn \{[\s\S]*?width: 28px; height: 28px; box-sizing: border-box/);
