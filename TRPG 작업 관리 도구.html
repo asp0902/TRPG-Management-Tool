@@ -2769,7 +2769,9 @@ tr.ct-row-end .ct-select:focus {
 .cp-divider { border-top: 1px solid #f0f0f0; margin: 8px 0; }
 .cp-input-row { display: flex; gap: 5px; align-items: center; }
 /* 미리보기는 색 칸과 같은 모양: 네이티브 색 입력의 안쪽 틀·여백을 없앤다 */
-#cp-native { padding: 0; background: none; overflow: hidden; }
+/* 색 칸은 테두리 아래까지 색이 차지만, color input의 안쪽 색은 테두리 안에만 그려져 2~3px 작아 보인다. 테두리를 outline으로 안쪽에 겹쳐 그려 같은 크기로 보이게 한다. */
+#cp-native { padding: 0; background: none; overflow: hidden; border: 0; outline: 1.5px solid rgba(0,0,0,0.1); outline-offset: -1.5px; }
+#cp-native:focus-visible { outline: 2px solid #4a9eff; outline-offset: 1px; }
 #cp-native::-webkit-color-swatch-wrapper { padding: 0; }
 #cp-native::-webkit-color-swatch { border: none; border-radius: 0; }
 #cp-native::-moz-color-swatch { border: none; border-radius: 0; }
