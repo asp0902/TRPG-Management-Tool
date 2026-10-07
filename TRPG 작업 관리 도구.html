@@ -8945,7 +8945,7 @@ select.sh-field-input,
     onkeydown="if(event.key==='Escape')closeGitHubSyncModal()">
     <div class="rb-modal github-sync-modal" onclick="event.stopPropagation()">
       <div class="rb-modal-heading" id="github-sync-heading">GitHub 동기화</div>
-      <div class="github-sync-repo">asp0902/TRPG-Management-Tool · sync</div>
+      <div class="github-sync-repo">asp0902/TRPG-Management-Tool-data · sync</div>
       <div class="rb-modal-field">
         <label class="rb-modal-label req" for="github-sync-token">저장소 전용 토큰</label>
         <input type="password" id="github-sync-token" class="rb-modal-input"
@@ -8956,7 +8956,7 @@ select.sh-field-input,
         자동 동기화 사용
       </label>
       <p class="github-sync-help">
-        변경 데이터는 최대 10분 간격으로 업로드됩니다. 토큰에는 이 저장소의
+        변경 데이터는 최대 10분 간격으로 업로드됩니다. 토큰에는 asp0902/TRPG-Management-Tool-data 저장소의
         <strong>Contents 읽기/쓰기</strong> 권한만 부여하세요.
         <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">토큰 만들기</a>
       </p>
@@ -23315,7 +23315,7 @@ async function initAutoBackup() {
 }
 
 // GitHub Pages는 앱만 배포한다. 데이터는 비공개 sync 브랜치의 단일 최신본으로 동기화한다.
-const GITHUB_SYNC_REPO = 'asp0902/TRPG-Management-Tool';
+const GITHUB_SYNC_REPO = 'asp0902/TRPG-Management-Tool-data';
 const GITHUB_SYNC_BRANCH = 'sync';
 const GITHUB_SYNC_PATH = 'trpg-tool.latest.json';
 const GITHUB_SYNC_TOKEN_KEY = 'trpg-github-sync-token';
