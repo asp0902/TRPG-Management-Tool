@@ -3443,24 +3443,22 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
   overflow-wrap: anywhere; word-break: break-word;
 }
 .tb-variation {
-  display: inline-flex; flex-direction: column;
-  align-items: flex-start;
+  display: inline;
   margin: 2px 2px; padding: 1px 7px 1px 10px;
   border-left: 2px solid #ccc; border-radius: 2px;
-  vertical-align: middle; white-space: normal;
-  max-width: 100%;
+  white-space: normal;
 }
 .tb-variation-before-text {
   color: #b8b8b8; text-decoration: line-through;
   font-size: inherit; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
 }
-.tb-variation-after-row { display: flex; align-items: center; gap: 4px; }
+.tb-variation-after-row { display: inline; }
 .tb-variation-after-text {
   font-size: inherit; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
 }
 .tb-variation-copy-btn {
   flex-shrink: 0; border: none; background: none; cursor: pointer;
-  color: #ccc; font-size: 11px; padding: 0 2px; line-height: 1;
+  color: #ccc; font-size: 11px; padding: 0 2px; margin-left: 4px; line-height: 1;
   opacity: 0; transition: opacity 0.1s, color 0.1s;
 }
 .tb-variation:hover .tb-variation-copy-btn { opacity: 1; }
