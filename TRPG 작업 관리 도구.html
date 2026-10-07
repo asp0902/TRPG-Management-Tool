@@ -3413,10 +3413,13 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
   cursor: default;
 }
 .tb-ctx-sep { border-top: 1px solid #f0f0f0; margin: 3px 0; }
-.tb-bullet-menu { width: 190px; padding: 8px; }
-.tb-bullet-preset { width: 100%; height: 30px; border: 0; border-radius: 5px; background: transparent; text-align: left; cursor: pointer; padding: 0 10px; }
-.tb-bullet-preset:hover { background: #f3f4f6; }
-.tb-bullet-default-label { margin-left: 2px; }
+.tb-bullet-menu { width: 204px; padding: 8px; }
+.tb-bullet-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; max-height: 188px; overflow-y: auto; padding: 1px; }
+.tb-bullet-preset { height: 44px; min-width: 0; border: 1px solid #e0e0e0; border-radius: 5px; background: #fff; cursor: pointer; padding: 0 6px; display: flex; align-items: center; gap: 5px; overflow: hidden; }
+.tb-bullet-preset:hover { background: #f3f4f6; border-color: #bbb; }
+.tb-bullet-preset:focus-visible { outline: 2px solid #4a9eff; outline-offset: 1px; }
+.tb-bullet-symbol { flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; line-height: 1; color: #222; }
+.tb-bullet-lines { flex: 1 1 0; min-width: 0; height: 12px; background: linear-gradient(#cfd3d9, #cfd3d9) 0 0 / 100% 2px no-repeat, linear-gradient(#cfd3d9, #cfd3d9) 0 100% / 100% 2px no-repeat; }
 .tb-bullet-custom { display: flex; gap: 5px; margin-top: 6px; }
 .tb-bullet-custom input { min-width: 0; flex: 1; height: 28px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; padding: 0 7px; }
 .tb-bullet-custom button { height: 28px; border: 0; border-radius: 5px; padding: 0 10px; background: #111; color: #fff; cursor: pointer; }
@@ -27144,20 +27147,20 @@ function tbOpenBulletMenu(button) {
   const renderPresets = () => {
     const presets = menu.querySelector('.tb-bullet-presets');
     presets.replaceChildren();
-    [...TB_PRESET_BULLETS, ...tbGetCustomBulletSymbols().filter(symbol => !TB_PRESET_BULLETS.includes(symbol))].forEach((symbol, index) => {
+    [...TB_PRESET_BULLETS, ...tbGetCustomBulletSymbols().filter(symbol => !TB_PRESET_BULLETS.includes(symbol))].forEach(symbol => {
       const preset = document.createElement('button');
       preset.type = 'button';
       preset.className = 'tb-bullet-preset';
-      if (index) {
-        preset.textContent = symbol;
-      } else {
-        const symbolEl = document.createElement('span');
-        const labelEl = document.createElement('span');
-        symbolEl.textContent = TB_DEFAULT_BULLET;
-        labelEl.className = 'tb-bullet-default-label';
-        labelEl.textContent = '기본 글머리';
-        preset.append(symbolEl, document.createTextNode(' '), labelEl);
-      }
+      const label = (symbol === TB_DEFAULT_BULLET ? '기본 글머리 ' : '글머리 ') + symbol;
+      preset.title = label;
+      preset.setAttribute('aria-label', label);
+      const symbolEl = document.createElement('span');
+      symbolEl.className = 'tb-bullet-symbol';
+      symbolEl.textContent = symbol;
+      const linesEl = document.createElement('span');
+      linesEl.className = 'tb-bullet-lines';
+      linesEl.setAttribute('aria-hidden', 'true');
+      preset.append(symbolEl, linesEl);
       preset.onclick = () => { if (tbInsertBullet(symbol)) tbCloseCtxMenu(); };
       presets.appendChild(preset);
     });
