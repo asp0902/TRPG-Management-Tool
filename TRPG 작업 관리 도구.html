@@ -14187,7 +14187,8 @@ function tbFitBranchGrid(grid) {
     branchFitCtx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
     input.value.split('\n').forEach(line => { longest = Math.max(longest, branchFitCtx.measureText(line).width); });
   });
-  grid.classList.toggle('cols-3', branchChoiceColumns(width, Math.ceil(longest) + 1, inputs.length) === 3);
+  // 이미 3열이면 6px 여유를 줘서 스크롤바가 생기고 사라지는 경계에서 열 수가 왔다갔다하지 않게 한다.
+  grid.classList.toggle('cols-3', branchChoiceColumns(width + (grid.classList.contains('cols-3') ? 6 : 0), Math.ceil(longest) + 1, inputs.length) === 3);
 }
 function tbFitBranchGrids() {
   document.querySelectorAll('.branch-choice-grid').forEach(grid => {
@@ -14199,6 +14200,14 @@ document.addEventListener('input', e => {
   const grid = e.target.closest?.('.branch-choice-grid');
   if (grid) tbFitBranchGrid(grid);
 });
+// 블록 하나만 다시 그리는 경로(내용 블록 접기/펼치기 등)는 renderBlocks 를 거치지 않으므로, 새 선택지 grid 가 DOM 에 들어오면 공통으로 열 수를 다시 판단한다.
+if (typeof MutationObserver === 'function' && typeof document !== 'undefined' && document.body) {
+  new MutationObserver(records => {
+    const added = records.some(record => Array.from(record.addedNodes).some(node =>
+      node.nodeType === 1 && (node.matches?.('.branch-choice-grid') || node.querySelector?.('.branch-choice-grid'))));
+    if (added) tbFitBranchGrids();
+  }).observe(document.body, { childList: true, subtree: true });
+}
 function renderBlocks(blocks, cid) {
   const c = document.getElementById(cid);
   if (!c) return;
