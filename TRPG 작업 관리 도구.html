@@ -12670,6 +12670,7 @@ function loadInfo(s) {
         repairedAny = true;
       }
       el.innerHTML = normalizeInfoEditableValue(repaired);
+      tbNormalizeVariationLayout(el);
     }
     else {
       el.value = val || '';
