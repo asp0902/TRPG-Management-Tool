@@ -7079,8 +7079,9 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 /* 광기 줄: 첫 줄 현재 정신 상태(가로 전체), 둘째 줄 일시적/장기적 · 남은 시간 · 광기의 발작 · 실시간/요약 */
 .sh-coc-madness-body { display: flex; flex-direction: column; gap: 8px; flex: 1 1 0; min-width: 0; }
 .sh-coc-sanity-side .sh-coc-misc-input:not(.sh-coc-misc-select) { width: 70px; } /* 남은 시간 */
-.sh-coc-mental-field { width: 100%; }
-.sh-coc-mental-input { width: 100%; min-width: 0; }
+.sh-coc-mental-field { width: 100%; flex-direction: row; align-items: center; gap: 8px; }
+.sh-coc-mental-field .sh-coc-misc-label { flex: none; white-space: nowrap; }
+.sh-coc-mental-input { flex: 1 1 0; width: auto; min-width: 0; }
 .sh-coc-wealth-panel,
 .sh-coc-balance-panel { border: 1px solid #ddd; border-radius: 10px; background: #f8f8f8; overflow: hidden; min-width: 0; }
 .sh-coc-wealth-panel { width: 100%; max-width: 400px; }
@@ -40495,10 +40496,10 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
     return '<div class="sh-coc-misc-field"><span class="sh-coc-misc-label">' + esc(label) + '</span>'
       + '<select class="sh-coc-misc-input sh-coc-misc-select" onchange="' + esc(sf(fid, false)) + '">' + opts + '</select></div>';
   }
-  function noteInp(fid, placeholder) {
+  function noteInp(fid) {
     var v = sectionData[fid] !== undefined ? sectionData[fid] : '';
     return '<div class="sh-coc-misc-field sh-coc-mental-field"><span class="sh-coc-misc-label">현재 정신 상태</span>'
-      + '<input class="sh-coc-misc-input sh-coc-mental-input" type="text" value="' + esc(String(v)) + '" placeholder="' + esc(placeholder) + '" oninput="' + esc(sf(fid, false)) + '"></div>';
+      + '<input class="sh-coc-misc-input sh-coc-mental-input" type="text" value="' + esc(String(v)) + '" oninput="' + esc(sf(fid, false)) + '"></div>';
   }
   var sep = '<span class="sh-coc-derived-sep">/</span>';
   var hpRow = '<div class="sh-coc-derived-row"><span class="sh-coc-derived-label">체력</span>'
@@ -40517,7 +40518,7 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
     + '</div>';
   // 광기: 첫 줄 현재 정신 상태, 둘째 줄 일시적/장기적 · 남은 시간 · 광기의 발작 · 실시간/요약
   var madnessRow = '<div class="sh-coc-derived-row"><span class="sh-coc-derived-label">광기</span>'
-    + '<div class="sh-coc-madness-body">' + noteInp('mentalStatusNote','현재 정신 상태') + sanSide + '</div></div>';
+    + '<div class="sh-coc-madness-body">' + noteInp('mentalStatusNote') + sanSide + '</div></div>';
   var wealthInfo = derived.wealth || calcCoc7eWealthInfo(0, '', sectionData);
   var wealthLedgerRows = normalizeCocWealthLedgerRows(sectionData.wealthLedger);
   var wealthLedgerTotals = getCocWealthLedgerTotals(wealthLedgerRows);
