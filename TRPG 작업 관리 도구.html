@@ -25454,6 +25454,7 @@ function renderFontPickerList() {
   }).join('');
 }
 
+// 항목 클릭은 폰트 적용 + 내 글꼴 추가만 한다(해제 없음). 제거는 휴지통 버튼(removeCustomFont)으로 한다.
 async function toggleFontInPicker(name) {
   if (!name || typeof name !== 'string') return;
 
