@@ -5398,6 +5398,12 @@ body.block-pointer-dragging {
   grid-auto-rows: 1fr;
   gap: 6px;
 }
+/* 분기점 안 한 줄 기준 높이: 선택지 칸과 내용 블록(내용·콜아웃) 제목 줄이 같은 값을 쓴다. */
+.branch-block { --branch-row-h: 39px; }
+.branch-block .branch-choice,
+.branch-block .branch-inner-content-block > .branch-inner-block-header,
+.branch-block .branch-inner-callout > .nested-callout > .nested-callout-header { box-sizing: border-box; min-height: var(--branch-row-h); }
+.branch-block .branch-inner-content-block > .branch-inner-block-header { padding-block: 6px; }
 .branch-choice-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .branch-choice {
   position: relative;
