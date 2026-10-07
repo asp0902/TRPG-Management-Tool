@@ -3283,6 +3283,8 @@ body.is-block-range-selecting * {
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+/* 글꼴·색 span 이 블록형 미리보기를 감싸면 그 span 이 블록 앞뒤로 쪼개지며 빈 줄(약 20px)이 위아래에 생겨 칸이 내용보다 크게 보였다. 감싸는 span 의 상자를 없애 쪼개짐을 막는다(상속은 그대로). */
+.block-text-ce span:has(> [data-text-css-preview-block="1"]) { display: contents; }
 .block-text-ce [data-text-css-preview-block="1"] {
   display: block !important;
   width: auto !important;
