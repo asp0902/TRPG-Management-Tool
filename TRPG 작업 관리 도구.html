@@ -3468,6 +3468,10 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 .tb-variation-after-row { display: inline; }
 .tb-variation-after-text {
   font-size: inherit; line-height: inherit; white-space: pre-wrap; word-break: break-word;
+  /* 원래 문장과 바뀐 문장 사이 회색 세로 바: 의사 요소 없이 배경으로 그려 글자(1em) 높이·세로 중앙에 맞추고,
+     after 첫 글자와 떨어지지 않게 한다. 왼쪽 간격은 앞 공백(0.28em), 오른쪽은 padding 으로 같게 둔다. */
+  padding-left: calc(2px + 0.28em);
+  background: linear-gradient(#ccc, #ccc) no-repeat left center / 2px 1em;
 }
 .tb-variation-copy-btn {
   position: absolute; right: 0; bottom: 100%; z-index: 2;
