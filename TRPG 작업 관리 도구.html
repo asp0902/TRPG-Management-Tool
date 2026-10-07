@@ -3287,6 +3287,8 @@ body.is-block-range-selecting * {
   width: auto !important;
   margin: 4px 0 !important;
   clear: both;
+  /* 글꼴 span([style*="font-family"])이 line-height:0 을 주고 이 미리보기를 품으면 0 을 상속해 얇은 선으로 접힌다. 편집 칸 기본 줄 높이로 되돌린다. */
+  line-height: 1.4;
 }
 [contenteditable="true"] span[style*="font-family"]:not(:has(:is(br, div, p, li, ul, ol, blockquote, h1, h2, h3, h4))) { line-height: 0; }
 [contenteditable="true"][style*="Nanum Myeongjo"],
