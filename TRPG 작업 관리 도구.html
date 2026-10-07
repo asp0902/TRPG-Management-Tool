@@ -2836,10 +2836,10 @@ tr.ct-row-end .ct-select:focus {
   color: #000;
 }
 .tb-select-wide { width: 82px; } /* 블록 유형 */
-.tb-block-type-wrap { position: relative; width: 82px; height: 24px; flex: 0 0 82px; }
+.tb-block-type-wrap { --tb-block-type-w: 76px; position: relative; width: var(--tb-block-type-w); height: 24px; flex: 0 0 var(--tb-block-type-w); }
 .tb-block-type-trigger {
   position: relative; display: flex; align-items: center; justify-content: center;
-  width: 82px; height: 24px; padding: 0; font: inherit; font-size: 11px;
+  width: var(--tb-block-type-w); height: 24px; padding: 0; font: inherit; font-size: 11px;
   border: 1px solid #e2e2e2; border-radius: 4px; color: #444; background: transparent;
   cursor: pointer;
 }
@@ -2847,7 +2847,7 @@ tr.ct-row-end .ct-select:focus {
 .tb-block-type-trigger .tb-control-chevron { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
 .tb-block-type-trigger:focus { border-color: #000; outline: none; }
 .tb-block-type-menu {
-  position: fixed; z-index: 10062; width: 82px; padding: 2px 0; margin: 0;
+  position: fixed; z-index: 10062; width: var(--tb-block-type-w); padding: 2px 0; margin: 0;
   border: 1px solid #bbb; border-radius: 4px; background: #fff;
   box-shadow: 0 5px 16px rgba(0,0,0,0.16); list-style: none;
 }
