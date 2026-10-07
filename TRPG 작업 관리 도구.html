@@ -26931,6 +26931,7 @@ function tbValidBulletSymbol(value) {
   return symbol && !/[\r\n<>]/.test(symbol) && Array.from(symbol).length <= 8 ? symbol : '';
 }
 const TB_DEFAULT_BULLET = '•';
+const TB_PRESET_BULLETS = [TB_DEFAULT_BULLET, '-'];
 function tbBulletMarker(symbol) {
   return JSON.stringify(symbol + ' ');
 }
@@ -26939,7 +26940,7 @@ function tbGetCustomBulletSymbols() {
   return state.customBulletSymbols;
 }
 function tbRememberBulletSymbol(symbol) {
-  if (!symbol || symbol === TB_DEFAULT_BULLET || tbGetCustomBulletSymbols().includes(symbol)) return;
+  if (!symbol || TB_PRESET_BULLETS.includes(symbol) || tbGetCustomBulletSymbols().includes(symbol)) return;
   state.customBulletSymbols.push(symbol);
   persist();
 }
@@ -27137,7 +27138,7 @@ function tbOpenBulletMenu(button) {
   const renderPresets = () => {
     const presets = menu.querySelector('.tb-bullet-presets');
     presets.replaceChildren();
-    [TB_DEFAULT_BULLET, ...tbGetCustomBulletSymbols()].forEach((symbol, index) => {
+    [...TB_PRESET_BULLETS, ...tbGetCustomBulletSymbols().filter(symbol => !TB_PRESET_BULLETS.includes(symbol))].forEach((symbol, index) => {
       const preset = document.createElement('button');
       preset.type = 'button';
       preset.className = 'tb-bullet-preset';
