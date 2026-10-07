@@ -7163,10 +7163,13 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sk-name-cell { text-align: left !important; white-space: nowrap; font-size: 11px; color: #333; padding: 0 !important; }
 .sk-base-cell { color: #666; font-size: 11px; }
 .sk-num-input { width: 100%; max-width: 100%; box-sizing: border-box; border: 1px solid #e4e4e4; border-radius: 3px; padding: 2px; font-size: 11px; text-align: center; font-family: inherit; background: #fff; outline: none; -moz-appearance: textfield; }
-.ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-block { width: fit-content; max-width: 100%; margin-inline: auto; }
+/* 기능 섹션만 좌우 padding 을 상하(12px)와 같게 하고, 넓은 시트에서는 점수 묶음·3단 표·추가 기능이 그 안쪽 폭을 균등하게 쓴다. */
+.sh-section-body:has(> .sh-coc-skills-block) { padding-inline: 12px; }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-block { width: auto; max-width: 100%; }
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-section-hdr { width: 0; min-width: 100%; box-sizing: border-box; }
-.ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-wrap { justify-content: center; flex-wrap: nowrap; overflow-x: visible; --coc-skill-name-width: 130px; }
-.ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-table { table-layout: fixed; }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-wrap { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow-x: visible; --coc-skill-name-width: 130px; }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-wrap > div { min-width: 0; }
+.ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-table { table-layout: fixed; width: 100%; }
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-table th:nth-child(2),
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-table td:nth-child(2) { width: var(--coc-skill-name-width); min-width: var(--coc-skill-name-width); max-width: none; box-sizing: border-box; white-space: nowrap; overflow: visible; text-overflow: clip; }
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-skills-table .sk-name-cell { width: var(--coc-skill-name-width); min-width: var(--coc-skill-name-width); max-width: none; text-align: center !important; padding: 0 !important; white-space: nowrap; overflow: visible; text-overflow: clip; }
