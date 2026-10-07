@@ -3451,6 +3451,7 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
   overflow-wrap: anywhere; word-break: break-word;
 }
 /* 앞뒤 문장과 이어 읽히도록 여백·테두리 없이 줄 흐름 안에 둔다. 복사 버튼은 글자 사이를 벌리지 않게 위쪽에 띄운다. */
+.tb-divider-selected { outline: 2px solid #2563eb; outline-offset: 4px; }
 .tb-variation {
   display: inline; position: relative;
   margin: 0; padding: 0; border: 0; border-radius: 0;
@@ -16372,6 +16373,11 @@ function tbGetVariationCtxItems(e) {
     ];
   }
 
+  const divider = e.target.closest?.('[role="separator"][data-divider-style]');
+  if (divider && editable.contains(divider)) {
+    return [{ icon: '✕', label: '구분선 삭제', action: () => tbRemoveEditorDivider(divider) }];
+  }
+
   const variation = e.target.closest('.tb-variation');
   if (variation && editable.contains(variation)) {
     return [
@@ -17013,10 +17019,12 @@ function tbOpenDividerMenu(button, apply) {
     },
   })), { className: 'tb-divider-menu' });
 }
-// ─── 정보 칸 구분선 드래그 이동 ───
-// 정보 탭 .info-ce 안의 구분선만 대상이다. draggable 속성은 mousedown 때만 붙이고 끝나면 지워 저장 HTML에 남기지 않는다.
+// ─── 편집 칸 구분선 드래그 이동·선택·삭제 ───
+// 서식 툴바로 넣은 구분선(contenteditable 안의 role=separator)이 대상이고, 같은 편집 칸 안에서만 옮긴다. 구분선 "블록"은 편집 칸 밖이라 해당 없다.
+// draggable 속성·선택 클래스는 쓰는 동안만 붙이고 끝나면 지워 저장 HTML에 남기지 않는다.
 let infoDividerDrag = null;
-const INFO_DIVIDER_SELECTOR = '#panel-info .info-ce [role="separator"][data-divider-style]';
+const INFO_DIVIDER_SELECTOR = '[contenteditable="true"] [role="separator"][data-divider-style]';
+const DIVIDER_ROOT_SELECTOR = '[contenteditable="true"]';
 function tbIsInfoLineBoundary(node) {
   return !!node && node.nodeType === Node.ELEMENT_NODE
     && (node.tagName === 'BR' || /^(block|flex|grid|list-item|table)$/.test(getComputedStyle(node).display));
@@ -17077,24 +17085,27 @@ document.addEventListener('mouseup', () => {
 document.addEventListener('dragstart', event => {
   const sep = event.target.closest?.(INFO_DIVIDER_SELECTOR);
   if (!sep) return;
-  infoDividerDrag = { el: sep, root: sep.closest('.info-ce'), ref: undefined };
+  event.stopPropagation(); // 블록 드래그(beginBlockDrag)가 이어받아 취소하지 않게
+  infoDividerDrag = { el: sep, root: sep.closest(DIVIDER_ROOT_SELECTOR), ref: undefined };
   event.dataTransfer.effectAllowed = 'move';
   event.dataTransfer.setData('text/plain', '');
-});
+}, true);
 document.addEventListener('dragover', event => {
   if (!infoDividerDrag) return;
-  const root = event.target.closest?.('.info-ce');
+  const root = event.target.closest?.(DIVIDER_ROOT_SELECTOR);
   if (root !== infoDividerDrag.root) { infoDividerDrag.ref = undefined; tbInfoDividerIndicator(false); return; }
   event.preventDefault();
+  event.stopPropagation();
   const best = tbFindInfoDividerDropRef(root, infoDividerDrag.el, event.clientY);
   infoDividerDrag.ref = best.ref;
   tbInfoDividerIndicator(true, root.getBoundingClientRect(), best.y);
-});
+}, true);
 document.addEventListener('drop', event => {
   if (!infoDividerDrag) return;
   const { el, root, ref } = infoDividerDrag;
-  if (event.target.closest?.('.info-ce') !== root || ref === undefined) return;
+  if (event.target.closest?.(DIVIDER_ROOT_SELECTOR) !== root || ref === undefined) return;
   event.preventDefault();
+  event.stopPropagation();
   const oldParent = el.parentNode;
   if (ref !== el && ref !== el.nextSibling) {
     // 블록이던 구분선이 빠지면 앞뒤 글자가 한 줄로 붙으므로, 양쪽이 모두 글자 흐름이면 그 자리에 줄바꿈을 둔다.
@@ -17105,8 +17116,54 @@ document.addEventListener('drop', event => {
     el.removeAttribute('draggable');
     root.dispatchEvent(new Event('input', { bubbles: true }));
   }
-});
+}, true);
 document.addEventListener('dragend', tbEndInfoDividerDrag);
+function tbClearDividerSelection() {
+  document.querySelectorAll('.tb-divider-selected').forEach(el => {
+    el.classList.remove('tb-divider-selected');
+    if (!el.getAttribute('class')) el.removeAttribute('class');
+  });
+}
+function tbRemoveEditorDivider(sep) {
+  const root = sep.closest(DIVIDER_ROOT_SELECTOR);
+  const parent = sep.parentNode;
+  tbClearDividerSelection();
+  // 블록이던 구분선이 빠지면 앞뒤 글자가 한 줄로 붙으므로, 양쪽이 모두 글자 흐름이면 그 자리에 줄바꿈을 둔다.
+  const prev = sep.previousSibling, next = sep.nextSibling;
+  if (prev && next && !tbIsInfoLineBoundary(prev) && !tbIsInfoLineBoundary(next)) parent.insertBefore(document.createElement('br'), sep);
+  // 가능하면 execCommand 로 지워 실행 취소 기록에 남기고, 안 되면 직접 제거한다.
+  const range = document.createRange();
+  range.selectNode(sep);
+  const sel = window.getSelection();
+  root.focus();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  document.execCommand('delete');
+  if (sep.isConnected) sep.remove();
+  if (parent !== root && parent.isConnected && !parent.textContent.trim() && !parent.querySelector('[role="separator"],img,table')) parent.remove();
+  root.dispatchEvent(new Event('input', { bubbles: true }));
+}
+document.addEventListener('mousedown', event => {
+  const sep = event.target.closest?.(INFO_DIVIDER_SELECTOR);
+  if (sep?.classList.contains('tb-divider-selected')) return;
+  tbClearDividerSelection();
+  if (sep) sep.classList.add('tb-divider-selected');
+}, true);
+document.addEventListener('keydown', event => {
+  const sep = document.querySelector('.tb-divider-selected');
+  if (!sep) return;
+  if (event.key === 'Delete' || event.key === 'Backspace') {
+    event.preventDefault();
+    event.stopPropagation();
+    tbRemoveEditorDivider(sep);
+  } else if (!['Shift', 'Control', 'Alt', 'Meta'].includes(event.key)) tbClearDividerSelection();
+}, true);
+// 저장 로직이 innerHTML 을 읽기 전에 선택 표시를 지운다.
+document.addEventListener('input', tbClearDividerSelection, true);
+document.addEventListener('focusout', event => {
+  const sel = document.querySelector('.tb-divider-selected');
+  if (sel && event.target.contains?.(sel)) tbClearDividerSelection();
+}, true);
 function tbInsertTable(rows, columns, target = tbResolveFormatTarget()) {
   const root = target?.ta;
   if (target?.type !== 'ce' || !root?.isConnected || !root.closest('#blocks-container,#rb-blocks-container')) return false;
