@@ -3478,7 +3478,9 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 /* 정보 칸 host(.field)는 세로 flex라 flex-basis 100%가 높이가 되어 칸이 찌그러진다. 내용 높이만 차지하게 한다. */
 .field > .tb-variation-panel { flex: none; }
 /* .field label 규칙이 패널의 label.tbvp-field(→ textarea)까지 번지는 것을 막는다. */
-.field .tb-variation-panel .tbvp-field { font-weight: 400; text-transform: none; letter-spacing: normal; }
+.field .tb-variation-panel .tbvp-field { font-size: inherit; font-weight: 400; text-transform: none; letter-spacing: normal; }
+/* .field textarea 규칙(padding 10px 14px 등)이 패널 textarea까지 번지지 않게 BEFORE 칸과 같은 값으로 되돌린다. */
+.field .tb-variation-panel .tbvp-textarea { padding: 6px 8px; font-size: inherit; color: #222; }
 .tbvp-head {
   display: flex; align-items: center; gap: 0;
 }
@@ -16792,7 +16794,10 @@ function btcpAutoResize(ta) {
   if (!ta) return;
   const minHeight = parseFloat(getComputedStyle(ta).minHeight) || 0;
   ta.style.height = '0px';
-  ta.style.height = Math.max(Math.ceil(ta.scrollHeight), Math.ceil(minHeight)) + 'px';
+  const cs = getComputedStyle(ta);
+  // border-box에서는 height에 상하 border가 포함되므로 scrollHeight(border 제외)에 더해야 첫 줄이 잘리지 않는다.
+  const border = cs.boxSizing === 'border-box' ? (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0) : 0;
+  ta.style.height = Math.max(Math.ceil(ta.scrollHeight + border), Math.ceil(minHeight)) + 'px';
 }
 function refreshCssMacroTextareaHeights(root = document) {
   const run = () => root.querySelectorAll?.('.css-macro-textarea')?.forEach?.(btcpAutoResize);
