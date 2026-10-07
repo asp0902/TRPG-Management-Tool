@@ -14931,7 +14931,7 @@ function getBibItemHtml(blockId, ibId, item, idx, total, cid) {
             <div class="speech-edit-row">
               <span class="speech-edit-label">색상</span>
               <div class="speech-color-swatch" id="ibscs-${item.id}" style="background:${esc(speakerColor)}"
-                onclick="document.getElementById('ibsnc-${item.id}').click()" title="색상 선택"></div>
+                onclick="openSpeechColorPicker('ibsnc-${item.id}','ibscs-${item.id}')" title="색상 선택"></div>
             </div>
             
             <div class="speech-token-wrap">
@@ -17812,7 +17812,7 @@ function getRollResultBlockHtml(blockId, resultId, child, cid, childIdx, totalCo
             <div class="speech-edit-row">
               <span class="speech-edit-label">색상</span>
               <div class="speech-color-swatch" id="rrscs-${child.id}" style="background:${esc(speakerColor)}"
-                onclick="document.getElementById('rrsnc-${child.id}').click()" title="색상 선택"></div>
+                onclick="openSpeechColorPicker('rrsnc-${child.id}','rrscs-${child.id}')" title="색상 선택"></div>
             </div>
             <div class="speech-token-wrap">
               <div class="speech-token-label">화자 토큰</div>
@@ -18169,6 +18169,16 @@ function openNativeColorPicker(initialColor, handlers = {}) {
     cleanup();
   }, { once: true });
   input.click();
+}
+
+// 대사 블록 화자 색: 브라우저 색 선택창 대신 앱 색상 패널을 연다(본문·판정 결과·분기점 내용 블록 공통).
+// 패널 적용 시 숨김 color input 과 스와치에 반영하고, 화자 팝업의 「적용」이 기존 저장 함수로 저장한다.
+function openSpeechColorPicker(nativeId, swatchId) {
+  const native = document.getElementById(nativeId);
+  const swatch = document.getElementById(swatchId);
+  if (!native || !swatch) return;
+  cpTarget = { type: 'speech', native, swatch, originalColor: native.value };
+  cpOpenPanel('speech', native.value, { centered: true });
 }
 
 function openDividerColorPicker(blockId, key, cid, preview) {
@@ -18547,7 +18557,7 @@ function mkBlockEl(b, cid, ctx = {}) {
             <div class="speech-edit-row">
               <span class="speech-edit-label">색상</span>
               <div class="speech-color-swatch" id="scs-${b.id}" style="background:${esc(spColor)}"
-                onclick="document.getElementById('snc-${b.id}').click()" title="색상 선택"></div>
+                onclick="openSpeechColorPicker('snc-${b.id}','scs-${b.id}')" title="색상 선택"></div>
             </div>
             <div class="speech-token-wrap">
               <div class="speech-token-label">화자 토큰</div>
@@ -19583,7 +19593,7 @@ function speechTogglePopup(blockId) {
     // 바깥 클릭 닫기
     setTimeout(() => {
       const close = e => {
-        if (!popup.contains(e.target) && !anchor?.contains(e.target)) {
+        if (!popup.contains(e.target) && !anchor?.contains(e.target) && !e.target.closest?.('#cp-panel, #cp-backdrop')) {
           closeSpeechPopup(popup);
           document.removeEventListener('mousedown', close);
         }
@@ -19637,7 +19647,7 @@ function rrSpeechTogglePopup(blockId, resultId, childId, cid) {
 
     setTimeout(() => {
       const close = e => {
-        if (!popup.contains(e.target) && !anchor?.contains(e.target)) {
+        if (!popup.contains(e.target) && !anchor?.contains(e.target) && !e.target.closest?.('#cp-panel, #cp-backdrop')) {
           closeSpeechPopup(popup);
           document.removeEventListener('mousedown', close);
         }
@@ -21867,7 +21877,7 @@ function ibSpeechTogglePopup(blockId, ibId, itemId) {
     }
     setTimeout(() => {
       const close = evt => {
-        if (!popup.contains(evt.target) && !anchor?.contains(evt.target)) {
+        if (!popup.contains(evt.target) && !anchor?.contains(evt.target) && !evt.target.closest?.('#cp-panel, #cp-backdrop')) {
           closeSpeechPopup(popup);
           document.removeEventListener('mousedown', close);
         }
@@ -25984,6 +25994,7 @@ function cpPreviewCurrentColor() {
   if (cpTarget.type === 'chapter') {
     applyChapterColorToDOM(cpTarget.blockId, cpTarget.key, cpGetCurrentColor());
   }
+  if (cpTarget.type === 'speech') cpTarget.swatch.style.background = cpGetCurrentColor();
 }
 
 function cpOpenPanel(mode, color, options = {}) {
@@ -26081,6 +26092,7 @@ function closeColorPanel(options = {}) {
   if (cpTarget?.type === 'chapter' && !apply) {
     applyChapterColorToDOM(cpTarget.blockId, cpTarget.key, cpTarget.originalColor);
   }
+  if (cpTarget?.type === 'speech' && !apply) cpTarget.swatch.style.background = cpTarget.originalColor;
   if (cpTarget?.type === 'quote' && !apply && cpTarget.quoteEl?.isConnected) {
     if (cpTarget.originalBackground) cpTarget.quoteEl.style.backgroundColor = cpTarget.originalBackground;
     else cpTarget.quoteEl.style.removeProperty('background-color');
@@ -26098,6 +26110,13 @@ function closeColorPanel(options = {}) {
 
 function applyColorPanel() {
   const color = cpGetCurrentColor();
+  if (cpTarget?.type === 'speech') {
+    cpTarget.native.value = color;
+    cpTarget.swatch.style.background = color;
+    closeColorPanel({ apply: true });
+    document.getElementById('cp-native').value = '#000000';
+    return;
+  }
   if (cpTarget?.type === 'quote') {
     const quoteEl = cpTarget.quoteEl;
     const editable = cpTarget.editable;
