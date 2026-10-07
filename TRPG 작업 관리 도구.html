@@ -126,8 +126,9 @@ body {
 .ct-cell-center { text-align: center !important; }
 .ct-cell-center .ct-input,
 .ct-cell-center input.ct-input,
+.ct-cell-center textarea.ct-input,
 .ct-cell-center select.ct-input { text-align: center !important; text-align-last: center; }
-.ct-cell-center input.ct-input { margin-inline: auto; }
+.ct-cell-center input.ct-input, .ct-cell-center textarea.ct-input { margin-inline: auto; }
 .ct-act { width: 64px !important; text-align: right !important; white-space: nowrap; }
 .catalog-table td.ct-num { text-align: center; cursor: context-menu; position: relative; }
 .catalog-table td.ct-num:hover { background: #f5f5f5; }
@@ -153,7 +154,8 @@ body {
   font-size: 12px; font-family: inherit; color: #222;
   padding: 5px 7px; outline: none; border-radius: 3px; min-width: 60px;
 }
-input.ct-input { width: auto; field-sizing: content; }
+input.ct-input, textarea.ct-input { width: auto; field-sizing: content; }
+textarea.ct-input { resize: none; overflow: hidden; white-space: pre; font-family: inherit; line-height: normal; }
 select.ct-input { width: 100%; }
 .ct-input:focus { background: #fff; outline: 2px solid #4a9eff; outline-offset: -1px; z-index: 2; position: relative; }
 .ct-num-input { text-align: center; -moz-appearance: textfield; }
@@ -8255,8 +8257,8 @@ select.sh-field-input,
             <tr>
               <th class="ct-rule">룰</th>
               <th class="ct-genre">종류</th>
-              <th class="ct-num" title="GM 난이도">GM 난이도</th>
-              <th class="ct-num" title="PL 난이도">PL 난이도</th>
+              <th class="ct-num" title="GM 난이도">GM<br>난이도</th>
+              <th class="ct-num" title="PL 난이도">PL<br>난이도</th>
               <th class="ct-script-cell" title="연결된 스크립트로 이동"></th>
               <th class="ct-title">시나리오명</th>
               <th class="ct-chk" title="GM 스크립트 준비">GM</th>
@@ -28932,10 +28934,11 @@ const CATALOG_LINK_LABEL_OPTIONS = [
 
 // ── 헬퍼: 인라인 입력 HTML 생성 ──
 function ctInput(cid, field, value, ph) {
-  return `<input class="ct-input" value="${esc(value||'')}" placeholder="${ph||''}"
+  return `<textarea class="ct-input" rows="1" wrap="off" spellcheck="false" placeholder="${ph||''}"
     onfocus="this.dataset.orig=this.value"
     onblur="saveCatalogField('${cid}','${field}',this.value)"
-    onkeydown="ctKey(event,this)">`;
+    onkeydown="ctKey(event,this)">
+${esc(value||'')}</textarea>`;
 }
 function ctNumInput(cid, field, value) {
   const which = field === 'gmDiff' ? 'gm' : 'pl';
@@ -28952,7 +28955,7 @@ function ctSelect(cid, field, value, options) {
   return `<select class="ct-input ct-select" onchange="saveCatalogField('${cid}','${field}',this.value)">${opts}</select>`;
 }
 function ctKey(e, el) {
-  if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+  if (e.key === 'Enter' && !e.isComposing && !e.shiftKey) { e.preventDefault(); el.blur(); }
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); el.value = el.dataset.orig ?? el.value; el.blur(); }
 }
 function ctRowClass(c) {
