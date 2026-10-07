@@ -3442,26 +3442,27 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
   min-width: 0; padding: 6px 8px; border: 1px solid #bbb; vertical-align: top;
   overflow-wrap: anywhere; word-break: break-word;
 }
+/* 앞뒤 문장과 이어 읽히도록 여백·테두리 없이 줄 흐름 안에 둔다. 복사 버튼은 글자 사이를 벌리지 않게 위쪽에 띄운다. */
 .tb-variation {
-  display: inline;
-  margin: 2px 2px; padding: 1px 7px 1px 10px;
-  border-left: 2px solid #ccc; border-radius: 2px;
+  display: inline; position: relative;
+  margin: 0; padding: 0; border: 0; border-radius: 0;
   white-space: normal;
 }
 .tb-variation-before-text {
   color: #b8b8b8; text-decoration: line-through;
-  font-size: inherit; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
+  font-size: inherit; line-height: inherit; white-space: pre-wrap; word-break: break-word;
 }
 .tb-variation-after-row { display: inline; }
 .tb-variation-after-text {
-  font-size: inherit; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
+  font-size: inherit; line-height: inherit; white-space: pre-wrap; word-break: break-word;
 }
 .tb-variation-copy-btn {
-  flex-shrink: 0; border: none; background: none; cursor: pointer;
-  color: #ccc; font-size: 11px; padding: 0 2px; margin-left: 4px; line-height: 1;
-  opacity: 0; transition: opacity 0.1s, color 0.1s;
+  position: absolute; right: 0; bottom: 100%; z-index: 2;
+  border: 1px solid #e5e5e5; border-radius: 4px; background: #fff; cursor: pointer;
+  color: #aaa; font-size: 11px; padding: 1px 4px; line-height: 1;
+  opacity: 0; pointer-events: none; transition: opacity 0.1s, color 0.1s;
 }
-.tb-variation:hover .tb-variation-copy-btn { opacity: 1; }
+.tb-variation:hover .tb-variation-copy-btn { opacity: 1; pointer-events: auto; }
 .tb-variation-copy-btn:hover { color: #555; }
 .tb-variation-copy-btn.copied { color: #16a34a; opacity: 1; }
 .tb-variation-panel {
@@ -15068,6 +15069,7 @@ function mkTextBlockEl(b, cid, ctx = {}) {
   ce.spellcheck = false;
   ce.innerHTML = b.content || '';
   if (b.content) { migrateVariations(ce); b.content = ce.innerHTML; }
+  tbNormalizeVariationLayout(ce);
   applyTextBlockCssPreview(ce, b.css);
 
   // 플로팅 액션 (hover 시 표시)
@@ -16506,20 +16508,26 @@ function tbIsVariationBoundaryNode(node) {
 }
 
 function tbEnsureVariationSeparation(variation) {
-  if (!variation?.parentNode) return;
-  const prev = tbGetVariationSibling(variation, 'prev');
-  if (prev && !tbIsVariationBoundaryNode(prev)) {
-    variation.parentNode.insertBefore(document.createElement('br'), variation);
-  }
-  const next = tbGetVariationSibling(variation, 'next');
-  if (next && !tbIsVariationBoundaryNode(next)) {
-    variation.parentNode.insertBefore(document.createElement('br'), next);
-  }
+  // 개변은 앞뒤 문장과 한 줄 흐름으로 이어 표시하므로 더 이상 <br>로 줄을 가르지 않는다.
+  tbTrimVariationWhitespace(variation);
+}
+
+// 템플릿 줄바꿈·들여쓰기 공백 노드가 글자 사이를 벌리지 않게, 원래 글자와 바뀐 글자 사이 공백 하나만 남긴다.
+function tbTrimVariationWhitespace(variation) {
+  const before = variation?.querySelector?.(':scope > .tb-variation-before-text');
+  const row = variation?.querySelector?.(':scope > .tb-variation-after-row');
+  if (!before || !row) return;
+  const dropBlank = parent => Array.from(parent.childNodes).forEach(node => {
+    if (node.nodeType === Node.TEXT_NODE && !node.nodeValue.trim()) node.remove();
+  });
+  dropBlank(variation);
+  dropBlank(row);
+  variation.insertBefore(document.createTextNode(' '), row);
 }
 
 function tbNormalizeVariationLayout(root) {
   if (!root?.querySelectorAll) return;
-  root.querySelectorAll('.tb-variation').forEach(tbEnsureVariationSeparation);
+  root.querySelectorAll('.tb-variation').forEach(tbTrimVariationWhitespace);
 }
 
 function tbCreateVariationEl(before, after) {
@@ -16528,12 +16536,7 @@ function tbCreateVariationEl(before, after) {
   wrap.contentEditable = 'false';
   wrap.dataset.before = before;
   wrap.dataset.after = after;
-  wrap.innerHTML = `
-    <span class="tb-variation-before-text"></span>
-    <span class="tb-variation-after-row">
-      <span class="tb-variation-after-text"></span>
-      <button class="tb-variation-copy-btn" title="After 복사">⧉</button>
-    </span>`;
+  wrap.innerHTML = '<span class="tb-variation-before-text"></span> <span class="tb-variation-after-row"><span class="tb-variation-after-text"></span><button class="tb-variation-copy-btn" title="After 복사">⧉</button></span>';
   wrap.querySelector('.tb-variation-before-text').textContent = before;
   wrap.querySelector('.tb-variation-after-text').textContent = after;
   return wrap;
