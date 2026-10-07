@@ -3990,7 +3990,7 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 }
 /* 정보 탭 항목명만 2px 들여쓴다(개변 패널의 label.tbvp-field 등 후손 label에는 적용하지 않는다). */
 #panel-info .field > label { padding-left: 2px; }
-/* 진상·기타: 항목명을 눌러 내용 접기/펼치기(data-info-fold 가 붙은 field 만) */
+/* 개요·주의사항·진상·기타·후기: 항목명을 눌러 내용 접기/펼치기(data-info-fold 가 붙은 field 만) */
 .field[data-info-fold] > label { display: flex; align-items: center; gap: 4px; width: fit-content; cursor: pointer; user-select: none; }
 .field[data-info-fold] > label::before { content: '▾'; font-size: 10px; }
 .field[data-info-fold].collapsed > label::before { content: '▸'; }
@@ -8169,12 +8169,12 @@ select.sh-field-input,
             </div>
             <div class="section-heading">시나리오 정보</div>
             <div class="info-grid">
-              <div class="field full"><label>개요</label><div class="info-ce" id="i-overview" contenteditable="true" data-ph="시나리오 개요" oninput="syncInfo()" oncontextmenu="return openInfoEditableContextMenu(event)"></div></div>
+              <div class="field full" data-info-fold="overview"><label>개요</label><div class="info-ce" id="i-overview" contenteditable="true" data-ph="시나리오 개요" oninput="syncInfo()" oncontextmenu="return openInfoEditableContextMenu(event)"></div></div>
               <div class="field full" id="field-insane-handout" style="display:none"><label>핸드아웃</label><div class="info-ce" id="i-handout" contenteditable="true" data-ph="핸드아웃" oninput="syncInfo()"></div></div>
-              <div class="field full"><label>주의사항</label><div class="info-ce" id="i-cautions" contenteditable="true" data-ph="플레이어에게 전달할 주의사항" oninput="syncInfo()"></div></div>
+              <div class="field full" data-info-fold="cautions"><label>주의사항</label><div class="info-ce" id="i-cautions" contenteditable="true" data-ph="플레이어에게 전달할 주의사항" oninput="syncInfo()"></div></div>
               <div class="field full" data-info-fold="truth"><label>진상</label><div class="info-ce" id="i-truth" contenteditable="true" data-ph="사건의 진상 (GM 전용)" oninput="syncInfo()" oncontextmenu="return openInfoEditableContextMenu(event)"></div></div>
               <div class="field full" data-info-fold="other"><label>기타</label><div class="info-ce" id="i-other" contenteditable="true" data-ph="기타 사항" oninput="syncInfo()"></div></div>
-              <div class="field full"><label>후기</label><div class="info-ce" id="i-afterword" contenteditable="true" data-ph="라이터 후기" oninput="syncInfo()"></div></div>
+              <div class="field full" data-info-fold="afterword"><label>후기</label><div class="info-ce" id="i-afterword" contenteditable="true" data-ph="라이터 후기" oninput="syncInfo()"></div></div>
             </div>
           </div>
         </div>
@@ -12665,7 +12665,7 @@ function select(id, tab = 'info') {
 // ═══════════════════════════════════════════════
 // INFO TAB
 // ═══════════════════════════════════════════════
-// 진상·기타 접힘 상태: 기기별 UI 상태라 시나리오 데이터가 아닌 localStorage 에만 둔다(실패하면 펼침).
+// 접힘 상태(data-info-fold 항목별): 기기별 UI 상태라 시나리오 데이터가 아닌 localStorage 에만 둔다(실패하면 펼침).
 const INFO_FOLD_KEY = 'trpg-info-fold-collapsed';
 function loadInfoFolded() {
   try {
