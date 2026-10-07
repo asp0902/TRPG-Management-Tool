@@ -27189,9 +27189,12 @@ function tbSkipOpeningIndentBlocks(html, boundaryIndex) {
   }
   return boundaryIndex;
 }
+// 줄 경계: <br>, 닫는 블록 태그, 줄바꿈 문자, 그리고 여는 블록 태그 직후.
+// Chrome은 Enter 시 "첫 문단<div>둘째 문단</div>"처럼 둘째 문단 앞에 여는 태그만 두기 때문이다.
+const TB_INDENT_BOUNDARY_SOURCE = '(?:<br\\s*\\/?>|<\\/(?:div|p|li|h[1-4]|blockquote)>|<(?:div|p|li|h[1-4]|blockquote)(?:\\s[^>]*)?>|\\r?\\n)';
 function tbFindIndentBoundaryIndex(html, markerIndex) {
   const beforeMarker = html.slice(0, markerIndex);
-  const boundaryRegex = /(?:<br\s*\/?>|<\/div>|<\/p>|<\/li>|<\/h1>|<\/h2>|<\/h3>|<\/h4>|<\/blockquote>|\r?\n)/gi;
+  const boundaryRegex = new RegExp(TB_INDENT_BOUNDARY_SOURCE, 'gi');
   let boundaryIndex = 0;
   let match = null;
   while ((match = boundaryRegex.exec(beforeMarker))) {
@@ -27200,7 +27203,7 @@ function tbFindIndentBoundaryIndex(html, markerIndex) {
   return tbSkipOpeningIndentBlocks(html, boundaryIndex);
 }
 function tbFindNextIndentBoundaryIndex(html, fromIndex) {
-  const boundaryRegex = /(?:<br\s*\/?>|<\/div>|<\/p>|<\/li>|<\/h1>|<\/h2>|<\/h3>|<\/h4>|<\/blockquote>|\r?\n)/gi;
+  const boundaryRegex = new RegExp(TB_INDENT_BOUNDARY_SOURCE, 'gi');
   boundaryRegex.lastIndex = fromIndex;
   const match = boundaryRegex.exec(html);
   if (!match) return -1;
