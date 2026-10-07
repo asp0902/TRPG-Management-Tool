@@ -3974,7 +3974,7 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 .section-heading {
   font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.1em; color: #333;
-  border-bottom: 2px solid #111; padding-bottom: 5px; margin: 26px 0 14px;
+  border-bottom: 2px solid #111; padding: 0 0 5px 2px; margin: 26px 0 14px;
 }
 .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
 .info-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
@@ -3985,6 +3985,8 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
   font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.06em; color: #999;
 }
+/* 정보 탭 항목명만 2px 들여쓴다(개변 패널의 label.tbvp-field 등 후손 label에는 적용하지 않는다). */
+#panel-info .field > label { padding-left: 2px; }
 .field input, .field textarea, .field select {
   width: 100%; border: 1px solid #e4e4e4; border-radius: 5px;
   padding: 10px 14px; font-size: 13px; color: #111;
