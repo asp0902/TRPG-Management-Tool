@@ -5404,6 +5404,11 @@ body.block-pointer-dragging {
 .branch-block .branch-inner-content-block > .branch-inner-block-header,
 .branch-block .branch-inner-callout > .nested-callout > .nested-callout-header { box-sizing: border-box; min-height: var(--branch-row-h); }
 .branch-block .branch-inner-content-block > .branch-inner-block-header { padding-block: 6px; }
+/* 제목 글자 시작만 +1px(본문·화살표 위치는 그대로), 내용 편집 칸 기본 글자 크기는 13px(서식 툴바 인라인 크기는 그대로 우선) */
+.branch-block .branch-inner-content-block > .branch-inner-block-header > .branch-inner-block-label { padding-left: 1px; }
+.branch-block .branch-inner-callout .nested-callout-header .callout-title-inp { margin-left: 9px; }
+.branch-block .bib-item-text-ce,
+.branch-block .branch-inner-block .block-text-ce { font-size: 13px; }
 .branch-choice-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .branch-choice {
   position: relative;
