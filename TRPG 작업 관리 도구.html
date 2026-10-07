@@ -6882,7 +6882,8 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-section-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .ch-sheet-basic-wrap { display: flex; align-items: stretch; gap: 14px; min-width: 0; }
 .ch-sheet-basic-portrait { position: relative; width: 150px; min-height: 0; border: 1px solid #e4e4e4; border-radius: 10px; background: #f5f5f5; color: #bbb; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; overflow: hidden; flex: 0 0 150px; align-self: stretch; box-sizing: border-box; }
-.ch-sheet-basic-portrait.is-square { aspect-ratio: 1 / 1; align-self: flex-start; }
+/* 정사각 이미지 칸: 높이는 옆 기본 정보 칸에 맞추고(stretch) 폭은 fitCharacterPortraitBox 가 높이에 맞춘다. 쌓임(좁은 창)에서는 아래 미디어 규칙이 정사각형으로 되돌린다. */
+.ch-sheet-basic-portrait.is-square { align-self: stretch; }
 .ch-sheet-basic-portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
 .sh-sheet-image-manage { position: absolute; right: 6px; bottom: 6px; z-index: 2; width: 28px; height: 28px; border: 1px solid rgba(255,255,255,0.8); border-radius: 6px; background: rgba(17,17,17,0.78); color: #fff; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .sh-sheet-image-manage:hover { background: #111; }
@@ -6891,6 +6892,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 @media(max-width:640px) {
   .ch-sheet-basic-wrap { flex-direction: column; }
   .ch-sheet-basic-portrait { width: 150px; max-width: 100%; aspect-ratio: var(--portrait-ratio, 3 / 4); min-height: 0; flex-basis: auto; align-self: auto; }
+  .ch-sheet-basic-portrait.is-square { aspect-ratio: 1 / 1; align-self: flex-start; }
   .ch-sheet-basic-fields { width: 100%; }
 }
 .sh-dnd-basic-wrap { display: flex; align-items: stretch; gap: 14px; min-width: 0; }
@@ -7234,7 +7236,7 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-support-title { font-size: 14px; font-weight: 800; text-align: center; }
 .ch-sheet-modal.sheet-wide-coc7e .ch-sheet-basic-wrap { flex-direction: row; }
 .ch-sheet-modal.sheet-wide-coc7e .ch-sheet-basic-portrait { width: 150px; max-width: none; aspect-ratio: auto; flex: 0 0 150px; align-self: stretch; }
-.ch-sheet-modal.sheet-wide-coc7e .ch-sheet-basic-portrait.is-square { aspect-ratio: 1 / 1; align-self: flex-start; }
+.ch-sheet-modal.sheet-wide-coc7e .ch-sheet-basic-portrait.is-square { align-self: stretch; }
 .ch-sheet-modal.sheet-wide-coc7e .sh-field-grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-stats-layout { grid-template-columns: minmax(0, 1fr) minmax(360px, 420px); }
 .ch-sheet-modal.sheet-wide-coc7e .sh-coc-stats-layout .sh-coc-derived-section { border-top: none; border-left: 1px solid #ebebeb; padding-top: 0; padding-left: 14px; margin-top: 0; }
@@ -33074,15 +33076,24 @@ function toggleArianrhod2eSkillGuide() {
 function fitCharacterPortrait(img) {
   if (!img || !img.parentElement) return;
   const portrait = img.parentElement;
-  if (portrait.classList.contains('is-square')) return;
   const nw = img.naturalWidth, nh = img.naturalHeight;
   if (!nw || !nh) return;
-  const ratio = nw / nh;
+  fitCharacterPortraitBox(portrait, portrait.classList.contains('is-square') ? 1 : nw / nh);
+}
+// 이미지 칸 높이는 옆 기본 정보 칸(align-self:stretch)이 정하고, 폭은 그 높이 × 비율로 맞춘다(CSS 만으로는 폭을 높이에서 계산할 수 없다).
+// 가로 배치(row)에서만 적용하고, 오른쪽 입력칸이 좁아지지 않게 폭은 전체의 40%까지로 제한한다.
+function fitCharacterPortraitBox(portrait, ratio) {
   const apply = () => {
     if (!document.body.contains(portrait)) return;
+    const wrap = portrait.parentElement;
+    if (!wrap) return;
+    if (getComputedStyle(wrap).flexDirection !== 'row') {
+      portrait.style.width = portrait.style.flex = portrait.style.minWidth = '';
+      return;
+    }
     const ph = portrait.getBoundingClientRect().height;
     if (!ph) return;
-    const w = ph * ratio;
+    const w = Math.min(ph * ratio, wrap.clientWidth * 0.4);
     const cur = parseFloat(portrait.style.width);
     if (!isNaN(cur) && Math.abs(cur - w) < 0.5) return;
     portrait.style.width = w + 'px';
@@ -33098,6 +33109,9 @@ function fitCharacterPortrait(img) {
     ro.observe(portrait);
     portrait._chPortraitRO = ro;
   }
+}
+function fitCharacterPortraits(root) {
+  root.querySelectorAll('.ch-sheet-basic-portrait.is-square').forEach(portrait => fitCharacterPortraitBox(portrait, 1));
 }
 
 async function bootstrapApp() {
@@ -40166,6 +40180,7 @@ function renderCharacterSheet(chId) {
     bodyEl.querySelectorAll('.sh-field-textarea[data-auto-grow="1"]').forEach(autoResizeSheetTextarea);
     bodyEl.querySelectorAll('.ar2e-sk-in').forEach(ds_ar2eSkillAutoWidth);
     bodyEl.querySelectorAll('.ar2e-sk-card').forEach(_ar2eEqualizeSkillAreas);
+    fitCharacterPortraits(bodyEl);
   });
 }
 
