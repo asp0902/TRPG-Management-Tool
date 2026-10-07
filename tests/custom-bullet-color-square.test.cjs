@@ -12,7 +12,7 @@ assert.match(html, /list\.style\.listStyleType = marker/);
 assert.match(html, /root\.setRangeText\(next, lineStart, stop, 'select'\)/);
 assert.match(html, /class="tb-bullet-custom"[\s\S]*?placeholder="기호 직접 입력"/);
 assert.match(html, /state\.customBulletSymbols\.push\(symbol\)[\s\S]*?persist\(\)/);
-assert.match(html, /\[TB_DEFAULT_BULLET, \.\.\.tbGetCustomBulletSymbols\(\)\]/);
+assert.match(html, /\[\.\.\.TB_PRESET_BULLETS, \.\.\.tbGetCustomBulletSymbols\(\)\.filter\(/);
 assert.match(html, /\.tb-bullet-preset \{[^}]*padding: 0 10px;/);
 assert.match(html, /\.tb-bullet-default-label \{ margin-left: 2px; \}/);
 assert.match(html, /preset\.append\(symbolEl, document\.createTextNode\(' '\), labelEl\)/);
