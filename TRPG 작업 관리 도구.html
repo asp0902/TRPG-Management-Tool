@@ -5398,6 +5398,7 @@ body.block-pointer-dragging {
   grid-auto-rows: 1fr;
   gap: 6px;
 }
+.branch-choice-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .branch-choice {
   position: relative;
   width: 100%;
@@ -14116,6 +14117,37 @@ function renderBlockListInto(container, blocks, ctx = {}) {
   });
 }
 
+// 분기점 선택지: 3열로 놓아도 가장 긴 선택지가 한 줄에 들어가면 3열(.cols-3), 아니면 기존 auto-fit 규칙을 그대로 둔다.
+// 3열 칸 콘텐츠 폭 = (grid 폭 - 2*gap)/3 - 좌우 padding(8+24). 3개 미만 분기점은 건드리지 않는다.
+function branchChoiceColumns(gridWidth, longestTextWidth, count, gap = 6, padding = 32) {
+  if (count < 3 || gridWidth <= 0) return 0;
+  return (gridWidth - gap * 2) / 3 - padding >= longestTextWidth ? 3 : 0;
+}
+let branchFitCtx = null;
+const branchGridObserver = window.ResizeObserver && new ResizeObserver(entries => entries.forEach(entry => tbFitBranchGrid(entry.target)));
+function tbFitBranchGrid(grid) {
+  const inputs = Array.from(grid.querySelectorAll('.branch-choice-input'));
+  const width = grid.clientWidth;
+  if (!inputs.length || !width) return;
+  branchFitCtx = branchFitCtx || document.createElement('canvas').getContext('2d');
+  let longest = 0;
+  inputs.forEach(input => {
+    const cs = getComputedStyle(input);
+    branchFitCtx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    input.value.split('\n').forEach(line => { longest = Math.max(longest, branchFitCtx.measureText(line).width); });
+  });
+  grid.classList.toggle('cols-3', branchChoiceColumns(width, Math.ceil(longest) + 1, inputs.length) === 3);
+}
+function tbFitBranchGrids() {
+  document.querySelectorAll('.branch-choice-grid').forEach(grid => {
+    branchGridObserver?.observe(grid);
+    tbFitBranchGrid(grid);
+  });
+}
+document.addEventListener('input', e => {
+  const grid = e.target.closest?.('.branch-choice-grid');
+  if (grid) tbFitBranchGrid(grid);
+});
 function renderBlocks(blocks, cid) {
   const c = document.getElementById(cid);
   if (!c) return;
@@ -14132,6 +14164,7 @@ function renderBlocks(blocks, cid) {
   }
   rbHydrateInlineMemoLinks(c);
   renderBlockMemoMarkers(cid);
+  tbFitBranchGrids();
 
   if (cid === 'blocks-container') {
     renderToc(blocks);
