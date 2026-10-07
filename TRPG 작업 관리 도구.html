@@ -16975,8 +16975,15 @@ const EDITOR_DIVIDER_STYLES = [
   ['wave', '물결선', 'width:100%;height:12px;background:currentColor;mask:url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2720%27 height=%2712%27%3E%3Cpath d=%27M0 2L10 10L20 2%27 fill=%27none%27 stroke=%27black%27 stroke-width=%271.5%27/%3E%3C/svg%3E") repeat-x center'],
   ['thin', '실선', 'width:100%;border-top:1px solid'],
   ['thick', '굵은 실선', 'width:100%;border-top:3px solid'],
-  ['dash', '파선', 'width:100%;border-top:2px dashed'],
+  ['dash', '파선', 'width:100%;height:1px;border-top:0;background:repeating-linear-gradient(to right,currentColor 0 6px,transparent 6px 10px)'],
 ];
+// 이미 저장된 파선(인라인 border-top:2px dashed)도 같은 정의로 보이게, 정의 값을 CSS 규칙으로 한 번 더 덮는다(값은 이 정의 한 곳에서만 관리).
+(() => {
+  const dash = EDITOR_DIVIDER_STYLES.find(item => item[0] === 'dash');
+  const style = document.createElement('style');
+  style.textContent = '[data-divider-style="dash"]{' + dash[2].split(';').map(decl => decl + ' !important').join(';') + '}';
+  document.head.appendChild(style);
+})();
 function getEditorDividerHtml(style, color = '#888888') {
   const item = EDITOR_DIVIDER_STYLES.find(item => item[0] === style) || EDITOR_DIVIDER_STYLES[8];
   return '<div role="separator" contenteditable="false" data-divider-style="' + item[0] + '" style="display:block;box-sizing:border-box;margin:18px auto;text-align:center;line-height:1;color:' + esc(color) + ';' + esc(item[2]) + '">' + (item[3] || '') + '</div>';
