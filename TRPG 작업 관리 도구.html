@@ -25447,7 +25447,7 @@ function renderFontPickerList() {
         <span class="font-picker-actions">
           ${unavailable ? '<span class="font-picker-unavailable">사용할 수 없음</span>' : ''}
           <span class="font-picker-check"><i class="fa-solid fa-check"></i></span>
-          ${manual ? `<button type="button" class="font-picker-delete" title="추가한 폰트 삭제" aria-label="추가한 폰트 삭제" onclick="removeCustomFont(event,${esc(JSON.stringify(f))})"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>` : ''}
+          ${(manual || active) ? `<button type="button" class="font-picker-delete" title="추가한 폰트 삭제" aria-label="추가한 폰트 삭제" onclick="removeCustomFont(event,${esc(JSON.stringify(f))})"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>` : ''}
         </span>
       </div>
     `;
