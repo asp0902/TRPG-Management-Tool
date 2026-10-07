@@ -1536,6 +1536,7 @@ tr.ct-row-end .ct-select:focus {
 .css-macro-preview-line + .css-macro-preview-line {
   margin-top: 0;
 }
+.css-macro-preview-desc-row:empty::before { content: " a0"; }
 .css-macro-preview-line:empty::before {
   content: "\00a0";
 }
@@ -31617,7 +31618,7 @@ const CCFOLIA_PREVIEW = {
   lineHeight: '20.02px',
   color: '#fff',
   whiteSpace: 'pre-wrap',
-  appendStyle: 'box-sizing:border-box;max-width:100%;min-width:0;word-break:break-word;overflow-wrap:anywhere;margin:0;width:auto;overflow:hidden',
+  appendStyle: 'box-sizing:border-box;max-width:100%;min-width:0;word-break:break-word;overflow-wrap:anywhere;margin:0;width:auto;overflow:hidden;position:static',
   blockedProps: ['-webkit-text-stroke'],
   blockedValues: { 'font-weight': ['800'] },
   // /desc 메시지: 감싸는 DIV 는 사방 16px 여백(본문 328px), 본문은 기울임·가운데·overflow hidden, 조각 span 의 font-weight 는 모두 제거된다.
@@ -31814,9 +31815,16 @@ function renderCssMacroPreviewHtml(value) {
   });
 
   if (parsedAny) {
-    return lines.map(line => line.isDesc
-      ? `<div class="css-macro-preview-line desc"><div class="css-macro-preview-desc-body">${line.html || ''}</div></div>`
-      : `<div class="css-macro-preview-line">${line.html || ''}</div>`).join('');
+    // 코코포리아는 /desc 를 여러 줄로 보내면 한 메시지(위아래 16px)로 묶고 줄 사이 틈이 없다: 연속한 /desc 줄은 한 래퍼로 묶는다.
+    const out = [];
+    for (let i = 0; i < lines.length; i += 1) {
+      if (!lines[i].isDesc) { out.push(`<div class="css-macro-preview-line">${lines[i].html || ''}</div>`); continue; }
+      let rows = '';
+      while (i < lines.length && lines[i].isDesc) { rows += `<div class="css-macro-preview-desc-row">${lines[i].html || ''}</div>`; i += 1; }
+      i -= 1;
+      out.push(`<div class="css-macro-preview-line desc"><div class="css-macro-preview-desc-body">${rows}</div></div>`);
+    }
+    return out.join('');
   }
   if (sawMacroSyntax) {
     return `<span class="css-macro-preview-error">미리보기를 생성할 수 없습니다.</span>`;
