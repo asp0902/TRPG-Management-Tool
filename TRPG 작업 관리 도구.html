@@ -17003,6 +17003,100 @@ function tbOpenDividerMenu(button, apply) {
     },
   })), { className: 'tb-divider-menu' });
 }
+// ─── 정보 칸 구분선 드래그 이동 ───
+// 정보 탭 .info-ce 안의 구분선만 대상이다. draggable 속성은 mousedown 때만 붙이고 끝나면 지워 저장 HTML에 남기지 않는다.
+let infoDividerDrag = null;
+const INFO_DIVIDER_SELECTOR = '#panel-info .info-ce [role="separator"][data-divider-style]';
+function tbIsInfoLineBoundary(node) {
+  return !!node && node.nodeType === Node.ELEMENT_NODE
+    && (node.tagName === 'BR' || /^(block|flex|grid|list-item|table)$/.test(getComputedStyle(node).display));
+}
+// 구분선을 놓을 줄 경계(root의 직계 노드 앞/뒤 중 y에 가장 가까운 곳)를 찾아 기준 노드를 돌려준다. null이면 맨 끝.
+function tbFindInfoDividerDropRef(root, dragged, y) {
+  const rootRect = root.getBoundingClientRect();
+  const lineTop = node => {
+    if (node.nodeType === Node.ELEMENT_NODE) return node.getBoundingClientRect().top;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    return range.getBoundingClientRect().top;
+  };
+  const lineBottom = node => {
+    if (node.nodeType === Node.ELEMENT_NODE) return node.getBoundingClientRect().bottom;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    return range.getBoundingClientRect().bottom;
+  };
+  const isBoundary = tbIsInfoLineBoundary;
+  const nodes = Array.from(root.childNodes).filter(node => node !== dragged);
+  const candidates = [{ ref: nodes[0] || null, y: nodes.length ? lineTop(nodes[0]) : rootRect.top }];
+  nodes.forEach((node, index) => {
+    if (!isBoundary(node)) return;
+    candidates.push({ ref: nodes[index + 1] || null, y: lineBottom(node) });
+  });
+  const last = nodes[nodes.length - 1];
+  if (last && !candidates.some(c => c.ref === null)) candidates.push({ ref: null, y: lineBottom(last) });
+  let best = candidates[0];
+  candidates.forEach(c => { if (Math.abs(c.y - y) < Math.abs(best.y - y)) best = c; });
+  return best;
+}
+function tbInfoDividerIndicator(show, rect, y) {
+  let bar = document.getElementById('info-divider-drop-line');
+  if (!show) { bar?.remove(); return; }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'info-divider-drop-line';
+    bar.style.cssText = 'position:fixed;height:3px;background:#2563eb;border-radius:2px;pointer-events:none;z-index:10070;box-shadow:0 0 0 1px #fff';
+    document.body.appendChild(bar);
+  }
+  bar.style.left = rect.left + 'px';
+  bar.style.width = rect.width + 'px';
+  bar.style.top = (y - 1) + 'px';
+}
+function tbEndInfoDividerDrag() {
+  infoDividerDrag?.el?.removeAttribute('draggable');
+  infoDividerDrag = null;
+  tbInfoDividerIndicator(false);
+}
+document.addEventListener('mousedown', event => {
+  const sep = event.target.closest?.(INFO_DIVIDER_SELECTOR);
+  if (sep && event.button === 0) sep.draggable = true;
+});
+document.addEventListener('mouseup', () => {
+  if (!infoDividerDrag) document.querySelectorAll(INFO_DIVIDER_SELECTOR + '[draggable]').forEach(el => el.removeAttribute('draggable'));
+});
+document.addEventListener('dragstart', event => {
+  const sep = event.target.closest?.(INFO_DIVIDER_SELECTOR);
+  if (!sep) return;
+  infoDividerDrag = { el: sep, root: sep.closest('.info-ce'), ref: undefined };
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', '');
+});
+document.addEventListener('dragover', event => {
+  if (!infoDividerDrag) return;
+  const root = event.target.closest?.('.info-ce');
+  if (root !== infoDividerDrag.root) { infoDividerDrag.ref = undefined; tbInfoDividerIndicator(false); return; }
+  event.preventDefault();
+  const best = tbFindInfoDividerDropRef(root, infoDividerDrag.el, event.clientY);
+  infoDividerDrag.ref = best.ref;
+  tbInfoDividerIndicator(true, root.getBoundingClientRect(), best.y);
+});
+document.addEventListener('drop', event => {
+  if (!infoDividerDrag) return;
+  const { el, root, ref } = infoDividerDrag;
+  if (event.target.closest?.('.info-ce') !== root || ref === undefined) return;
+  event.preventDefault();
+  const oldParent = el.parentNode;
+  if (ref !== el && ref !== el.nextSibling) {
+    // 블록이던 구분선이 빠지면 앞뒤 글자가 한 줄로 붙으므로, 양쪽이 모두 글자 흐름이면 그 자리에 줄바꿈을 둔다.
+    const prev = el.previousSibling, next = el.nextSibling;
+    if (prev && next && !tbIsInfoLineBoundary(prev) && !tbIsInfoLineBoundary(next)) oldParent.insertBefore(document.createElement('br'), el);
+    root.insertBefore(el, ref);
+    if (oldParent !== root && oldParent.isConnected && !oldParent.textContent.trim() && !oldParent.querySelector('[role="separator"],img,table')) oldParent.remove();
+    el.removeAttribute('draggable');
+    root.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+});
+document.addEventListener('dragend', tbEndInfoDividerDrag);
 function tbInsertTable(rows, columns, target = tbResolveFormatTarget()) {
   const root = target?.ta;
   if (target?.type !== 'ce' || !root?.isConnected || !root.closest('#blocks-container,#rb-blocks-container')) return false;
