@@ -7077,7 +7077,9 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-coc-misc-select { width: 150px; text-align: center; text-align-last: center; }
 .sh-coc-misc-select option { text-align: center; }
 /* 광기 줄: 첫 줄 현재 정신 상태(가로 전체), 둘째 줄 일시적/장기적 · 남은 시간 · 광기의 발작 · 실시간/요약 */
-.sh-coc-madness-body { display: flex; flex-direction: column; gap: 8px; flex: 1 1 0; min-width: 0; }
+.sh-coc-madness-row { display: flex; flex-direction: column; gap: 6px; }
+.sh-coc-madness-title { align-self: center; }
+.sh-coc-madness-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .sh-coc-sanity-side .sh-coc-misc-input:not(.sh-coc-misc-select) { width: 70px; } /* 남은 시간 */
 .sh-coc-mental-field { width: 100%; flex-direction: row; align-items: center; gap: 8px; }
 .sh-coc-mental-field .sh-coc-misc-label { flex: none; white-space: nowrap; }
@@ -40516,8 +40518,8 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
   var sanRow = '<div class="sh-coc-derived-row"><span class="sh-coc-derived-label">이성</span>'
     + '<div class="sh-coc-derived-vals">' + numInp('sanCur','현재') + sep + calcInp('sanMax','최대', derived.sanMax) + sep + numInp('sanStart','시작치') + '</div>'
     + '</div>';
-  // 광기: 첫 줄 현재 정신 상태, 둘째 줄 일시적/장기적 · 남은 시간 · 광기의 발작 · 실시간/요약
-  var madnessRow = '<div class="sh-coc-derived-row"><span class="sh-coc-derived-label">광기</span>'
+  // 광기: 이성 줄 아래 가운데 소제목, 그 아래 첫 줄 현재 정신 상태, 둘째 줄 일시적/장기적 · 남은 시간 · 광기의 발작 · 실시간/요약
+  var madnessRow = '<div class="sh-coc-madness-row"><span class="sh-coc-derived-label sh-coc-madness-title">광기</span>'
     + '<div class="sh-coc-madness-body">' + noteInp('mentalStatusNote') + sanSide + '</div></div>';
   var wealthInfo = derived.wealth || calcCoc7eWealthInfo(0, '', sectionData);
   var wealthLedgerRows = normalizeCocWealthLedgerRows(sectionData.wealthLedger);
