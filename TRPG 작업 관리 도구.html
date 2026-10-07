@@ -10,6 +10,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
+  --callout-line-height: calc(1.7em - 2px); /* 콜아웃 내용 줄 간격(자동 줄넘김 줄 사이) */
   --sidebar-bg: #111111;
   --main-bg: #f5f5f5;
   --border: #e2e2e2;
@@ -3698,7 +3699,7 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 .callout-title-inp::placeholder { color: #bbb; font-weight: 400; } /* 10px padding 제거 및 상하 margin 5px 적용 */
 .callout-content-ce {
   padding: 6px 12px; width: 100%; min-height: 0; height: auto; outline: none;
-  font-size: 14px; line-height: 1.7; color: #333; text-align: left;
+  font-size: 14px; line-height: var(--callout-line-height); color: #333; text-align: left;
   background: transparent; word-break: break-word; font-family: inherit;
   overflow: hidden; box-sizing: border-box;
 }
@@ -3830,7 +3831,7 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 }
 .nested-callout-content {
   padding: 6px 12px; min-height: 35px; outline: none;
-  font-size: 14px; line-height: 1.7; color: #333;
+  font-size: 14px; line-height: var(--callout-line-height); color: #333;
   background: transparent; word-break: break-word; font-family: inherit;
   white-space: pre-wrap;
 }
@@ -4829,7 +4830,7 @@ body.block-pointer-dragging {
   box-sizing: border-box;
 }
 .block-ce:empty::before { content: attr(data-ph); color: #ccc; pointer-events: none; display: block; }
-.callout-content-ce.block-ce { font-size: 14px; line-height: 1.7; }
+.callout-content-ce.block-ce { font-size: 14px; line-height: var(--callout-line-height); }
 .sub-ce {
   width: 100%; min-height: 36px; outline: none;
   font-size: 12px; line-height: 1.6; color: #333;
