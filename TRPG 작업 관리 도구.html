@@ -1525,7 +1525,13 @@ tr.ct-row-end .ct-select:focus {
   display: block;
 }
 .css-macro-preview-line.desc {
-  text-align: center;
+  /* 코코포리아 /desc: 감싸는 DIV 위아래 16px 여백(가로 328px 본문은 그대로), 본문은 기울임·가운데·overflow hidden */
+  padding-block: var(--ccf-desc-padding);
+}
+.css-macro-preview-desc-body {
+  font-style: var(--ccf-desc-font-style);
+  text-align: var(--ccf-desc-text-align);
+  overflow: var(--ccf-desc-overflow);
 }
 .css-macro-preview-line + .css-macro-preview-line {
   margin-top: 0;
@@ -31564,6 +31570,8 @@ const CCFOLIA_PREVIEW = {
   appendStyle: 'box-sizing:border-box;max-width:100%;min-width:0;word-break:break-word;overflow-wrap:anywhere;margin:0;width:auto;overflow:hidden',
   blockedProps: ['-webkit-text-stroke'],
   blockedValues: { 'font-weight': ['800'] },
+  // /desc 메시지: 감싸는 DIV 는 사방 16px 여백(본문 328px), 본문은 기울임·가운데·overflow hidden, 조각 span 의 font-weight 는 모두 제거된다.
+  desc: { padding: 16, fontStyle: 'italic', textAlign: 'center', overflow: 'hidden', blockedProps: ['font-weight'] },
 };
 if (typeof document !== 'undefined') {
   const rootStyle = document.documentElement.style;
@@ -31574,9 +31582,13 @@ if (typeof document !== 'undefined') {
   rootStyle.setProperty('--ccf-line-height', CCFOLIA_PREVIEW.lineHeight);
   rootStyle.setProperty('--ccf-color', CCFOLIA_PREVIEW.color);
   rootStyle.setProperty('--ccf-white-space', CCFOLIA_PREVIEW.whiteSpace);
+  rootStyle.setProperty('--ccf-desc-padding', CCFOLIA_PREVIEW.desc.padding + 'px');
+  rootStyle.setProperty('--ccf-desc-font-style', CCFOLIA_PREVIEW.desc.fontStyle);
+  rootStyle.setProperty('--ccf-desc-text-align', CCFOLIA_PREVIEW.desc.textAlign);
+  rootStyle.setProperty('--ccf-desc-overflow', CCFOLIA_PREVIEW.desc.overflow);
 }
 // 사용자 style 에서 코코포리아가 걸러내는 선언을 빼고, 코코포리아가 덧붙이는 style 을 뒤에 붙인다.
-function cssMacroPreviewSpanStyle(style) {
+function cssMacroPreviewSpanStyle(style, isDesc = false) {
   const decls = [];
   let current = '';
   let depth = 0;
@@ -31597,6 +31609,7 @@ function cssMacroPreviewSpanStyle(style) {
     const prop = decl.slice(0, colon).trim().toLowerCase();
     const value = decl.slice(colon + 1).trim().toLowerCase();
     if (CCFOLIA_PREVIEW.blockedProps.some(blocked => prop.startsWith(blocked))) return false;
+    if (isDesc && CCFOLIA_PREVIEW.desc.blockedProps.some(blocked => prop.startsWith(blocked))) return false;
     return !(CCFOLIA_PREVIEW.blockedValues[prop] || []).includes(value);
   });
   return [...kept, CCFOLIA_PREVIEW.appendStyle].join('; ');
@@ -31611,7 +31624,7 @@ function normalizeCssMacroStyle(style) {
   } catch (e) { return raw; }
 }
 function replaceCssMacroPreviewTokens(source, options = {}) {
-  const { allowRawHtml = false } = options;
+  const { allowRawHtml = false, isDesc = false } = options;
   const input = String(source || '');
   let html = '';
   let cursor = 0;
@@ -31641,7 +31654,7 @@ function replaceCssMacroPreviewTokens(source, options = {}) {
       continue;
     }
     parsedToken = true;
-    const styleAttr = ` style="${esc(cssMacroPreviewSpanStyle(token.style))}"`;
+    const styleAttr = ` style="${esc(cssMacroPreviewSpanStyle(token.style, isDesc))}"`;
     const text = esc(token.text.trim() ? token.text : '\u00a0');
     const norm = normalizeCssMacroStyle(token.style);
     if (last && last.norm === norm) last.text += text;
@@ -31744,14 +31757,16 @@ function renderCssMacroPreviewHtml(value) {
       const altText = esc(mdImageMatch[1] || '');
       return { html: `<img src="${esc(imageUrl)}" alt="${altText}" onload="trimCssMacroPreviewImage(this)">`, isStructured: true, isDesc };
     }
-    const rendered = replaceCssMacroPreviewTokens(source);
+    const rendered = replaceCssMacroPreviewTokens(source, { isDesc });
     const html = rendered.html;
     if (rendered.parsedToken || isDesc) parsedAny = true;
     return { html, isStructured: false, isDesc };
   });
 
   if (parsedAny) {
-    return lines.map(line => `<div class="css-macro-preview-line${line.isDesc ? ' desc' : ''}">${line.html || ''}</div>`).join('');
+    return lines.map(line => line.isDesc
+      ? `<div class="css-macro-preview-line desc"><div class="css-macro-preview-desc-body">${line.html || ''}</div></div>`
+      : `<div class="css-macro-preview-line">${line.html || ''}</div>`).join('');
   }
   if (sawMacroSyntax) {
     return `<span class="css-macro-preview-error">미리보기를 생성할 수 없습니다.</span>`;
