@@ -13184,7 +13184,9 @@ function syncBodyTitlePreviewEdit() {
 
 // ─── RENDER ───
 function bdef(typeId) { return BTYPES.find(t => t.id === typeId) || { label: typeId, color: '#aaa' }; }
-const CALLOUT_TYPE_LABELS = { basic:'기본', info:'정보', warn:'주의', error:'경고', note:'메모', other:'기타' };
+// 저장 type 값은 그대로 두고 표시만 교환한다: info(예전 정보 모양) → '메모', note(파란 핀 모양) → '정보'.
+const CALLOUT_TYPE_LABELS = { basic:'기본', info:'메모', warn:'주의', error:'경고', note:'정보', other:'기타' };
+const CALLOUT_TYPE_ORDER = ['basic', 'note', 'warn', 'error', 'info', 'other'];
 
 function getCalloutTypeIconSvg(type) {
   switch (type) {
@@ -13262,7 +13264,8 @@ function openCalloutTypeMenu(e, btn, apply) {
   menu.style.left = `${left}px`;
   menu.style.top = `${bottom}px`;
   menu.style.width = `${right - left - 2}px`;
-  Object.entries(CALLOUT_TYPE_LABELS).forEach(([v, label]) => {
+  CALLOUT_TYPE_ORDER.forEach(v => {
+    const label = CALLOUT_TYPE_LABELS[v];
     const row = document.createElement('div');
     row.className = 'callout-type-dropdown-item';
     if (v === btn.value) row.classList.add('is-selected');
