@@ -3493,7 +3493,7 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 /* .field label 규칙이 패널의 label.tbvp-field(→ textarea)까지 번지는 것을 막는다. */
 .field .tb-variation-panel .tbvp-field { font-size: inherit; font-weight: 400; text-transform: none; letter-spacing: normal; }
 /* .field textarea 규칙(padding 10px 14px 등)이 패널 textarea까지 번지지 않게 BEFORE 칸과 같은 값으로 되돌린다. */
-.field .tb-variation-panel .tbvp-textarea { padding: 6px 8px; font-size: inherit; color: #222; }
+.field .tb-variation-panel .tbvp-textarea { padding: 6px 8px; color: #222; }
 .tbvp-head {
   display: flex; align-items: center; gap: 0;
 }
@@ -3515,11 +3515,11 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 .tbvp-before-box {
   padding: 6px 8px; border: 1px solid #ececec; border-radius: 5px;
   background: #fff; color: #9ca3af; text-decoration: line-through;
-  line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+  font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
 }
 .tbvp-textarea {
-  width: 100%; min-height: 36px; border: 1px solid #e4e4e4; border-radius: 5px;
-  padding: 6px 8px; font: inherit; color: #222;
+  width: 100%; min-height: 34px; border: 1px solid #e4e4e4; border-radius: 5px;
+  padding: 6px 8px; font: inherit; font-size: 13px; color: #222;
   outline: none; resize: none; overflow: hidden; line-height: 1.55;
   background: #fff;
 }
@@ -16719,8 +16719,6 @@ function tbGetVariationPanel(root) {
     if (insertBefore) host.insertBefore(panel, insertBefore);
     else host.appendChild(panel);
   }
-  // 정보 칸처럼 칸 글자 크기가 본문과 다른 host는 편집 중인 칸의 글자 크기를 따른다.
-  if (host.classList.contains('field')) panel.style.fontSize = getComputedStyle(root).fontSize;
   return panel;
 }
 
@@ -16770,8 +16768,8 @@ function tbOpenVariationEditor(root, opts = {}) {
   title.textContent = variation ? '개변 수정' : '개변 추가';
   beforeBox.textContent = before;
   textarea.value = after;
-  btcpAutoResize(textarea);
   panel.classList.add('open');
+  btcpAutoResize(textarea); // 패널이 보이는 상태에서 재야 여러 줄도 잘리지 않는다
   tbVariationEditorState = {
     panel,
     root,
