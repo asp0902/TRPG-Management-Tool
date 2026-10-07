@@ -5026,7 +5026,7 @@ body.block-pointer-dragging {
 }
 .block.block-speech.block-child > .block-body {
   padding-top: 5px;
-  padding-bottom: 0;
+  padding-bottom: 5px;
 }
 .block.block-speech.block-child > .block-body > .speech-row {
   align-items: center;
@@ -5253,6 +5253,8 @@ body.block-pointer-dragging {
 
 /* Speech */
 .block.block-speech .block-body { padding: 5px 12px; }
+/* 하위 블록이 없는 빈 children 영역의 위 margin(4px)이 토큰 아래 여백만 키워 토큰이 위로 치우쳐 보였다 */
+.block.block-speech > .block-body > .block-children-wrap[data-empty="1"] { margin-top: 0; }
 .speech-row { display: flex; align-items: center; gap: 10px; }
 .speech-row .block-ce {
   min-height: 24px;
