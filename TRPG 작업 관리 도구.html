@@ -4394,7 +4394,8 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 /* 모든 콜아웃 컨테이너(.callout-body=루트/generic, .nested-callout=분기 bib/내부) 공통.
    조상 한정(.bib-item-callout 등) 없이도 매칭되게 일반화. */
 /* .block-child 클래스 유무와 무관하게(부모가 콜아웃 wrap일 때만 매칭되므로 안전) */
-:is(.callout-body, .nested-callout) > .block-children-wrap > .block > .block-actions {
+/* 분기 내용 블록 항목(.bib-item)의 하위 블록도 같은 규칙: 우측 거터는 스크롤 영역·우측 패널에 가려져 위/아래 이동 버튼이 눌리지 않았다. */
+:is(.callout-body, .nested-callout, .bib-item) > .block-children-wrap > .block > .block-actions {
   left: auto;
   right: 4px;
   top: 4px;
