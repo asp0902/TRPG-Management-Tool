@@ -1297,13 +1297,13 @@ tr.ct-row-end .ct-select:focus {
   padding: 0;
   border: 1px solid #aaa;
   border-radius: 1px;
-  background: #fff;
+  background: #2c2c2c; /* 기본 = 코코포리아 채팅 바탕, .dark(전환된 상태) = 밝은 바탕 */
   box-sizing: border-box;
   cursor: pointer;
 }
 .css-macro-preview-bg-toggle.dark {
-  background: #000;
-  border-color: #000;
+  background: #fff;
+  border-color: #aaa;
 }
 .css-macro-preview-bg-toggle:focus-visible {
   outline: 1px solid #555;
@@ -1500,30 +1500,33 @@ tr.ct-row-end .ct-select:focus {
   /* 코코포리아 채팅 환경: 본문 폭 328px(padding·border 제외), Roboto 14px/20.02px, pre-wrap (값은 CCFOLIA_PREVIEW) */
   box-sizing: content-box;
   width: var(--ccf-width);
-  border: 1px solid #d9dde5;
+  border: 1px solid #333;
   border-radius: 10px;
-  background: #fff;
+  /* 기본 모양 = 코코포리아 채팅: 반투명 바탕(검정 위), 흰 글자, 메시지 여백 0 16px 16px */
+  background: linear-gradient(var(--ccf-bg), var(--ccf-bg)), #000;
   min-height: 28px;
-  padding: 8px 9px;
+  padding: 0 16px 16px;
   font-family: var(--ccf-font);
   font-size: var(--ccf-size);
   line-height: var(--ccf-line-height);
-  color: #222;
+  color: var(--ccf-color);
   white-space: var(--ccf-white-space);
   word-break: break-word;
   overflow-wrap: anywhere;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  box-shadow: none;
   overflow-anchor: none;
 }
+/* 전환 버튼으로 바꾼 상태(저장 플래그 …PreviewDark = true): 밝은 바탕 */
 .css-macro-preview-wrap.dark .css-macro-preview-body {
-  background: linear-gradient(var(--ccf-bg), var(--ccf-bg)), #000;
-  border-color: #333;
-  color: var(--ccf-color);
-  box-shadow: none;
+  background: #fff;
+  border-color: #d9dde5;
+  color: #222;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 .css-macro-preview-line {
   display: block;
 }
+.css-macro-preview-line.desc:last-child { margin-bottom: calc(-1 * var(--ccf-desc-padding)); } /* /desc 래퍼 아래 여백과 본문 아래 여백(16px)이 겹치지 않게 */
 .css-macro-preview-line.desc {
   /* 코코포리아 /desc: 감싸는 DIV 위아래 16px 여백(가로 328px 본문은 그대로), 본문은 기울임·가운데·overflow hidden */
   padding-block: var(--ccf-desc-padding);
@@ -4684,7 +4687,6 @@ body.block-drag-active .block-gap-line {
 .btn.handout-toggle, .btn.handout-macro-copy { border: 0; box-shadow: none; }
 .handout-fold .css-macro-preview-bg-toggle { position: absolute; right: 6px; top: 5px; }
 .handout-fold.css-macro-preview-wrap { display: block; }
-.handout-fold.dark .handout-preview { background: #000; }
 .handout-toggle[aria-expanded="true"] i { transform: rotate(180deg); }
 .handout-header:has(.handout-toggle[aria-expanded="false"]) { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
 .handout-shared { border-top: 1px solid var(--border); padding-top: 12px; }
@@ -4709,7 +4711,7 @@ body:not(.rule-insane) #blocks-container .handout-columns:not(:has(> [data-secre
 .handout-column h3 { font-size: 14px; font-weight: 700; margin-bottom: 11px; padding-bottom: 9px; border-bottom: 1px solid var(--border); text-align: center; }
 .handout-column .block-ce { min-height: 88px; margin-bottom: 14px; }
 .handout-column:has(> .handout-shared[hidden]) > .block-ce { min-height: 1.7em; margin-bottom: 0; }
-.handout-preview { flex: 1; min-height: 120px; border: 1px solid var(--border); border-radius: 5px; padding: 12px; overflow: auto; }
+.handout-preview { flex: 1; min-height: 120px; overflow: auto; }
 .handout-preview > img { display: block; max-width: 100%; max-height: 280px; object-fit: contain; margin: 0 auto 8px; }
 .handout-macro { display: block; width: 100%; min-height: 40px; box-sizing: border-box; resize: none; overflow-y: hidden; padding: 10px; border: 1px solid var(--border); border-radius: 5px; font: 12px/1.5 monospace; color: #333; background: #fafafa; }
 @media (max-width: 640px) { .handout-columns { min-width: 480px; } .block-handout > .block-body { overflow-x: auto; } }
@@ -31906,7 +31908,7 @@ function isCssMacroPreviewDark(itemId) {
 function applyPreviewBackgroundToggle(button, dark) {
   button?.closest('.css-macro-preview-wrap')?.classList.toggle('dark', dark);
   if (button) {
-    const nextColor = dark ? '흰색' : '검은색';
+    const nextColor = dark ? '코코포리아 바탕' : '밝은 바탕';
     button.classList.toggle('dark', dark);
     button.setAttribute('aria-pressed', dark ? 'true' : 'false');
     button.setAttribute('aria-label', `미리보기 배경을 ${nextColor}으로 변경`);
@@ -31926,7 +31928,7 @@ function toggleIntroPreviewBackground(button) {
   commitScenarioHistory('info:intro-preview-background', { force: true });
 }
 function renderPreviewBackgroundToggle(dark, onclick) {
-  const nextColor = dark ? '흰색' : '검은색';
+  const nextColor = dark ? '코코포리아 바탕' : '밝은 바탕';
   return `<button type="button" class="css-macro-preview-bg-toggle${dark ? ' dark' : ''}"
     aria-pressed="${dark ? 'true' : 'false'}"
     aria-label="미리보기 배경을 ${nextColor}으로 변경"
