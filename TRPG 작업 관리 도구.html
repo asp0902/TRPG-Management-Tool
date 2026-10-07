@@ -40483,7 +40483,7 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
     var v = getFieldOrDefault(fid, fallback);
     return '<div class="sh-coc-wealth-cell sh-coc-wealth-currency-cell' + (extraCls ? ' ' + extraCls : '') + '">'
       + '<span class="sh-coc-wealth-currency-symbol">' + esc(symbol) + '</span>'
-      + '<input class="sh-coc-wealth-rate-input ' + esc('sh-coc-wealth-rate-' + fid.replace('wealthRate', '').toLowerCase()) + '" type="number" step="any" value="' + esc(String(v)) + '" oninput="' + esc(sf(fid, false)) + '"></div>';
+      + '<input class="sh-coc-wealth-rate-input ' + esc('sh-coc-wealth-rate-' + fid.replace('wealthRate', '').toLowerCase()) + '" type="text" inputmode="decimal" value="' + esc(formatCoc7eRateText(v)) + '" oninput="' + esc(sf(fid, false).replace(',this.value)', ',cleanCoc7eRateText(this.value))')) + '" onblur="this.value=formatCoc7eRateText(this.value)" onkeydown="if(event.key===\'Enter\')this.blur()"></div>';
   }
   function wealthValueCell(value, extraCls) {
     return '<div class="sh-coc-wealth-cell sh-coc-wealth-value-cell' + (extraCls ? ' ' + extraCls : '') + '">' + buildCoc7eWealthValueHtml(value) + '</div>';
@@ -40836,8 +40836,19 @@ function formatCoc7eDollarAmount(amount) {
   return '$' + num.toLocaleString('en-US');
 }
 
+// 환율 입력: 표시는 천 단위 쉼표, 저장·계산은 쉼표를 뺀 숫자 문자열. 입력 중에는 친 그대로 두고 blur/Enter 때 정리한다.
+function cleanCoc7eRateText(text) {
+  return String(text == null ? '' : text).replace(/[,\s]/g, '');
+}
+function formatCoc7eRateText(value) {
+  var clean = cleanCoc7eRateText(value);
+  if (!/^-?\d*\.?\d*$/.test(clean) || !/\d/.test(clean)) return String(value == null ? '' : value);
+  var parts = clean.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.join('.');
+}
 function getCoc7eWealthRateValue(value, fallback) {
-  var num = parseFloat(value);
+  var num = parseFloat(cleanCoc7eRateText(value));
   return isFinite(num) && num > 0 ? num : fallback;
 }
 
