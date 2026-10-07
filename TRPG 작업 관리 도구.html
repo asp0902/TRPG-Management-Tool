@@ -31549,34 +31549,56 @@ function tryParseCssMacroToken(source, startIdx) {
     style: normalizeCssMacroPreviewStyleText(angleWrapped ? styleText.replace(/>\s*$/, '') : styleText),
   };
 }
+// 코코포리아처럼, 사이에 글자·공백·@주석 없이 붙은 연속 토큰의 style 이 정리한 값으로 같으면 하나의 span 으로 합친다.
+function normalizeCssMacroStyle(style) {
+  const raw = String(style || '').trim();
+  try {
+    const probe = normalizeCssMacroStyle.probe || (normalizeCssMacroStyle.probe = document.createElement('span'));
+    probe.style.cssText = raw;
+    return probe.style.cssText || raw;
+  } catch (e) { return raw; }
+}
 function replaceCssMacroPreviewTokens(source, options = {}) {
   const { allowRawHtml = false } = options;
   const input = String(source || '');
   let html = '';
   let cursor = 0;
   let parsedToken = false;
+  let last = null; // 아직 출력하지 않은 직전 토큰(뒤 토큰과 합칠 수 있다)
+  const flush = () => {
+    if (!last) return;
+    html += `<span${last.styleAttr}>${last.text}</span>`;
+    last = null;
+  };
   while (cursor < input.length) {
     const nextBracket = input.indexOf('[', cursor);
     if (nextBracket < 0) {
       const tail = decodeCssMacroPreviewValue(input.slice(cursor));
+      if (tail) flush();
       html += allowRawHtml ? tail : esc(tail);
       break;
     }
     const plain = decodeCssMacroPreviewValue(input.slice(cursor, nextBracket));
+    if (plain) flush();
     html += allowRawHtml ? plain : esc(plain);
     const token = tryParseCssMacroToken(input, nextBracket);
     if (!token) {
+      flush();
       html += allowRawHtml ? input[nextBracket] : esc(input[nextBracket]);
       cursor = nextBracket + 1;
       continue;
     }
     parsedToken = true;
     const styleAttr = token.style ? ` style="${esc(token.style)}"` : '';
-    html += `<span${styleAttr}>${esc(token.text.trim() ? token.text : '\u00a0')}</span>`;
+    const text = esc(token.text.trim() ? token.text : '\u00a0');
+    const norm = normalizeCssMacroStyle(token.style);
+    if (last && last.norm === norm) last.text += text;
+    else { flush(); last = { styleAttr, text, norm }; }
     cursor = token.end;
     const annotation = input.slice(cursor).match(/^[ \t]*@[^\r\n]*/);
-    if (annotation) cursor += annotation[0].length;
+    if (annotation) { cursor += annotation[0].length; flush(); }
   }
+  flush();
   return { html, parsedToken };
 }
 function sanitizeCssMacroPreviewHtml(value) {

@@ -4,7 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
 const context = vm.createContext({});
-for (const name of ['decodeCssMacroPreviewValue', 'normalizeCssMacroPreviewStyleText', 'tryParseCssMacroToken']) {
+for (const name of ['decodeCssMacroPreviewValue', 'normalizeCssMacroPreviewStyleText', 'tryParseCssMacroToken', 'normalizeCssMacroStyle']) {
   vm.runInContext(html.match(new RegExp(`function ${name}\\([^]*?\\n\\}`))[0], context);
 }
 const url = 'https://i.imgur.com/95RxNez.gif';
