@@ -175,6 +175,8 @@ select.ct-input { width: 100%; }
   background-repeat: no-repeat; background-position: right 11px center; padding-right: 25px !important;
 }
 .ct-select:focus { background-color: #fff; }
+.ct-select:has(option[value=""]:checked) { color: #bbbbbb; }
+.ct-select option { color: #222; }
 .ct-note-dot {
   position: absolute; top: 5px; right: 5px;
   width: 5px; height: 5px; border-radius: 50%; background: #111; pointer-events: none;
