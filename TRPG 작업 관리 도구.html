@@ -2793,11 +2793,14 @@ tr.ct-row-end .ct-select:focus {
   background: #111; color: #fff; cursor: pointer; font-size: 12px; font-weight: 600;
 }
 .cp-apply-btn:hover { background: #000; }
+.tb-size-stepper { display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
 .tb-size-inp {
-  width: 48px; height: 24px; border: 1px solid #e2e2e2; border-radius: 4px;
-  padding: 0; text-indent: 8px; font-size: 11px; text-align: center; outline: none;
-  background: transparent; color: #444; flex-shrink: 0;
+  width: 40px; height: 24px; border: 1px solid #aaa; border-radius: 6px;
+  padding: 0; font-size: 12px; text-align: center; outline: none;
+  background: transparent; color: #444; flex-shrink: 0; -moz-appearance: textfield;
 }
+.tb-size-inp::-webkit-outer-spin-button,
+.tb-size-inp::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .tb-size-inp:focus { border-color: #000; }
 .tb-select {
   height: 24px; font-size: 11px; border: 1px solid #e2e2e2; border-radius: 4px;
@@ -2810,7 +2813,8 @@ tr.ct-row-end .ct-select:focus {
   display: grid; grid-template-columns: minmax(0, 1fr) 18px; align-items: center;
   padding: 0; font-family: inherit;
 }
-.tb-font-trigger-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.tb-font-trigger-label { grid-area: 1 / 1 / 2 / 3; min-width: 0; padding: 0 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
+.tb-font-trigger .tb-control-chevron { grid-area: 1 / 2; }
 .tb-control-chevron { justify-self: center; font-size: 9px; color: #777; pointer-events: none; }
 .tb-font-trigger .tb-control-chevron { transform: translateX(-1px); }
 .tb-font-menu {
@@ -2864,7 +2868,7 @@ tr.ct-row-end .ct-select:focus {
 .tb-lh-wrap { position: relative; width: 52px; height: 24px; flex: 0 0 52px; }
 #format-bar .tb-select-lh {
   width: 100%; appearance: none; -webkit-appearance: none; font-size: 10px;
-  padding: 0 18px 0 4px; text-align: center; text-align-last: center;
+  padding: 0 15px; text-align: center; text-align-last: center;
   background-color: transparent; background-image: none;
 }
 .tb-lh-wrap .tb-control-chevron { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
@@ -7852,7 +7856,12 @@ select.sh-field-input,
           onclick="tbChooseFontDropdownOption(event.target.closest('.tb-font-option')?.dataset.value)"
           onmouseleave="tbPreviewFont('')"></div>
       </div>
-      <input type="number" class="tb-size-inp" id="tb-size" value="12" min="1" max="200" title="글자 크기" onchange="tbFontSize(this.value)" onkeydown="if(event.key==='Enter'){tbFontSize(this.value);this.blur();}">
+      <div class="tb-sep"></div>
+      <div class="tb-size-stepper">
+        <button type="button" class="tb-btn" id="tb-size-dec" onmousedown="event.preventDefault();tbCaptureFormatTarget()" onclick="tbStepFontSize(-1)" title="글자 크기 줄이기" aria-label="글자 크기 줄이기"><i class="fa-solid fa-minus"></i></button>
+        <input type="number" class="tb-size-inp" id="tb-size" value="12" min="1" max="200" title="글자 크기" onchange="tbFontSize(this.value)" onkeydown="if(event.key==='Enter'){tbFontSize(this.value);this.blur();}">
+        <button type="button" class="tb-btn" id="tb-size-inc" onmousedown="event.preventDefault();tbCaptureFormatTarget()" onclick="tbStepFontSize(1)" title="글자 크기 키우기" aria-label="글자 크기 키우기"><i class="fa-solid fa-plus"></i></button>
+      </div>
       <div class="tb-sep"></div>
       <!-- 굵게 / 기울임 / 밑줄 / 취소선 / 서식 지우기 -->
       <button class="tb-btn" id="tb-bold-btn" onclick="isCE()?tbApplyCEInlineStyle('fontWeight','bold'):tbWrap('font-weight:bold')" title="굵게"><i class="fa-solid fa-bold"></i></button>
@@ -26900,6 +26909,14 @@ function tbFontFamily(fontFamily) {
     }
   }
 });
+function tbStepFontSize(delta) {
+  const input = document.getElementById('tb-size');
+  const current = parseInt(input.value) || 12;
+  const next = Math.min(200, Math.max(1, current + delta));
+  if (next === current) return;
+  input.value = next;
+  tbFontSize(next);
+}
 function tbFontSize(val) {
   const size = parseInt(val); if (!size || size < 1) return;
   // 현재 CE에 선택 영역이 있으면 그대로 적용
