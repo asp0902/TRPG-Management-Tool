@@ -3476,6 +3476,10 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
   background: #fafafa;
 }
 .tb-variation-panel.open { display: flex; }
+/* 정보 칸 host(.field)는 세로 flex라 flex-basis 100%가 높이가 되어 칸이 찌그러진다. 내용 높이만 차지하게 한다. */
+.field > .tb-variation-panel { flex: none; }
+/* .field label 규칙이 패널의 label.tbvp-field(→ textarea)까지 번지는 것을 막는다. */
+.field .tb-variation-panel .tbvp-field { font-weight: 400; text-transform: none; letter-spacing: normal; }
 .tbvp-head {
   display: flex; align-items: center; gap: 0;
 }
@@ -16592,6 +16596,8 @@ function tbGetVariationPanel(root) {
     if (insertBefore) host.insertBefore(panel, insertBefore);
     else host.appendChild(panel);
   }
+  // 정보 칸처럼 칸 글자 크기가 본문과 다른 host는 편집 중인 칸의 글자 크기를 따른다.
+  if (host.classList.contains('field')) panel.style.fontSize = getComputedStyle(root).fontSize;
   return panel;
 }
 
