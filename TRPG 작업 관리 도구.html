@@ -3328,6 +3328,8 @@ body.is-block-range-selecting * {
 .block-text-css-badge:hover { opacity: 0.7; }
 .block-text-css-badge.active { color: #1a1a1a; }
 /* 컨텍스트 메뉴 */
+/* 사용자 지정 글머리: 문자열 ::marker는 기호가 글자 쪽에 붙어 기본 글머리(disc)보다 오른쪽 간격이 좁다. 자간으로 같은 간격을 맞춘다. */
+ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 .tb-ctx-menu {
   position: fixed; z-index: 99999;
   background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
