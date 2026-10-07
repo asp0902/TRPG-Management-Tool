@@ -4004,7 +4004,6 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
   background: #fff; outline: none; font-family: inherit;
   transition: border-color 0.2s; word-break: break-word; line-height: 1.6;
 }
-#i-triggers.info-ce,
 #i-cautions.info-ce,
 #i-truth.info-ce,
 #i-afterword.info-ce {
@@ -4013,6 +4012,8 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
   padding-bottom: 10px;
   line-height: 1.6;
 }
+/* 기본 정보 그리드 안 칸: 옆 .info-basic-ce와 같은 높이로 보이고, 여러 줄이면 자동으로 늘어난다 */
+#i-triggers.info-ce { min-height: 43px; white-space: pre-wrap; overflow-wrap: anywhere; }
 #i-other.info-ce {
   min-height: 42.8px;
   height: auto;
@@ -8112,9 +8113,7 @@ select.sh-field-input,
               <div class="field" id="field-players"><label>추천 인원</label><div class="info-basic-ce" id="i-players" contenteditable="true" data-ph="예) 2~4인" oninput="syncInfo()" spellcheck="false"></div></div>
               <div class="field" id="field-skills"><label>추천 기능</label><div class="info-basic-ce" id="i-skills" contenteditable="true" data-ph="추천 기능" oninput="syncInfo()" spellcheck="false"></div></div>
               <div class="field"><label>추천 관계</label><div class="info-basic-ce" id="i-relations" contenteditable="true" data-ph="추천 관계" oninput="syncInfo()" spellcheck="false"></div></div>
-            </div>
-            <div class="info-grid">
-              <div class="field full"><label>트리거 요소</label><div class="info-ce" id="i-triggers" contenteditable="true" data-ph="트리거 요소" oninput="syncInfo()"></div></div>
+              <div class="field"><label>트리거 요소</label><div class="info-ce" id="i-triggers" contenteditable="true" data-ph="트리거 요소" oninput="syncInfo()"></div></div>
             </div>
             <div class="section-heading">가능성</div>
             <div class="info-grid-3" id="info-possibility-grid">
@@ -26016,7 +26015,7 @@ function handleFormatIndentShortcut(e) {
   const editable = e.target?.closest?.('textarea, [contenteditable="true"]');
   if (editable?.closest('.tb-variation-panel')) return;
   if (!editable || !editable.closest('#panel-info.active, #panel-body.active, #rb-chapter-body')) return;
-  if (editable.closest('#info-basic-grid')) return;
+  if (editable.closest('#info-basic-grid') && !editable.closest('.info-ce')) return;
   e.preventDefault();
   lastFocusedTA = editable;
   if (editable.contentEditable === 'true') tbSaveCERange();
