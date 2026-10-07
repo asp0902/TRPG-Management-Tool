@@ -7076,8 +7076,11 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-coc-misc-input:focus { border-color: #111; }
 .sh-coc-misc-select { width: 150px; text-align: center; text-align-last: center; }
 .sh-coc-misc-select option { text-align: center; }
-.sh-coc-mental-field { min-width: 220px; flex: 1 1 220px; }
-.sh-coc-mental-input { width: 100%; min-width: 220px; }
+/* 첫 줄: 광기 체크·남은 시간·현재 정신 상태(남은 폭), 둘째 줄: 광기의 발작·실시간/요약(.sh-coc-san-break 가 줄을 나눈다) */
+.sh-coc-san-break { flex: 0 0 100%; height: 0; }
+.sh-coc-sanity-side .sh-coc-misc-input:not(.sh-coc-misc-select):not(.sh-coc-mental-input) { width: 90px; } /* 남은 시간 */
+.sh-coc-mental-field { min-width: 140px; flex: 1 1 140px; }
+.sh-coc-mental-input { width: 100%; min-width: 140px; }
 .sh-coc-wealth-panel,
 .sh-coc-balance-panel { border: 1px solid #ddd; border-radius: 10px; background: #f8f8f8; overflow: hidden; min-width: 0; }
 .sh-coc-wealth-panel { width: 100%; max-width: 400px; }
@@ -40506,9 +40509,10 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
   var sanSide = '<div class="sh-coc-sanity-side">'
     + '<div class="sh-coc-chk-stack">' + chkInp('sanTempInsane','일시적 광기') + chkInp('sanPermInsane','장기적 광기') + '</div>'
     + miscInp('remainingTime','남은 시간',true)
+    + noteInp('mentalStatusNote','현재 정신 상태')
+    + '<span class="sh-coc-san-break"></span>'
     + miscSel('insaneBurst','광기의 발작',['없음','기억상실','심신성 장애','폭력','편집증','중요한 사람','기절','필사적인 도주','발작적 행동','공포증','집착증'],'없음')
     + '<div class="sh-coc-chk-stack">' + chkInp('insaneRealtime','실시간') + chkInp('insaneSummary','요약') + '</div>'
-    + noteInp('mentalStatusNote','현재 정신 상태')
     + '</div>';
   var sanRow = '<div class="sh-coc-derived-row"><span class="sh-coc-derived-label">이성</span>'
     + '<div class="sh-coc-derived-vals">' + numInp('sanCur','현재') + sep + calcInp('sanMax','최대', derived.sanMax) + sep + numInp('sanStart','시작치') + '</div>'
