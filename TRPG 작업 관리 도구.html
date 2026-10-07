@@ -4678,6 +4678,13 @@ body.block-drag-active .block-gap-line {
 .handout-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; position: relative; }
 .handout-columns::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border); pointer-events: none; }
 .handout-columns[hidden] { display: none; }
+.handout-label-single { display: none; }
+/* 인세인 외 룰(body.rule-insane 없음): 비밀 칸에 데이터가 없으면 공개 칸 하나만 전체 폭 "내용"으로 보인다. 본문(#blocks-container)만 대상. */
+body:not(.rule-insane) #blocks-container .handout-columns:not(:has(> [data-secret-filled])) { grid-template-columns: minmax(0, 1fr); }
+body:not(.rule-insane) #blocks-container .handout-columns:not(:has(> [data-secret-filled]))::before,
+body:not(.rule-insane) #blocks-container .handout-columns:not(:has(> [data-secret-filled])) > [data-handout-side="secret"],
+body:not(.rule-insane) #blocks-container .handout-columns:not(:has(> [data-secret-filled])) .handout-label-pair { display: none; }
+body:not(.rule-insane) #blocks-container .handout-columns:not(:has(> [data-secret-filled])) .handout-label-single { display: inline; }
 .handout-info-toggle { border: 0; background: transparent; color: inherit; font: inherit; width: 100%; padding: 0; cursor: pointer; }
 .handout-column { min-width: 0; padding-inline: 10px; }
 .handout-column h3 { font-size: 14px; font-weight: 700; margin-bottom: 11px; padding-bottom: 9px; border-bottom: 1px solid var(--border); text-align: center; }
@@ -12757,6 +12764,7 @@ function updateInfoGridByRule() {
   const rule = (document.getElementById('i-rule')?.value) || '';
   const isUnsungDuet = rule === '언성 듀엣';
   const isInsane = rule === 'inSANe';
+  document.body.classList.toggle('rule-insane', isInsane);
   const showPlayers = !isUnsungDuet;
   const showSkills  = !isUnsungDuet && !isInsane;
   const fp = document.getElementById('field-players');
@@ -18336,6 +18344,12 @@ function repairHandoutInlineParagraphs(value) {
   });
   return changed ? root.innerHTML : value;
 }
+// 인세인이 아닌 룰에서는 내용 칸 하나만 보이지만, 비밀 쪽에 데이터가 있으면 숨기지 않는다(data-secret-filled).
+function handoutSecretFilled(b) {
+  const content = String(b.secretContent || '');
+  return /<img\b/i.test(content) || !!content.replace(/<[^>]*>|&nbsp;/g, '').trim()
+    || !!String(b.secretMacro || '').trim() || !!String(b.secretImage || '').trim();
+}
 function getHandoutBlockHtml(b, cid) {
   ['content', 'secretContent'].forEach(field => { b[field] = repairHandoutInlineParagraphs(b[field]); });
   return `<div class="handout-header"><input class="handout-title" aria-label="핸드아웃 제목" placeholder="핸드아웃 제목" value="${esc(b.title || '')}" oninput="upd('${b.id}','title',this.value,'${cid}')">
@@ -18343,8 +18357,8 @@ function getHandoutBlockHtml(b, cid) {
     <div class="handout-columns" id="handout-columns-${esc(b.id)}" hidden>${['public', 'secret'].map(side => {
       const label = side === 'public' ? '공개' : '비밀';
       const field = side === 'public' ? 'content' : 'secretContent';
-      return `<section class="handout-column" data-handout-side="${side}">
-        <h3><button type="button" class="handout-info-toggle" aria-expanded="false" aria-controls="handout-${side}-${esc(b.id)}" title="PREVIEW / CSS MACRO">${label} 정보</button></h3>
+      return `<section class="handout-column" data-handout-side="${side}"${side === 'secret' && handoutSecretFilled(b) ? ' data-secret-filled="1"' : ''}>
+        <h3><button type="button" class="handout-info-toggle" aria-expanded="false" aria-controls="handout-${side}-${esc(b.id)}" title="PREVIEW / CSS MACRO">${side === 'public' ? `<span class="handout-label-pair">${label} 정보</span><span class="handout-label-single">내용</span>` : `${label} 정보`}</button></h3>
         <div class="block-ce" contenteditable="true" data-field="${field}" data-ph="${label} 내용" aria-label="핸드아웃 ${label} 내용" oninput="upd('${b.id}','${field}',this.innerHTML,'${cid}')"></div>
     <div class="handout-shared" id="handout-${side}-${esc(b.id)}" hidden>
       <details class="handout-fold css-macro-preview-wrap${b[side + 'PreviewDark'] ? ' dark' : ''}"><summary>PREVIEW${renderPreviewBackgroundToggle(!!b[side + 'PreviewDark'], '')}</summary>
@@ -18384,7 +18398,9 @@ function bindHandoutBlock(el, b, cid) {
     };
     const refresh = () => {
       column.querySelector('.handout-preview').innerHTML = getHandoutPreviewHtml(b, side);
+      if (side === 'secret') column.toggleAttribute('data-secret-filled', handoutSecretFilled(b));
     };
+    if (side === 'secret') column.querySelector('.block-ce').addEventListener('input', refresh);
     const macro = column.querySelector('.handout-macro');
     column.querySelector('.handout-macro-copy').onclick = async event => {
       event.preventDefault();

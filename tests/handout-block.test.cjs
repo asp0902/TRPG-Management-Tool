@@ -11,7 +11,7 @@ const context = {
   renderCssMacroPreviewHtml: text => `preview:${text}`,
 };
 vm.createContext(context);
-vm.runInContext(['createBlockData', 'getHandoutSideValue', 'getHandoutPreviewHtml', 'renderPreviewBackgroundToggle', 'repairHandoutInlineParagraphs', 'getHandoutBlockHtml'].map(extract).join('\n'), context);
+vm.runInContext(['createBlockData', 'getHandoutSideValue', 'getHandoutPreviewHtml', 'renderPreviewBackgroundToggle', 'repairHandoutInlineParagraphs', 'handoutSecretFilled', 'getHandoutBlockHtml'].map(extract).join('\n'), context);
 const block = context.createBlockData('handout');
 assert.equal(block.secretContent, '');
 assert.equal(block.handoutImage, '');
