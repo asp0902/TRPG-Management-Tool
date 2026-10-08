@@ -72,7 +72,7 @@ body {
 .record-timeline-page-inner { width: 100%; max-width: 1040px; margin: 0 auto; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; }
 .record-timeline-page-title { font-size: 16px; font-weight: 800; color: #111; }
 .record-timeline-page-inner .record-timeline-editor { padding: 16px; }
-.record-timeline-desc-ce { min-height: 34px; padding: 6px 8px; font-size: 13px; line-height: 1.5; }
+.record-timeline-editor .record-timeline-desc-ce, .record-timeline-editor .record-timeline-note-ce { box-sizing: border-box; min-height: 34px; padding: 6px 8px; font-size: 13px; line-height: 20px; }
 .record-timeline-summary { font-size: 9.5pt; color: #555; display: flex; flex-direction: column; gap: 3px; }
 .record-timeline-summary b { color: #111; }
 .record-timeline-summary-hint { font-size: 9pt; color: #999; }
@@ -394,7 +394,14 @@ tr.ct-row-end .ct-select:focus {
 .record-timeline-anchor { grid-template-columns: 84px minmax(0, 1fr); align-items: center; }
 .record-timeline-event-form { grid-template-columns: minmax(160px, 1fr) minmax(110px, 150px) 84px 84px minmax(180px, 1fr) auto; }
 .record-timeline-anchor-list { display: flex; flex-direction: column; gap: 6px; }
-.record-timeline-anchor-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+/* 타임라인 탭: 모든 입력칸은 같은 가로 폭(1fr)이고 오른쪽에 56px 버튼 칸을 둔다. 글 길이에 따라 높이가 늘고 줄어든다. */
+.record-timeline-row { display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: 6px; align-items: start; }
+.record-timeline-meta { display: grid; grid-template-columns: minmax(0, 1fr) 110px 84px; gap: 6px; }
+.record-timeline-editor :is(.record-form-input, .record-form-select) { box-sizing: border-box; width: 100%; min-height: 34px; }
+.record-timeline-text { display: block; resize: none; overflow: hidden; line-height: 20px; }
+.record-timeline-editor :is(.record-form-select, input.record-form-input) { height: 34px; }
+.record-timeline-editor .record-inline-add-btn { box-sizing: border-box; width: 56px; min-width: 56px; height: 34px; padding: 0; text-align: center; align-self: start; }
+.record-timeline-editor .record-timeline-icon-btn { width: 56px; height: 34px; }
 .record-timeline-label { font-size: 9pt; font-weight: 700; color: #777; }
 .record-timeline-list { display: flex; flex-direction: column; gap: 6px; }
 .record-timeline-item { display: grid; grid-template-columns: 78px minmax(0, 1fr) auto; gap: 8px; align-items: start; padding: 8px; border-left: 3px solid #b8b8b8; background: #fafafa; }
@@ -406,9 +413,9 @@ tr.ct-row-end .ct-select:focus {
 .record-timeline-icon-btn { width: 26px; height: 26px; border: 1px solid #ddd; background: #fff; color: #555; cursor: pointer; }
 .record-timeline-icon-btn:hover { border-color: #999; color: #111; }
 .record-timeline-note { margin-left: 24px; padding: 6px 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; background: #f3f3f3; font-size: 9pt; color: #555; }
-.record-timeline-note-add { margin-left: 24px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: start; }
-.record-timeline-note-ce { min-height: 30px; padding: 5px 8px; font-size: 13px; line-height: 1.5; }
-.record-timeline-note.editing { align-items: start; }
+.record-timeline-note-add { display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: 6px; align-items: start; }
+.record-timeline-note.editing { margin-left: 0; padding: 0; gap: 6px; background: none; grid-template-columns: minmax(0, 1fr) 56px; align-items: start; }
+.record-timeline-note.editing .record-timeline-actions { width: 56px; justify-content: center; }
 .record-timeline-empty { padding: 8px; color: #999; font-size: 9pt; text-align: center; }
 .record-detail-timeline { border-top: 1px solid #ececec; padding-top: 14px; }
 .record-detail-timeline .record-timeline-item { grid-template-columns: 78px minmax(0, 1fr); }
@@ -30026,7 +30033,7 @@ function renderRecordTimelineItems(input, editable = false, rid = '') {
         }
         return `<div class="record-timeline-note"><span class="record-timeline-note-text">${recordTimelineDescriptionHtml(note.title)}</span>${editable ? `<span class="record-timeline-actions"><button type="button" class="record-timeline-icon-btn" title="보충사항 편집" aria-label="보충사항 편집" onclick="editRecordTimelineNote(${noteKey},${ridArg})"><i class="fa-solid fa-pen"></i></button><button type="button" class="record-timeline-icon-btn" title="보충사항 삭제" aria-label="보충사항 삭제" onclick="deleteRecordTimelineNote(${noteKey},${ridArg})"><i class="fa-solid fa-trash"></i></button></span>` : ''}</div>`;
       }).join('')}
-      ${editable && item.type === 'event' ? `<div class="record-timeline-note-add"><div class="info-ce record-timeline-note-ce" id="${rid ? 'rt' : 'rf'}-timeline-note-${esc(item.id)}" contenteditable="true" data-ph="보충사항" oncontextmenu="return openInfoEditableContextMenu(event)" onkeydown="handleRecordTimelineNoteKey(event,${key},${ridArg},false)"></div><button type="button" class="record-inline-add-btn" onclick="addRecordTimelineNote(${key},${ridArg})">+ 추가</button></div>` : ''}`;
+      ${editable && item.type === 'event' ? `<div class="record-timeline-note-add"><div class="info-ce record-timeline-note-ce" id="${rid ? 'rt' : 'rf'}-timeline-note-${esc(item.id)}" contenteditable="true" data-ph="보충사항" oncontextmenu="return openInfoEditableContextMenu(event)" onkeydown="handleRecordTimelineNoteKey(event,${key},${ridArg},false)"></div><button type="button" class="record-inline-add-btn" onclick="addRecordTimelineNote(${key},${ridArg})">추가</button></div>` : ''}`;
   }).join('');
 }
 // 타임라인 편집: rid(기록 id)가 있으면 그 기록의 timelineEvents 를 바로 고치고 저장(기록 타임라인 탭), 없으면 폼의 임시 draft 를 고친다.
@@ -30041,6 +30048,24 @@ function setRecordTimelineEvents(rid, events) {
   const record = getRecordTimelineRecord(rid);
   if (record) record.timelineEvents = events;
   else recordTimelineDraft = events;
+}
+// 사건 입력의 기준 선택 기본값 = 마지막으로 고른 기준(처음엔 첫 기준). 기록 데이터가 아니라 기기별 UI 상태(localStorage)로만 저장한다.
+const RECORD_TIMELINE_ANCHOR_PREF_KEY = 'trpg-record-timeline-anchor';
+function getRecordTimelineAnchorPref(rid) {
+  try { return JSON.parse(localStorage.getItem(RECORD_TIMELINE_ANCHOR_PREF_KEY) || '{}')[rid] || ''; }
+  catch (e) { return ''; }
+}
+function setRecordTimelineAnchorPref(rid, anchorId) {
+  if (!rid || !anchorId) return;
+  try {
+    const map = JSON.parse(localStorage.getItem(RECORD_TIMELINE_ANCHOR_PREF_KEY) || '{}');
+    map[rid] = anchorId;
+    localStorage.setItem(RECORD_TIMELINE_ANCHOR_PREF_KEY, JSON.stringify(map));
+  } catch (e) {}
+}
+// 글 길이에 따라 높이가 늘고 줄어드는 타임라인 입력칸(textarea)
+function fitRecordTimelineTextareas() {
+  document.querySelectorAll('#page-record-timeline textarea.record-timeline-text').forEach(btcpAutoResize);
 }
 function recordTimelineEl(rid, name) {
   return document.getElementById(`${rid ? 'rt' : 'rf'}-timeline-${name}`);
@@ -30058,8 +30083,8 @@ function renderRecordTimelineEditor(rid = '', options = {}) {
     const ridArg = esc(JSON.stringify(rid || ''));
     anchorList.innerHTML = anchors.map((anchor, index) => {
       const key = esc(JSON.stringify(anchor.id));
-      return `<div class="record-timeline-anchor-row"><span class="record-timeline-label">${index === 0 ? '기준 사건' : ''}</span>`
-        + `<input type="text" class="record-form-input" value="${esc(anchor.title)}" aria-label="기준 사건 이름" oninput="renameRecordTimelineAnchor(${key},this.value,${ridArg})" onblur="this.value=getRecordTimelineEvents(${ridArg}).find(item => item.id === ${key})?.title || ''">`
+      return `<div class="record-timeline-row">`
+        + `<textarea rows="1" class="record-form-input record-timeline-text" aria-label="기준 사건 이름" oninput="btcpAutoResize(this);renameRecordTimelineAnchor(${key},this.value,${ridArg})" onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();this.blur()}" onblur="this.value=getRecordTimelineEvents(${ridArg}).find(item => item.id === ${key})?.title || '';btcpAutoResize(this)">${esc(anchor.title)}</textarea>`
         + `<button type="button" class="record-timeline-icon-btn" title="기준 삭제" aria-label="기준 삭제" onclick="deleteRecordTimelineAnchor(${key},${ridArg},event)"><i class="fa-solid fa-trash"></i></button></div>`;
     }).join('');
   }
@@ -30068,10 +30093,12 @@ function renderRecordTimelineEditor(rid = '', options = {}) {
   if (select) {
     const current = select.value;
     select.innerHTML = anchors.map(anchor => `<option value="${esc(anchor.id)}">${esc(anchor.title || '이름 없음')}</option>`).join('');
-    select.value = anchors.some(anchor => anchor.id === current) ? current : (anchors[anchors.length - 1]?.id || '');
+    const pref = getRecordTimelineAnchorPref(rid);
+    select.value = anchors.some(anchor => anchor.id === current) ? current : (anchors.some(anchor => anchor.id === pref) ? pref : (anchors[0]?.id || ''));
   }
   const list = recordTimelineEl(rid, 'list');
   if (list) list.innerHTML = renderRecordTimelineItems(events, true, rid);
+  fitRecordTimelineTextareas();
 }
 function resetRecordTimelineEventForm(rid = '') {
   editingRecordTimelineEventId = null;
@@ -30084,19 +30111,17 @@ function resetRecordTimelineEventForm(rid = '') {
   if (direction) direction.value = 'before';
   if (offset) offset.value = '0';
   setRecordTimelineDescriptionField(description, '');
-  if (save) save.textContent = '+ 사건 추가';
+  if (save) save.textContent = '추가';
+  fitRecordTimelineTextareas();
 }
 // 기준 사건: 여러 개를 입력한 순서대로 둔다. 이름 변경은 입력 중 trim 하지 않고(입력칸을 다시 그리지 않음) 저장값만 갱신한다.
 function addRecordTimelineAnchor(rid = '') {
   const input = recordTimelineEl(rid, 'anchor');
   const title = String(input?.value || '').trim();
   if (!title) { input?.focus(); return; }
-  const anchorId = mkId();
-  getRecordTimelineEvents(rid).push({ id: anchorId, type: 'anchor', title, direction: 'anchor', offset: 0, description: '', parentId: '', anchorId: '' });
+  getRecordTimelineEvents(rid).push({ id: mkId(), type: 'anchor', title, direction: 'anchor', offset: 0, description: '', parentId: '', anchorId: '' });
   if (input) input.value = '';
   commitRecordTimeline(rid);
-  const select = recordTimelineEl(rid, 'anchor-select');
-  if (select) select.value = anchorId; // 사건 입력의 기본 기준 = 가장 최근에 추가한 기준
   input?.focus();
 }
 function handleRecordTimelineAnchorKey(event, rid = '') {
@@ -30146,6 +30171,7 @@ function saveRecordTimelineEvent(rid = '') {
     return;
   }
   const anchorId = recordTimelineEl(rid, 'anchor-select')?.value || events.find(item => item.type === 'anchor').id;
+  setRecordTimelineAnchorPref(rid, anchorId);
   const titleInput = recordTimelineEl(rid, 'title');
   const title = String(titleInput?.value || '').trim();
   if (!title) { titleInput?.focus(); return; }
@@ -30169,7 +30195,8 @@ function editRecordTimelineEvent(id, rid = '') {
   recordTimelineEl(rid, 'direction').value = item.direction;
   recordTimelineEl(rid, 'offset').value = String(item.offset);
   setRecordTimelineDescriptionField(recordTimelineEl(rid, 'description'), item.description);
-  recordTimelineEl(rid, 'save').textContent = '사건 저장';
+  recordTimelineEl(rid, 'save').textContent = '저장';
+  fitRecordTimelineTextareas();
   recordTimelineEl(rid, 'title').focus();
 }
 function deleteRecordTimelineEvent(id, rid = '') {
@@ -30259,24 +30286,31 @@ function renderRecordTimelinePage(recordId) {
   host.innerHTML = `<div class="record-timeline-page-inner">
     <div class="record-timeline-page-title">${esc(getRecordTimelineTabLabel(recordId))}</div>
     <div class="record-timeline-editor">
+      <div class="record-timeline-label">기준 사건</div>
       <div class="record-timeline-anchor-list" id="rt-timeline-anchor-list"></div>
-      <div class="record-timeline-anchor">
-        <label class="record-timeline-label" for="rt-timeline-anchor">기준 추가</label>
-        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;">
-          <input type="text" class="record-form-input" id="rt-timeline-anchor" placeholder="세션 시작, 사건 발생 등" onkeydown="handleRecordTimelineAnchorKey(event,${rid})">
-          <button type="button" class="record-inline-add-btn" onclick="addRecordTimelineAnchor(${rid})">+ 기준 추가</button>
-        </div>
+      <div class="record-timeline-row">
+        <textarea rows="1" class="record-form-input record-timeline-text" id="rt-timeline-anchor" placeholder="세션 시작, 사건 발생 등" aria-label="기준 사건 추가" oninput="btcpAutoResize(this)" onkeydown="handleRecordTimelineAnchorKey(event,${rid})"></textarea>
+        <button type="button" class="record-inline-add-btn" onclick="addRecordTimelineAnchor(${rid})">추가</button>
       </div>
-      <div class="record-timeline-event-form">
-        <input type="text" class="record-form-input" id="rt-timeline-title" placeholder="중요 사건 이름">
-        <select class="record-form-select" id="rt-timeline-anchor-select" aria-label="소속 기준 사건"></select>
-        <select class="record-form-select" id="rt-timeline-direction" aria-label="기준 사건 전후">
-          <option value="before">기준 전</option>
-          <option value="after">기준 후</option>
-        </select>
-        <input type="number" class="record-form-input" id="rt-timeline-offset" min="0" step="1" value="0" aria-label="기준 대비 거리">
+      <div class="record-timeline-label">사건 추가</div>
+      <div class="record-timeline-row">
+        <textarea rows="1" class="record-form-input record-timeline-text" id="rt-timeline-title" placeholder="중요 사건 이름" aria-label="사건 이름" oninput="btcpAutoResize(this)" onkeydown="if(event.key==='Enter'&&!event.isComposing)event.preventDefault()"></textarea>
+        <span></span>
+      </div>
+      <div class="record-timeline-row">
+        <div class="record-timeline-meta">
+          <select class="record-form-select" id="rt-timeline-anchor-select" aria-label="소속 기준 사건" onchange="setRecordTimelineAnchorPref(${rid},this.value)"></select>
+          <select class="record-form-select" id="rt-timeline-direction" aria-label="기준 사건 전후">
+            <option value="before">기준 전</option>
+            <option value="after">기준 후</option>
+          </select>
+          <input type="number" class="record-form-input" id="rt-timeline-offset" min="0" step="1" value="0" aria-label="기준 대비 거리">
+        </div>
+        <span></span>
+      </div>
+      <div class="record-timeline-row">
         <div class="info-ce record-timeline-description record-timeline-desc-ce" id="rt-timeline-description" contenteditable="true" data-ph="설명" oncontextmenu="return openInfoEditableContextMenu(event)"></div>
-        <button type="button" class="record-inline-add-btn" id="rt-timeline-save" onclick="saveRecordTimelineEvent(${rid})">+ 사건 추가</button>
+        <button type="button" class="record-inline-add-btn" id="rt-timeline-save" onclick="saveRecordTimelineEvent(${rid})">추가</button>
       </div>
       <div class="record-timeline-list" id="rt-timeline-list"></div>
     </div>
