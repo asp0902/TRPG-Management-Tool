@@ -30027,7 +30027,8 @@ function renderRecordTimelineEditor(rid = '') {
   const anchor = events.find(item => item.type === 'anchor');
   const anchorInput = recordTimelineEl(rid, 'anchor');
   const list = recordTimelineEl(rid, 'list');
-  if (anchorInput && anchorInput.value !== (anchor?.title || '')) anchorInput.value = anchor?.title || '';
+  // 입력 중(포커스·한글 조합 중)에는 입력칸 값을 덮어쓰지 않는다. 저장값은 trim 되어 있어 덮어쓰면 끝 공백이 바로 사라진다. blur 때 정리한다.
+  if (anchorInput && document.activeElement !== anchorInput && anchorInput.value !== (anchor?.title || '')) anchorInput.value = anchor?.title || '';
   if (list) list.innerHTML = renderRecordTimelineItems(events, true, rid);
 }
 function resetRecordTimelineEventForm(rid = '') {
@@ -30143,7 +30144,7 @@ function renderRecordTimelinePage(recordId) {
     <div class="record-timeline-editor">
       <div class="record-timeline-anchor">
         <label class="record-timeline-label" for="rt-timeline-anchor">기준 사건</label>
-        <input type="text" class="record-form-input" id="rt-timeline-anchor" placeholder="세션 시작, 사건 발생 등" oninput="setRecordTimelineAnchor(this.value,${rid})">
+        <input type="text" class="record-form-input" id="rt-timeline-anchor" placeholder="세션 시작, 사건 발생 등" oninput="setRecordTimelineAnchor(this.value,${rid})" onblur="renderRecordTimelineEditor(${rid})">
       </div>
       <div class="record-timeline-event-form">
         <input type="text" class="record-form-input" id="rt-timeline-title" placeholder="중요 사건 이름">
