@@ -33595,6 +33595,27 @@ document.addEventListener('click', e => {
   btn.classList.add('copied');
   setTimeout(() => btn.classList.remove('copied'), 1200);
 });
+// 개변 더블클릭: 클릭한 부분(전/후) 글자 안에서만 단어를 선택한다. 개변 밖은 기본 동작.
+document.addEventListener('dblclick', e => {
+  const part = e.target.closest?.('.tb-variation-before-text, .tb-variation-after-text');
+  if (!part) return;
+  const pos = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+  const node = pos?.startContainer;
+  if (!node || node.nodeType !== 3 || !part.contains(node)) return;
+  const text = node.data, at = Math.min(pos.startOffset, text.length - 1);
+  let start = 0, end = text.length;
+  if (window.Intl?.Segmenter) {
+    for (const seg of new Intl.Segmenter(undefined, { granularity: 'word' }).segment(text)) {
+      if (at >= seg.index && at < seg.index + seg.segment.length) { start = seg.index; end = seg.index + seg.segment.length; break; }
+    }
+  }
+  const range = document.createRange();
+  range.setStart(node, start);
+  range.setEnd(node, end);
+  const sel = getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+});
 document.addEventListener('click', e => {
   if (!shouldClearBranchSelectionFromClick(e.target)) return;
   clearAllActiveBranches('blocks-container');
