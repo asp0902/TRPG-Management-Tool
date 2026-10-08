@@ -72,6 +72,7 @@ body {
 .record-timeline-page-inner { width: 100%; max-width: 1040px; margin: 0 auto; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; }
 .record-timeline-page-title { font-size: 16px; font-weight: 800; color: #111; }
 .record-timeline-page-inner .record-timeline-editor { padding: 16px; }
+.record-timeline-desc-ce { min-height: 34px; padding: 6px 8px; font-size: 13px; line-height: 1.5; }
 .record-timeline-summary { font-size: 9.5pt; color: #555; display: flex; flex-direction: column; gap: 3px; }
 .record-timeline-summary b { color: #111; }
 .record-timeline-summary-hint { font-size: 9pt; color: #999; }
@@ -24390,7 +24391,8 @@ function syncFormatBarVisibility() {
       document.getElementById('panel-body')?.classList.contains('active')
     );
   const rulebookChapterActive = currentPage === 'rulebook' && !!currentChapterId;
-  bar.classList.toggle('visible', scriptTabActive || rulebookChapterActive);
+  const recordTimelineActive = !!getRecordTimelineIdFromPage(currentPage);
+  bar.classList.toggle('visible', scriptTabActive || rulebookChapterActive || recordTimelineActive);
   requestAnimationFrame(layoutFormatToolbar);
   syncFormatTocButton();
   syncFormatMemoButton();
@@ -26371,7 +26373,7 @@ function handleFormatIndentShortcut(e) {
   const editable = e.target?.closest?.('textarea, [contenteditable="true"]');
   if (editable?.closest('.tb-variation-panel')) return;
   if (editable?.closest('.branch-choice-input')) return; // 선택지 칸은 들여쓰기 대신 기본 Tab 포커스 이동
-  if (!editable || !editable.closest('#panel-info.active, #panel-body.active, #rb-chapter-body')) return;
+  if (!editable || !editable.closest('#panel-info.active, #panel-body.active, #rb-chapter-body, #page-record-timeline')) return;
   if (editable.closest('#info-basic-grid') && !editable.closest('.info-ce')) return;
   e.preventDefault();
   lastFocusedTA = editable;
@@ -29980,6 +29982,16 @@ function getRecordTimelineTimeLabel(item) {
   if (item.type === 'anchor') return '기준';
   return `${item.direction === 'before' ? '기준 전' : '기준 후'} ${item.offset}`;
 }
+// 설명: 서식 편집 칸의 HTML 로 저장한다. 예전 평문 설명(마이그레이션 없음)은 이스케이프한 글자로, HTML 은 정화해서 보여준다.
+function recordTimelineDescriptionHtml(description) {
+  const text = String(description || '');
+  return /<\/?[a-z][^>]*>|&(?:lt|gt|amp|nbsp|quot|#\d+);/i.test(text) ? sanitizeCssMacroPreviewHtml(text) : esc(text).replace(/\n/g, '<br>');
+}
+function setRecordTimelineDescriptionField(el, description) {
+  if (!el) return;
+  if (el.isContentEditable) el.innerHTML = recordTimelineDescriptionHtml(description);
+  else el.value = description || '';
+}
 function renderRecordTimelineItems(input, editable = false, rid = '') {
   const sorted = sortRecordTimelineEvents(input);
   const parents = sorted.filter(item => item.type !== 'note');
@@ -29991,7 +30003,7 @@ function renderRecordTimelineItems(input, editable = false, rid = '') {
     return `
       <div class="record-timeline-item ${item.type === 'anchor' ? 'anchor' : ''}">
         <div class="record-timeline-time">${esc(getRecordTimelineTimeLabel(item))}</div>
-        <div><div class="record-timeline-name">${esc(item.title || '이름 없음')}</div>${item.description ? `<div class="record-timeline-desc">${esc(item.description)}</div>` : ''}</div>
+        <div><div class="record-timeline-name">${esc(item.title || '이름 없음')}</div>${item.description ? `<div class="record-timeline-desc">${recordTimelineDescriptionHtml(item.description)}</div>` : ''}</div>
         ${editable && item.type === 'event' ? `<div class="record-timeline-actions"><button type="button" class="record-timeline-icon-btn" title="사건 편집" aria-label="사건 편집" onclick="editRecordTimelineEvent(${key},${ridArg})"><i class="fa-solid fa-pen"></i></button><button type="button" class="record-timeline-icon-btn" title="사건 삭제" aria-label="사건 삭제" onclick="deleteRecordTimelineEvent(${key},${ridArg})"><i class="fa-solid fa-trash"></i></button></div>` : ''}
       </div>
       ${notes.map(note => {
@@ -30041,7 +30053,7 @@ function resetRecordTimelineEventForm(rid = '') {
   if (title) title.value = '';
   if (direction) direction.value = 'before';
   if (offset) offset.value = '0';
-  if (description) description.value = '';
+  setRecordTimelineDescriptionField(description, '');
   if (save) save.textContent = '+ 사건 추가';
 }
 function setRecordTimelineAnchor(value, rid = '') {
@@ -30069,7 +30081,8 @@ function saveRecordTimelineEvent(rid = '') {
   if (!title) { titleInput?.focus(); return; }
   const direction = recordTimelineEl(rid, 'direction')?.value === 'before' ? 'before' : 'after';
   const offset = Math.max(0, Number(recordTimelineEl(rid, 'offset')?.value) || 0);
-  const description = String(recordTimelineEl(rid, 'description')?.value || '').trim();
+  const descriptionEl = recordTimelineEl(rid, 'description');
+  const description = descriptionEl?.isContentEditable ? normalizeEditableHtml(descriptionEl.innerHTML) : String(descriptionEl?.value || '').trim();
   const existing = events.find(item => item.id === editingRecordTimelineEventId && item.type === 'event');
   if (existing) Object.assign(existing, { title, direction, offset, description });
   else events.push({ id: mkId(), type: 'event', title, direction, offset, description, parentId: '' });
@@ -30083,7 +30096,7 @@ function editRecordTimelineEvent(id, rid = '') {
   recordTimelineEl(rid, 'title').value = item.title;
   recordTimelineEl(rid, 'direction').value = item.direction;
   recordTimelineEl(rid, 'offset').value = String(item.offset);
-  recordTimelineEl(rid, 'description').value = item.description;
+  setRecordTimelineDescriptionField(recordTimelineEl(rid, 'description'), item.description);
   recordTimelineEl(rid, 'save').textContent = '사건 저장';
   recordTimelineEl(rid, 'title').focus();
 }
@@ -30153,7 +30166,7 @@ function renderRecordTimelinePage(recordId) {
           <option value="after">기준 후</option>
         </select>
         <input type="number" class="record-form-input" id="rt-timeline-offset" min="0" step="1" value="0" aria-label="기준 대비 거리">
-        <input type="text" class="record-form-input record-timeline-description" id="rt-timeline-description" placeholder="설명 (선택)">
+        <div class="info-ce record-timeline-description record-timeline-desc-ce" id="rt-timeline-description" contenteditable="true" data-ph="설명 (선택)" oncontextmenu="return openInfoEditableContextMenu(event)"></div>
         <button type="button" class="record-inline-add-btn" id="rt-timeline-save" onclick="saveRecordTimelineEvent(${rid})">+ 사건 추가</button>
       </div>
       <div class="record-timeline-list" id="rt-timeline-list"></div>
