@@ -42,4 +42,21 @@ assert.deepEqual({ ...moveContext.result, pages: undefined }, {
 assert.match(html, /function openCharacterSheet\(id\)[\s\S]*?switchPage\(getCharacterSheetPageId\(id\)\)/, '캐릭터 시트는 앱 탭으로 열려야 합니다.');
 assert.match(html, /function switchPage\(page\)[\s\S]*?renderCharacterSheetPage\(characterSheetId\)/, '캐릭터 시트 탭 전환 시 시트를 렌더링해야 합니다.');
 
+const labelFn = html.slice(html.indexOf('function getAppPageLabel'), html.indexOf('function normalizeAppPages'));
+const labelContext = {};
+vm.runInNewContext(`
+  const CSS_MACRO_PAGE_LABELS = { script: 'SCRIPT', record: 'RECORD' };
+  function getRecordTimelineIdFromPage() { return null; }
+  function getCharacterSheetIdFromPage() { return null; }
+  let open = { title: '내 시나리오' };
+  function cur() { return open; }
+  function getScenarioListTitle(s) { return s.title; }
+  ${labelFn}
+  const withScenario = getAppPageLabel('script');
+  open = null;
+  result = { withScenario, without: getAppPageLabel('script'), other: getAppPageLabel('record') };
+`, labelContext);
+assert.deepEqual({ ...labelContext.result }, { withScenario: '내 시나리오', without: 'SCRIPT', other: 'RECORD' }, '시나리오가 열리면 SCRIPT 탭 라벨은 시나리오 제목이어야 합니다.');
+assert.match(html, /function updateScriptTopbarTitle\(\) \{\s*try \{ renderAppPageTabs\(\)/, '시나리오 전환·제목 변경 시 탭 라벨을 갱신해야 합니다.');
+
 console.log('app page tab checks: OK');

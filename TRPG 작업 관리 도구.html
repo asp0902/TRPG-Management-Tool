@@ -11729,6 +11729,7 @@ function getScenarioListTitle(scenario) {
   return titlePlainText(extractBlockPlainText(scenario?.title, '').trim()) || '제목 없음';
 }
 function updateScriptTopbarTitle() {
+  try { renderAppPageTabs(); } catch (e) {} // SCRIPT 탭 라벨 = 열린 시나리오 제목
   const el = document.getElementById('topbar-title');
   if (!el || currentPage !== 'script') return;
   const s = cur();
@@ -33170,6 +33171,10 @@ function getRecordTimelineIdFromPage(page) {
 function getAppPageLabel(page) {
   const timelineRecordId = getRecordTimelineIdFromPage(page);
   if (timelineRecordId) return getRecordTimelineTabLabel(timelineRecordId);
+  if (page === 'script' && typeof cur === 'function') {
+    const scenario = cur();
+    if (scenario) return getScenarioListTitle(scenario);
+  }
   const characterId = getCharacterSheetIdFromPage(page);
   if (!characterId) return CSS_MACRO_PAGE_LABELS[page] || '';
   const character = state.characters.find(item => item.id === characterId);
@@ -33226,7 +33231,7 @@ function renderAppPageTabs() {
     const canClose = openAppPages.length > 1 || page !== 'script';
     const label = getAppPageLabel(page);
     return '<div class="app-page-tab' + (isActive ? ' active' : '') + '" role="tab" tabindex="0" draggable="true"'
-      + ' aria-selected="' + isActive + '" aria-label="' + esc(label) + ' 탭. 드래그 또는 Alt+좌우 방향키로 순서 변경" data-page="' + esc(page) + '">'
+      + ' aria-selected="' + isActive + '" aria-label="' + esc(label) + ' 탭. 드래그 또는 Alt+좌우 방향키로 순서 변경" title="' + esc(label) + '" data-page="' + esc(page) + '">'
       + '<span class="app-page-tab-label">' + esc(label) + '</span>'
       + (canClose ? '<button class="app-page-tab-close" type="button" data-page="' + esc(page)
         + '" title="탭 닫기" aria-label="' + esc(label) + ' 탭 닫기"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>' : '')
