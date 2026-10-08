@@ -36,8 +36,9 @@ assert.equal(
 assert.deepEqual(Array.from(context.normalize(undefined)), []);
 
 assert.match(html, /timelineEvents: normalizeRecordTimelineEvents\(input\?\.timelineEvents\)/);
-assert.match(html, /timelineEvents: recordTimelineDraft/);
+assert.match(html, /timelineEvents: existingRecord \? getRecordTimelineEvents\(existingRecord\.id\) : recordTimelineDraft/);
 assert.match(html, /record-detail-heading">타임라인/);
-assert.match(html, /id="rf-timeline-anchor"/);
+assert.match(html, /id="rt-timeline-anchor"/);
+assert.match(html, /id="rf-timeline-open"/);
 
 console.log('record timeline checks: OK');

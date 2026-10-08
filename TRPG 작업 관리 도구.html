@@ -65,9 +65,16 @@ body {
 .page-dropdown-item:hover { background: #262626; color: #ddd; }
 .page-dropdown-item.active { color: #fff; }
 /* ─── 앱 페이지 ─── */
-#page-scenario, #page-css-macro, #page-bookmark, #page-rulebook, #page-character, #page-datasheet {
+#page-scenario, #page-css-macro, #page-bookmark, #page-rulebook, #page-character, #page-datasheet, #page-record-timeline {
   display: none; flex: 1; flex-direction: column; overflow-y: auto;
 }
+/* 기록 타임라인 탭: 편집 칸을 넓게 */
+.record-timeline-page-inner { width: 100%; max-width: 1040px; margin: 0 auto; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; }
+.record-timeline-page-title { font-size: 16px; font-weight: 800; color: #111; }
+.record-timeline-page-inner .record-timeline-editor { padding: 16px; }
+.record-timeline-summary { font-size: 9.5pt; color: #555; display: flex; flex-direction: column; gap: 3px; }
+.record-timeline-summary b { color: #111; }
+.record-timeline-summary-hint { font-size: 9pt; color: #999; }
 #page-record {
   display: none; flex: 1; flex-direction: column; overflow: auto;
 }
@@ -8409,6 +8416,7 @@ select.sh-field-input,
   </div>
 
   <!-- RECORD PAGE -->
+  <div id="page-record-timeline"></div>
   <div id="page-record">
     <div class="record-inner">
       <div class="record-top">
@@ -8505,22 +8513,9 @@ select.sh-field-input,
                 <div class="record-timeline-editor">
                   <div class="record-timeline-head">
                     <div class="record-timeline-title">타임라인 정리</div>
+                    <button type="button" class="record-inline-add-btn" id="rf-timeline-open" onclick="openRecordTimelineTab()">타임라인 탭에서 열기</button>
                   </div>
-                  <div class="record-timeline-anchor">
-                    <label class="record-timeline-label" for="rf-timeline-anchor">기준 사건</label>
-                    <input type="text" class="record-form-input" id="rf-timeline-anchor" placeholder="세션 시작, 사건 발생 등" oninput="setRecordTimelineAnchor(this.value)">
-                  </div>
-                  <div class="record-timeline-event-form">
-                    <input type="text" class="record-form-input" id="rf-timeline-title" placeholder="중요 사건 이름">
-                    <select class="record-form-select" id="rf-timeline-direction" aria-label="기준 사건 전후">
-                      <option value="before">기준 전</option>
-                      <option value="after">기준 후</option>
-                    </select>
-                    <input type="number" class="record-form-input" id="rf-timeline-offset" min="0" step="1" value="0" aria-label="기준 대비 거리">
-                    <input type="text" class="record-form-input record-timeline-description" id="rf-timeline-description" placeholder="설명 (선택)">
-                    <button type="button" class="record-inline-add-btn" id="rf-timeline-save" onclick="saveRecordTimelineEvent()">+ 사건 추가</button>
-                  </div>
-                  <div class="record-timeline-list" id="rf-timeline-list"></div>
+                  <div class="record-timeline-summary" id="rf-timeline-summary"></div>
                 </div>
               </div>
               <div class="record-form-row full">
@@ -12637,7 +12632,7 @@ function renderList() {
   normalizeSidebarState();
   const el = document.getElementById('scenario-list');
   el.innerHTML = '';
-  if (currentPage === 'record') {
+  if (currentPage === 'record' || getRecordTimelineIdFromPage(currentPage)) {
     updateSidebarPrimaryAction();
     renderRecordSidebar(el);
     return;
@@ -24269,6 +24264,8 @@ function refreshAfterImport(replaceMode = false) {
   }
   openAppPages = normalizeAppPages(openAppPages).filter(page => {
     const characterId = getCharacterSheetIdFromPage(page);
+    const timelineRecordId = getRecordTimelineIdFromPage(page);
+    if (timelineRecordId) return state.records.some(record => record.id === timelineRecordId);
     return !characterId || state.characters.some(character => character.id === characterId);
   });
   if (!openAppPages.length) openAppPages = ['script'];
@@ -29983,10 +29980,11 @@ function getRecordTimelineTimeLabel(item) {
   if (item.type === 'anchor') return '기준';
   return `${item.direction === 'before' ? '기준 전' : '기준 후'} ${item.offset}`;
 }
-function renderRecordTimelineItems(input, editable = false) {
+function renderRecordTimelineItems(input, editable = false, rid = '') {
   const sorted = sortRecordTimelineEvents(input);
   const parents = sorted.filter(item => item.type !== 'note');
   if (!parents.length) return '<div class="record-timeline-empty">등록된 타임라인이 없습니다.</div>';
+  const ridArg = esc(JSON.stringify(rid || ''));
   return parents.map(item => {
     const key = esc(JSON.stringify(item.id));
     const notes = sorted.filter(note => note.type === 'note' && note.parentId === item.id);
@@ -29994,99 +29992,174 @@ function renderRecordTimelineItems(input, editable = false) {
       <div class="record-timeline-item ${item.type === 'anchor' ? 'anchor' : ''}">
         <div class="record-timeline-time">${esc(getRecordTimelineTimeLabel(item))}</div>
         <div><div class="record-timeline-name">${esc(item.title || '이름 없음')}</div>${item.description ? `<div class="record-timeline-desc">${esc(item.description)}</div>` : ''}</div>
-        ${editable && item.type === 'event' ? `<div class="record-timeline-actions"><button type="button" class="record-timeline-icon-btn" title="사건 편집" aria-label="사건 편집" onclick="editRecordTimelineEvent(${key})"><i class="fa-solid fa-pen"></i></button><button type="button" class="record-timeline-icon-btn" title="사건 삭제" aria-label="사건 삭제" onclick="deleteRecordTimelineEvent(${key})"><i class="fa-solid fa-trash"></i></button></div>` : ''}
+        ${editable && item.type === 'event' ? `<div class="record-timeline-actions"><button type="button" class="record-timeline-icon-btn" title="사건 편집" aria-label="사건 편집" onclick="editRecordTimelineEvent(${key},${ridArg})"><i class="fa-solid fa-pen"></i></button><button type="button" class="record-timeline-icon-btn" title="사건 삭제" aria-label="사건 삭제" onclick="deleteRecordTimelineEvent(${key},${ridArg})"><i class="fa-solid fa-trash"></i></button></div>` : ''}
       </div>
       ${notes.map(note => {
         const noteKey = esc(JSON.stringify(note.id));
-        return `<div class="record-timeline-note"><span>${esc(note.title)}</span>${editable ? `<span class="record-timeline-actions"><button type="button" class="record-timeline-icon-btn" title="보충사항 편집" aria-label="보충사항 편집" onclick="editRecordTimelineNote(${noteKey})"><i class="fa-solid fa-pen"></i></button><button type="button" class="record-timeline-icon-btn" title="보충사항 삭제" aria-label="보충사항 삭제" onclick="deleteRecordTimelineNote(${noteKey})"><i class="fa-solid fa-trash"></i></button></span>` : ''}</div>`;
+        return `<div class="record-timeline-note"><span>${esc(note.title)}</span>${editable ? `<span class="record-timeline-actions"><button type="button" class="record-timeline-icon-btn" title="보충사항 편집" aria-label="보충사항 편집" onclick="editRecordTimelineNote(${noteKey},${ridArg})"><i class="fa-solid fa-pen"></i></button><button type="button" class="record-timeline-icon-btn" title="보충사항 삭제" aria-label="보충사항 삭제" onclick="deleteRecordTimelineNote(${noteKey},${ridArg})"><i class="fa-solid fa-trash"></i></button></span>` : ''}</div>`;
       }).join('')}
-      ${editable && item.type === 'event' ? `<div class="record-timeline-note-add"><input type="text" class="record-form-input" id="rf-timeline-note-${esc(item.id)}" placeholder="보충사항"><button type="button" class="record-inline-add-btn" onclick="addRecordTimelineNote(${key})">+ 추가</button></div>` : ''}`;
+      ${editable && item.type === 'event' ? `<div class="record-timeline-note-add"><input type="text" class="record-form-input" id="${rid ? 'rt' : 'rf'}-timeline-note-${esc(item.id)}" placeholder="보충사항"><button type="button" class="record-inline-add-btn" onclick="addRecordTimelineNote(${key},${ridArg})">+ 추가</button></div>` : ''}`;
   }).join('');
 }
-function renderRecordTimelineEditor() {
-  const anchor = recordTimelineDraft.find(item => item.type === 'anchor');
-  const anchorInput = document.getElementById('rf-timeline-anchor');
-  const list = document.getElementById('rf-timeline-list');
-  if (anchorInput && anchorInput.value !== (anchor?.title || '')) anchorInput.value = anchor?.title || '';
-  if (list) list.innerHTML = renderRecordTimelineItems(recordTimelineDraft, true);
+// 타임라인 편집: rid(기록 id)가 있으면 그 기록의 timelineEvents 를 바로 고치고 저장(기록 타임라인 탭), 없으면 폼의 임시 draft 를 고친다.
+function getRecordTimelineRecord(rid) {
+  return rid ? state.records.find(record => record.id === rid) || null : null;
 }
-function resetRecordTimelineEventForm() {
+function getRecordTimelineEvents(rid) {
+  const record = getRecordTimelineRecord(rid);
+  return record ? (record.timelineEvents = normalizeRecordTimelineEvents(record.timelineEvents)) : recordTimelineDraft;
+}
+function setRecordTimelineEvents(rid, events) {
+  const record = getRecordTimelineRecord(rid);
+  if (record) record.timelineEvents = events;
+  else recordTimelineDraft = events;
+}
+function recordTimelineEl(rid, name) {
+  return document.getElementById(`${rid ? 'rt' : 'rf'}-timeline-${name}`);
+}
+function commitRecordTimeline(rid) {
+  renderRecordTimelineEditor(rid);
+  if (rid) persist();
+  renderRecordTimelineSummary();
+}
+function renderRecordTimelineEditor(rid = '') {
+  const events = getRecordTimelineEvents(rid);
+  const anchor = events.find(item => item.type === 'anchor');
+  const anchorInput = recordTimelineEl(rid, 'anchor');
+  const list = recordTimelineEl(rid, 'list');
+  if (anchorInput && anchorInput.value !== (anchor?.title || '')) anchorInput.value = anchor?.title || '';
+  if (list) list.innerHTML = renderRecordTimelineItems(events, true, rid);
+}
+function resetRecordTimelineEventForm(rid = '') {
   editingRecordTimelineEventId = null;
-  const title = document.getElementById('rf-timeline-title');
-  const direction = document.getElementById('rf-timeline-direction');
-  const offset = document.getElementById('rf-timeline-offset');
-  const description = document.getElementById('rf-timeline-description');
-  const save = document.getElementById('rf-timeline-save');
+  const title = recordTimelineEl(rid, 'title');
+  const direction = recordTimelineEl(rid, 'direction');
+  const offset = recordTimelineEl(rid, 'offset');
+  const description = recordTimelineEl(rid, 'description');
+  const save = recordTimelineEl(rid, 'save');
   if (title) title.value = '';
   if (direction) direction.value = 'before';
   if (offset) offset.value = '0';
   if (description) description.value = '';
   if (save) save.textContent = '+ 사건 추가';
 }
-function setRecordTimelineAnchor(value) {
+function setRecordTimelineAnchor(value, rid = '') {
   const title = String(value || '').trim();
-  const index = recordTimelineDraft.findIndex(item => item.type === 'anchor');
+  const events = getRecordTimelineEvents(rid);
+  const index = events.findIndex(item => item.type === 'anchor');
   if (!title) {
-    if (index >= 0) recordTimelineDraft.splice(index, 1);
+    if (index >= 0) events.splice(index, 1);
   } else if (index >= 0) {
-    recordTimelineDraft[index].title = title;
+    events[index].title = title;
   } else {
-    recordTimelineDraft.unshift({ id: mkId(), type: 'anchor', title, direction: 'anchor', offset: 0, description: '', parentId: '' });
+    events.unshift({ id: mkId(), type: 'anchor', title, direction: 'anchor', offset: 0, description: '', parentId: '' });
   }
-  renderRecordTimelineEditor();
+  commitRecordTimeline(rid);
 }
-function saveRecordTimelineEvent() {
-  if (!recordTimelineDraft.some(item => item.type === 'anchor')) {
+function saveRecordTimelineEvent(rid = '') {
+  const events = getRecordTimelineEvents(rid);
+  if (!events.some(item => item.type === 'anchor')) {
     alert('기준 사건을 먼저 입력하세요.');
-    document.getElementById('rf-timeline-anchor')?.focus();
+    recordTimelineEl(rid, 'anchor')?.focus();
     return;
   }
-  const titleInput = document.getElementById('rf-timeline-title');
+  const titleInput = recordTimelineEl(rid, 'title');
   const title = String(titleInput?.value || '').trim();
   if (!title) { titleInput?.focus(); return; }
-  const direction = document.getElementById('rf-timeline-direction')?.value === 'before' ? 'before' : 'after';
-  const offset = Math.max(0, Number(document.getElementById('rf-timeline-offset')?.value) || 0);
-  const description = String(document.getElementById('rf-timeline-description')?.value || '').trim();
-  const existing = recordTimelineDraft.find(item => item.id === editingRecordTimelineEventId && item.type === 'event');
+  const direction = recordTimelineEl(rid, 'direction')?.value === 'before' ? 'before' : 'after';
+  const offset = Math.max(0, Number(recordTimelineEl(rid, 'offset')?.value) || 0);
+  const description = String(recordTimelineEl(rid, 'description')?.value || '').trim();
+  const existing = events.find(item => item.id === editingRecordTimelineEventId && item.type === 'event');
   if (existing) Object.assign(existing, { title, direction, offset, description });
-  else recordTimelineDraft.push({ id: mkId(), type: 'event', title, direction, offset, description, parentId: '' });
-  resetRecordTimelineEventForm();
-  renderRecordTimelineEditor();
+  else events.push({ id: mkId(), type: 'event', title, direction, offset, description, parentId: '' });
+  resetRecordTimelineEventForm(rid);
+  commitRecordTimeline(rid);
 }
-function editRecordTimelineEvent(id) {
-  const item = recordTimelineDraft.find(entry => entry.id === id && entry.type === 'event');
+function editRecordTimelineEvent(id, rid = '') {
+  const item = getRecordTimelineEvents(rid).find(entry => entry.id === id && entry.type === 'event');
   if (!item) return;
   editingRecordTimelineEventId = id;
-  document.getElementById('rf-timeline-title').value = item.title;
-  document.getElementById('rf-timeline-direction').value = item.direction;
-  document.getElementById('rf-timeline-offset').value = String(item.offset);
-  document.getElementById('rf-timeline-description').value = item.description;
-  document.getElementById('rf-timeline-save').textContent = '사건 저장';
-  document.getElementById('rf-timeline-title').focus();
+  recordTimelineEl(rid, 'title').value = item.title;
+  recordTimelineEl(rid, 'direction').value = item.direction;
+  recordTimelineEl(rid, 'offset').value = String(item.offset);
+  recordTimelineEl(rid, 'description').value = item.description;
+  recordTimelineEl(rid, 'save').textContent = '사건 저장';
+  recordTimelineEl(rid, 'title').focus();
 }
-function deleteRecordTimelineEvent(id) {
-  recordTimelineDraft = recordTimelineDraft.filter(item => item.id !== id && item.parentId !== id);
-  if (editingRecordTimelineEventId === id) resetRecordTimelineEventForm();
-  renderRecordTimelineEditor();
+function deleteRecordTimelineEvent(id, rid = '') {
+  setRecordTimelineEvents(rid, getRecordTimelineEvents(rid).filter(item => item.id !== id && item.parentId !== id));
+  if (editingRecordTimelineEventId === id) resetRecordTimelineEventForm(rid);
+  commitRecordTimeline(rid);
 }
-function addRecordTimelineNote(parentId) {
-  const input = document.getElementById(`rf-timeline-note-${parentId}`);
+function addRecordTimelineNote(parentId, rid = '') {
+  const input = document.getElementById(`${rid ? 'rt' : 'rf'}-timeline-note-${parentId}`);
   const title = String(input?.value || '').trim();
   if (!title) { input?.focus(); return; }
-  recordTimelineDraft.push({ id: mkId(), type: 'note', title, direction: 'after', offset: 0, description: '', parentId });
-  renderRecordTimelineEditor();
+  getRecordTimelineEvents(rid).push({ id: mkId(), type: 'note', title, direction: 'after', offset: 0, description: '', parentId });
+  commitRecordTimeline(rid);
 }
-function editRecordTimelineNote(id) {
-  const item = recordTimelineDraft.find(entry => entry.id === id && entry.type === 'note');
+function editRecordTimelineNote(id, rid = '') {
+  const item = getRecordTimelineEvents(rid).find(entry => entry.id === id && entry.type === 'note');
   if (!item) return;
   const title = prompt('보충사항', item.title);
   if (title === null || !title.trim()) return;
   item.title = title.trim();
-  renderRecordTimelineEditor();
+  commitRecordTimeline(rid);
 }
-function deleteRecordTimelineNote(id) {
-  recordTimelineDraft = recordTimelineDraft.filter(item => item.id !== id);
-  renderRecordTimelineEditor();
+function deleteRecordTimelineNote(id, rid = '') {
+  setRecordTimelineEvents(rid, getRecordTimelineEvents(rid).filter(item => item.id !== id));
+  commitRecordTimeline(rid);
+}
+
+// 세션 기록 편집 폼: 타임라인은 요약만 보이고, 편집은 기록 타임라인 탭에서 한다(저장된 기록만).
+function renderRecordTimelineSummary() {
+  const box = document.getElementById('rf-timeline-summary');
+  const openBtn = document.getElementById('rf-timeline-open');
+  if (!box) return;
+  const events = editingRecordId ? getRecordTimelineEvents(editingRecordId) : recordTimelineDraft;
+  const sorted = sortRecordTimelineEvents(events);
+  const anchor = sorted.find(item => item.type === 'anchor');
+  const eventItems = sorted.filter(item => item.type === 'event');
+  const top = eventItems.slice(0, 3).map(item => `<div>${esc(getRecordTimelineTimeLabel(item))} · ${esc(item.title || '이름 없음')}</div>`).join('');
+  box.innerHTML = `<div>기준 사건: <b>${esc(anchor?.title || '없음')}</b> · 사건 ${eventItems.length}개</div>${top}`
+    + (editingRecordId ? '' : '<div class="record-timeline-summary-hint">기록을 저장하면 타임라인 탭에서 편집할 수 있어요.</div>');
+  if (openBtn) openBtn.disabled = !editingRecordId;
+}
+function getRecordTimelineTabLabel(recordId) {
+  const record = state.records.find(item => item.id === recordId);
+  return `${record?.scenarioName || '이름 없는 기록'} · 타임라인`;
+}
+function openRecordTimelineTab(recordId = editingRecordId) {
+  if (!recordId || !state.records.some(record => record.id === recordId)) return;
+  switchPage(getRecordTimelinePageId(recordId));
+}
+function renderRecordTimelinePage(recordId) {
+  const host = document.getElementById('page-record-timeline');
+  const record = state.records.find(item => item.id === recordId);
+  if (!host || !record) return;
+  const rid = esc(JSON.stringify(recordId));
+  host.innerHTML = `<div class="record-timeline-page-inner">
+    <div class="record-timeline-page-title">${esc(getRecordTimelineTabLabel(recordId))}</div>
+    <div class="record-timeline-editor">
+      <div class="record-timeline-anchor">
+        <label class="record-timeline-label" for="rt-timeline-anchor">기준 사건</label>
+        <input type="text" class="record-form-input" id="rt-timeline-anchor" placeholder="세션 시작, 사건 발생 등" oninput="setRecordTimelineAnchor(this.value,${rid})">
+      </div>
+      <div class="record-timeline-event-form">
+        <input type="text" class="record-form-input" id="rt-timeline-title" placeholder="중요 사건 이름">
+        <select class="record-form-select" id="rt-timeline-direction" aria-label="기준 사건 전후">
+          <option value="before">기준 전</option>
+          <option value="after">기준 후</option>
+        </select>
+        <input type="number" class="record-form-input" id="rt-timeline-offset" min="0" step="1" value="0" aria-label="기준 대비 거리">
+        <input type="text" class="record-form-input record-timeline-description" id="rt-timeline-description" placeholder="설명 (선택)">
+        <button type="button" class="record-inline-add-btn" id="rt-timeline-save" onclick="saveRecordTimelineEvent(${rid})">+ 사건 추가</button>
+      </div>
+      <div class="record-timeline-list" id="rt-timeline-list"></div>
+    </div>
+  </div>`;
+  editingRecordTimelineEventId = null;
+  renderRecordTimelineEditor(recordId);
 }
 
 function ensureRecordNotePopup() {
@@ -30768,7 +30841,6 @@ function openRecordForm(recordId) {
   const formSeed = recordId ? null : recordFormSeedData;
   const sourceRecord = recordId ? state.records.find(r => r.id === recordId) : formSeed;
   recordTimelineDraft = normalizeRecordTimelineEvents(sourceRecord?.timelineEvents);
-  resetRecordTimelineEventForm();
   const recordRule = sourceRecord?.rule || '';
   if (ruleInput) {
     ruleInput.innerHTML = catalogRuleOptionsHtml(recordRule);
@@ -30810,7 +30882,7 @@ function openRecordForm(recordId) {
   syncRecordScenarioImageCard();
   if (sessionTagEditorInput) sessionTagEditorInput.value = '';
   renderRecordSessionTagEditor();
-  renderRecordTimelineEditor();
+  renderRecordTimelineSummary();
   if (durationInput) durationInput.value = '';
   updateCustomNameRow();
   updateRecordDurationPreview();
@@ -30886,7 +30958,8 @@ function saveRecord() {
     sessionTag: formatRecordSessionTags(sessionTags),
     notes: extractBlockPlainText(notesHtml, '').trim(),
     notesHtml,
-    timelineEvents: recordTimelineDraft,
+    // 저장된 기록의 타임라인은 타임라인 탭에서 바로 저장되므로 폼 값으로 덮어쓰지 않고 최신 값을 유지한다.
+    timelineEvents: existingRecord ? getRecordTimelineEvents(existingRecord.id) : recordTimelineDraft,
     createdAt: editingRecordId
       ? (state.records.find(r => r.id === editingRecordId)?.createdAt || Date.now())
       : Date.now(),
@@ -30908,6 +30981,8 @@ function saveRecord() {
 function deleteRecord(id) {
   if (!confirm('이 기록을 삭제하시겠습니까?')) return;
   state.records = state.records.filter(r => r.id !== id);
+  const timelinePage = getRecordTimelinePageId(id);
+  if (openAppPages.includes(timelinePage)) closeAppPageTab(timelinePage);
   if (currentRecordSidebarId === id) currentRecordSidebarId = null;
   if (expandedRecordId === id) expandedRecordId = null;
   persist();
@@ -32926,7 +33001,18 @@ function getCharacterSheetIdFromPage(page) {
   try { return decodeURIComponent(page.slice(CHARACTER_SHEET_PAGE_PREFIX.length)) || null; }
   catch (e) { return null; }
 }
+const RECORD_TIMELINE_PAGE_PREFIX = 'record-timeline:';
+function getRecordTimelinePageId(recordId) {
+  return RECORD_TIMELINE_PAGE_PREFIX + encodeURIComponent(String(recordId || ''));
+}
+function getRecordTimelineIdFromPage(page) {
+  if (typeof page !== 'string' || !page.startsWith(RECORD_TIMELINE_PAGE_PREFIX)) return null;
+  try { return decodeURIComponent(page.slice(RECORD_TIMELINE_PAGE_PREFIX.length)) || null; }
+  catch (e) { return null; }
+}
 function getAppPageLabel(page) {
+  const timelineRecordId = getRecordTimelineIdFromPage(page);
+  if (timelineRecordId) return getRecordTimelineTabLabel(timelineRecordId);
   const characterId = getCharacterSheetIdFromPage(page);
   if (!characterId) return CSS_MACRO_PAGE_LABELS[page] || '';
   const character = state.characters.find(item => item.id === characterId);
@@ -32935,7 +33021,7 @@ function getAppPageLabel(page) {
 function normalizeAppPages(pages) {
   return Array.isArray(pages)
     ? pages.filter((page, index) => page !== 'datasheet'
-      && (CSS_MACRO_PAGE_LABELS[page] || getCharacterSheetIdFromPage(page))
+      && (CSS_MACRO_PAGE_LABELS[page] || getCharacterSheetIdFromPage(page) || getRecordTimelineIdFromPage(page))
       && pages.indexOf(page) === index)
     : [];
 }
@@ -32953,7 +33039,7 @@ function saveOpenAppPages() {
   localStorage.setItem(APP_OPEN_PAGES_KEY, JSON.stringify(normalizeAppPages(openAppPages)));
 }
 function ensureAppPageTab(page) {
-  if (!(CSS_MACRO_PAGE_LABELS[page] || getCharacterSheetIdFromPage(page)) || openAppPages.includes(page)) return;
+  if (!(CSS_MACRO_PAGE_LABELS[page] || getCharacterSheetIdFromPage(page) || getRecordTimelineIdFromPage(page)) || openAppPages.includes(page)) return;
   openAppPages.push(page);
   saveOpenAppPages();
 }
@@ -33029,6 +33115,12 @@ function switchPage(page) {
     page = 'character';
     characterSheetId = null;
   }
+  let recordTimelineId = getRecordTimelineIdFromPage(page);
+  if (recordTimelineId && !state.records.some(record => record.id === recordTimelineId)) {
+    removeAppPageTab(page);
+    page = 'record';
+    recordTimelineId = null;
+  }
   ensureAppPageTab(page);
   if (_openCharacterSheetId && _openCharacterSheetId !== characterSheetId) {
     closeCocCustomSkillModal();
@@ -33043,9 +33135,9 @@ function switchPage(page) {
   if (page !== 'datasheet' && !isCharacterSheetPopupMode()) localStorage.setItem('trpg-last-page', page);
   closeCssPopupDictionary();
   document.querySelectorAll('.page-dropdown-item').forEach(item => {
-    item.classList.toggle('active', item.dataset.page === (characterSheetId ? 'character' : page));
+    item.classList.toggle('active', item.dataset.page === (characterSheetId ? 'character' : (recordTimelineId ? 'record' : page)));
   });
-  document.getElementById('sidebar-logo-text').textContent = characterSheetId ? 'CHARACTER' : (CSS_MACRO_PAGE_LABELS[page] || String(page || '').toUpperCase());
+  document.getElementById('sidebar-logo-text').textContent = characterSheetId ? 'CHARACTER' : (recordTimelineId ? 'RECORD' : (CSS_MACRO_PAGE_LABELS[page] || String(page || '').toUpperCase()));
   document.getElementById('sidebar-logo-wrap').classList.remove('open');
 
   const isScript = page === 'script';
@@ -33056,6 +33148,7 @@ function switchPage(page) {
 
   document.getElementById('page-scenario').style.display = page === 'scenario' ? 'flex' : 'none';
   document.getElementById('page-record').style.display = page === 'record' ? 'flex' : 'none';
+  document.getElementById('page-record-timeline').style.display = recordTimelineId ? 'flex' : 'none';
   document.getElementById('page-css-macro').style.display = page === 'css-macro' ? 'flex' : 'none';
   document.getElementById('page-bookmark').style.display = page === 'bookmark' ? 'flex' : 'none';
   document.getElementById('page-rulebook').style.display = page === 'rulebook' ? 'flex' : 'none';
@@ -33069,7 +33162,7 @@ function switchPage(page) {
     updateScriptTopbarTitle();
   } else if (page === 'rulebook') {
     updateRulebookTopbarTitle();
-  } else if (characterSheetId) {
+  } else if (characterSheetId || recordTimelineId) {
     titleEl.textContent = getAppPageLabel(page);
   } else {
     titleEl.textContent = CSS_MACRO_PAGE_TITLES[page] || '';
@@ -33078,6 +33171,7 @@ function switchPage(page) {
   renderList();
   if (page === 'scenario') renderCatalog();
   if (page === 'record') renderRecordPage();
+  if (recordTimelineId) renderRecordTimelinePage(recordTimelineId);
   if (page === 'css-macro') {
     ensureCssMacroHistory();
     renderCssMacroPage();
@@ -33178,6 +33272,8 @@ async function bootstrapApp() {
   updateFontDropdown();
   openAppPages = normalizeAppPages(openAppPages).filter(page => {
     const characterId = getCharacterSheetIdFromPage(page);
+    const timelineRecordId = getRecordTimelineIdFromPage(page);
+    if (timelineRecordId) return state.records.some(record => record.id === timelineRecordId);
     return !characterId || state.characters.some(character => character.id === characterId);
   });
   if (!openAppPages.length) openAppPages = ['script'];
@@ -33205,8 +33301,10 @@ async function bootstrapApp() {
     // 마지막 페이지 복원
     const _lastPage = localStorage.getItem('trpg-last-page');
     const _lastCharacterId = getCharacterSheetIdFromPage(_lastPage);
+    const _lastTimelineId = getRecordTimelineIdFromPage(_lastPage);
     const _canRestoreLastPage = _lastPage !== 'datasheet' && (
       CSS_MACRO_PAGE_LABELS[_lastPage]
+      || (_lastTimelineId && state.records.some(record => record.id === _lastTimelineId))
       || (_lastCharacterId && state.characters.some(character => character.id === _lastCharacterId))
     );
     switchPage(_canRestoreLastPage ? _lastPage : 'script');
