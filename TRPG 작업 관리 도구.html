@@ -420,8 +420,6 @@ tr.ct-row-end .ct-select:focus {
 .record-timeline-note.editing { margin-left: 0; padding: 0; gap: 6px; background: none; grid-template-columns: minmax(0, 1fr) 56px; align-items: start; }
 .record-timeline-note.editing .record-timeline-actions { width: 56px; justify-content: center; }
 .record-timeline-empty { padding: 8px; color: #999; font-size: 9pt; text-align: center; }
-.record-detail-timeline { border-top: 1px solid #ececec; padding-top: 14px; }
-.record-detail-timeline .record-timeline-item { grid-template-columns: 78px minmax(0, 1fr); }
 .record-session-tag-editor {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
   min-height: 33px; border: 1px solid #e4e4e4; border-radius: 5px;
@@ -30803,7 +30801,6 @@ function renderRecordDetailContent(record) {
   const scenarioCard = String(scenario?.info?.sessionCard || record?.scenarioImage || '').trim();
   const dateTimeInfo = getRecordDateTimeInfo(record?.dateTime || record?.date);
   const noteHtml = (record?.notesHtml || recordPlainTextToHtml(record?.notes || '') || '').trim();
-  const timelineEvents = normalizeRecordTimelineEvents(record?.timelineEvents);
   const detailMeta = [
     { label: '날짜와 시간', value: dateTimeInfo.display || record?.dateTime || record?.date || '-' },
     { label: '플레이 시간', value: getRecordDurationLabel(record) || '-' },
@@ -30840,7 +30837,6 @@ function renderRecordDetailContent(record) {
           </div>
         </div>
       </div>
-      ${timelineEvents.length ? `<div class="record-detail-section record-detail-timeline"><div class="record-detail-heading">타임라인</div><div class="record-timeline-list">${renderRecordTimelineItems(timelineEvents)}</div></div>` : ''}
     </div>`;
 }
 
