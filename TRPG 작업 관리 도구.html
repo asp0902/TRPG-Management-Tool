@@ -404,7 +404,9 @@ tr.ct-row-end .ct-select:focus {
 .record-timeline-icon-btn { width: 26px; height: 26px; border: 1px solid #ddd; background: #fff; color: #555; cursor: pointer; }
 .record-timeline-icon-btn:hover { border-color: #999; color: #111; }
 .record-timeline-note { margin-left: 24px; padding: 6px 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; background: #f3f3f3; font-size: 9pt; color: #555; }
-.record-timeline-note-add { margin-left: 24px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.record-timeline-note-add { margin-left: 24px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: start; }
+.record-timeline-note-ce { min-height: 30px; padding: 5px 8px; font-size: 13px; line-height: 1.5; }
+.record-timeline-note.editing { align-items: start; }
 .record-timeline-empty { padding: 8px; color: #999; font-size: 9pt; text-align: center; }
 .record-detail-timeline { border-top: 1px solid #ececec; padding-top: 14px; }
 .record-detail-timeline .record-timeline-item { grid-template-columns: 78px minmax(0, 1fr); }
@@ -29992,6 +29994,7 @@ function setRecordTimelineDescriptionField(el, description) {
   if (el.isContentEditable) el.innerHTML = recordTimelineDescriptionHtml(description);
   else el.value = description || '';
 }
+let editingRecordTimelineNoteId = null;
 function renderRecordTimelineItems(input, editable = false, rid = '') {
   const sorted = sortRecordTimelineEvents(input);
   const parents = sorted.filter(item => item.type !== 'note');
@@ -30008,9 +30011,13 @@ function renderRecordTimelineItems(input, editable = false, rid = '') {
       </div>
       ${notes.map(note => {
         const noteKey = esc(JSON.stringify(note.id));
-        return `<div class="record-timeline-note"><span>${esc(note.title)}</span>${editable ? `<span class="record-timeline-actions"><button type="button" class="record-timeline-icon-btn" title="보충사항 편집" aria-label="보충사항 편집" onclick="editRecordTimelineNote(${noteKey},${ridArg})"><i class="fa-solid fa-pen"></i></button><button type="button" class="record-timeline-icon-btn" title="보충사항 삭제" aria-label="보충사항 삭제" onclick="deleteRecordTimelineNote(${noteKey},${ridArg})"><i class="fa-solid fa-trash"></i></button></span>` : ''}</div>`;
+        const editingNote = editable && editingRecordTimelineNoteId === note.id;
+        if (editingNote) {
+          return `<div class="record-timeline-note editing"><div class="info-ce record-timeline-note-ce" id="${rid ? 'rt' : 'rf'}-timeline-note-edit-${esc(note.id)}" contenteditable="true" data-ph="보충사항" oncontextmenu="return openInfoEditableContextMenu(event)" onkeydown="handleRecordTimelineNoteKey(event,${noteKey},${ridArg},true)">${recordTimelineDescriptionHtml(note.title)}</div><span class="record-timeline-actions"><button type="button" class="record-timeline-icon-btn" title="저장" aria-label="보충사항 저장" onmousedown="event.preventDefault()" onclick="saveRecordTimelineNoteEdit(${noteKey},${ridArg})"><i class="fa-solid fa-check"></i></button><button type="button" class="record-timeline-icon-btn" title="취소" aria-label="보충사항 편집 취소" onmousedown="event.preventDefault()" onclick="cancelRecordTimelineNoteEdit(${ridArg})"><i class="fa-solid fa-xmark"></i></button></span></div>`;
+        }
+        return `<div class="record-timeline-note"><span class="record-timeline-note-text">${recordTimelineDescriptionHtml(note.title)}</span>${editable ? `<span class="record-timeline-actions"><button type="button" class="record-timeline-icon-btn" title="보충사항 편집" aria-label="보충사항 편집" onclick="editRecordTimelineNote(${noteKey},${ridArg})"><i class="fa-solid fa-pen"></i></button><button type="button" class="record-timeline-icon-btn" title="보충사항 삭제" aria-label="보충사항 삭제" onclick="deleteRecordTimelineNote(${noteKey},${ridArg})"><i class="fa-solid fa-trash"></i></button></span>` : ''}</div>`;
       }).join('')}
-      ${editable && item.type === 'event' ? `<div class="record-timeline-note-add"><input type="text" class="record-form-input" id="${rid ? 'rt' : 'rf'}-timeline-note-${esc(item.id)}" placeholder="보충사항"><button type="button" class="record-inline-add-btn" onclick="addRecordTimelineNote(${key},${ridArg})">+ 추가</button></div>` : ''}`;
+      ${editable && item.type === 'event' ? `<div class="record-timeline-note-add"><div class="info-ce record-timeline-note-ce" id="${rid ? 'rt' : 'rf'}-timeline-note-${esc(item.id)}" contenteditable="true" data-ph="보충사항" oncontextmenu="return openInfoEditableContextMenu(event)" onkeydown="handleRecordTimelineNoteKey(event,${key},${ridArg},false)"></div><button type="button" class="record-inline-add-btn" onclick="addRecordTimelineNote(${key},${ridArg})">+ 추가</button></div>` : ''}`;
   }).join('');
 }
 // 타임라인 편집: rid(기록 id)가 있으면 그 기록의 timelineEvents 를 바로 고치고 저장(기록 타임라인 탭), 없으면 폼의 임시 draft 를 고친다.
@@ -30107,18 +30114,50 @@ function deleteRecordTimelineEvent(id, rid = '') {
 }
 function addRecordTimelineNote(parentId, rid = '') {
   const input = document.getElementById(`${rid ? 'rt' : 'rf'}-timeline-note-${parentId}`);
-  const title = String(input?.value || '').trim();
+  const title = normalizeEditableHtml(input?.innerHTML || '');
   if (!title) { input?.focus(); return; }
   getRecordTimelineEvents(rid).push({ id: mkId(), type: 'note', title, direction: 'after', offset: 0, description: '', parentId });
   commitRecordTimeline(rid);
 }
+// 보충사항 칸 키: Enter = 추가/저장(한글 조합 중 제외), Shift+Enter = 줄바꿈, Esc = 편집 취소
+function handleRecordTimelineNoteKey(event, id, rid, editing) {
+  if (event.isComposing || event.keyCode === 229) return;
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    if (editing) saveRecordTimelineNoteEdit(id, rid);
+    else addRecordTimelineNote(id, rid);
+  } else if (event.key === 'Escape' && editing) {
+    event.preventDefault();
+    cancelRecordTimelineNoteEdit(rid);
+  }
+}
 function editRecordTimelineNote(id, rid = '') {
   const item = getRecordTimelineEvents(rid).find(entry => entry.id === id && entry.type === 'note');
   if (!item) return;
-  const title = prompt('보충사항', item.title);
-  if (title === null || !title.trim()) return;
-  item.title = title.trim();
+  editingRecordTimelineNoteId = id;
+  renderRecordTimelineEditor(rid);
+  const editor = document.getElementById(`${rid ? 'rt' : 'rf'}-timeline-note-edit-${id}`);
+  if (!editor) return;
+  editor.focus();
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(false);
+  window.getSelection()?.removeAllRanges();
+  window.getSelection()?.addRange(range);
+}
+function saveRecordTimelineNoteEdit(id, rid = '') {
+  const item = getRecordTimelineEvents(rid).find(entry => entry.id === id && entry.type === 'note');
+  const editor = document.getElementById(`${rid ? 'rt' : 'rf'}-timeline-note-edit-${id}`);
+  if (!item || !editor) return;
+  const title = normalizeEditableHtml(editor.innerHTML);
+  if (!title) { editor.focus(); return; }
+  item.title = title;
+  editingRecordTimelineNoteId = null;
   commitRecordTimeline(rid);
+}
+function cancelRecordTimelineNoteEdit(rid = '') {
+  editingRecordTimelineNoteId = null;
+  renderRecordTimelineEditor(rid);
 }
 function deleteRecordTimelineNote(id, rid = '') {
   setRecordTimelineEvents(rid, getRecordTimelineEvents(rid).filter(item => item.id !== id));
@@ -30166,7 +30205,7 @@ function renderRecordTimelinePage(recordId) {
           <option value="after">기준 후</option>
         </select>
         <input type="number" class="record-form-input" id="rt-timeline-offset" min="0" step="1" value="0" aria-label="기준 대비 거리">
-        <div class="info-ce record-timeline-description record-timeline-desc-ce" id="rt-timeline-description" contenteditable="true" data-ph="설명 (선택)" oncontextmenu="return openInfoEditableContextMenu(event)"></div>
+        <div class="info-ce record-timeline-description record-timeline-desc-ce" id="rt-timeline-description" contenteditable="true" data-ph="설명" oncontextmenu="return openInfoEditableContextMenu(event)"></div>
         <button type="button" class="record-inline-add-btn" id="rt-timeline-save" onclick="saveRecordTimelineEvent(${rid})">+ 사건 추가</button>
       </div>
       <div class="record-timeline-list" id="rt-timeline-list"></div>
