@@ -392,7 +392,9 @@ tr.ct-row-end .ct-select:focus {
 .record-timeline-title { font-size: 10pt; font-weight: 800; color: #555; }
 .record-timeline-anchor, .record-timeline-event-form { display: grid; gap: 6px; }
 .record-timeline-anchor { grid-template-columns: 84px minmax(0, 1fr); align-items: center; }
-.record-timeline-event-form { grid-template-columns: minmax(160px, 1fr) 84px 84px minmax(180px, 1fr) auto; }
+.record-timeline-event-form { grid-template-columns: minmax(160px, 1fr) minmax(110px, 150px) 84px 84px minmax(180px, 1fr) auto; }
+.record-timeline-anchor-list { display: flex; flex-direction: column; gap: 6px; }
+.record-timeline-anchor-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
 .record-timeline-label { font-size: 9pt; font-weight: 700; color: #777; }
 .record-timeline-list { display: flex; flex-direction: column; gap: 6px; }
 .record-timeline-item { display: grid; grid-template-columns: 78px minmax(0, 1fr) auto; gap: 8px; align-items: start; padding: 8px; border-left: 3px solid #b8b8b8; background: #fafafa; }
@@ -9875,14 +9877,9 @@ function formatRecordSessionTags(tags) {
 function normalizeRecordTimelineEvents(input) {
   if (!Array.isArray(input)) return [];
   const seenIds = new Set();
-  let hasAnchor = false;
   const events = input.map(item => {
     if (!item || typeof item !== 'object') return null;
-    let type = item.type === 'anchor' ? 'anchor' : (item.type === 'note' ? 'note' : 'event');
-    if (type === 'anchor') {
-      if (hasAnchor) type = 'event';
-      else hasAnchor = true;
-    }
+    const type = item.type === 'anchor' ? 'anchor' : (item.type === 'note' ? 'note' : 'event');
     let id = typeof item.id === 'string' && item.id ? item.id : mkId();
     while (seenIds.has(id)) id = mkId();
     seenIds.add(id);
@@ -9895,26 +9892,37 @@ function normalizeRecordTimelineEvents(input) {
       offset: type === 'anchor' || type === 'note' ? 0 : Math.max(0, Number.isFinite(number) ? number : 0),
       description: String(item.description || '').trim(),
       parentId: type === 'note' && typeof item.parentId === 'string' ? item.parentId : '',
+      anchorId: type === 'event' && typeof item.anchorId === 'string' ? item.anchorId : '',
     };
   }).filter(Boolean);
+  // 기준 사건은 여러 개(입력한 순서 = 배열 순서). 소속 기준(anchorId)이 없거나 사라진 사건은 첫 기준 소속으로 읽는다(예전 단일 기준 데이터 호환).
+  const anchorIds = events.filter(item => item.type === 'anchor').map(item => item.id);
+  events.forEach(item => {
+    if (item.type === 'event') item.anchorId = anchorIds.includes(item.anchorId) ? item.anchorId : (anchorIds[0] || '');
+  });
   const parentIds = new Set(events.filter(item => item.type === 'event').map(item => item.id));
   return events.filter(item => item.type !== 'note' || parentIds.has(item.parentId));
 }
+// 기준 사건을 입력 순서대로, 각 기준 주위에 소속 사건을 전(거리 큰 순) → 기준 → 후(거리 작은 순)로 놓고 보충사항은 사건 바로 뒤에 붙인다.
 function sortRecordTimelineEvents(input) {
   const events = normalizeRecordTimelineEvents(input);
   const notes = events.filter(item => item.type === 'note');
-  const rank = item => item.type === 'anchor' ? 1 : (item.direction === 'before' ? 0 : 2);
-  const parents = events.map((item, index) => ({ item, index }))
-    .filter(entry => entry.item.type !== 'note')
-    .sort((a, b) => {
-      const rankDiff = rank(a.item) - rank(b.item);
-      if (rankDiff) return rankDiff;
-      if (a.item.type === 'event' && a.item.offset !== b.item.offset) {
-        return a.item.direction === 'before' ? b.item.offset - a.item.offset : a.item.offset - b.item.offset;
-      }
-      return a.index - b.index;
-    });
-  return parents.flatMap(({ item }) => [item, ...notes.filter(note => note.parentId === item.id)]);
+  const anchors = events.filter(item => item.type === 'anchor');
+  const withNotes = item => [item, ...notes.filter(note => note.parentId === item.id)];
+  const arrange = list => {
+    const before = list.filter(item => item.direction === 'before').sort((a, b) => b.offset - a.offset);
+    const after = list.filter(item => item.direction !== 'before').sort((a, b) => a.offset - b.offset);
+    return { before, after };
+  };
+  const eventsOf = anchorId => events.filter(item => item.type === 'event' && item.anchorId === anchorId);
+  if (!anchors.length) {
+    const { before, after } = arrange(eventsOf(''));
+    return [...before, ...after].flatMap(withNotes);
+  }
+  return anchors.flatMap(anchor => {
+    const { before, after } = arrange(eventsOf(anchor.id));
+    return [...before.flatMap(withNotes), ...withNotes(anchor), ...after.flatMap(withNotes)];
+  });
 }
 function cloneRecordTimelineEvents(input) {
   const events = normalizeRecordTimelineEvents(input);
@@ -9923,6 +9931,7 @@ function cloneRecordTimelineEvents(input) {
     ...item,
     id: idMap.get(item.id),
     parentId: item.parentId ? (idMap.get(item.parentId) || '') : '',
+    anchorId: item.anchorId ? (idMap.get(item.anchorId) || '') : '',
   }));
 }
 function recordPlainTextToHtml(value = '') {
@@ -30036,18 +30045,32 @@ function setRecordTimelineEvents(rid, events) {
 function recordTimelineEl(rid, name) {
   return document.getElementById(`${rid ? 'rt' : 'rf'}-timeline-${name}`);
 }
-function commitRecordTimeline(rid) {
-  renderRecordTimelineEditor(rid);
+function commitRecordTimeline(rid, options = {}) {
+  renderRecordTimelineEditor(rid, options);
   if (rid) persist();
   renderRecordTimelineSummary();
 }
-function renderRecordTimelineEditor(rid = '') {
+function renderRecordTimelineEditor(rid = '', options = {}) {
   const events = getRecordTimelineEvents(rid);
-  const anchor = events.find(item => item.type === 'anchor');
-  const anchorInput = recordTimelineEl(rid, 'anchor');
+  const anchors = events.filter(item => item.type === 'anchor');
+  const anchorList = recordTimelineEl(rid, 'anchor-list');
+  if (anchorList && !options.keepAnchorRows) {
+    const ridArg = esc(JSON.stringify(rid || ''));
+    anchorList.innerHTML = anchors.map((anchor, index) => {
+      const key = esc(JSON.stringify(anchor.id));
+      return `<div class="record-timeline-anchor-row"><span class="record-timeline-label">${index === 0 ? '기준 사건' : ''}</span>`
+        + `<input type="text" class="record-form-input" value="${esc(anchor.title)}" aria-label="기준 사건 이름" oninput="renameRecordTimelineAnchor(${key},this.value,${ridArg})" onblur="this.value=getRecordTimelineEvents(${ridArg}).find(item => item.id === ${key})?.title || ''">`
+        + `<button type="button" class="record-timeline-icon-btn" title="기준 삭제" aria-label="기준 삭제" onclick="deleteRecordTimelineAnchor(${key},${ridArg},event)"><i class="fa-solid fa-trash"></i></button></div>`;
+    }).join('');
+  }
+  // 사건 입력의 기준 선택: 현재 선택을 유지하고, 없으면 가장 최근에 추가한 기준을 기본으로 한다.
+  const select = recordTimelineEl(rid, 'anchor-select');
+  if (select) {
+    const current = select.value;
+    select.innerHTML = anchors.map(anchor => `<option value="${esc(anchor.id)}">${esc(anchor.title || '이름 없음')}</option>`).join('');
+    select.value = anchors.some(anchor => anchor.id === current) ? current : (anchors[anchors.length - 1]?.id || '');
+  }
   const list = recordTimelineEl(rid, 'list');
-  // 입력 중(포커스·한글 조합 중)에는 입력칸 값을 덮어쓰지 않는다. 저장값은 trim 되어 있어 덮어쓰면 끝 공백이 바로 사라진다. blur 때 정리한다.
-  if (anchorInput && document.activeElement !== anchorInput && anchorInput.value !== (anchor?.title || '')) anchorInput.value = anchor?.title || '';
   if (list) list.innerHTML = renderRecordTimelineItems(events, true, rid);
 }
 function resetRecordTimelineEventForm(rid = '') {
@@ -30063,18 +30086,57 @@ function resetRecordTimelineEventForm(rid = '') {
   setRecordTimelineDescriptionField(description, '');
   if (save) save.textContent = '+ 사건 추가';
 }
-function setRecordTimelineAnchor(value, rid = '') {
-  const title = String(value || '').trim();
-  const events = getRecordTimelineEvents(rid);
-  const index = events.findIndex(item => item.type === 'anchor');
-  if (!title) {
-    if (index >= 0) events.splice(index, 1);
-  } else if (index >= 0) {
-    events[index].title = title;
-  } else {
-    events.unshift({ id: mkId(), type: 'anchor', title, direction: 'anchor', offset: 0, description: '', parentId: '' });
-  }
+// 기준 사건: 여러 개를 입력한 순서대로 둔다. 이름 변경은 입력 중 trim 하지 않고(입력칸을 다시 그리지 않음) 저장값만 갱신한다.
+function addRecordTimelineAnchor(rid = '') {
+  const input = recordTimelineEl(rid, 'anchor');
+  const title = String(input?.value || '').trim();
+  if (!title) { input?.focus(); return; }
+  const anchorId = mkId();
+  getRecordTimelineEvents(rid).push({ id: anchorId, type: 'anchor', title, direction: 'anchor', offset: 0, description: '', parentId: '', anchorId: '' });
+  if (input) input.value = '';
   commitRecordTimeline(rid);
+  const select = recordTimelineEl(rid, 'anchor-select');
+  if (select) select.value = anchorId; // 사건 입력의 기본 기준 = 가장 최근에 추가한 기준
+  input?.focus();
+}
+function handleRecordTimelineAnchorKey(event, rid = '') {
+  if (event.isComposing || event.keyCode === 229) return;
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    addRecordTimelineAnchor(rid);
+  }
+}
+function renameRecordTimelineAnchor(id, value, rid = '') {
+  const anchor = getRecordTimelineEvents(rid).find(item => item.id === id && item.type === 'anchor');
+  const title = String(value || '').trim();
+  if (!anchor || !title) return;
+  anchor.title = title;
+  commitRecordTimeline(rid, { keepAnchorRows: true });
+}
+// 기준 삭제: 소속 사건이 있으면 앱 메뉴로 「앞 기준으로 이동 / 함께 삭제 / 취소」를 고르게 한다(브라우저 confirm 은 선택지를 줄 수 없다).
+function deleteRecordTimelineAnchor(id, rid = '', event = null) {
+  const events = getRecordTimelineEvents(rid);
+  const anchors = events.filter(item => item.type === 'anchor');
+  const index = anchors.findIndex(item => item.id === id);
+  if (index < 0) return;
+  const owned = events.filter(item => item.type === 'event' && item.anchorId === id);
+  const removeAnchor = moveToId => {
+    const ownedIds = new Set(owned.map(item => item.id));
+    let next = events.filter(item => item.id !== id);
+    if (moveToId) next.forEach(item => { if (item.type === 'event' && item.anchorId === id) item.anchorId = moveToId; });
+    else next = next.filter(item => !ownedIds.has(item.id) && !(item.type === 'note' && ownedIds.has(item.parentId)));
+    if (editingRecordTimelineEventId && !next.some(item => item.id === editingRecordTimelineEventId)) resetRecordTimelineEventForm(rid);
+    setRecordTimelineEvents(rid, next);
+    commitRecordTimeline(rid);
+  };
+  if (!owned.length) { removeAnchor(''); return; }
+  const target = anchors[index - 1] || anchors[index + 1];
+  const rect = (event?.currentTarget || event?.target)?.getBoundingClientRect?.() || { left: 200, bottom: 200 };
+  const items = [{ heading: `소속 사건 ${owned.length}개가 있습니다` }];
+  if (target) items.push({ icon: '↑', label: `"${target.title || '이름 없음'}" 기준으로 이동`, action: () => removeAnchor(target.id) });
+  items.push({ icon: '✕', label: `소속 사건 ${owned.length}개와 함께 삭제`, danger: true, action: () => removeAnchor('') });
+  items.push({ sep: true }, { icon: '↩', label: '취소', action: () => {} });
+  tbShowCtxMenu(rect.left, rect.bottom + 4, items);
 }
 function saveRecordTimelineEvent(rid = '') {
   const events = getRecordTimelineEvents(rid);
@@ -30083,6 +30145,7 @@ function saveRecordTimelineEvent(rid = '') {
     recordTimelineEl(rid, 'anchor')?.focus();
     return;
   }
+  const anchorId = recordTimelineEl(rid, 'anchor-select')?.value || events.find(item => item.type === 'anchor').id;
   const titleInput = recordTimelineEl(rid, 'title');
   const title = String(titleInput?.value || '').trim();
   if (!title) { titleInput?.focus(); return; }
@@ -30091,8 +30154,8 @@ function saveRecordTimelineEvent(rid = '') {
   const descriptionEl = recordTimelineEl(rid, 'description');
   const description = descriptionEl?.isContentEditable ? normalizeEditableHtml(descriptionEl.innerHTML) : String(descriptionEl?.value || '').trim();
   const existing = events.find(item => item.id === editingRecordTimelineEventId && item.type === 'event');
-  if (existing) Object.assign(existing, { title, direction, offset, description });
-  else events.push({ id: mkId(), type: 'event', title, direction, offset, description, parentId: '' });
+  if (existing) Object.assign(existing, { title, direction, offset, description, anchorId });
+  else events.push({ id: mkId(), type: 'event', title, direction, offset, description, parentId: '', anchorId });
   resetRecordTimelineEventForm(rid);
   commitRecordTimeline(rid);
 }
@@ -30101,6 +30164,8 @@ function editRecordTimelineEvent(id, rid = '') {
   if (!item) return;
   editingRecordTimelineEventId = id;
   recordTimelineEl(rid, 'title').value = item.title;
+  const anchorSelect = recordTimelineEl(rid, 'anchor-select');
+  if (anchorSelect && item.anchorId) anchorSelect.value = item.anchorId;
   recordTimelineEl(rid, 'direction').value = item.direction;
   recordTimelineEl(rid, 'offset').value = String(item.offset);
   setRecordTimelineDescriptionField(recordTimelineEl(rid, 'description'), item.description);
@@ -30171,10 +30236,10 @@ function renderRecordTimelineSummary() {
   if (!box) return;
   const events = editingRecordId ? getRecordTimelineEvents(editingRecordId) : recordTimelineDraft;
   const sorted = sortRecordTimelineEvents(events);
-  const anchor = sorted.find(item => item.type === 'anchor');
+  const anchorTitles = sorted.filter(item => item.type === 'anchor').map(item => item.title || '이름 없음');
   const eventItems = sorted.filter(item => item.type === 'event');
   const top = eventItems.slice(0, 3).map(item => `<div>${esc(getRecordTimelineTimeLabel(item))} · ${esc(item.title || '이름 없음')}</div>`).join('');
-  box.innerHTML = `<div>기준 사건: <b>${esc(anchor?.title || '없음')}</b> · 사건 ${eventItems.length}개</div>${top}`
+  box.innerHTML = `<div>기준 사건: <b>${esc(anchorTitles.join(', ') || '없음')}</b> · 사건 ${eventItems.length}개</div>${top}`
     + (editingRecordId ? '' : '<div class="record-timeline-summary-hint">기록을 저장하면 타임라인 탭에서 편집할 수 있어요.</div>');
   if (openBtn) openBtn.disabled = !editingRecordId;
 }
@@ -30194,12 +30259,17 @@ function renderRecordTimelinePage(recordId) {
   host.innerHTML = `<div class="record-timeline-page-inner">
     <div class="record-timeline-page-title">${esc(getRecordTimelineTabLabel(recordId))}</div>
     <div class="record-timeline-editor">
+      <div class="record-timeline-anchor-list" id="rt-timeline-anchor-list"></div>
       <div class="record-timeline-anchor">
-        <label class="record-timeline-label" for="rt-timeline-anchor">기준 사건</label>
-        <input type="text" class="record-form-input" id="rt-timeline-anchor" placeholder="세션 시작, 사건 발생 등" oninput="setRecordTimelineAnchor(this.value,${rid})" onblur="renderRecordTimelineEditor(${rid})">
+        <label class="record-timeline-label" for="rt-timeline-anchor">기준 추가</label>
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;">
+          <input type="text" class="record-form-input" id="rt-timeline-anchor" placeholder="세션 시작, 사건 발생 등" onkeydown="handleRecordTimelineAnchorKey(event,${rid})">
+          <button type="button" class="record-inline-add-btn" onclick="addRecordTimelineAnchor(${rid})">+ 기준 추가</button>
+        </div>
       </div>
       <div class="record-timeline-event-form">
         <input type="text" class="record-form-input" id="rt-timeline-title" placeholder="중요 사건 이름">
+        <select class="record-form-select" id="rt-timeline-anchor-select" aria-label="소속 기준 사건"></select>
         <select class="record-form-select" id="rt-timeline-direction" aria-label="기준 사건 전후">
           <option value="before">기준 전</option>
           <option value="after">기준 후</option>
