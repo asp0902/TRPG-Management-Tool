@@ -29563,6 +29563,7 @@ function setLinkLabelFromDropdown(btn) {
   const idx = Number(dd?.dataset.linkLabelIdx);
   if (!Number.isInteger(idx) || !_linksPopover.links[idx]) return;
   _linksPopover.links[idx].label = btn.dataset.value || '';
+  delete _linksPopover.links[idx]._auto; // 직접 고른 라벨은 자동 판정이 덮어쓰지 않는다
   renderLinksPopover();
 }
 function normalizeLinkUrl(url) {
@@ -29577,17 +29578,25 @@ function detectCatalogLinkLabelFromUrl(url) {
   try {
     const parsed = new URL(normalized);
     const host = parsed.hostname.replace(/^www\./i, '').toLowerCase();
+    const is = d => host === d || host.endsWith('.' + d);
+    if (is('x.com') || is('twitter.com')) return CATALOG_LINK_ICON_LABEL_VALUE;
+    if (is('postype.com')) return CATALOG_LINK_POSTYPE_LABEL_VALUE;
+    if (is('tistory.com')) return CATALOG_LINK_TISTORY_LABEL_VALUE;
     if (host === 'docs.google.com') return CATALOG_LINK_GOOGLE_DOCS_LABEL_VALUE;
   } catch(e) {}
   return '';
 }
+// URL 입력·붙여넣기 때마다 호출. 라벨이 비었거나 자동으로 정해진 것(_auto, 저장 안 됨)일 때만 다시 판정한다.
+// 입력칸 포커스·커서가 유지되도록 행 전체가 아니라 라벨 드롭다운만 교체한다.
 function autoSetLinkLabelFromUrl(idx) {
   const lk = _linksPopover.links[idx];
-  if (!lk || lk.label) return;
+  if (!lk || (lk.label && !lk._auto)) return;
   const detected = detectCatalogLinkLabelFromUrl(lk.url);
-  if (!detected) return;
+  if (detected === (lk.label || '')) return;
   lk.label = detected;
-  renderLinksPopover();
+  lk._auto = !!detected;
+  const dd = document.querySelectorAll('#clp-list .clp-link-row')[idx]?.querySelector('.clp-link-label-dd');
+  if (dd) dd.outerHTML = renderCatalogLinkLabelDropdown(lk, idx);
 }
 function renderLinkDragHandle() {
   return '<button type="button" class="clp-link-drag" onpointerdown="beginLinkPopoverRowDrag(event)" title="순서 변경" aria-label="순서 변경">≡</button>';
@@ -29803,7 +29812,7 @@ function renderLinksPopover() {
         ${renderLinkDragHandle()}
         ${renderCatalogLinkLabelDropdown(lk, i)}
         <div class="clp-link-fields">
-          <input class="clp-input clp-link-url" placeholder="URL" value="${esc(lk.url||'')}" oninput="_linksPopover.links[${i}].url=this.value" onblur="autoSetLinkLabelFromUrl(${i})">
+          <input class="clp-input clp-link-url" placeholder="URL" value="${esc(lk.url||'')}" oninput="_linksPopover.links[${i}].url=this.value;autoSetLinkLabelFromUrl(${i})">
           <input class="clp-input clp-link-memo" placeholder="메모 (예: 1차 공개분)" value="${esc(lk.memo||'')}" oninput="_linksPopover.links[${i}].memo=this.value">
         </div>
         <button class="clp-link-confirm" onclick="finishEditingLink(${i})" title="등록">✓</button>
