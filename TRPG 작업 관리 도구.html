@@ -1520,6 +1520,11 @@ tr.ct-row-end .ct-select:focus {
   box-shadow: none;
   overflow-anchor: none;
 }
+/* PREVIEW 머리글의 「핸드아웃용 복사」: PREVIEW 가 롤20 모양(.roll20-chat)일 때만 보인다 */
+.r20-copy-btn { display: none; margin-left: auto; padding: 1px 6px; font-size: 11px; font-weight: 400; line-height: 1.4; color: #666; background: transparent; border: 1px solid #c8c8c8; border-radius: 3px; cursor: pointer; white-space: nowrap; }
+.r20-copy-btn:hover { color: #222; border-color: #999; }
+.css-macro-preview-wrap:has(.roll20-chat) .r20-copy-btn { display: inline-block; }
+.handout-fold > summary .r20-copy-btn { position: absolute; right: 6px; top: 2px; margin: 0; }
 /* 롤20 채팅: 매크로를 롤20 채팅 모양으로 그린다(값은 ROLL20_PREVIEW). 코코포리아와 달리 조각 style 을 거르지 않는다. */
 .css-macro-preview-body:has(> .roll20-chat) {
   background: var(--r20-bg) !important; border: 0; border-radius: 0; padding: 0; color: var(--r20-color); white-space: normal;
@@ -18441,7 +18446,7 @@ function getHandoutBlockHtml(b, cid) {
         <h3><button type="button" class="handout-info-toggle" aria-expanded="false" aria-controls="handout-${side}-${esc(b.id)}" title="PREVIEW / CSS MACRO">${side === 'public' ? `<span class="handout-label-pair">${label} 정보</span><span class="handout-label-single">내용</span>` : `${label} 정보`}</button></h3>
         <div class="block-ce" contenteditable="true" data-field="${field}" data-ph="${label} 내용" aria-label="핸드아웃 ${label} 내용" oninput="upd('${b.id}','${field}',this.innerHTML,'${cid}')"></div>
     <div class="handout-shared" id="handout-${side}-${esc(b.id)}" hidden>
-      <details class="handout-fold css-macro-preview-wrap"><summary>PREVIEW</summary>
+      <details class="handout-fold css-macro-preview-wrap"><summary>PREVIEW<button type="button" class="r20-copy-btn" onclick="copyRoll20HandoutFromPreview(this,event)" title="롤20 핸드아웃용 HTML로 변환해 복사">핸드아웃용 복사</button></summary>
       <div class="handout-preview css-macro-preview-body">${getHandoutPreviewHtml(b, side)}</div>
       </details>
       <details class="handout-fold"><summary>CSS MACRO<button type="button" class="btn handout-macro-copy" title="CSS MACRO 복사" aria-label="핸드아웃 ${label} CSS MACRO 복사"><i class="fa-solid fa-copy" aria-hidden="true"></i></button></summary>
@@ -18558,6 +18563,7 @@ function mkBlockEl(b, cid, ctx = {}) {
           <div class="intro-preview-pane css-macro-preview-wrap">
             <div class="css-macro-preview-head">
               <div class="intro-pane-label">PREVIEW</div>
+              <button type="button" class="r20-copy-btn" onclick="copyRoll20HandoutFromPreview(this,event)" title="롤20 핸드아웃용 HTML로 변환해 복사">핸드아웃용 복사</button>
             </div>
             <div class="css-macro-preview-chatbox">
               <div class="css-macro-preview-body intro-preview-body" data-intro-preview-id="${b.id}">
@@ -32069,16 +32075,21 @@ function updateRoll20Handout() {
     img.src = url;
   });
 }
-async function copyRoll20Handout() {
-  const input = document.getElementById('r20ho-input');
-  const status = document.getElementById('r20ho-status');
-  if (!input?.value.trim()) return;
-  const { html } = buildRoll20HandoutHtml(input.value, _r20hoImageWidths);
-  const text = document.getElementById('r20ho-preview')?.innerText || '';
-  const done = ok => { if (status) status.textContent = ok ? '복사했습니다. Roll20 핸드아웃 편집 창에 Ctrl+V 하세요.' : '복사에 실패했습니다.'; };
+function roll20HandoutPlainText(html) {
+  const holder = document.createElement('div');
+  holder.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px';
+  holder.innerHTML = html;
+  document.body.appendChild(holder);
+  const text = holder.innerText;
+  holder.remove();
+  return text;
+}
+// text/html + text/plain 을 클립보드에 넣는다. 실패하면 숨긴 contenteditable 을 선택해 execCommand('copy') 로 대신한다. 성공 여부를 돌려준다.
+async function copyRoll20HandoutHtml(html) {
+  const text = roll20HandoutPlainText(html);
   try {
     await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })]);
-    done(true);
+    return true;
   } catch (e) {
     const holder = document.createElement('div');
     holder.contentEditable = 'true';
@@ -32094,8 +32105,38 @@ async function copyRoll20Handout() {
     try { ok = document.execCommand('copy'); } catch (err) {}
     sel.removeAllRanges();
     holder.remove();
-    done(ok);
+    return ok;
   }
+}
+async function copyRoll20Handout() {
+  const input = document.getElementById('r20ho-input');
+  const status = document.getElementById('r20ho-status');
+  if (!input?.value.trim()) return;
+  const ok = await copyRoll20HandoutHtml(buildRoll20HandoutHtml(input.value, _r20hoImageWidths).html);
+  if (status) status.textContent = ok ? '복사했습니다. Roll20 핸드아웃 편집 창에 Ctrl+V 하세요.' : '복사에 실패했습니다.';
+}
+// PREVIEW 머리글의 「핸드아웃용 복사」: PREVIEW 가 보여주는 매크로 원문을 같은 변환으로 복사한다(그림 폭은 PREVIEW 에 불러온 img 의 naturalWidth).
+function getRoll20PreviewSource(body) {
+  if (!body) return '';
+  if (body.dataset.cssMacroId) return getCssMacroResolvedContent(state.cssMacros.find(item => item.id === body.dataset.cssMacroId));
+  if (body.dataset.introPreviewId) return body.closest('.intro-split-wrap')?.querySelector('.intro-macro-ta')?.value || '';
+  return body.closest('.handout-shared')?.querySelector('.handout-macro')?.value || '';
+}
+async function copyRoll20HandoutFromPreview(button, event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const body = button.closest('.css-macro-preview-wrap')?.querySelector('.css-macro-preview-body');
+  const macro = getRoll20PreviewSource(body);
+  if (!macro.trim()) return;
+  const widths = {};
+  buildRoll20HandoutHtml(macro).images.forEach(url => {
+    const img = [...body.querySelectorAll('.roll20-chat img')].find(item => [url, normalizeImageBlockSource(url)].includes(item.getAttribute('src')));
+    if (img?.naturalWidth) widths[url] = img.naturalWidth;
+  });
+  const ok = await copyRoll20HandoutHtml(buildRoll20HandoutHtml(macro, widths).html);
+  button.textContent = ok ? '복사됨' : '복사 실패';
+  clearTimeout(button._r20Timer);
+  button._r20Timer = setTimeout(() => { button.textContent = '핸드아웃용 복사'; }, 1500);
 }
 function renderRoll20PreviewHtml(raw) {
   const messages = raw.split('\n').filter(line => line.trim()).map(line => {
@@ -32951,6 +32992,7 @@ function renderCssMacroPage() {
           <div class="css-macro-preview-wrap">
             <div class="css-macro-preview-head">
               <div class="css-macro-preview-label">PREVIEW</div>
+              <button type="button" class="r20-copy-btn" onclick="copyRoll20HandoutFromPreview(this,event)" title="롤20 핸드아웃용 HTML로 변환해 복사">핸드아웃용 복사</button>
             </div>
             <div class="css-macro-preview-chatbox">
               <div class="css-macro-preview-body" data-css-macro-id="${item.id}">${renderCssMacroPreviewHtml(getCssMacroResolvedContent(item))}</div>

@@ -40,6 +40,10 @@ const wide = context.buildRoll20HandoutHtml(macro, { 'https://i.imgur.com/aBnOCE
 assert.match(wide, /^<table bgcolor="#000000" width="500"/);
 assert.match(wide, /<img src="https:\/\/i\.imgur\.com\/aBnOCE4\.png" width="500" style="display:block; width:100%;/);
 
-assert.match(html, /function copyRoll20Handout\(\)[\s\S]*?new ClipboardItem\(\{ 'text\/html'[\s\S]*?execCommand\('copy'\)/);
+assert.match(html, /async function copyRoll20HandoutHtml\(html\)[\s\S]*?new ClipboardItem\(\{ 'text\/html'[\s\S]*?execCommand\('copy'\)/);
+assert.match(html, /async function copyRoll20Handout\(\)[\s\S]*?copyRoll20HandoutHtml\(/);
+assert.match(html, /async function copyRoll20HandoutFromPreview\(button, event\)[\s\S]*?event\.preventDefault\(\);[\s\S]*?event\.stopPropagation\(\);[\s\S]*?copyRoll20HandoutHtml\(/);
+assert.equal((html.match(/class="r20-copy-btn"/g) || []).length, 3, 'CSS 매크로 페이지·인트로·핸드아웃 PREVIEW 세 곳에 버튼이 있어야 합니다.');
+assert.match(html, /\.css-macro-preview-wrap:has\(\.roll20-chat\) \.r20-copy-btn \{ display: inline-block; \}/);
 assert.match(html, /id="r20ho-backdrop"/);
 console.log('roll20 handout checks: OK');
