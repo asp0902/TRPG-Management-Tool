@@ -11827,8 +11827,13 @@ function getRecordPlayersText(record) {
 function getRecordNotesText(record) {
   return extractBlockPlainText(record?.notesHtml || record?.notes || '', '').trim();
 }
+// 기록의 시나리오 이름은 예전에 제목 원문(HTML·매크로 문법)이 저장된 것도 있다. 표시할 때는 getScenarioListTitle 과 같은 방식으로 글자만 남긴다(저장값은 그대로).
+function getRecordPlainTitle(raw) {
+  const text = String(raw || '').trim();
+  return titlePlainText(/<\/?[a-z][^>]*>/i.test(text) ? extractBlockPlainText(text, '').trim() : text).trim();
+}
 function getRecordDisplayTitle(record) {
-  return String(record?.scenarioName || '').trim() || '시나리오 없음';
+  return getRecordPlainTitle(record?.scenarioName) || '시나리오 없음';
 }
 function getRecordSearchText(record) {
   return [
@@ -30288,7 +30293,7 @@ function renderRecordTimelineSummary() {
 }
 function getRecordTimelineTabLabel(recordId) {
   const record = state.records.find(item => item.id === recordId);
-  return `${record?.scenarioName || '이름 없는 기록'} · 타임라인`;
+  return `${getRecordPlainTitle(record?.scenarioName) || '이름 없는 기록'} · 타임라인`;
 }
 function openRecordTimelineTab(recordId = editingRecordId) {
   if (!recordId || !state.records.some(record => record.id === recordId)) return;
@@ -31094,7 +31099,7 @@ function saveRecord() {
   const existingRecord = editingRecordId ? state.records.find(r => r.id === editingRecordId) : null;
   const sourceRecord = existingRecord || recordFormSeedData;
   const scenarioName = scenarioId
-    ? (state.scenarios.find(s => s.id === scenarioId)?.title || '')
+    ? getScenarioListTitle(state.scenarios.find(s => s.id === scenarioId))
     : document.getElementById('rf-custom-name')?.value.trim();
   const notesHtml = normalizeEditableHtml(document.getElementById('rf-notes-html')?.innerHTML || '');
   const playersData = collectRecordPlayersData();
