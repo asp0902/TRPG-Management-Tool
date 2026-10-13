@@ -1545,6 +1545,23 @@ tr.ct-row-end .ct-select:focus {
   color: #222;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
+.css-macro-preview-body { position: relative; }
+.css-macro-preview-mode {
+  position: absolute; top: 2px; right: 6px; z-index: 2; pointer-events: none;
+  font: 10px/1 sans-serif; font-style: normal; font-weight: 400; color: #888; opacity: 0.8; white-space: nowrap;
+}
+/* 롤20 채팅: 매크로를 롤20 채팅 모양으로 그린다(값은 ROLL20_PREVIEW). 코코포리아와 달리 조각 style 을 거르지 않는다. */
+.css-macro-preview-body:has(> .roll20-chat) {
+  background: var(--r20-bg) !important; border-radius: 0; padding: 0; color: var(--r20-color); white-space: normal;
+  width: min(calc(var(--r20-width) + 2px), 100%);
+}
+.roll20-chat, .roll20-chat * { box-sizing: content-box; }
+.roll20-chat { position: relative; overflow: hidden; font: var(--r20-size)/var(--r20-line-height) var(--r20-font); color: var(--r20-color); }
+.roll20-msg { position: relative; display: block; padding: var(--r20-padding); }
+.roll20-spacer { height: 2px; margin-bottom: 7px; }
+.roll20-msg.desc { font-style: italic; font-weight: 700; text-align: center; }
+.roll20-chat a { color: var(--r20-link) !important; cursor: default; }
+.roll20-chat img { max-width: 100%; vertical-align: middle; }
 .css-macro-preview-line {
   display: block;
 }
@@ -31884,6 +31901,62 @@ if (typeof document !== 'undefined') {
   rootStyle.setProperty('--ccf-desc-text-align', CCFOLIA_PREVIEW.desc.textAlign);
   rootStyle.setProperty('--ccf-desc-overflow', CCFOLIA_PREVIEW.desc.overflow);
 }
+// 롤20 채팅(app.roll20.net, 한국어 UI, Windows Chrome, 창 1278px, 채팅창 폭 325px, 2026-10-13) 실측값.
+// 실측: /desc 한 줄 = 메시지 하나(바탕 #f1f1f1, 패딩 0 16 7 15, 위 spacer 높이 2px·아래 margin 7px, 13.65px/17.0625px, 기울임·굵게·가운데). 조각은 <a> 이고 style 은 걸러지지 않는다
+// (display·음수 margin·% padding·height·border 모두 그대로). 링크 색은 !important 가 있는 inline color 만 이긴다(color:transparent 는 분홍 #e10085 로 보인다).
+// [x](이미지 주소) 는 <a><img></a>(인라인, 폭 max 100%, vertical-align middle). 메시지 사이 틈은 없고, 음수 margin 으로 앞 메시지 아래 여백을 덮는다.
+const ROLL20_PREVIEW = {
+  width: 325,
+  padding: '0 16px 7px 15px',
+  fontFamily: '"Proxima Nova", ProximaNova-Regular, -apple-system, "Segoe UI", Roboto, sans-serif',
+  fontSize: 13.65,
+  lineHeight: '17.0625px',
+  bg: '#f1f1f1',
+  color: '#404040',
+  link: '#e10085',
+};
+if (typeof document !== 'undefined') {
+  const r20Style = document.documentElement.style;
+  r20Style.setProperty('--r20-width', ROLL20_PREVIEW.width + 'px');
+  r20Style.setProperty('--r20-padding', ROLL20_PREVIEW.padding);
+  r20Style.setProperty('--r20-font', ROLL20_PREVIEW.fontFamily);
+  r20Style.setProperty('--r20-size', ROLL20_PREVIEW.fontSize + 'px');
+  r20Style.setProperty('--r20-line-height', ROLL20_PREVIEW.lineHeight);
+  r20Style.setProperty('--r20-bg', ROLL20_PREVIEW.bg);
+  r20Style.setProperty('--r20-color', ROLL20_PREVIEW.color);
+  r20Style.setProperty('--r20-link', ROLL20_PREVIEW.link);
+}
+// 롤20용 매크로 자동 판별: 롤20 전용 명령(/em /w /direct …, &{template:)이 있거나, (#" 조각과 같은 줄에 [글](https://…) 링크(이미지)가 섞인 줄이 있으면 롤20.
+// 줄 전체가 이미지 링크 하나뿐인 경우는 기존 코코포리아 동작을 유지한다.
+function isRoll20Macro(raw) {
+  const text = String(raw || '');
+  if (/^\s*(?:\/(?:em|emas|w|direct|gmroll|as|fx)\b|&\{template:)/im.test(text)) return true;
+  return text.split('\n').some(line => /\(#"/.test(line) && /\]\(\s*https?:\/\//i.test(line));
+}
+function renderRoll20PreviewLine(source) {
+  let html = '';
+  let cursor = 0;
+  while (cursor < source.length) {
+    const open = source.indexOf('[', cursor);
+    if (open < 0) { html += esc(decodeCssMacroPreviewValue(source.slice(cursor))); break; }
+    html += esc(decodeCssMacroPreviewValue(source.slice(cursor, open)));
+    const token = tryParseCssMacroToken(source, open);
+    if (token) { html += `<a style="${esc(token.style)}">${esc(token.text)}</a>`; cursor = token.end; continue; }
+    const image = source.slice(open).match(/^\[[^\]]*\]\(\s*(https?:\/\/[^\s)]+)\s*\)/i);
+    if (image) { html += `<a><img src="${esc(normalizeImageBlockSource(image[1]))}" alt=""></a>`; cursor = open + image[0].length; continue; }
+    html += '[';
+    cursor = open + 1;
+  }
+  return html;
+}
+function renderRoll20PreviewHtml(raw) {
+  const messages = raw.split('\n').filter(line => line.trim()).map(line => {
+    const isDesc = /^\s*\/desc\b/i.test(line);
+    const body = renderRoll20PreviewLine(line.replace(/^\s*\/desc\b\s*/i, ''));
+    return `<div class="roll20-msg${isDesc ? ' desc' : ''}"><div class="roll20-spacer"></div>${body}</div>`;
+  }).join('');
+  return `<span class="css-macro-preview-mode">롤20 기준</span><div class="roll20-chat">${messages}</div>`;
+}
 // 사용자 style 에서 코코포리아가 걸러내는 선언을 빼고, 코코포리아가 덧붙이는 style 을 뒤에 붙인다.
 function cssMacroPreviewSpanStyle(style, isDesc = false) {
   const decls = [];
@@ -32009,6 +32082,7 @@ function renderCssMacroPreviewHtml(value) {
   if (!raw.trim()) {
     return `<span class="css-macro-preview-placeholder">매크로를 입력하면 여기에 미리보기가 표시됩니다.</span>`;
   }
+  if (isRoll20Macro(raw)) return renderRoll20PreviewHtml(raw);
   const normalizeDescPreviewSource = (input, isDesc) => {
     if (!isDesc) return input;
     return String(input || '').replace(/\s*%NEWLINE%\s*/gi, '\u00a0');
@@ -32070,7 +32144,7 @@ function renderCssMacroPreviewHtml(value) {
       i -= 1;
       out.push(`<div class="css-macro-preview-line desc"><div class="css-macro-preview-desc-body">${rows}</div></div>`);
     }
-    return out.join('');
+    return `<span class="css-macro-preview-mode">코코포리아 기준</span>` + out.join('');
   }
   if (sawMacroSyntax) {
     return `<span class="css-macro-preview-error">미리보기를 생성할 수 없습니다.</span>`;
