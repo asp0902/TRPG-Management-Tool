@@ -33806,6 +33806,18 @@ document.addEventListener('dblclick', e => {
   sel.removeAllRanges();
   sel.addRange(range);
 });
+// 개변 트리플클릭: 기본 문단 선택이 전/후 글자를 함께 잡지 않게, 클릭한 부분 글자 전체만 선택한다.
+document.addEventListener('mousedown', e => {
+  if (e.detail < 3 || e.button !== 0) return;
+  const part = e.target.closest?.('.tb-variation-before-text, .tb-variation-after-text');
+  if (!part) return;
+  e.preventDefault();
+  const range = document.createRange();
+  range.selectNodeContents(part);
+  const sel = getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+});
 document.addEventListener('click', e => {
   if (!shouldClearBranchSelectionFromClick(e.target)) return;
   clearAllActiveBranches('blocks-container');
