@@ -11,7 +11,7 @@ const context = {
   renderCssMacroPreviewHtml: text => `preview:${text}`,
 };
 vm.createContext(context);
-vm.runInContext(['createBlockData', 'getHandoutSideValue', 'getHandoutPreviewHtml', 'renderPreviewBackgroundToggle', 'repairHandoutInlineParagraphs', 'handoutSecretFilled', 'getHandoutBlockHtml'].map(extract).join('\n'), context);
+vm.runInContext(['createBlockData', 'getHandoutSideValue', 'getHandoutPreviewHtml', 'repairHandoutInlineParagraphs', 'handoutSecretFilled', 'getHandoutBlockHtml'].map(extract).join('\n'), context);
 const block = context.createBlockData('handout');
 assert.equal(block.secretContent, '');
 assert.equal(block.handoutImage, '');
@@ -53,11 +53,11 @@ assert.ok(rendered.includes('id="handout-secret-test" hidden'));
 assert.equal((rendered.match(/<details class="handout-fold/g) || []).length, 4);
 assert.ok(!rendered.includes('<details class="handout-fold" open>'));
 assert.ok(rendered.indexOf('<summary>PREVIEW') < rendered.indexOf('<summary>CSS MACRO'));
-assert.equal((rendered.match(/aria-pressed="false"/g) || []).length, 2);
-block.publicPreviewDark = true;
+assert.ok(!rendered.includes('css-macro-preview-bg-toggle'), '배경색 전환 버튼은 없어야 합니다.');
+block.publicPreviewDark = true; // 이미 저장된 플래그는 무시한다
 const darkRendered = context.getHandoutBlockHtml(block, 'blocks-container');
-assert.equal((darkRendered.match(/aria-pressed="true"/g) || []).length, 1);
-assert.ok(darkRendered.includes('handout-fold css-macro-preview-wrap dark'));
+assert.ok(!darkRendered.includes('css-macro-preview-wrap dark'));
+assert.equal(block.publicPreviewDark, true);
 assert.equal((rendered.match(/class="btn handout-macro-copy"/g) || []).length, 2);
 assert.ok(!rendered.includes('data-handout-image-edit'));
 assert.ok(!rendered.includes('data-handout-image-delete'));

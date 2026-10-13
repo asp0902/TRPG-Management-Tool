@@ -1311,24 +1311,6 @@ tr.ct-row-end .ct-select:focus {
   align-items: center;
   gap: 6px;
 }
-.css-macro-preview-bg-toggle {
-  width: 12px;
-  height: 12px;
-  padding: 0;
-  border: 1px solid #aaa;
-  border-radius: 1px;
-  background: #2c2c2c; /* 기본 = 코코포리아 채팅 바탕, .dark(전환된 상태) = 밝은 바탕 */
-  box-sizing: border-box;
-  cursor: pointer;
-}
-.css-macro-preview-bg-toggle.dark {
-  background: #fff;
-  border-color: #aaa;
-}
-.css-macro-preview-bg-toggle:focus-visible {
-  outline: 1px solid #555;
-  outline-offset: 2px;
-}
 .css-macro-preview-toggle {
   width: 100%;
   display: flex;
@@ -1537,13 +1519,6 @@ tr.ct-row-end .ct-select:focus {
   overflow-wrap: anywhere;
   box-shadow: none;
   overflow-anchor: none;
-}
-/* 전환 버튼으로 바꾼 상태(저장 플래그 …PreviewDark = true): 밝은 바탕 */
-.css-macro-preview-wrap.dark .css-macro-preview-body {
-  background: #fff;
-  border-color: #d9dde5;
-  color: #222;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 .css-macro-preview-body { position: relative; }
 .css-macro-preview-mode {
@@ -4724,7 +4699,6 @@ body.block-drag-active .block-gap-line {
 .handout-title { grid-column: 2; width: 100%; min-width: 0; border: 0; padding: 2px 0; margin: 0; text-align: center; font: inherit; font-size: 16px; font-weight: 700; background: transparent; }
 .handout-toggle { width: 30px; height: 30px; padding: 0; }
 .btn.handout-toggle, .btn.handout-macro-copy { border: 0; box-shadow: none; }
-.handout-fold .css-macro-preview-bg-toggle { position: absolute; right: 6px; top: 5px; }
 .handout-fold.css-macro-preview-wrap { display: block; }
 .handout-toggle[aria-expanded="true"] i { transform: rotate(180deg); }
 .handout-header:has(.handout-toggle[aria-expanded="false"]) { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
@@ -18472,7 +18446,7 @@ function getHandoutBlockHtml(b, cid) {
         <h3><button type="button" class="handout-info-toggle" aria-expanded="false" aria-controls="handout-${side}-${esc(b.id)}" title="PREVIEW / CSS MACRO">${side === 'public' ? `<span class="handout-label-pair">${label} 정보</span><span class="handout-label-single">내용</span>` : `${label} 정보`}</button></h3>
         <div class="block-ce" contenteditable="true" data-field="${field}" data-ph="${label} 내용" aria-label="핸드아웃 ${label} 내용" oninput="upd('${b.id}','${field}',this.innerHTML,'${cid}')"></div>
     <div class="handout-shared" id="handout-${side}-${esc(b.id)}" hidden>
-      <details class="handout-fold css-macro-preview-wrap${b[side + 'PreviewDark'] ? ' dark' : ''}"><summary>PREVIEW${renderPreviewBackgroundToggle(!!b[side + 'PreviewDark'], '')}</summary>
+      <details class="handout-fold css-macro-preview-wrap"><summary>PREVIEW</summary>
       <div class="handout-preview css-macro-preview-body">${getHandoutPreviewHtml(b, side)}</div>
       </details>
       <details class="handout-fold"><summary>CSS MACRO<button type="button" class="btn handout-macro-copy" title="CSS MACRO 복사" aria-label="핸드아웃 ${label} CSS MACRO 복사"><i class="fa-solid fa-copy" aria-hidden="true"></i></button></summary>
@@ -18499,13 +18473,6 @@ function bindHandoutBlock(el, b, cid) {
       pane.hidden = !pane.hidden;
       infoToggle.setAttribute('aria-expanded', String(!pane.hidden));
       if (!pane.hidden) column.querySelectorAll('.handout-macro').forEach(btcpAutoResize);
-    };
-    column.querySelector('.css-macro-preview-bg-toggle').onclick = event => {
-      event.preventDefault();
-      event.stopPropagation();
-      const dark = b[side + 'PreviewDark'] = !b[side + 'PreviewDark'];
-      applyPreviewBackgroundToggle(event.currentTarget, dark);
-      commitBlockTreeChange(`handout:${b.id}:${side}:preview-background`, cid);
     };
     const refresh = () => {
       column.querySelector('.handout-preview').innerHTML = getHandoutPreviewHtml(b, side);
@@ -18591,13 +18558,11 @@ function mkBlockEl(b, cid, ctx = {}) {
     case 'intro': {
       const introContent = b.content || '';
       const isScriptIntro = currentPage === 'script';
-      const introPreviewDark = isScriptIntro && !!cur()?.info?.introPreviewDark;
       bodyHtml = `
         <div class="intro-split-wrap">
-          <div class="intro-preview-pane css-macro-preview-wrap${introPreviewDark ? ' dark' : ''}">
+          <div class="intro-preview-pane css-macro-preview-wrap">
             <div class="css-macro-preview-head">
               <div class="intro-pane-label">PREVIEW</div>
-              ${isScriptIntro ? renderPreviewBackgroundToggle(introPreviewDark, 'toggleIntroPreviewBackground(this)') : ''}
             </div>
             <div class="css-macro-preview-chatbox">
               <div class="css-macro-preview-body intro-preview-body" data-intro-preview-id="${b.id}">
@@ -32401,49 +32366,9 @@ function trimCssMacroPreviewImage(img) {
   }
 }
 const cssMacroPreviewOpenMap = Object.create(null);
-const cssMacroPreviewDarkMap = Object.create(null);
 const cssMacroPickerPreviewOpenMap = Object.create(null);
 function isCssMacroPreviewOpen(itemId) {
   return !!cssMacroPreviewOpenMap[itemId];
-}
-function isCssMacroPreviewDark(itemId) {
-  return !!cssMacroPreviewDarkMap[itemId];
-}
-function applyPreviewBackgroundToggle(button, dark) {
-  button?.closest('.css-macro-preview-wrap')?.classList.toggle('dark', dark);
-  if (button) {
-    const nextColor = dark ? '코코포리아 바탕' : '밝은 바탕';
-    button.classList.toggle('dark', dark);
-    button.setAttribute('aria-pressed', dark ? 'true' : 'false');
-    button.setAttribute('aria-label', `미리보기 배경을 ${nextColor}으로 변경`);
-    button.title = `미리보기 배경을 ${nextColor}으로 변경`;
-  }
-}
-function toggleCssMacroPreviewBackground(itemId, button) {
-  const dark = cssMacroPreviewDarkMap[itemId] = !isCssMacroPreviewDark(itemId);
-  applyPreviewBackgroundToggle(button, dark);
-}
-function toggleIntroPreviewBackground(button) {
-  const scenario = cur();
-  if (!scenario) return;
-  const dark = scenario.info.introPreviewDark = !scenario.info.introPreviewDark;
-  document.querySelectorAll('#blocks-container .intro-preview-pane .css-macro-preview-bg-toggle')
-    .forEach(toggle => applyPreviewBackgroundToggle(toggle, dark));
-  commitScenarioHistory('info:intro-preview-background', { force: true });
-}
-function renderPreviewBackgroundToggle(dark, onclick) {
-  const nextColor = dark ? '코코포리아 바탕' : '밝은 바탕';
-  return `<button type="button" class="css-macro-preview-bg-toggle${dark ? ' dark' : ''}"
-    aria-pressed="${dark ? 'true' : 'false'}"
-    aria-label="미리보기 배경을 ${nextColor}으로 변경"
-    title="미리보기 배경을 ${nextColor}으로 변경"
-    onclick="${onclick}"></button>`;
-}
-function renderCssMacroPreviewBackgroundToggle(itemId) {
-  return renderPreviewBackgroundToggle(
-    isCssMacroPreviewDark(itemId),
-    `toggleCssMacroPreviewBackground('${itemId}',this)`
-  );
 }
 function toggleCssMacroPreview(itemId, button) {
   cssMacroPreviewOpenMap[itemId] = !cssMacroPreviewOpenMap[itemId];
@@ -33028,10 +32953,9 @@ function renderCssMacroPage() {
           </div>
         </div>
         <div class="css-macro-card-body${isCssMacroPreviewOpen(item.id) ? ' open' : ''}">
-          <div class="css-macro-preview-wrap${isCssMacroPreviewDark(item.id) ? ' dark' : ''}">
+          <div class="css-macro-preview-wrap">
             <div class="css-macro-preview-head">
               <div class="css-macro-preview-label">PREVIEW</div>
-              ${renderCssMacroPreviewBackgroundToggle(item.id)}
             </div>
             <div class="css-macro-preview-chatbox">
               <div class="css-macro-preview-body" data-css-macro-id="${item.id}">${renderCssMacroPreviewHtml(getCssMacroResolvedContent(item))}</div>
@@ -33076,7 +33000,6 @@ function deleteCssMacroItem(itemId) {
   if (!confirm(`"${item.title || '이 매크로'}"를 삭제할까요?`)) return;
   ensureCssMacroHistory();
   delete cssMacroPreviewOpenMap[itemId];
-  delete cssMacroPreviewDarkMap[itemId];
   state.cssMacros = state.cssMacros.filter(entry => entry.id !== itemId);
   if (currentCssMacroId === itemId) currentCssMacroId = state.cssMacros[0]?.id || null;
   commitCssMacroHistory(`css-macro:${itemId}:delete`, { force: true });
