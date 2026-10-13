@@ -1520,15 +1520,10 @@ tr.ct-row-end .ct-select:focus {
   box-shadow: none;
   overflow-anchor: none;
 }
-.css-macro-preview-body { position: relative; }
-.css-macro-preview-mode {
-  position: absolute; top: 2px; right: 6px; z-index: 2; pointer-events: none;
-  font: 10px/1 sans-serif; font-style: normal; font-weight: 400; color: #888; opacity: 0.8; white-space: nowrap;
-}
 /* 롤20 채팅: 매크로를 롤20 채팅 모양으로 그린다(값은 ROLL20_PREVIEW). 코코포리아와 달리 조각 style 을 거르지 않는다. */
 .css-macro-preview-body:has(> .roll20-chat) {
-  background: var(--r20-bg) !important; border-radius: 0; padding: 0; color: var(--r20-color); white-space: normal;
-  width: min(calc(var(--r20-width) + 2px), 100%);
+  background: var(--r20-bg) !important; border: 0; border-radius: 0; padding: 0; color: var(--r20-color); white-space: normal;
+  width: min(var(--r20-width), 100%); margin-inline: auto; /* 칸 안 가로 가운데 */
 }
 .roll20-chat, .roll20-chat * { box-sizing: content-box; }
 .roll20-chat { position: relative; overflow: hidden; font: var(--r20-size)/var(--r20-line-height) var(--r20-font); color: var(--r20-color); }
@@ -32108,7 +32103,7 @@ function renderRoll20PreviewHtml(raw) {
     const body = renderRoll20PreviewLine(line.replace(/^\s*\/desc\b\s*/i, ''));
     return `<div class="roll20-msg${isDesc ? ' desc' : ''}"><div class="roll20-spacer"></div>${body}</div>`;
   }).join('');
-  return `<span class="css-macro-preview-mode">롤20 기준</span><div class="roll20-chat">${messages}</div>`;
+  return `<div class="roll20-chat">${messages}</div>`;
 }
 // 사용자 style 에서 코코포리아가 걸러내는 선언을 빼고, 코코포리아가 덧붙이는 style 을 뒤에 붙인다.
 function cssMacroPreviewSpanStyle(style, isDesc = false) {
@@ -32297,7 +32292,7 @@ function renderCssMacroPreviewHtml(value) {
       i -= 1;
       out.push(`<div class="css-macro-preview-line desc"><div class="css-macro-preview-desc-body">${rows}</div></div>`);
     }
-    return `<span class="css-macro-preview-mode">코코포리아 기준</span>` + out.join('');
+    return out.join('');
   }
   if (sawMacroSyntax) {
     return `<span class="css-macro-preview-error">미리보기를 생성할 수 없습니다.</span>`;
