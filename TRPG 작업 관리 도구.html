@@ -8591,10 +8591,30 @@ select.sh-field-input,
         <div class="css-macro-toolbar-right">
           <input class="css-macro-search" id="css-macro-search" placeholder="검색..." oninput="renderCssMacroPage()">
           <button class="css-macro-action-btn css-macro-dict-btn" onclick="openCssPopupDictionary()" title="CSS 팝업사전"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></button>
+          <button class="css-macro-action-btn" onclick="openRoll20Handout()" title="Roll20 채팅 매크로를 핸드아웃용 HTML로 변환해 복사">핸드아웃</button>
           <button class="css-macro-add-btn" onclick="addCssMacroItem()">＋ 매크로</button>
         </div>
       </div>
       <div class="css-macro-content" id="css-macro-list"></div>
+    </div>
+  </div>
+  <div id="r20ho-backdrop" class="css-popup-dictionary-backdrop" onclick="if(event.target===this) closeRoll20Handout()">
+    <div class="css-popup-dictionary-modal" onclick="event.stopPropagation()">
+      <div class="css-popup-dictionary-head">
+        <div>
+          <div class="css-popup-dictionary-title">Roll20 핸드아웃용 복사</div>
+          <div class="css-popup-dictionary-subtitle">채팅 CSS 매크로를 붙여넣으면 핸드아웃용 HTML(검정 1칸 표)로 바꿉니다. 복사한 뒤 Roll20 핸드아웃 편집 창에 Ctrl+V 하세요.</div>
+        </div>
+        <div class="css-popup-dictionary-head-actions">
+          <button class="css-macro-action-btn" type="button" onclick="copyRoll20Handout()">핸드아웃용 복사</button>
+          <button class="css-popup-dictionary-close" type="button" onclick="closeRoll20Handout()">닫기</button>
+        </div>
+      </div>
+      <div class="css-popup-dictionary-body">
+        <textarea id="r20ho-input" class="css-popup-dictionary-textarea" rows="6" spellcheck="false" placeholder="/desc [글자](#&quot; style=&quot;…&quot;)[x](https://…png) … 매크로를 붙여넣으세요" oninput="updateRoll20Handout()"></textarea>
+        <div id="r20ho-status" style="font-size:12px;color:#888;margin:6px 0"></div>
+        <div id="r20ho-preview" style="overflow:auto;background:#fff;border:1px solid #ddd;padding:8px"></div>
+      </div>
     </div>
   </div>
   <div id="css-popup-dictionary-backdrop" class="css-popup-dictionary-backdrop" onclick="if(event.target===this) closeCssPopupDictionary()">
@@ -31948,6 +31968,174 @@ function renderRoll20PreviewLine(source) {
     cursor = open + 1;
   }
   return html;
+}
+// Roll20 채팅 매크로(/desc + 링크 style 꼼수) → 핸드아웃용 HTML(검정 1칸 표). Roll20 핸드아웃 편집기는 붙여넣을 때 div 배경은 지우고 table/td 의 bgcolor·background-color 는 남긴다(사용자 실측).
+// 글자 서식(color/font-size/font-weight/font-style/text-decoration)만 유지하고, 음수 margin·%padding·height·'.' 스페이서는 간격 신호로만 쓴다. 출력 태그는 table/tr/td/p/span/img/br 뿐.
+function buildRoll20HandoutHtml(macro, imageWidths = {}) {
+  const escH = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const colorOk = value => /^(?:#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|[a-z]{3,20})$/i.test(value) && !/^(?:transparent|inherit|initial|unset|currentcolor)$/i.test(value);
+  const hex6 = value => (/^#[0-9a-f]{3}$/i.test(value) ? '#' + [...value.slice(1)].map(ch => ch + ch).join('') : value).toLowerCase();
+  const px = value => { const m = /^(-?\d+(?:\.\d+)?)px$/i.exec(String(value || '').trim()); return m ? Number(m[1]) : null; };
+  const parseStyle = text => {
+    const map = {};
+    String(text || '').split(';').forEach(decl => {
+      const i = decl.indexOf(':');
+      if (i < 0) return;
+      map[decl.slice(0, i).trim().toLowerCase()] = decl.slice(i + 1).replace(/!important/i, '').trim();
+    });
+    return map;
+  };
+  const imageUrl = value => {
+    const url = String(value || '').trim();
+    return /^https:\/\/[^\s"'<>()]+$/i.test(url) && (/\.(?:png|jpe?g|gif|webp)(?:$|\?)/i.test(url) || /^https:\/\/i\.imgur\.com\//i.test(url)) ? url : '';
+  };
+  const textStyle = st => {
+    const out = {};
+    if (st.color && colorOk(st.color)) out.color = hex6(st.color);
+    const size = px(st['font-size']);
+    if (size && size > 0 && size <= 64) out['font-size'] = size + 'px';
+    if (/^(?:bold|bolder|[6-9]00)$/i.test(st['font-weight'] || '')) out['font-weight'] = 'bold';
+    if (/^italic$/i.test(st['font-style'] || '')) out['font-style'] = 'italic';
+    if (/underline|line-through/i.test(st['text-decoration'] || '')) out['text-decoration'] = st['text-decoration'].match(/underline|line-through/i)[0].toLowerCase();
+    return out;
+  };
+  const styleAttr = (obj, base = {}) => Object.keys(obj).filter(k => obj[k] !== base[k]).map(k => `${k}:${obj[k]};`).join(' ');
+  const bgCount = {};
+  const images = [];
+  const parseLine = line => {
+    let source = line.replace(/^\s*\/[a-z]+\s*/i, '');
+    const pieces = [];
+    let cursor = 0;
+    while (cursor < source.length) {
+      const open = source.indexOf('[', cursor);
+      const plain = decodeCssMacroPreviewValue(source.slice(cursor, open < 0 ? source.length : open));
+      if (plain.trim() && plain.trim() !== '%NEWLINE%') pieces.push({ text: plain, st: {}, block: false });
+      if (open < 0) break;
+      const token = tryParseCssMacroToken(source, open);
+      if (token) {
+        const st = parseStyle(token.style);
+        if (st['background-color'] && colorOk(st['background-color'])) { const c = hex6(st['background-color']); bgCount[c] = (bgCount[c] || 0) + 1; }
+        const hidden = px(st['font-size']) === 0 || /^transparent$/i.test(st.color || '');
+        const label = token.text.trim();
+        pieces.push({
+          text: token.text, st, block: /^block$/i.test(st.display || ''), padTop: Math.max(0, Math.min(8, px(st['padding-top'] || String(st.padding || '').split(/\s+/)[0]) || 0)),
+          spacer: hidden && (label === '.' || label === '' || label === 'x'), height: px(st.height) || 0,
+        });
+        cursor = token.end;
+        continue;
+      }
+      const image = source.slice(open).match(/^\[[^\]]*\]\(\s*([^\s)]+)\s*\)/);
+      const url = image && imageUrl(image[1]);
+      if (url) { pieces.push({ image: url }); images.push(url); cursor = open + image[0].length; continue; }
+      pieces.push({ text: '[', st: {}, block: false });
+      cursor = open + 1;
+    }
+    const bare = imageUrl(source.trim());
+    if (!pieces.length && bare) { pieces.push({ image: bare }); images.push(bare); }
+    return pieces;
+  };
+  const lines = String(macro || '').replace(/\r\n?/g, '\n').split('\n');
+  const parsed = lines.map(line => ({ raw: line, pieces: parseLine(line) }));
+  const uniqueImages = [...new Set(images)];
+  const widths = uniqueImages.map(url => Number(imageWidths[url]) || 0).filter(Boolean);
+  const tableWidth = widths.length ? Math.max(...widths) : 476;
+  const body = [];
+  let gap = 0;
+  parsed.forEach(({ raw, pieces }) => {
+    const visible = pieces.filter(p => !p.spacer);
+    if (!visible.length) {
+      const spacer = pieces.find(p => p.spacer);
+      if (spacer) gap += Math.min(40, spacer.height || 0);
+      else if (/%NEWLINE%/i.test(raw)) gap += 16;
+      return;
+    }
+    const top = () => (body.length ? 4 + gap : 0);
+    let para = null;
+    let blockOpen = false;
+    let first = true;
+    const flush = () => { if (para) { body.push(para); para = null; blockOpen = false; } };
+    visible.forEach(piece => {
+      if (piece.image) {
+        flush();
+        const wide = (Number(imageWidths[piece.image]) || 0) >= tableWidth;
+        const margin = first ? top() : 0;
+        body.push({ img: piece.image, wide, margin });
+        gap = 0; first = false;
+        return;
+      }
+      if (!para || piece.block || !blockOpen) {
+        const newPara = !para || (!first && piece.padTop > 0) || first;
+        if (newPara) { flush(); para = { margin: first ? top() : piece.padTop, blocks: [], st: textStyle(piece.st) }; gap = 0; }
+        para.blocks.push([]);
+        blockOpen = true;
+        first = false;
+      }
+      para.blocks[para.blocks.length - 1].push({ text: piece.text, st: textStyle(piece.st) });
+    });
+    flush();
+  });
+  let bg = Object.keys(bgCount).sort((a, b) => bgCount[b] - bgCount[a])[0] || '#000000';
+  bg = hex6(bg);
+  const parts = body.map(item => {
+    if (item.img) {
+      return `<img src="${escH(item.img)}"${item.wide ? ` width="${tableWidth}"` : ''} style="display:block;${item.wide ? ' width:100%;' : ''} margin:${item.margin ? item.margin + 'px' : '0'} auto 0;">`;
+    }
+    const inner = item.blocks.map(block => block.map(piece => {
+      const diff = styleAttr(piece.st, item.st);
+      const text = escH(piece.text.replace(/ /g, ' ').trim() === '' ? ' ' : piece.text);
+      return diff ? `<span style="${diff}">${text}</span>` : text;
+    }).join('')).join('<br>');
+    const own = styleAttr(item.st);
+    return `<p style="margin:${item.margin ? item.margin + 'px 0 0' : '0'};${own ? ' ' + own : ''}">${inner}</p>`;
+  });
+  const html = `<table bgcolor="${bg}" width="${tableWidth}" align="center" cellpadding="0" cellspacing="0" border="0" style="background-color:${bg}; width:${tableWidth}px; margin:0 auto; border-collapse:collapse; border:0;">\n`
+    + `<tr><td bgcolor="${bg}" align="center" style="background-color:${bg}; text-align:center; padding:0 0 16px; border:0;">\n${parts.join('\n')}\n</td></tr>\n</table>`;
+  return { html, images: uniqueImages };
+}
+let _r20hoImageWidths = {};
+function openRoll20Handout() { document.getElementById('r20ho-backdrop')?.classList.add('open'); updateRoll20Handout(); }
+function closeRoll20Handout() { document.getElementById('r20ho-backdrop')?.classList.remove('open'); }
+function updateRoll20Handout() {
+  const input = document.getElementById('r20ho-input');
+  const preview = document.getElementById('r20ho-preview');
+  if (!input || !preview) return;
+  if (!input.value.trim()) { preview.innerHTML = ''; return; }
+  const { html, images } = buildRoll20HandoutHtml(input.value, _r20hoImageWidths);
+  preview.innerHTML = html;
+  images.filter(url => !(url in _r20hoImageWidths)).forEach(url => {
+    _r20hoImageWidths[url] = 0;
+    const img = new Image();
+    img.onload = () => { _r20hoImageWidths[url] = img.naturalWidth; updateRoll20Handout(); };
+    img.src = url;
+  });
+}
+async function copyRoll20Handout() {
+  const input = document.getElementById('r20ho-input');
+  const status = document.getElementById('r20ho-status');
+  if (!input?.value.trim()) return;
+  const { html } = buildRoll20HandoutHtml(input.value, _r20hoImageWidths);
+  const text = document.getElementById('r20ho-preview')?.innerText || '';
+  const done = ok => { if (status) status.textContent = ok ? '복사했습니다. Roll20 핸드아웃 편집 창에 Ctrl+V 하세요.' : '복사에 실패했습니다.'; };
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })]);
+    done(true);
+  } catch (e) {
+    const holder = document.createElement('div');
+    holder.contentEditable = 'true';
+    holder.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    holder.innerHTML = html;
+    document.body.appendChild(holder);
+    const range = document.createRange();
+    range.selectNodeContents(holder);
+    const sel = getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) {}
+    sel.removeAllRanges();
+    holder.remove();
+    done(ok);
+  }
 }
 function renderRoll20PreviewHtml(raw) {
   const messages = raw.split('\n').filter(line => line.trim()).map(line => {
