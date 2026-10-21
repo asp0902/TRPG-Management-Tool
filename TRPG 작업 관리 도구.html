@@ -188,6 +188,14 @@ input.ct-num-input { width: 100%; min-width: 0; }
   background-repeat: no-repeat; background-position: right 11px center; padding-right: 25px !important;
 }
 .ct-select:focus { background-color: #fff; }
+/* 룰 칸 앱 자체 드롭다운(#146): 네이티브 select 팝업은 padding 이 옵션에 번져 글자가 오른쪽으로 치우쳐서 교체. 펼친 목록은 칸 폭 그대로, 항목은 가운데. */
+button.ct-dd-btn { width: 100%; text-align: center; }
+.ct-dd-btn.is-empty { color: #bbbbbb; }
+.ct-dd-menu { display: none; position: fixed; z-index: 10000; box-sizing: border-box; background: #fff; border: 1px solid #d5d5d5; border-radius: 4px; box-shadow: 0 4px 14px rgba(0,0,0,0.15); padding: 2px 0; }
+.ct-dd.open .ct-dd-menu { display: block; }
+.ct-dd-option { display: block; width: 100%; box-sizing: border-box; padding: 5px 7px; border: 0; background: transparent; font: inherit; font-size: 12px; color: #222; text-align: center; cursor: pointer; }
+.ct-dd-option:hover, .ct-dd-option.active { background: #f3f7ff; }
+.ct-dd-option.selected { font-weight: 700; }
 .ct-select:has(option[value=""]:checked) { color: #bbbbbb; }
 .ct-select option { color: #222; }
 .ct-note-dot {
@@ -29359,6 +29367,81 @@ function ctNumInput(cid, field, value) {
     oncontextmenu="return openDiffNotePopup(event,'${cid}','${which}')"
     onkeydown="ctKey(event,this)">`;
 }
+function catalogRuleLabel(value) {
+  return value === 'CoC 7판' ? 'CoC 7th' : (value || '—');
+}
+// 룰 칸: 네이티브 select 대신 앱 자체 드롭다운. 저장은 saveCatalogField 그대로.
+function ctRuleDropdown(cid, value) {
+  const options = CATALOG_RULES.map(option =>
+    `<button type="button" class="ct-dd-option${option === value ? ' selected' : ''}" role="option" data-value="${esc(option)}" tabindex="-1" onclick="selectCatalogRule(this)">${esc(catalogRuleLabel(option))}</button>`
+  ).join('');
+  return `<div class="ct-dd" data-cid="${cid}" data-field="rule" onkeydown="ctRuleKey(event,this)">`
+    + `<button type="button" class="ct-input ct-select ct-dd-btn${value ? '' : ' is-empty'}" aria-haspopup="listbox" aria-expanded="false" onclick="toggleCatalogRuleDropdown(this.closest('.ct-dd'))">${esc(catalogRuleLabel(value))}</button>`
+    + `<div class="ct-dd-menu" role="listbox">${options}</div></div>`;
+}
+function closeCatalogRuleDropdowns(except) {
+  document.querySelectorAll('.ct-dd.open').forEach(dd => {
+    if (dd === except) return;
+    dd.classList.remove('open');
+    dd.querySelector('.ct-dd-btn')?.setAttribute('aria-expanded', 'false');
+  });
+}
+function toggleCatalogRuleDropdown(dd, forceOpen) {
+  if (!dd) return;
+  const open = forceOpen ?? !dd.classList.contains('open');
+  closeCatalogRuleDropdowns(open ? dd : null);
+  dd.classList.toggle('open', open);
+  const btn = dd.querySelector('.ct-dd-btn');
+  btn.setAttribute('aria-expanded', String(open));
+  if (!open) return;
+  const menu = dd.querySelector('.ct-dd-menu');
+  const rect = btn.getBoundingClientRect();
+  menu.style.left = rect.left + 'px';
+  menu.style.width = rect.width + 'px';
+  menu.style.top = rect.bottom + 'px';
+  const bottom = menu.getBoundingClientRect().bottom;
+  if (bottom > window.innerHeight - 4) menu.style.top = Math.max(4, rect.top - menu.offsetHeight) + 'px';
+  setCatalogRuleActive(dd, dd.querySelector('.ct-dd-option.selected') || dd.querySelector('.ct-dd-option'));
+}
+function setCatalogRuleActive(dd, option) {
+  dd.querySelectorAll('.ct-dd-option.active').forEach(item => item.classList.remove('active'));
+  if (option) { option.classList.add('active'); option.scrollIntoView({ block: 'nearest' }); }
+}
+function selectCatalogRule(option) {
+  const dd = option.closest('.ct-dd');
+  const value = option.dataset.value || '';
+  saveCatalogField(dd.dataset.cid, dd.dataset.field, value);
+  const btn = dd.querySelector('.ct-dd-btn');
+  btn.textContent = catalogRuleLabel(value);
+  btn.classList.toggle('is-empty', !value);
+  dd.querySelectorAll('.ct-dd-option').forEach(item => item.classList.toggle('selected', item === option));
+  toggleCatalogRuleDropdown(dd, false);
+  btn.focus();
+}
+function ctRuleKey(event, dd) {
+  const open = dd.classList.contains('open');
+  const items = [...dd.querySelectorAll('.ct-dd-option')];
+  const index = items.findIndex(item => item.classList.contains('active'));
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (!open) { toggleCatalogRuleDropdown(dd, true); return; }
+    const next = Math.min(items.length - 1, Math.max(0, index + (event.key === 'ArrowDown' ? 1 : -1)));
+    setCatalogRuleActive(dd, items[next]);
+  } else if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    if (!open) toggleCatalogRuleDropdown(dd, true);
+    else if (items[index]) selectCatalogRule(items[index]);
+  } else if (event.key === 'Escape' && open) {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleCatalogRuleDropdown(dd, false);
+  } else if (event.key === 'Tab') {
+    toggleCatalogRuleDropdown(dd, false);
+  }
+}
+document.addEventListener('mousedown', e => { if (!e.target.closest?.('.ct-dd')) closeCatalogRuleDropdowns(); });
+window.addEventListener('resize', () => closeCatalogRuleDropdowns());
+document.addEventListener('scroll', e => { if (!e.target.closest?.('.ct-dd-menu')) closeCatalogRuleDropdowns(); }, true);
 function ctSelect(cid, field, value, options) {
   const opts = field === 'rule' && options === CATALOG_RULES
     ? catalogRuleOptionsHtml(value)
@@ -29397,7 +29480,7 @@ function renderCatalog() {
       ? `<button class="ct-script-btn linked" onclick="onScriptLinkClick(event,'${c.id}')" oncontextmenu="return onScriptLinkContextMenu(event,'${c.id}')" title="${esc(linkedTitle)} (좌클릭: 이동, 우클릭: 변경)">→</button>`
       : `<button class="ct-script-btn" onclick="onScriptLinkClick(event,'${c.id}')" oncontextmenu="return onScriptLinkContextMenu(event,'${c.id}')" title="스크립트 연결">＋</button>`;
     return `<tr data-cid="${c.id}"${rowCls ? ` class="${rowCls}"` : ''}>
-      <td class="ct-cell ct-rule">${ctSelect(c.id,'rule',c.rule,CATALOG_RULES)}</td>
+      <td class="ct-cell ct-rule">${ctRuleDropdown(c.id,c.rule)}</td>
       <td class="ct-cell ct-genre">${ctSelect(c.id,'genre',c.genre,CATALOG_GENRES)}</td>
       <td class="ct-cell ct-num-cell" title="${c.gmDiffNote ? '메모 있음 (우클릭)' : '우클릭으로 메모'}">
         ${ctNumInput(c.id,'gmDiff',c.gmDiff)}${c.gmDiffNote ? '<span class="ct-note-dot"></span>' : ''}
