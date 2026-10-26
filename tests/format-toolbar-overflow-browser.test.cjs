@@ -13,6 +13,7 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
   const shots = path.join(__dirname, '.artifacts', 'format-toolbar-overflow');
   fs.mkdirSync(shots, { recursive: true });
   try {
+    await page.addInitScript(() => localStorage.setItem('trpg-auto-backup-enabled', '0')); // 시작 시 자동 백업 권한 팝업(#152)이 클릭을 가리지 않게
     await page.goto(pathToFileURL(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html')).href);
     await page.evaluate(() => {
       createNew();

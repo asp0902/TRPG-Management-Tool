@@ -2493,6 +2493,7 @@ tr.ct-row-end .ct-select:focus {
 }
 .sidebar-footer button:hover { border-color: #555; color: #ccc; }
 .sidebar-footer button.active { border-color: #16a34a; color: #bbf7d0; background: rgba(22,163,74,0.12); }
+.sidebar-footer #auto-backup-btn.warning { border-color: #dc2626; color: #fecaca; background: rgba(220,38,38,0.12); }
 .sidebar-footer #github-sync-btn.active { border-color: #2563eb; color: #bfdbfe; background: rgba(37,99,235,0.14); }
 .sidebar-footer #github-sync-btn.error, .sidebar-footer #github-sync-btn.needs-token { border-color: #dc2626; color: #fecaca; background: rgba(220,38,38,0.12); }
 
@@ -9087,6 +9088,18 @@ select.sh-field-input,
   </div>
 
   <!-- GITHUB SYNC MODAL -->
+  <div id="ab-perm-backdrop" class="rb-modal-backdrop" style="z-index: 10001;"
+    role="dialog" aria-modal="true" aria-labelledby="ab-perm-heading" data-kind="">
+    <div class="rb-modal github-sync-modal" onclick="event.stopPropagation()">
+      <div class="rb-modal-heading" id="ab-perm-heading">자동 백업 파일 권한 허용</div>
+      <p class="github-sync-help" id="ab-perm-desc"></p>
+      <div id="ab-perm-status" class="github-sync-status" aria-live="polite" style="display:none"></div>
+      <div class="rb-modal-footer">
+        <button type="button" class="rb-modal-cancel" onclick="skipAutoBackupStartupPopup()">이번에는 건너뛰기</button>
+        <button type="button" class="rb-modal-save" id="ab-perm-ok" onclick="confirmAutoBackupStartupPopup()">허용</button>
+      </div>
+    </div>
+  </div>
   <div id="github-sync-backdrop" class="rb-modal-backdrop" style="z-index: 10000;"
     role="dialog" aria-modal="true" aria-labelledby="github-sync-heading"
     onclick="if(event.target===this)closeGitHubSyncModal()"
@@ -23485,6 +23498,7 @@ const AUTO_BACKUP_INTERVAL_KEY = 'trpg-auto-backup-interval-ms';
 const AUTO_BACKUP_LAST_KEY = 'trpg-auto-backup-last-at';
 const AUTO_BACKUP_DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
 let autoBackupTimer = null;
+let autoBackupWarning = false; // 권한·파일 문제나 「건너뛰기」로 이번 방문에 자동 파일 백업이 꺼져 있는 상태
 let autoBackupFileHandle = null;
 let autoBackupIntervalMs = Number(localStorage.getItem(AUTO_BACKUP_INTERVAL_KEY)) || AUTO_BACKUP_DEFAULT_INTERVAL_MS;
 
@@ -23601,11 +23615,12 @@ function updateAutoBackupButton() {
   if (!btn) return;
   const running = !!autoBackupTimer;
   btn.classList.toggle('active', running);
-  btn.textContent = running ? `자동 ${getAutoBackupIntervalLabel()}` : '자동 백업';
+  btn.classList.toggle('warning', !running && autoBackupWarning);
+  btn.textContent = running ? `자동 ${getAutoBackupIntervalLabel()}` : (autoBackupWarning ? '자동 백업 꺼짐' : '자동 백업');
   const lastAt = localStorage.getItem(AUTO_BACKUP_LAST_KEY);
   btn.title = running
     ? `자동 백업 실행 중 (${getAutoBackupIntervalLabel()} 간격)${lastAt ? `\n마지막 백업: ${new Date(lastAt).toLocaleString()}` : ''}`
-    : '백업 파일을 지정하고 1분 또는 5분마다 자동 저장합니다.';
+    : (autoBackupWarning ? '자동 파일 백업이 꺼져 있습니다. 클릭하면 권한 요청 또는 파일 지정을 다시 진행합니다.' : '백업 파일을 지정하고 1분 또는 5분마다 자동 저장합니다.');
 }
 function startAutoBackupTimer(intervalMs) {
   if (autoBackupTimer) clearInterval(autoBackupTimer);
@@ -23699,6 +23714,59 @@ async function toggleAutoBackup() {
     }
   }
 }
+// ── 열 때 자동 백업 권한 팝업 (#152) ──
+function showAutoBackupStartupPopup(kind, tries = 0) {
+  const backdrop = document.getElementById('ab-perm-backdrop');
+  if (!backdrop) return;
+  // 다른 모달(GitHub 동기화 등)이 열려 있으면 닫힌 뒤에 띄운다
+  if (document.querySelector('.rb-modal-backdrop.open') && tries < 60) {
+    setTimeout(() => showAutoBackupStartupPopup(kind, tries + 1), 1000);
+    return;
+  }
+  backdrop.dataset.kind = kind;
+  const isPick = kind === 'pick';
+  document.getElementById('ab-perm-heading').textContent = isPick ? '자동 백업 파일 지정' : '자동 백업 파일 권한 허용';
+  document.getElementById('ab-perm-desc').textContent = isPick
+    ? '자동 파일 백업을 쓰려면 백업 파일을 한 번 지정해야 합니다. [파일 지정]을 누르면 저장 위치와 주기를 고릅니다.'
+    : '브라우저를 다시 열어 자동 백업 파일 권한이 필요합니다. [허용]을 누르면 브라우저의 권한 창이 뜹니다. 「방문할 때마다 허용」을 고르면 다음부터 이 창이 생략될 수 있습니다.';
+  document.getElementById('ab-perm-ok').textContent = isPick ? '파일 지정' : '허용';
+  const status = document.getElementById('ab-perm-status');
+  status.style.display = 'none';
+  status.textContent = '';
+  backdrop.classList.add('open');
+}
+function closeAutoBackupStartupPopup() {
+  document.getElementById('ab-perm-backdrop')?.classList.remove('open');
+}
+function skipAutoBackupStartupPopup() {
+  closeAutoBackupStartupPopup();
+  autoBackupWarning = !autoBackupTimer;
+  updateAutoBackupButton();
+}
+async function confirmAutoBackupStartupPopup() {
+  const kind = document.getElementById('ab-perm-backdrop')?.dataset.kind;
+  const status = document.getElementById('ab-perm-status');
+  const showError = message => { status.textContent = message; status.className = 'github-sync-status error'; status.style.display = ''; };
+  if (kind === 'pick') {
+    closeAutoBackupStartupPopup();
+    await toggleAutoBackup();
+    autoBackupWarning = !autoBackupTimer;
+    updateAutoBackupButton();
+    return;
+  }
+  try {
+    const granted = await autoBackupFileHandle?.requestPermission?.({ mode: 'readwrite' }) === 'granted';
+    if (!granted) { showError('권한이 허용되지 않았습니다. 다시 시도하거나 건너뛰기를 누르세요.'); return; }
+    closeAutoBackupStartupPopup();
+    autoBackupWarning = false;
+    startAutoBackupTimer(autoBackupIntervalMs || AUTO_BACKUP_DEFAULT_INTERVAL_MS);
+    await writeAutoBackup({ silent: true });
+    showToast('자동 파일 백업을 다시 시작했습니다.');
+  } catch (err) {
+    console.error('auto backup permission failed:', err);
+    showError('권한 요청에 실패했습니다: ' + (err?.message || err));
+  }
+}
 async function initAutoBackup() {
   // 명시적으로 끄지 않은 한 자동 백업은 기본 활성 상태로 취급
   if (localStorage.getItem(AUTO_BACKUP_ENABLED_KEY) === null) {
@@ -23710,15 +23778,21 @@ async function initAutoBackup() {
   try {
     autoBackupFileHandle = await getStoredAutoBackupHandle();
     if (!autoBackupFileHandle) {
-      // 저장된 파일 핸들이 아직 없을 뿐 비활성으로 전환하지 않음 — 사용자가 백업 파일을 지정하면 즉시 동작
+      // 저장된 파일 핸들이 아직 없음: 비활성으로 전환하지 않고, 파일 지정 팝업을 띄운다(건너뛰면 경고 표시).
+      autoBackupWarning = true;
       updateAutoBackupButton();
+      showAutoBackupStartupPopup('pick');
       return;
     }
     if (await verifyAutoBackupPermission(autoBackupFileHandle, false)) {
+      autoBackupWarning = false;
       startAutoBackupTimer(autoBackupIntervalMs || AUTO_BACKUP_DEFAULT_INTERVAL_MS);
       writeAutoBackup({ silent: true });
     } else {
+      // 권한이 prompt: 브라우저는 클릭 없이 권한을 못 물으므로 앱 팝업의 [허용] 클릭에서 requestPermission 을 부른다.
+      autoBackupWarning = true;
       updateAutoBackupButton();
+      showAutoBackupStartupPopup('permission');
     }
   } catch (err) {
     console.error('auto backup init failed:', err);

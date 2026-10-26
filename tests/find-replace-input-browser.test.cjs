@@ -7,6 +7,7 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
   const browser = await chromium.launch({ headless: true, executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe' });
   const page = await browser.newPage({ viewport: { width: 390, height: 700 } });
   try {
+    await page.addInitScript(() => localStorage.setItem('trpg-auto-backup-enabled', '0')); // 시작 시 자동 백업 권한 팝업(#152)이 클릭을 가리지 않게
     await page.goto(pathToFileURL(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html')).href);
     await page.evaluate(() => {
       createNew();
