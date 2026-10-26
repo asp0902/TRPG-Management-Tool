@@ -30084,11 +30084,34 @@ function getScriptLinkTitleText(value) {
     .trim();
 }
 
+// 시나리오 목록 항목에서 새 스크립트를 만들고 연결한다. 채우는 info 필드: writer←작가, rule←룰(스크립트 룰 목록에 있는 값만), background←배경,
+// playtime←소요시간, players←인원, relations←관계. 제목은 시나리오명. 그 밖의 필드(난이도·메모·링크 등)는 스크립트 쪽에 대응 필드가 없어 옮기지 않는다.
+const CATALOG_RULE_TO_SCRIPT_RULE = { 'CoC 7판': 'Call of Cthulhu 7th Edition', '인세인': 'inSANe', '언성 듀엣': '언성 듀엣' };
+function createScriptFromCatalog(entry) {
+  const scenario = mkScenario('');
+  scenario.title = String(entry.title || '').trim() || '제목 없음';
+  Object.assign(scenario.info, {
+    writer: entry.writer || '',
+    rule: CATALOG_RULE_TO_SCRIPT_RULE[entry.rule] || '',
+    background: entry.background || '',
+    playtime: entry.time || '',
+    players: entry.players || '',
+    relations: entry.relation || '',
+  });
+  state.scenarios.push(scenario);
+  entry.scriptId = scenario.id;
+  persist(); renderCatalog(); renderList();
+  openInScript(scenario.id);
+}
 function buildScriptLinkMenu(catalogId) {
   const entry = state.catalog.find(c => c.id === catalogId);
   if (!entry) return [];
   const items = [{ heading: '스크립트 연결' }];
   const linked = entry.scriptId && state.scenarios.find(s => s.id === entry.scriptId);
+  if (!linked) {
+    items.push({ icon: '＋', label: '새 스크립트 추가', action: () => createScriptFromCatalog(entry) });
+    items.push({ sep: true });
+  }
   if (linked) {
     items.push({
       icon: '↗',
