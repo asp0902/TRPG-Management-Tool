@@ -158,6 +158,26 @@ body {
 .catalog-edit-btn:hover { background: #f0f0f0; color: #111; }
 .catalog-del-btn { color: #ccc; }
 .catalog-del-btn:hover { background: #fff0f0; color: #e53e3e; }
+/* ─── 시리즈 묶음 (#153) ─── */
+.ct-drag-head, .ct-drag-cell { width: 24px !important; min-width: 24px !important; padding: 0 !important; text-align: center; }
+.ct-row-handle { width: 20px; height: 24px; border: none; background: transparent; padding: 0; color: #c2c2c2; font-size: 13px; line-height: 1; cursor: grab; font-family: inherit; touch-action: none; }
+.ct-row-handle:hover { color: #777; }
+tr.ct-child td.ct-drag-cell { border-left: 3px solid #cfd8e6; }
+tr.ct-child td.ct-title-cell { padding-left: 14px !important; }
+tr.ct-series-row td { background: #f3f5f9; border-bottom: 1px solid #e3e7ee; }
+tr.ct-series-row:hover td { background: #eef1f7 !important; }
+.ct-series-cell { padding: 2px 4px !important; }
+.ct-series-inner { display: flex; align-items: center; gap: 6px; }
+.ct-series-toggle { border: none; background: transparent; cursor: pointer; font-size: 12px; color: #667; padding: 2px 4px; font-family: inherit; }
+.ct-series-count { color: #889; font-size: 11px; white-space: nowrap; }
+.ct-series-inner textarea.ct-input { font-weight: 700; flex: 0 1 auto; min-width: 160px; }
+.ct-series-del { margin-left: auto; }
+tr.ct-drop-before td { box-shadow: inset 0 2px 0 #4a9eff; }
+tr.ct-drop-after td { box-shadow: inset 0 -2px 0 #4a9eff; }
+tr.ct-drop-into td { background: #e6f1ff !important; box-shadow: inset 0 0 0 1px #4a9eff; }
+tr.ct-dragging td { opacity: 0.45; }
+body.ct-row-dragging, body.ct-row-dragging * { user-select: none !important; cursor: grabbing !important; }
+.ct-drag-ghost { position: fixed; z-index: 10050; pointer-events: none; background: #fff; border: 1px solid #4a9eff; border-radius: 5px; padding: 4px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.18); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* ─── CATALOG INLINE INPUTS ─── */
 .ct-cell { padding: 1px 2px !important; }
 .ct-title-cell { min-width: 180px; }
@@ -8399,6 +8419,7 @@ select.sh-field-input,
         <table class="catalog-table">
           <thead>
             <tr>
+              <th rowspan="2" class="ct-drag-head"></th>
               <th rowspan="2" class="ct-rule">룰</th>
               <th rowspan="2" class="ct-genre">종류</th>
               <th class="ct-diff-head" colspan="2">난이도</th>
@@ -24359,6 +24380,9 @@ async function initGitHubSync() {
   await syncGitHubState({ automatic: true, startup: true });
 }
 function normalizeCatalogImportEntry(input = {}) {
+  if (input?.kind === 'series') {
+    return { id: input.id || mkId(), kind: 'series', title: String(input.title || ''), collapsed: !!input.collapsed, parentId: '' };
+  }
   const base = mkCatalogEntry();
   return {
     ...base,
@@ -24366,6 +24390,7 @@ function normalizeCatalogImportEntry(input = {}) {
     id: input?.id || base.id,
     links: Array.isArray(input?.links) ? input.links : [],
     scriptId: typeof input?.scriptId === 'string' ? input.scriptId : '',
+    parentId: typeof input?.parentId === 'string' ? input.parentId : '',
   };
 }
 function makeImportPayload(data) {
@@ -24496,6 +24521,7 @@ function reassignImportedIdsForMerge(payload) {
   });
   payload.catalog.forEach(entry => {
     if (entry.scriptId) entry.scriptId = mapImportedId(entry.scriptId, scenarioIdMap);
+    if (entry.parentId) entry.parentId = mapImportedId(entry.parentId, catalogIdMap);
   });
   payload.cssMacros.forEach(item => {
     if (item.folderId) item.folderId = mapImportedId(item.folderId, cssMacroFolderIdMap);
@@ -24669,7 +24695,7 @@ function refreshAfterImport(replaceMode = false) {
   }
 }
 function formatImportSummary(payload) {
-  return `${payload.scenarios.length}개의 시나리오, ${payload.folders.length}개의 시나리오 폴더, ${payload.cssMacroFolders.length}개의 CSS 매크로 폴더, ${payload.records.length}개의 세션 기록, ${payload.catalog.length}개의 카탈로그 항목, ${payload.cssMacros.length}개의 매크로, ${payload.cssPopupDictionary.length}개의 CSS 팝업사전 항목, ${payload.bookmarks.length}개의 북마크, ${payload.rulebooks.length}개의 룰북, ${payload.characters.length}명의 캐릭터, ${payload.customFonts.length}개의 커스텀 폰트`;
+  return `${payload.scenarios.length}개의 시나리오, ${payload.folders.length}개의 시나리오 폴더, ${payload.cssMacroFolders.length}개의 CSS 매크로 폴더, ${payload.records.length}개의 세션 기록, ${payload.catalog.filter(c => c.kind !== 'series').length}개의 카탈로그 항목, ${payload.cssMacros.length}개의 매크로, ${payload.cssPopupDictionary.length}개의 CSS 팝업사전 항목, ${payload.bookmarks.length}개의 북마크, ${payload.rulebooks.length}개의 룰북, ${payload.characters.length}명의 캐릭터, ${payload.customFonts.length}개의 커스텀 폰트`;
 }
 function importAll(e) {
   const file = e.target.files[0]; if (!file) return;
@@ -29645,7 +29671,7 @@ function togglePageDropdown() {
 // ─── 시나리오 카탈로그 ───
 function mkCatalogEntry() {
   return {
-    id: mkId(), title: '', rule: '', genre: '', type: '',
+    id: mkId(), parentId: '', title: '', rule: '', genre: '', type: '',
     background: '', relation: '', players: '', time: '',
     gmDiff: '', gmDiffNote: '', plDiff: '', plDiffNote: '',
     isGm: false, isPl: false, isEnd: false,
@@ -29794,29 +29820,81 @@ function ctRowClass(c) {
   if (c.isPl)  return 'ct-row-pl';
   return '';
 }
+const isCatalogSeries = c => c?.kind === 'series';
+// 머리 행 바로 뒤에 하위 행이 연속으로 오도록 정리하고, 머리 행이 없는 parentId 는 비운다.
+function normalizeCatalogSeries() {
+  const list = state.catalog;
+  const heads = new Set(list.filter(isCatalogSeries).map(c => c.id));
+  const kids = new Map();
+  list.forEach(c => {
+    if (isCatalogSeries(c)) { c.parentId = ''; return; }
+    if (c.parentId && heads.has(c.parentId)) { if (!kids.has(c.parentId)) kids.set(c.parentId, []); kids.get(c.parentId).push(c); }
+    else c.parentId = '';
+  });
+  const out = [];
+  list.forEach(c => {
+    if (isCatalogSeries(c)) { out.push(c, ...(kids.get(c.id) || [])); }
+    else if (!c.parentId) out.push(c);
+  });
+  if (out.length === list.length && out.every((c, i) => c === list[i])) return;
+  state.catalog = out;
+}
+function catalogRowMatches(c, q) {
+  return [c.title, c.rule, c.genre, c.writer, c.notes, c.background, c.relation].some(v => (v || '').toLowerCase().includes(q));
+}
+function getVisibleCatalogRows(q) {
+  const list = state.catalog;
+  const kidsOf = id => list.filter(c => !isCatalogSeries(c) && c.parentId === id);
+  const out = [];
+  list.forEach(c => {
+    if (isCatalogSeries(c)) {
+      const kids = kidsOf(c.id);
+      if (q) {
+        const headHit = (c.title || '').toLowerCase().includes(q);
+        const hit = headHit ? kids : kids.filter(k => catalogRowMatches(k, q));
+        if (headHit || hit.length) out.push({ row: c, series: true, count: kids.length }, ...hit.map(k => ({ row: k })));
+      } else {
+        out.push({ row: c, series: true, count: kids.length });
+        if (!c.collapsed) kids.forEach(k => out.push({ row: k }));
+      }
+    } else if (!c.parentId && (!q || catalogRowMatches(c, q))) out.push({ row: c });
+  });
+  return out;
+}
+function renderCatalogSeriesRow(c, count) {
+  return `<tr class="ct-series-row" data-cid="${c.id}" data-series="1" oncontextmenu="return onCatalogRowContextMenu(event,'${c.id}')">
+    <td class="ct-drag-cell"><button type="button" class="ct-row-handle" onpointerdown="beginCatalogRowDrag(event,'${c.id}')" title="끌어서 시리즈 이동" aria-label="시리즈 끌어서 이동">≡</button></td>
+    <td class="ct-cell ct-series-cell" colspan="17"><div class="ct-series-inner">
+      <button type="button" class="ct-series-toggle" onclick="toggleCatalogSeries('${c.id}')" aria-expanded="${c.collapsed ? 'false' : 'true'}" title="접기/펼치기">${c.collapsed ? '▸' : '▾'}</button>
+      ${ctInput(c.id, 'title', c.title, '시리즈 이름')}
+      ${c.collapsed ? `<span class="ct-series-count">(${count})</span>` : ''}
+      <button class="catalog-del-btn ct-series-del" onclick="deleteCatalogSeries('${c.id}')" title="시리즈 삭제(하위 시나리오는 보존)">✕</button>
+    </div></td>
+  </tr>`;
+}
 function renderCatalog() {
+  normalizeCatalogSeries();
   const q = (document.getElementById('catalog-search')?.value || '').trim().toLowerCase();
   const tbody = document.getElementById('catalog-tbody');
   if (!tbody) return;
-  let list = state.catalog;
-  if (q) list = list.filter(c =>
-    [c.title, c.rule, c.genre, c.writer, c.notes, c.background, c.relation]
-      .some(v => (v || '').toLowerCase().includes(q))
-  );
-  if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="17" class="catalog-empty">${q ? '검색 결과가 없습니다.' : '등록된 시나리오가 없습니다. ＋ 추가 버튼으로 시작하세요.'}</td></tr>`;
+  const rows = getVisibleCatalogRows(q);
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="18" class="catalog-empty">${q ? '검색 결과가 없습니다.' : '등록된 시나리오가 없습니다. ＋ 추가 버튼으로 시작하세요.'}</td></tr>`;
     return;
   }
-  tbody.innerHTML = list.map(c => {
+  tbody.innerHTML = rows.map(({ row: c, series, count }) => {
+    if (series) return renderCatalogSeriesRow(c, count);
     const lc = (c.links || []).length;
-    const rowCls = ctRowClass(c);
+    const rowCls = [ctRowClass(c), c.parentId ? 'ct-child' : ''].filter(Boolean).join(' ');
     const linkedScenario = c.scriptId ? state.scenarios.find(s => s.id === c.scriptId) : null;
     const linkedTitle = linkedScenario ? (titlePlainText(linkedScenario.title) || '제목 없음') : '';
     const scriptBtnHtml = linkedScenario
-      ? `<button class="ct-script-btn linked" onclick="onScriptLinkClick(event,'${c.id}')" oncontextmenu="return onScriptLinkContextMenu(event,'${c.id}')" title="${esc(linkedTitle)} (좌클릭: 이동, 우클릭: 변경)">→</button>`
+      ? `<button class="ct-script-btn linked" onclick="onScriptLinkClick(event,'${c.id}')" oncontextmenu="return onScriptLinkContextMenu(event,'${c.id}')" title="${esc(linkedTitle)} (좌클릭: 이동, 우클릭: 메뉴)">↗</button>`
       : `<button class="ct-script-btn" onclick="onScriptLinkClick(event,'${c.id}')" oncontextmenu="return onScriptLinkContextMenu(event,'${c.id}')" title="스크립트 연결">＋</button>`;
-    return `<tr data-cid="${c.id}"${rowCls ? ` class="${rowCls}"` : ''}>
-      <td class="ct-cell ct-rule">${ctRuleDropdown(c.id,c.rule)}</td>
+    return `<tr data-cid="${c.id}"${rowCls ? ` class="${rowCls}"` : ''} oncontextmenu="return onCatalogRowContextMenu(event,'${c.id}')">
+      <td class="ct-drag-cell"><button type="button" class="ct-row-handle" onpointerdown="beginCatalogRowDrag(event,'${c.id}')" title="끌어서 이동·묶기" aria-label="끌어서 이동">≡</button></td>
+      __ROW_CELLS__
+    </tr>`.replace('__ROW_CELLS__', () => `<td class="ct-cell ct-rule">${ctRuleDropdown(c.id,c.rule)}</td>
       <td class="ct-cell ct-genre">${ctSelect(c.id,'genre',c.genre,CATALOG_GENRES)}</td>
       <td class="ct-cell ct-num-cell" title="${c.gmDiffNote ? '메모 있음 (우클릭)' : '우클릭으로 메모'}">
         ${ctNumInput(c.id,'gmDiff',c.gmDiff)}${c.gmDiffNote ? '<span class="ct-note-dot"></span>' : ''}
@@ -29846,9 +29924,220 @@ function renderCatalog() {
       </td>
       <td class="ct-act">
         <button class="catalog-del-btn" onclick="deleteCatalogEntry('${c.id}')" title="삭제">✕</button>
-      </td>
-    </tr>`;
+      </td>`);
   }).join('');
+}
+
+// ── 시리즈 묶음 조작 (#153) ──
+function getCatalogSeriesChildren(seriesId) { return state.catalog.filter(c => !isCatalogSeries(c) && c.parentId === seriesId); }
+function commitCatalogChange() { normalizeCatalogSeries(); persist(); renderCatalog(); }
+function moveCatalogEntryAfter(entry, anchor) { // anchor 바로 뒤로(anchor 가 null 이면 맨 끝)
+  state.catalog = state.catalog.filter(c => c !== entry);
+  const at = anchor ? state.catalog.indexOf(anchor) + 1 : state.catalog.length;
+  state.catalog.splice(at, 0, entry);
+}
+function groupCatalogEntryAsNewSeries(id) {
+  const entry = state.catalog.find(c => c.id === id);
+  if (!entry || isCatalogSeries(entry)) return;
+  const name = prompt('시리즈 이름을 입력하세요.', (entry.title || '').trim());
+  if (name == null) return;
+  const head = { id: mkId(), kind: 'series', title: name.trim() || '새 시리즈', collapsed: false, parentId: '' };
+  state.catalog.splice(state.catalog.indexOf(entry), 0, head);
+  entry.parentId = head.id;
+  commitCatalogChange();
+}
+function addCatalogEntryToSeries(id, seriesId) {
+  const entry = state.catalog.find(c => c.id === id);
+  const head = state.catalog.find(c => c.id === seriesId && isCatalogSeries(c));
+  if (!entry || !head || isCatalogSeries(entry)) return;
+  const kids = getCatalogSeriesChildren(seriesId).filter(k => k !== entry);
+  moveCatalogEntryAfter(entry, kids.length ? kids[kids.length - 1] : head);
+  entry.parentId = seriesId;
+  commitCatalogChange();
+}
+function removeCatalogEntryFromSeries(id) {
+  const entry = state.catalog.find(c => c.id === id);
+  if (!entry || !entry.parentId) return;
+  const kids = getCatalogSeriesChildren(entry.parentId).filter(k => k !== entry);
+  const head = state.catalog.find(c => c.id === entry.parentId);
+  entry.parentId = '';
+  moveCatalogEntryAfter(entry, kids.length ? kids[kids.length - 1] : head);
+  commitCatalogChange();
+}
+function moveCatalogEntryInSeries(id, dir) {
+  const entry = state.catalog.find(c => c.id === id);
+  if (!entry || !entry.parentId) return;
+  const kids = getCatalogSeriesChildren(entry.parentId);
+  const at = kids.indexOf(entry);
+  const other = kids[at + dir];
+  if (!other) return;
+  const a = state.catalog.indexOf(entry), b = state.catalog.indexOf(other);
+  state.catalog[a] = other;
+  state.catalog[b] = entry;
+  commitCatalogChange();
+}
+function renameCatalogSeries(id) {
+  const head = state.catalog.find(c => c.id === id && isCatalogSeries(c));
+  if (!head) return;
+  const name = prompt('시리즈 이름', head.title || '');
+  if (name == null) return;
+  head.title = name.trim() || head.title;
+  commitCatalogChange();
+}
+function ungroupCatalogSeries(id) {
+  const head = state.catalog.find(c => c.id === id && isCatalogSeries(c));
+  if (!head) return;
+  getCatalogSeriesChildren(id).forEach(k => { k.parentId = ''; });
+  state.catalog = state.catalog.filter(c => c !== head);
+  commitCatalogChange();
+}
+function deleteCatalogSeries(id) {
+  const head = state.catalog.find(c => c.id === id && isCatalogSeries(c));
+  if (!head) return;
+  const n = getCatalogSeriesChildren(id).length;
+  if (!confirm(`시리즈 "${head.title || '이름 없음'}"을(를) 삭제할까요?\n하위 시나리오 ${n}개는 지우지 않고 풀어 줍니다.`)) return;
+  ungroupCatalogSeries(id);
+}
+function toggleCatalogSeries(id) {
+  const head = state.catalog.find(c => c.id === id && isCatalogSeries(c));
+  if (!head) return;
+  head.collapsed = !head.collapsed;
+  persist();
+  renderCatalog();
+}
+function buildCatalogRowMenu(id) {
+  const entry = state.catalog.find(c => c.id === id);
+  if (!entry) return [];
+  if (isCatalogSeries(entry)) {
+    return [
+      { heading: '시리즈' },
+      { icon: '✎', label: '이름 바꾸기', action: () => renameCatalogSeries(id) },
+      { icon: '⤢', label: '시리즈 풀기', action: () => ungroupCatalogSeries(id) },
+      { sep: true },
+      { icon: '✕', label: '시리즈 삭제', danger: true, action: () => deleteCatalogSeries(id) },
+    ];
+  }
+  const series = state.catalog.filter(isCatalogSeries).filter(h => h.id !== entry.parentId);
+  const items = [{ heading: '시리즈' }, { icon: '＋', label: '새 시리즈로 묶기', action: () => groupCatalogEntryAsNewSeries(id) }];
+  items.push({
+    icon: '▸', label: '시리즈에 추가', disabled: !series.length,
+    submenu: series.map(h => ({ icon: '', label: h.title || '이름 없음', action: () => addCatalogEntryToSeries(id, h.id) })),
+  });
+  if (entry.parentId) {
+    const kids = getCatalogSeriesChildren(entry.parentId);
+    const at = kids.indexOf(entry);
+    items.push({ icon: '↖', label: '시리즈에서 빼기', action: () => removeCatalogEntryFromSeries(id) });
+    items.push({ sep: true });
+    items.push({ icon: '↑', label: '위로 이동', disabled: at <= 0, action: () => moveCatalogEntryInSeries(id, -1) });
+    items.push({ icon: '↓', label: '아래로 이동', disabled: at >= kids.length - 1, action: () => moveCatalogEntryInSeries(id, 1) });
+  }
+  return items;
+}
+// 입력칸·스크립트 연결·난이도 메모·링크 칸의 우클릭은 기존 동작을 그대로 두고, 그 밖의 행 위치에서만 시리즈 메뉴를 연다.
+function onCatalogRowContextMenu(e, id) {
+  if (e.target.closest('textarea, input, select, .ct-script-btn, .ct-num-cell, .ct-dd, .ct-links-btn, .ct-bool-cell')) return true;
+  e.preventDefault();
+  e.stopPropagation();
+  tbShowCtxMenu(e.clientX, e.clientY, buildCatalogRowMenu(id));
+  return false;
+}
+
+// ── 행 드래그 (핸들 ≡ 에서만 시작) ──
+let _catalogDrag = null;
+function beginCatalogRowDrag(e, id) {
+  if (e.button !== 0) return;
+  const row = e.currentTarget.closest('tr');
+  if (!row || (document.getElementById('catalog-search')?.value || '').trim()) return; // 검색 중에는 일부 행만 보이므로 이동하지 않는다
+  e.preventDefault();
+  _catalogDrag = { id, row, startX: e.clientX, startY: e.clientY, dragging: false, drop: null, ghost: null };
+  window.addEventListener('pointermove', onCatalogDragMove, true);
+  window.addEventListener('pointerup', onCatalogDragEnd, true);
+  window.addEventListener('keydown', onCatalogDragKey, true);
+}
+function onCatalogDragKey(e) { if (e.key === 'Escape') finishCatalogDrag(false); }
+function resolveCatalogDrop(srcId, y, x) {
+  const src = state.catalog.find(c => c.id === srcId);
+  const el = document.elementFromPoint(x, y)?.closest?.('#catalog-tbody tr[data-cid]');
+  if (!src || !el) return null;
+  const target = state.catalog.find(c => c.id === el.dataset.cid);
+  if (!target || target === src) return null;
+  if (isCatalogSeries(src) && (target.parentId === src.id)) return null; // 자기 하위 위로는 놓을 수 없다
+  const r = el.getBoundingClientRect();
+  const frac = (y - r.top) / r.height;
+  let mode;
+  if (isCatalogSeries(target) && !isCatalogSeries(src)) mode = frac < 0.25 ? 'before' : (frac > 0.75 ? 'after' : 'into');
+  else mode = frac < 0.5 ? 'before' : 'after';
+  return { el, target, mode };
+}
+function onCatalogDragMove(e) {
+  const d = _catalogDrag;
+  if (!d) return;
+  if (!d.dragging) {
+    if (Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 5) return;
+    d.dragging = true;
+    document.body.classList.add('ct-row-dragging');
+    d.row.classList.add('ct-dragging');
+    d.ghost = document.createElement('div');
+    d.ghost.className = 'ct-drag-ghost';
+    d.ghost.textContent = (state.catalog.find(c => c.id === d.id)?.title || '').trim() || '제목 없음';
+    document.body.appendChild(d.ghost);
+  }
+  d.ghost.style.left = e.clientX + 14 + 'px';
+  d.ghost.style.top = e.clientY + 8 + 'px';
+  const wrap = document.querySelector('.catalog-table-wrap');
+  if (wrap) { // 가장자리 자동 스크롤
+    const wr = wrap.getBoundingClientRect();
+    if (e.clientY < wr.top + 50) wrap.scrollTop -= 12;
+    else if (e.clientY > wr.bottom - 40) wrap.scrollTop += 12;
+  }
+  document.querySelectorAll('.ct-drop-before, .ct-drop-after, .ct-drop-into').forEach(el => el.classList.remove('ct-drop-before', 'ct-drop-after', 'ct-drop-into'));
+  d.drop = resolveCatalogDrop(d.id, e.clientY, e.clientX);
+  if (d.drop) d.drop.el.classList.add('ct-drop-' + d.drop.mode);
+}
+function onCatalogDragEnd() { finishCatalogDrag(true); }
+function finishCatalogDrag(apply) {
+  const d = _catalogDrag;
+  _catalogDrag = null;
+  window.removeEventListener('pointermove', onCatalogDragMove, true);
+  window.removeEventListener('pointerup', onCatalogDragEnd, true);
+  window.removeEventListener('keydown', onCatalogDragKey, true);
+  document.body.classList.remove('ct-row-dragging');
+  document.querySelectorAll('.ct-drop-before, .ct-drop-after, .ct-drop-into, .ct-dragging').forEach(el => el.classList.remove('ct-drop-before', 'ct-drop-after', 'ct-drop-into', 'ct-dragging'));
+  d?.ghost?.remove();
+  if (!d || !d.dragging) return;
+  if (apply && d.drop) applyCatalogDrop(d.id, d.drop.target.id, d.drop.mode);
+}
+// 놓기 규칙: 일반 행 → 시리즈 머리 행 가운데 = 끝에 추가 / 머리 행 위·아래 = 묶음 앞(밖) · 묶음 첫 자리(안) / 하위 행 위·아래 = 그 자리(같은 시리즈) / 일반 행 위·아래 = 묶음 밖.
+// 머리 행(시리즈 통째)은 다른 행·묶음의 앞뒤로만 이동한다.
+function applyCatalogDrop(srcId, targetId, mode) {
+  const src = state.catalog.find(c => c.id === srcId);
+  const target = state.catalog.find(c => c.id === targetId);
+  if (!src || !target) return;
+  const block = isCatalogSeries(src) ? [src, ...getCatalogSeriesChildren(src.id)] : [src];
+  if (block.includes(target)) return;
+  let newParent = '';
+  const without = state.catalog.filter(c => !block.includes(c));
+  const indexAfterBlockOf = t => { // t 가 머리 행이면 t 와 하위 행 전체의 끝
+    const kids = isCatalogSeries(t) ? without.filter(c => c.parentId === t.id) : [];
+    return without.indexOf(kids.length ? kids[kids.length - 1] : t);
+  };
+  let insertAt;
+  if (isCatalogSeries(src)) {
+    const top = isCatalogSeries(target) ? target : (target.parentId ? without.find(c => c.id === target.parentId) : target);
+    insertAt = mode === 'before' ? without.indexOf(top) : indexAfterBlockOf(top) + 1;
+  } else if (isCatalogSeries(target)) {
+    if (mode === 'into') { insertAt = indexAfterBlockOf(target) + 1; newParent = target.id; }
+    else if (mode === 'before') insertAt = without.indexOf(target);
+    else if (!target.collapsed && without.some(c => c.parentId === target.id)) { insertAt = without.indexOf(target) + 1; newParent = target.id; }
+    else insertAt = indexAfterBlockOf(target) + 1;
+  } else {
+    insertAt = without.indexOf(target) + (mode === 'after' ? 1 : 0);
+    newParent = target.parentId || '';
+  }
+  if (!isCatalogSeries(src)) src.parentId = newParent;
+  without.splice(insertAt, 0, ...block);
+  state.catalog = without;
+  commitCatalogChange();
 }
 
 // ── 행 추가 ──
@@ -30388,7 +30677,7 @@ function createScriptFromCatalog(entry) {
 }
 function buildScriptLinkMenu(catalogId) {
   const entry = state.catalog.find(c => c.id === catalogId);
-  if (!entry) return [];
+  if (!entry || isCatalogSeries(entry)) return [];
   const items = [{ heading: '스크립트 연결' }];
   const linked = entry.scriptId && state.scenarios.find(s => s.id === entry.scriptId);
   if (!linked) {
