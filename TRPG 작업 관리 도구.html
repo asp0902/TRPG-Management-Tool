@@ -2505,11 +2505,12 @@ tr.ct-row-end .ct-select:focus {
 .scenario-item-move:hover { color: #fff; background: #242424; }
 .scenario-item-del:hover { color: #ef4444; }
 .sidebar-footer {
-  padding: 10px 14px; border-top: 1px solid #222; display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px 14px; border-top: 1px solid #222; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; /* 2×2: 내보내기·가져오기 / GitHub·백업 */
 }
 .sidebar-footer button {
-  flex: 1 1 calc(33.333% - 4px); background: none; border: 1px solid #2a2a2a; color: #666;
+  background: none; border: 1px solid #2a2a2a; color: #666; min-width: 0;
   padding: 5px 0; border-radius: 4px; cursor: pointer; font-size: 11px; transition: all 0.15s;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sidebar-footer button:hover { border-color: #555; color: #ccc; }
 .sidebar-footer button.active { border-color: #16a34a; color: #bbf7d0; background: rgba(22,163,74,0.12); }
@@ -24090,7 +24091,7 @@ function updateGitHubSyncButton() {
   btn.classList.toggle('error', githubSyncStatusType === 'error');
   const noToken = !getGitHubSyncToken();
   btn.classList.toggle('needs-token', noToken);
-  btn.textContent = noToken ? '토큰 필요' : (githubSyncInFlight ? '동기화 중' : (githubSyncStatusType === 'error' ? 'GitHub 확인' : (active ? 'GitHub 연결됨' : 'GitHub 동기화')));
+  btn.textContent = noToken ? '토큰 필요' : (githubSyncInFlight ? '동기화 중' : (githubSyncStatusType === 'error' ? 'GitHub 확인' : (active ? 'GitHub 연결중' : 'GitHub 동기화')));
   const lastAt = localStorage.getItem(GITHUB_SYNC_LAST_AT_KEY);
   btn.title = noToken ? 'GitHub 자동 백업을 쓰려면 토큰을 입력하세요.' : (githubSyncStatus || (lastAt ? `마지막 동기화: ${new Date(lastAt).toLocaleString()}` : 'GitHub 자동 동기화 설정'));
 }
