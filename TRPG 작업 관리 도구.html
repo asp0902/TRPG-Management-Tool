@@ -244,20 +244,21 @@ tr.ct-row-end .ct-select:focus {
   position: fixed; z-index: 700; background: #fff;
   border: 1px solid #e0e0e0; border-radius: 10px;
   box-shadow: 0 6px 24px rgba(0,0,0,0.14); padding: 12px 14px; width: 360px;
+  box-sizing: border-box; max-height: calc(100vh - 16px); flex-direction: column; /* 열릴 때 display:flex — 머리·추가·footer 는 고정, 목록만 스크롤 */
 }
-.clp-head { font-size: 10px; font-weight: 700; color: #aaa; letter-spacing: 0.07em; margin-bottom: 8px; }
+.clp-head { flex-shrink: 0; font-size: 10px; font-weight: 700; color: #aaa; letter-spacing: 0.07em; margin-bottom: 8px; }
 .clp-empty { font-size: 11px; color: #ccc; padding: 4px 0 6px; }
-.clp-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.clp-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .clp-link-row {
   position: relative; display: flex; gap: 5px; align-items: center; min-width: 0; border-radius: 5px;
   transition: background-color 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
-  will-change: transform;
 }
 .clp-link-row.dragging { opacity: 0.45; }
 .clp-link-row.dragover-before { background: #f7fbff; box-shadow: inset 0 2px 0 #4a9eff; }
 .clp-link-row.dragover-after { background: #f7fbff; box-shadow: inset 0 -2px 0 #4a9eff; }
 .clp-link-row.clp-link-dragging { position: relative; z-index: 1; }
 .clp-link-row.clp-link-animating { pointer-events: none; }
+.clp-link-row.clp-link-dragging, .clp-link-row.clp-link-animating { will-change: transform; } /* 상시 will-change 는 position:fixed 라벨 메뉴의 기준을 행으로 바꿔 버려서 드래그 중에만 둔다(#149) */
 .clp-link-drag-clone {
   box-sizing: border-box;
   pointer-events: none;
@@ -297,7 +298,7 @@ tr.ct-row-end .ct-select:focus {
 .clp-link-label-icon.is-tobe { transform: scale(1.27); transform-origin: center; mix-blend-mode: multiply; } /* 256px 아이콘은 둘레 21%가 불투명 흰 여백(실측: 내용 79%) → 확대 보정, 흰 여백은 multiply 로 목록 hover 색 위에서도 안 보이게(#148) */
 .clp-link-label-arrow { display: none; }
 .clp-link-label-menu {
-  display: none; position: absolute; left: 0; top: calc(100% + 3px); width: 34px; min-width: 0; z-index: 720;
+  display: none; position: fixed; left: 0; top: 0; width: 34px; min-width: 0; z-index: 720;
   border: 1px solid #e4e4e4; border-radius: 6px; background: #fff; box-shadow: 0 6px 18px rgba(0,0,0,0.12);
   padding: 3px;
 }
@@ -328,7 +329,7 @@ tr.ct-row-end .ct-select:focus {
 .clp-link-del:hover { color: #e53e3e; }
 .clp-add { background: none; border: 1px solid #e0e0e0; border-radius: 5px; padding: 5px 10px; font-size: 11px; cursor: pointer; color: #777; font-family: inherit; width: 100%; margin-bottom: 10px; }
 .clp-add:hover { background: #f5f5f5; }
-.clp-footer { display: flex; justify-content: flex-end; gap: 6px; border-top: 1px solid #f0f0f0; padding-top: 10px; }
+.clp-footer { flex-shrink: 0; display: flex; justify-content: flex-end; gap: 6px; border-top: 1px solid #f0f0f0; padding-top: 10px; }
 .clp-close { background: none; border: 1px solid #ddd; border-radius: 5px; padding: 5px 11px; font-size: 11px; cursor: pointer; color: #888; font-family: inherit; }
 .clp-close:hover { background: #f5f5f5; }
 .clp-save { background: #111; color: #fff; border: none; border-radius: 5px; padding: 5px 14px; font-size: 11px; cursor: pointer; font-family: inherit; font-weight: 700; }
@@ -29335,6 +29336,7 @@ document.addEventListener('keydown', e => {
 });
 
 // 팝오버 외부 클릭 시 닫기
+document.getElementById('clp-list')?.addEventListener('scroll', () => closeLinkLabelDropdowns());
 document.addEventListener('mousedown', function(e) {
   const diffPop = document.getElementById('diff-note-popup');
   if (diffPop && diffPop.style.display !== 'none' && !diffPop.contains(e.target)) closeDiffNotePopup();
@@ -29612,11 +29614,26 @@ function openCatalogLinksPopover(id, anchorEl) {
   ensureLinkPopoverKeys();
   renderLinksPopover();
   const pop = document.getElementById('catalog-links-popover');
-  pop.style.display = 'block';
+  pop.style.display = 'flex';
   const rect = anchorEl.getBoundingClientRect();
-  pop.style.left = Math.min(rect.left, window.innerWidth - 380) + 'px';
-  pop.style.top  = Math.min(rect.bottom + 4, window.innerHeight - 240) + 'px';
+  _linksPopoverAnchor = { top: rect.top, bottom: rect.bottom, left: rect.left };
+  positionLinksPopover();
 }
+let _linksPopoverAnchor = null;
+// 실제 높이로 위치를 다시 잡는다: 아래 공간이 모자라면 위로 뒤집고, 그래도 안 되면 화면 안에 맞춘다.
+function positionLinksPopover() {
+  const pop = document.getElementById('catalog-links-popover');
+  if (!pop || pop.style.display === 'none' || !_linksPopoverAnchor) return;
+  const margin = 8, h = pop.offsetHeight, w = pop.offsetWidth;
+  const { top, bottom, left } = _linksPopoverAnchor;
+  let y = bottom + 4;
+  if (y + h > window.innerHeight - margin) {
+    y = top - 4 - h >= margin ? top - 4 - h : Math.max(margin, window.innerHeight - margin - h);
+  }
+  pop.style.top = y + 'px';
+  pop.style.left = Math.max(margin, Math.min(left, window.innerWidth - w - margin)) + 'px';
+}
+window.addEventListener('resize', positionLinksPopover);
 function closeCatalogLinksPopover(save) {
   closeLinkLabelDropdowns();
   if (save && _linksPopover.id) {
@@ -29635,6 +29652,7 @@ function closeCatalogLinksPopover(save) {
     }
   }
   document.getElementById('catalog-links-popover').style.display = 'none';
+  _linksPopoverAnchor = null;
   _linksPopover = { id: null, links: [] };
 }
 function makeLinkPopoverKey() {
@@ -29695,6 +29713,13 @@ function toggleLinkLabelDropdown(e, btn) {
   const open = dd.classList.contains('open');
   closeLinkLabelDropdowns(dd);
   dd.classList.toggle('open', !open);
+  if (open) return;
+  const menu = dd.querySelector('.clp-link-label-menu');
+  const rect = btn.getBoundingClientRect();
+  menu.style.left = rect.left + 'px';
+  menu.style.top = rect.bottom + 3 + 'px';
+  const menuBottom = menu.getBoundingClientRect().bottom;
+  if (menuBottom > window.innerHeight - 4) menu.style.top = Math.max(4, rect.top - 3 - menu.offsetHeight) + 'px';
 }
 function setLinkLabelFromDropdown(btn) {
   const dd = btn.closest('.clp-link-label-dd');
@@ -29943,7 +29968,7 @@ function renderLinksPopover() {
   const list = document.getElementById('clp-list'); if (!list) return;
   const links = _linksPopover.links;
   ensureLinkPopoverKeys();
-  if (!links.length) { list.innerHTML = '<div class="clp-empty">등록된 링크가 없습니다.</div>'; return; }
+  if (!links.length) { list.innerHTML = '<div class="clp-empty">등록된 링크가 없습니다.</div>'; positionLinksPopover(); return; }
   list.innerHTML = links.map((lk, i) => {
     const isEditing = !!lk._editing || !(lk.url || '').trim();
     if (isEditing) {
@@ -29969,6 +29994,7 @@ function renderLinksPopover() {
       <button class="clp-link-del" onclick="removeLinkInPopover(${i})">✕</button>
     </div>`;
   }).join('');
+  positionLinksPopover();
 }
 function startEditingLink(idx) {
   const lk = _linksPopover.links[idx];
@@ -29976,7 +30002,9 @@ function startEditingLink(idx) {
   lk._editing = true;
   renderLinksPopover();
   setTimeout(() => {
-    document.querySelectorAll('#clp-list .clp-link-row')[idx]?.querySelector('.clp-link-url')?.focus();
+    const row = document.querySelectorAll('#clp-list .clp-link-row')[idx];
+    row?.scrollIntoView({ block: 'nearest' });
+    row?.querySelector('.clp-link-url')?.focus();
   }, 10);
 }
 function finishEditingLink(idx) {
@@ -29989,7 +30017,9 @@ function addLinkInPopover() {
   _linksPopover.links.push({ label: '', url: '', memo: '', _editing: true, _dragKey: makeLinkPopoverKey() });
   renderLinksPopover();
   setTimeout(() => {
-    document.querySelector('#clp-list .clp-link-row:last-child .clp-link-url')?.focus();
+    const row = document.querySelector('#clp-list .clp-link-row:last-child');
+    row?.scrollIntoView({ block: 'nearest' });
+    row?.querySelector('.clp-link-url')?.focus();
   }, 10);
 }
 function removeLinkInPopover(idx) {
