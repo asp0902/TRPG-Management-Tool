@@ -371,6 +371,7 @@ tr.ct-row-end .ct-select:focus {
 .clp-att-info { flex: 1; min-width: 0; }
 .clp-att-name { font-size: 12px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .clp-att-meta { font-size: 10px; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clp-att-state { flex-shrink: 0; width: 16px; text-align: center; font-size: 12px; color: #888; cursor: default; }
 .clp-att-btn { background: none; border: none; cursor: pointer; font-size: 12px; color: #888; padding: 2px 4px; border-radius: 3px; font-family: inherit; flex-shrink: 0; }
 .clp-att-btn:hover { background: #f0f0f0; color: #222; }
 .clp-footer { flex-shrink: 0; display: flex; justify-content: flex-end; gap: 6px; border-top: 1px solid #f0f0f0; padding-top: 10px; }
@@ -24362,6 +24363,7 @@ function syncGitHubState(options = {}) {
   }).finally(() => {
     githubSyncInFlight = null;
     updateGitHubSyncButton();
+    syncAttachmentsToGitHub(); // 첨부 파일은 JSON 과 별개로 파일별 백그라운드 업로드
   });
   updateGitHubSyncButton();
   return githubSyncInFlight;
@@ -30313,7 +30315,9 @@ async function addCatalogAttachments(entryId, files) {
     }
   }
   if (added) { persist(); updateCatalogLinksBtn(entry); setAttachmentStatusText(`${added}개를 첨부했습니다.`); }
+  await refreshAttachmentIndex();
   renderAttachmentList();
+  syncAttachmentsToGitHub();
 }
 function setAttachmentStatusText(text, isError = false) {
   const el = document.getElementById('clp-attach-status');
@@ -30331,9 +30335,11 @@ function getPopoverEntry() { return state.catalog.find(c => c.id === _linksPopov
 function renderAttachmentList() {
   const box = document.getElementById('clp-attach-list');
   if (!box) return;
+  if (!renderAttachmentList.indexReady) { renderAttachmentList.indexReady = true; refreshAttachmentIndex().then(renderAttachmentList); }
   const entry = getPopoverEntry();
   const list = entry?.attachments || [];
   box.innerHTML = list.length ? list.map(a => `<div class="clp-att-row" data-att-id="${esc(a.id)}">
+    <span class="clp-att-state" title="${esc(attachmentBackupBadge(a)[1])}">${attachmentBackupBadge(a)[0]}</span>
     <div class="clp-att-info"><div class="clp-att-name" title="${esc(a.name)}">${esc(a.name)}</div>
       <div class="clp-att-meta">${formatAttachmentSize(a.size)} · ${esc(new Date(a.addedAt).toLocaleDateString())}${a.memo ? ` · ${esc(a.memo)}` : ''}</div></div>
     ${isOpenableAttachment(a) ? `<button type="button" class="clp-att-btn" onclick="openAttachmentIsolated('${esc(a.id)}')" title="열기(격리 화면)">▶</button>` : ''}
@@ -30350,7 +30356,8 @@ function findAttachment(attId) {
 async function downloadAttachment(attId) {
   const { att } = findAttachment(attId);
   if (!att) return;
-  const record = await getAttachmentRecord(att.sha256);
+  let record;
+  try { record = await ensureAttachmentRecord(att); } catch (err) { setAttachmentStatusText(err?.message || '파일 본문을 가져오지 못했습니다.', true); return; }
   if (!record) { setAttachmentStatusText('이 기기에 파일 본문이 없습니다.', true); return; }
   // 다운로드는 파일로 저장만 한다(앱 origin 에서 열지 않는다). 형식은 octet-stream 으로 고정한다.
   const url = URL.createObjectURL(new Blob([record.blob], { type: 'application/octet-stream' }));
@@ -30368,7 +30375,8 @@ const isOpenableAttachment = a => /\.(html?|xhtml)$/i.test(a?.name || '') || a?.
 async function openAttachmentIsolated(attId) {
   const { att } = findAttachment(attId);
   if (!att || !isOpenableAttachment(att)) return;
-  const record = await getAttachmentRecord(att.sha256);
+  let record;
+  try { record = await ensureAttachmentRecord(att); } catch (err) { setAttachmentStatusText(err?.message || '파일 본문을 가져오지 못했습니다.', true); return; }
   if (!record) { setAttachmentStatusText('이 기기에 파일 본문이 없습니다.', true); return; }
   if (record.blob.size > ATTACH_VIEW_MAX_BYTES) { setAttachmentStatusText('파일이 너무 커서 열 수 없습니다. 다운로드해서 여세요.', true); return; }
   const frame = document.getElementById('attach-view-frame');
@@ -30403,9 +30411,130 @@ async function removeAttachment(attId) {
   updateCatalogLinksBtn(entry);
   // 같은 내용을 다른 항목이 쓰고 있지 않을 때만 이 기기의 본문을 지운다(GitHub 의 파일은 지우지 않는다)
   if (!isAttachmentReferenced(att.sha256)) {
-    try { await attachTx('blobs', 'readwrite', store => store.delete(att.sha256)); await attachTx('status', 'readwrite', store => store.delete(att.sha256)); } catch (err) { console.warn(err); }
+    try { await attachTx('blobs', 'readwrite', store => store.delete(att.sha256)); await attachTx('status', 'readwrite', store => store.delete(att.sha256)); attachLocalSet.delete(att.sha256); attachDoneSet.delete(att.sha256); } catch (err) { console.warn(err); }
   }
   renderAttachmentList();
+}
+// ── 첨부 파일 GitHub 백업 ──
+// sync 브랜치 attachments/{sha256} 에 파일별로 올린다(Contents API: 파일 100MB 한도, 요청 본문은 base64 라 약 133%). 그래서 40MB 이상은 조각으로 나눈다:
+//   attachments/{sha256}.part0 … + attachments/{sha256}.json(조각 목록, 마지막에 올려 완료 표시). 받을 때 합쳐 sha256 을 검증한다.
+// 같은 해시는 다시 올리지 않고(존재 확인), 실패하면 다음 동기화 때 이어서 다시 올린다. 파일 본문은 동기화 JSON 에 들어가지 않는다.
+const ATTACH_SPLIT_BYTES = 40 * 1024 * 1024;
+const attachBackupState = new Map(); // sha256 -> 'uploading' | 'error'
+let attachDoneSet = new Set();       // 업로드 완료한 sha256 (status 저장소와 동기)
+let attachLocalSet = new Set();      // 이 기기에 본문이 있는 sha256
+let attachSyncRunning = false;
+const githubContentsUrl = path => `https://api.github.com/repos/${GITHUB_SYNC_REPO}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
+async function githubFileExists(path) {
+  const response = await githubSyncRequest(`${githubContentsUrl(path)}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}`, { allow404: true });
+  return !!response;
+}
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+async function putGitHubFile(path, blob, message) {
+  await githubSyncRequest(githubContentsUrl(path), {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, content: await blobToBase64(blob), branch: GITHUB_SYNC_BRANCH }),
+  });
+}
+async function fetchGitHubBlob(path) {
+  const response = await githubSyncRequest(`${githubContentsUrl(path)}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}&raw=1`, { headers: { Accept: 'application/vnd.github.raw+json' } });
+  return await response.blob();
+}
+async function uploadAttachmentToGitHub(sha, blob) {
+  const base = `attachments/${sha}`;
+  const message = `첨부 ${sha.slice(0, 8)}`;
+  if (blob.size < ATTACH_SPLIT_BYTES) {
+    if (!await githubFileExists(base)) await putGitHubFile(base, blob, message);
+    return;
+  }
+  if (await githubFileExists(`${base}.json`)) return; // 목록이 있으면 조각은 모두 올라간 것
+  const parts = [];
+  for (let i = 0; i * ATTACH_SPLIT_BYTES < blob.size; i += 1) {
+    const piece = blob.slice(i * ATTACH_SPLIT_BYTES, (i + 1) * ATTACH_SPLIT_BYTES);
+    const name = `${base}.part${i}`;
+    if (!await githubFileExists(name)) await putGitHubFile(name, piece, `${message} 조각 ${i}`);
+    parts.push({ name: `${sha}.part${i}`, size: piece.size });
+  }
+  await putGitHubFile(`${base}.json`, new Blob([JSON.stringify({ sha256: sha, size: blob.size, chunkBytes: ATTACH_SPLIT_BYTES, parts })]), `${message} 목록`);
+}
+async function downloadAttachmentFromGitHub(att) {
+  const base = `attachments/${att.sha256}`;
+  let blob;
+  const manifestRes = await githubSyncRequest(`${githubContentsUrl(`${base}.json`)}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}&raw=1`, { headers: { Accept: 'application/vnd.github.raw+json' }, allow404: true });
+  if (manifestRes) {
+    const manifest = JSON.parse(await manifestRes.text());
+    const pieces = [];
+    for (const part of manifest.parts || []) pieces.push(await fetchGitHubBlob(`attachments/${part.name}`));
+    blob = new Blob(pieces);
+  } else {
+    blob = await fetchGitHubBlob(base);
+  }
+  if (await sha256Hex(blob) !== att.sha256) throw new Error('GitHub에서 받은 파일의 해시가 맞지 않습니다. 저장하지 않았습니다.');
+  await putAttachmentBlob(att.sha256, blob);
+  attachLocalSet.add(att.sha256);
+  await attachTx('status', 'readwrite', store => store.put({ sha256: att.sha256, uploadedAt: new Date().toISOString() }));
+  attachDoneSet.add(att.sha256);
+  return blob;
+}
+// 본문이 이 기기에 없으면(다른 origin·기기에서 메타만 온 경우) GitHub 에서 받아 저장한다.
+async function ensureAttachmentRecord(att) {
+  const local = await getAttachmentRecord(att.sha256);
+  if (local) return local;
+  if (!getGitHubSyncToken()) throw new Error('이 기기에 파일 본문이 없고 GitHub 토큰도 없습니다.');
+  setAttachmentStatusText(`"${att.name}"을(를) GitHub에서 받는 중...`);
+  await downloadAttachmentFromGitHub(att);
+  setAttachmentStatusText('');
+  renderAttachmentList();
+  return await getAttachmentRecord(att.sha256);
+}
+async function refreshAttachmentIndex() {
+  try {
+    attachLocalSet = new Set(await attachTx('blobs', 'readonly', store => store.getAllKeys()) || []);
+    attachDoneSet = new Set(await attachTx('status', 'readonly', store => store.getAllKeys()) || []);
+  } catch (err) { console.warn('attachment index failed:', err); }
+}
+// 백그라운드 순차 업로드. 동기화가 끝날 때마다, 첨부를 추가할 때마다 부른다. 이미 올라간 해시는 건너뛰고, 실패한 것은 다음에 다시 시도한다.
+async function syncAttachmentsToGitHub() {
+  if (attachSyncRunning || !getGitHubSyncToken() || !isGitHubSyncEnabled()) return;
+  attachSyncRunning = true;
+  try {
+    await refreshAttachmentIndex();
+    const pending = [...new Set(state.catalog.flatMap(c => (c.attachments || []).map(a => a.sha256)))].filter(sha => attachLocalSet.has(sha) && !attachDoneSet.has(sha));
+    for (const sha of pending) {
+      attachBackupState.set(sha, 'uploading');
+      renderAttachmentListIfOpen();
+      try {
+        const record = await getAttachmentRecord(sha);
+        if (!record) continue;
+        await uploadAttachmentToGitHub(sha, record.blob);
+        await attachTx('status', 'readwrite', store => store.put({ sha256: sha, uploadedAt: new Date().toISOString() }));
+        attachDoneSet.add(sha);
+        attachBackupState.delete(sha);
+      } catch (err) {
+        console.error('attachment upload failed:', err);
+        attachBackupState.set(sha, 'error');
+      }
+      renderAttachmentListIfOpen();
+    }
+  } finally { attachSyncRunning = false; }
+}
+function renderAttachmentListIfOpen() {
+  if (document.getElementById('catalog-links-popover')?.style.display !== 'none') renderAttachmentList();
+}
+function attachmentBackupBadge(att) {
+  const state = attachBackupState.get(att.sha256);
+  if (!attachLocalSet.has(att.sha256)) return ['⬇', '이 기기에 본문이 없습니다. 열거나 다운로드하면 GitHub에서 받아 옵니다.'];
+  if (state === 'uploading') return ['⏳', 'GitHub에 올리는 중'];
+  if (state === 'error') return ['⚠', '올리기에 실패했습니다. 다음 동기화 때 다시 시도합니다.'];
+  if (attachDoneSet.has(att.sha256)) return ['☁', 'GitHub에 백업됨'];
+  return ['·', isGitHubSyncEnabled() ? 'GitHub 업로드 대기 중' : 'GitHub 동기화가 꺼져 있어 올리지 않았습니다.'];
 }
 // 파일 끌어다 놓기(팝오버 위)
 function initAttachmentDrop() {
