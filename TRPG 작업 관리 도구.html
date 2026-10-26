@@ -261,7 +261,7 @@ tr.ct-row-end .ct-select:focus {
   font-size: 12px; cursor: pointer; padding: 3px 7px; color: #bbb; font-family: inherit; display: block; width: 100%;
 }
 .ct-links-btn:hover { border-color: #ddd; background: #f5f5f5; color: #555; }
-.ct-links-btn.has-links { color: #4a9eff; font-weight: 700; border-color: #c7dfff; background: #f0f6ff; width: 24px; height: 24px; padding: 0; margin: 0 auto; }
+.ct-links-btn.has-links { color: #4a9eff; font-weight: 700; border-color: #c7dfff; background: #f0f6ff; min-width: 24px; width: auto; height: 24px; padding: 0 4px; margin: 0 auto; white-space: nowrap; }
 /* ─── CATALOG LINKS POPOVER ─── */
 .catalog-links-popover {
   position: fixed; z-index: 700; background: #fff;
@@ -352,6 +352,20 @@ tr.ct-row-end .ct-select:focus {
 .clp-link-del:hover { color: #e53e3e; }
 .clp-add { background: none; border: 1px solid #e0e0e0; border-radius: 5px; padding: 5px 10px; font-size: 11px; cursor: pointer; color: #777; font-family: inherit; width: 100%; margin-bottom: 10px; }
 .clp-add:hover { background: #f5f5f5; }
+.catalog-links-popover.drop-over { outline: 2px dashed #4a9eff; outline-offset: -4px; }
+.clp-attach { flex-shrink: 0; margin-bottom: 8px; max-height: 32vh; overflow-y: auto; border-top: 1px solid #f0f0f0; padding-top: 8px; }
+.clp-attach-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 700; color: #888; margin-bottom: 4px; }
+.clp-attach-add { background: none; border: 1px solid #e0e0e0; border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; color: #777; font-family: inherit; }
+.clp-attach-add:hover { background: #f5f5f5; }
+.clp-attach-status { font-size: 11px; color: #4a7; padding: 2px 0 4px; }
+.clp-attach-status.error { color: #c33; }
+.clp-attach-list { display: flex; flex-direction: column; gap: 4px; }
+.clp-att-row { display: flex; align-items: center; gap: 4px; padding: 3px 4px; border: 1px solid #eee; border-radius: 5px; }
+.clp-att-info { flex: 1; min-width: 0; }
+.clp-att-name { font-size: 12px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clp-att-meta { font-size: 10px; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clp-att-btn { background: none; border: none; cursor: pointer; font-size: 12px; color: #888; padding: 2px 4px; border-radius: 3px; font-family: inherit; flex-shrink: 0; }
+.clp-att-btn:hover { background: #f0f0f0; color: #222; }
 .clp-footer { flex-shrink: 0; display: flex; justify-content: flex-end; gap: 6px; border-top: 1px solid #f0f0f0; padding-top: 10px; }
 .clp-close { background: none; border: 1px solid #ddd; border-radius: 5px; padding: 5px 11px; font-size: 11px; cursor: pointer; color: #888; font-family: inherit; }
 .clp-close:hover { background: #f5f5f5; }
@@ -8453,6 +8467,13 @@ select.sh-field-input,
     <div class="clp-head">링크 관리</div>
     <div class="clp-list" id="clp-list"></div>
     <button class="clp-add" onclick="addLinkInPopover()">＋ 링크 추가</button>
+    <div class="clp-attach" id="clp-attach">
+      <div class="clp-attach-head"><span>첨부 파일</span>
+        <button type="button" class="clp-attach-add" onclick="document.getElementById('clp-attach-input').click()">＋ 파일 첨부</button>
+        <input type="file" id="clp-attach-input" multiple style="display:none" onchange="onAttachInput(this)"></div>
+      <div id="clp-attach-status" class="clp-attach-status" style="display:none"></div>
+      <div class="clp-attach-list" id="clp-attach-list"></div>
+    </div>
     <div class="clp-footer">
       <button class="clp-close" onclick="closeCatalogLinksPopover(false)">취소</button>
       <button class="clp-save" onclick="closeCatalogLinksPopover(true)">저장</button>
@@ -24379,6 +24400,13 @@ async function initGitHubSync() {
   startGitHubSyncTimers();
   await syncGitHubState({ automatic: true, startup: true });
 }
+// 첨부 파일 메타(본문은 별도 IndexedDB). 메타만 catalog 에 두므로 동기화·스냅샷·백업 크기가 거의 늘지 않는다.
+function normalizeCatalogAttachments(list) {
+  return (Array.isArray(list) ? list : []).filter(a => a && typeof a === 'object' && typeof a.sha256 === 'string' && a.sha256).map(a => ({
+    id: a.id || mkId(), name: String(a.name || '첨부 파일'), size: Number(a.size) || 0, type: String(a.type || ''),
+    addedAt: a.addedAt || new Date().toISOString(), sha256: a.sha256, memo: String(a.memo || ''),
+  }));
+}
 function normalizeCatalogImportEntry(input = {}) {
   if (input?.kind === 'series') {
     return { id: input.id || mkId(), kind: 'series', title: String(input.title || ''), collapsed: !!input.collapsed, parentId: '' };
@@ -24391,6 +24419,7 @@ function normalizeCatalogImportEntry(input = {}) {
     links: Array.isArray(input?.links) ? input.links : [],
     scriptId: typeof input?.scriptId === 'string' ? input.scriptId : '',
     parentId: typeof input?.parentId === 'string' ? input.parentId : '',
+    attachments: normalizeCatalogAttachments(input?.attachments),
   };
 }
 function makeImportPayload(data) {
@@ -29671,7 +29700,7 @@ function togglePageDropdown() {
 // ─── 시나리오 카탈로그 ───
 function mkCatalogEntry() {
   return {
-    id: mkId(), parentId: '', title: '', rule: '', genre: '', type: '',
+    id: mkId(), parentId: '', attachments: [], title: '', rule: '', genre: '', type: '',
     background: '', relation: '', players: '', time: '',
     gmDiff: '', gmDiffNote: '', plDiff: '', plDiffNote: '',
     isGm: false, isPl: false, isEnd: false,
@@ -29924,7 +29953,7 @@ function renderCatalog() {
       <td class="ct-cell ct-cell-center">${ctInput(c.id,'notes',c.notes)}</td>
       <td class="ct-cell ct-cell-center">${ctInput(c.id,'writer',c.writer)}</td>
       <td class="ct-chk">
-        <button class="ct-links-btn${lc?' has-links':''}" onclick="openCatalogLinksPopover('${c.id}',this)">${lc||'＋'}</button>
+        <button class="ct-links-btn${lc || (c.attachments || []).length ? ' has-links' : ''}" onclick="openCatalogLinksPopover('${c.id}',this)" title="${esc(catalogLinksBtnTitle(c))}">${catalogLinksBtnLabel(c)}</button>
       </td>
       <td class="ct-act">
         <button class="catalog-del-btn" onclick="deleteCatalogEntry('${c.id}')" title="삭제">✕</button>
@@ -30187,6 +30216,175 @@ function deleteCatalogEntry(id) {
   persist(); renderCatalog();
 }
 
+// ── 링크 버튼 표시: 링크 수와 첨부 수를 구분 (예: 3·📎2) ──
+function catalogLinksBtnLabel(c) {
+  const lc = (c.links || []).length, ac = (c.attachments || []).length;
+  if (!lc && !ac) return '＋';
+  return [lc ? String(lc) : '', ac ? `📎${ac}` : ''].filter(Boolean).join('·');
+}
+function catalogLinksBtnTitle(c) {
+  return `링크 ${(c.links || []).length}개 · 첨부 파일 ${(c.attachments || []).length}개`;
+}
+function updateCatalogLinksBtn(entry) {
+  const btn = document.querySelector(`[data-cid="${entry.id}"] .ct-links-btn`);
+  if (!btn) return;
+  btn.textContent = catalogLinksBtnLabel(entry);
+  btn.title = catalogLinksBtnTitle(entry);
+  btn.classList.toggle('has-links', !!((entry.links || []).length || (entry.attachments || []).length));
+}
+
+// ── 첨부 파일 저장소 (별도 IndexedDB, 본문은 sha256 으로 한 번만 저장) ──
+const ATTACH_DB_NAME = 'trpg-scenario-editor-attachments';
+function openAttachDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(ATTACH_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains('blobs')) req.result.createObjectStore('blobs', { keyPath: 'sha256' });
+      if (!req.result.objectStoreNames.contains('status')) req.result.createObjectStore('status', { keyPath: 'sha256' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function attachTx(storeName, mode, work) {
+  const db = await openAttachDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, mode);
+      const result = work(tx.objectStore(storeName));
+      tx.oncomplete = () => resolve(result?.result);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally { db.close(); }
+}
+async function sha256Hex(blob) {
+  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+const getAttachmentRecord = sha => attachTx('blobs', 'readonly', store => store.get(sha));
+const hasAttachmentBlob = async sha => !!(await attachTx('blobs', 'readonly', store => store.count(sha)));
+async function putAttachmentBlob(sha, blob) {
+  if (await hasAttachmentBlob(sha)) return;
+  await attachTx('blobs', 'readwrite', store => store.put({ sha256: sha, blob, size: blob.size }));
+}
+function isAttachmentReferenced(sha) {
+  return state.catalog.some(c => (c.attachments || []).some(a => a.sha256 === sha));
+}
+function formatAttachmentSize(bytes) {
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + 'MB';
+  if (bytes >= 1024) return Math.round(bytes / 1024) + 'KB';
+  return bytes + 'B';
+}
+async function addCatalogAttachments(entryId, files) {
+  const entry = state.catalog.find(c => c.id === entryId && !isCatalogSeries(c));
+  if (!entry || !files?.length) return;
+  if (!Array.isArray(entry.attachments)) entry.attachments = [];
+  setAttachmentStatusText(`파일 ${files.length}개 저장 중...`);
+  let added = 0;
+  for (const file of [...files]) {
+    try {
+      const sha = await sha256Hex(file);
+      await putAttachmentBlob(sha, file);
+      entry.attachments.push({
+        id: mkId(), name: file.name || '첨부 파일', size: file.size, type: file.type || '',
+        addedAt: new Date().toISOString(), sha256: sha, memo: '',
+      });
+      added += 1;
+    } catch (err) {
+      console.error('attachment failed:', err);
+      setAttachmentStatusText(`"${file.name}" 저장에 실패했습니다: ${err?.message || err}`, true);
+    }
+  }
+  if (added) { persist(); updateCatalogLinksBtn(entry); setAttachmentStatusText(`${added}개를 첨부했습니다.`); }
+  renderAttachmentList();
+}
+function setAttachmentStatusText(text, isError = false) {
+  const el = document.getElementById('clp-attach-status');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('error', !!isError);
+  el.style.display = text ? '' : 'none';
+}
+function onAttachInput(input) {
+  const files = [...input.files];
+  input.value = '';
+  addCatalogAttachments(_linksPopover.id, files);
+}
+function getPopoverEntry() { return state.catalog.find(c => c.id === _linksPopover.id); }
+function renderAttachmentList() {
+  const box = document.getElementById('clp-attach-list');
+  if (!box) return;
+  const entry = getPopoverEntry();
+  const list = entry?.attachments || [];
+  box.innerHTML = list.length ? list.map(a => `<div class="clp-att-row" data-att-id="${esc(a.id)}">
+    <div class="clp-att-info"><div class="clp-att-name" title="${esc(a.name)}">${esc(a.name)}</div>
+      <div class="clp-att-meta">${formatAttachmentSize(a.size)} · ${esc(new Date(a.addedAt).toLocaleDateString())}${a.memo ? ` · ${esc(a.memo)}` : ''}</div></div>
+    <button type="button" class="clp-att-btn" onclick="downloadAttachment('${esc(a.id)}')" title="다운로드">⬇</button>
+    <button type="button" class="clp-att-btn" onclick="editAttachment('${esc(a.id)}')" title="이름·메모 편집">✎</button>
+    <button type="button" class="clp-att-btn" onclick="removeAttachment('${esc(a.id)}')" title="삭제">✕</button>
+  </div>`).join('') : '<div class="clp-empty">첨부된 파일이 없습니다.</div>';
+  positionLinksPopover();
+}
+function findAttachment(attId) {
+  const entry = getPopoverEntry();
+  return { entry, att: entry?.attachments?.find(a => a.id === attId) };
+}
+async function downloadAttachment(attId) {
+  const { att } = findAttachment(attId);
+  if (!att) return;
+  const record = await getAttachmentRecord(att.sha256);
+  if (!record) { setAttachmentStatusText('이 기기에 파일 본문이 없습니다.', true); return; }
+  // 다운로드는 파일로 저장만 한다(앱 origin 에서 열지 않는다). 형식은 octet-stream 으로 고정한다.
+  const url = URL.createObjectURL(new Blob([record.blob], { type: 'application/octet-stream' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = att.name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+function editAttachment(attId) {
+  const { entry, att } = findAttachment(attId);
+  if (!att) return;
+  const name = prompt('파일 이름', att.name);
+  if (name == null) return;
+  const memo = prompt('메모', att.memo || '');
+  if (memo == null) return;
+  att.name = name.trim() || att.name;
+  att.memo = memo.trim();
+  persist();
+  renderAttachmentList();
+}
+async function removeAttachment(attId) {
+  const { entry, att } = findAttachment(attId);
+  if (!att) return;
+  if (!confirm(`첨부 파일 "${att.name}"을(를) 삭제할까요?`)) return;
+  entry.attachments = entry.attachments.filter(a => a.id !== att.id);
+  persist();
+  updateCatalogLinksBtn(entry);
+  // 같은 내용을 다른 항목이 쓰고 있지 않을 때만 이 기기의 본문을 지운다(GitHub 의 파일은 지우지 않는다)
+  if (!isAttachmentReferenced(att.sha256)) {
+    try { await attachTx('blobs', 'readwrite', store => store.delete(att.sha256)); await attachTx('status', 'readwrite', store => store.delete(att.sha256)); } catch (err) { console.warn(err); }
+  }
+  renderAttachmentList();
+}
+// 파일 끌어다 놓기(팝오버 위)
+function initAttachmentDrop() {
+  const pop = document.getElementById('catalog-links-popover');
+  if (!pop || pop.dataset.dropReady) return;
+  pop.dataset.dropReady = '1';
+  const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
+  pop.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); pop.classList.add('drop-over'); });
+  pop.addEventListener('dragleave', e => { if (!pop.contains(e.relatedTarget)) pop.classList.remove('drop-over'); });
+  pop.addEventListener('drop', e => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    pop.classList.remove('drop-over');
+    addCatalogAttachments(_linksPopover.id, [...e.dataTransfer.files]);
+  });
+}
+initAttachmentDrop();
+
 // ── 링크 팝오버 ──
 let _linksPopover = { id: null, links: [] };
 let _linksPopoverDragState = null;
@@ -30196,6 +30394,8 @@ function openCatalogLinksPopover(id, anchorEl) {
   _linksPopover = { id, links: JSON.parse(JSON.stringify(entry.links || [])) };
   ensureLinkPopoverKeys();
   renderLinksPopover();
+  setAttachmentStatusText('');
+  renderAttachmentList();
   const pop = document.getElementById('catalog-links-popover');
   pop.style.display = 'flex';
   const rect = anchorEl.getBoundingClientRect();
@@ -30230,11 +30430,7 @@ function closeCatalogLinksPopover(save) {
         .map(lk => ({ label: lk.label || '', url: lk.url || '', memo: lk.memo || '' }));
       persist();
       const btn = document.querySelector(`[data-cid="${entry.id}"] .ct-links-btn`);
-      if (btn) {
-        const lc = entry.links.length;
-        btn.textContent = lc || '＋';
-        btn.classList.toggle('has-links', lc > 0);
-      }
+      if (btn) updateCatalogLinksBtn(entry);
     }
   }
   document.getElementById('catalog-links-popover').style.display = 'none';
