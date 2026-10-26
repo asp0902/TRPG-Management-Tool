@@ -352,6 +352,13 @@ tr.ct-row-end .ct-select:focus {
 .clp-link-del:hover { color: #e53e3e; }
 .clp-add { background: none; border: 1px solid #e0e0e0; border-radius: 5px; padding: 5px 10px; font-size: 11px; cursor: pointer; color: #777; font-family: inherit; width: 100%; margin-bottom: 10px; }
 .clp-add:hover { background: #f5f5f5; }
+.attach-view-backdrop { display: none; position: fixed; inset: 0; z-index: 10002; background: rgba(0,0,0,0.55); align-items: center; justify-content: center; padding: 16px; }
+.attach-view-backdrop.open { display: flex; }
+.attach-view-box { display: flex; flex-direction: column; width: min(1200px, 100%); height: 100%; background: #fff; border-radius: 10px; overflow: hidden; }
+.attach-view-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #e5e5e5; font-size: 13px; font-weight: 700; }
+.attach-view-bar #attach-view-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }
+.attach-view-note { flex: 1; font-size: 11px; font-weight: 400; color: #888; }
+#attach-view-frame { flex: 1; border: 0; width: 100%; background: #fff; }
 .catalog-links-popover.drop-over { outline: 2px dashed #4a9eff; outline-offset: -4px; }
 .clp-attach { flex-shrink: 0; margin-bottom: 8px; max-height: 32vh; overflow-y: auto; border-top: 1px solid #f0f0f0; padding-top: 8px; }
 .clp-attach-head { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 700; color: #888; margin-bottom: 4px; }
@@ -9161,6 +9168,15 @@ select.sh-field-input,
         <button type="button" class="rb-modal-cancel" onclick="saveSnapshotNow()">지금 스냅샷 저장</button>
         <button type="button" class="rb-modal-cancel" onclick="closeSnapshotModal()">닫기</button>
       </div>
+    </div>
+  </div>
+  <div id="attach-view-backdrop" class="attach-view-backdrop" role="dialog" aria-modal="true" aria-label="첨부 파일 보기"
+    onkeydown="if(event.key==='Escape')closeAttachmentView()">
+    <div class="attach-view-box">
+      <div class="attach-view-bar"><span id="attach-view-title"></span>
+        <span class="attach-view-note">앱과 분리된 안전 화면(스크립트는 앱 데이터에 접근할 수 없습니다)</span>
+        <button type="button" class="clp-attach-add" onclick="closeAttachmentView()">닫기</button></div>
+      <iframe id="attach-view-frame" sandbox="allow-scripts" referrerpolicy="no-referrer" title="첨부 파일 보기"></iframe>
     </div>
   </div>
   <div id="ab-perm-backdrop" class="rb-modal-backdrop" style="z-index: 10001;"
@@ -30320,6 +30336,7 @@ function renderAttachmentList() {
   box.innerHTML = list.length ? list.map(a => `<div class="clp-att-row" data-att-id="${esc(a.id)}">
     <div class="clp-att-info"><div class="clp-att-name" title="${esc(a.name)}">${esc(a.name)}</div>
       <div class="clp-att-meta">${formatAttachmentSize(a.size)} · ${esc(new Date(a.addedAt).toLocaleDateString())}${a.memo ? ` · ${esc(a.memo)}` : ''}</div></div>
+    ${isOpenableAttachment(a) ? `<button type="button" class="clp-att-btn" onclick="openAttachmentIsolated('${esc(a.id)}')" title="열기(격리 화면)">▶</button>` : ''}
     <button type="button" class="clp-att-btn" onclick="downloadAttachment('${esc(a.id)}')" title="다운로드">⬇</button>
     <button type="button" class="clp-att-btn" onclick="editAttachment('${esc(a.id)}')" title="이름·메모 편집">✎</button>
     <button type="button" class="clp-att-btn" onclick="removeAttachment('${esc(a.id)}')" title="삭제">✕</button>
@@ -30342,6 +30359,28 @@ async function downloadAttachment(attId) {
   a.download = att.name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+// ── 격리 열기 ──
+// 저장된 HTML 에는 원본 사이트의 스크립트가 남아 있을 수 있다. 앱 origin(blob: URL 포함)에서 열면 IndexedDB·localStorage(토큰)에 접근할 수 있으므로,
+// srcdoc + sandbox="allow-scripts"(allow-same-origin 없음) iframe 에서만 보여 준다. 이 iframe 문서는 불투명 origin 이라 앱 저장소에 접근할 수 없다.
+const ATTACH_VIEW_MAX_BYTES = 200 * 1024 * 1024;
+const isOpenableAttachment = a => /\.(html?|xhtml)$/i.test(a?.name || '') || a?.type === 'text/html';
+async function openAttachmentIsolated(attId) {
+  const { att } = findAttachment(attId);
+  if (!att || !isOpenableAttachment(att)) return;
+  const record = await getAttachmentRecord(att.sha256);
+  if (!record) { setAttachmentStatusText('이 기기에 파일 본문이 없습니다.', true); return; }
+  if (record.blob.size > ATTACH_VIEW_MAX_BYTES) { setAttachmentStatusText('파일이 너무 커서 열 수 없습니다. 다운로드해서 여세요.', true); return; }
+  const frame = document.getElementById('attach-view-frame');
+  frame.setAttribute('sandbox', 'allow-scripts');
+  document.getElementById('attach-view-title').textContent = att.name;
+  document.getElementById('attach-view-backdrop').classList.add('open');
+  frame.srcdoc = await record.blob.text();
+}
+function closeAttachmentView() {
+  document.getElementById('attach-view-backdrop')?.classList.remove('open');
+  const frame = document.getElementById('attach-view-frame');
+  if (frame) frame.srcdoc = '';
 }
 function editAttachment(attId) {
   const { entry, att } = findAttachment(attId);
