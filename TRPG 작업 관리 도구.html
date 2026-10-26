@@ -2493,7 +2493,7 @@ tr.ct-row-end .ct-select:focus {
 }
 .sidebar-footer button:hover { border-color: #555; color: #ccc; }
 .sidebar-footer button.active { border-color: #16a34a; color: #bbf7d0; background: rgba(22,163,74,0.12); }
-.sidebar-footer #auto-backup-btn.warning { border-color: #dc2626; color: #fecaca; background: rgba(220,38,38,0.12); }
+.sidebar-footer #snapshot-btn.warning { border-color: #dc2626; color: #fecaca; background: rgba(220,38,38,0.12); }
 .sidebar-footer #github-sync-btn.active { border-color: #2563eb; color: #bfdbfe; background: rgba(37,99,235,0.14); }
 .sidebar-footer #github-sync-btn.error, .sidebar-footer #github-sync-btn.needs-token { border-color: #dc2626; color: #fecaca; background: rgba(220,38,38,0.12); }
 
@@ -6425,7 +6425,10 @@ body.block-pointer-dragging {
 .github-sync-modal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .github-sync-modal-actions button { flex: 1 1 140px; }
 .github-sync-disconnect { margin-right: auto; color: #b91c1c; }
-.snapshot-list { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.snapshot-section { display: flex; flex-direction: column; gap: 6px; }
+.snapshot-section-title { font-size: 12px; font-weight: 700; color: #333; }
+.github-sync-help.ab-warn { color: #b91c1c; }
+.snapshot-list { max-height: 40vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .snapshot-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid #eee; border-radius: 6px; font-size: 12px; color: #444; }
 .snapshot-row .snapshot-info { flex: 1; min-width: 0; }
 .snapshot-row .snapshot-meta { color: #888; font-size: 11px; }
@@ -7900,9 +7903,8 @@ select.sh-field-input,
   <div class="sidebar-footer">
     <button onclick="exportDatedBackup()">내보내기</button>
     <button onclick="document.getElementById('import-input').click()">가져오기</button>
-    <button id="auto-backup-btn" onclick="toggleAutoBackup()">자동 백업</button>
     <button id="github-sync-btn" onclick="openGitHubSyncModal()">GitHub 동기화</button>
-    <button id="snapshot-btn" onclick="openSnapshotModal()" title="앱 안에 자동으로 쌓이는 스냅샷 목록">스냅샷</button>
+    <button id="snapshot-btn" onclick="openSnapshotModal()" title="자동 백업 설정과 앱 내부 스냅샷 목록">백업</button>
     <input type="file" id="import-input" accept=".json" style="display:none" onchange="importAll(event)">
   </div>
 </div>
@@ -9100,8 +9102,17 @@ select.sh-field-input,
     onclick="if(event.target===this)closeSnapshotModal()"
     onkeydown="if(event.key==='Escape')closeSnapshotModal()">
     <div class="rb-modal github-sync-modal" onclick="event.stopPropagation()">
-      <div class="rb-modal-heading" id="snapshot-heading">앱 내부 스냅샷</div>
-      <p class="github-sync-help">데이터가 바뀌면 최소 10분 간격으로 이 브라우저 안에 자동 저장됩니다(최근 10개 + 최근 7일 하루 1개, 권한 불필요). 빈 데이터는 저장하지 않습니다.</p>
+      <div class="rb-modal-heading" id="snapshot-heading">백업</div>
+      <div id="ab-settings" class="snapshot-section">
+        <div class="snapshot-section-title">파일 자동 백업</div>
+        <div id="ab-settings-status" class="github-sync-help"></div>
+        <div class="github-sync-modal-actions">
+          <button type="button" class="rb-modal-cancel" onclick="setupAutoBackup({ newFile: true }).then(() => { autoBackupWarning = !autoBackupTimer; updateAutoBackupButton(); })">백업 파일 지정/변경</button>
+          <button type="button" class="rb-modal-cancel" id="ab-toggle-btn" onclick="toggleAutoBackup()">자동 백업 끄기</button>
+        </div>
+      </div>
+      <div class="snapshot-section-title">앱 내부 스냅샷</div>
+      <p class="github-sync-help">데이터가 바뀌면 최소 5분 간격으로 이 브라우저 안에 자동 저장됩니다(최근 10개 + 최근 7일 하루 1개, 권한 불필요). 빈 데이터는 저장하지 않습니다.</p>
       <div id="snapshot-list" class="snapshot-list"></div>
       <div id="snapshot-status" class="github-sync-status" aria-live="polite" style="display:none"></div>
       <div class="rb-modal-footer">
@@ -9139,7 +9150,7 @@ select.sh-field-input,
         자동 동기화 사용
       </label>
       <p class="github-sync-help">
-        변경 데이터는 최대 10분 간격으로 업로드됩니다. 토큰에는 asp0902/TRPG-Management-Tool-data 저장소의
+        변경 데이터는 최대 5분 간격으로 업로드됩니다. 토큰에는 asp0902/TRPG-Management-Tool-data 저장소의
         <strong>Contents 읽기/쓰기</strong> 권한만 부여하세요.
         <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">토큰 만들기</a>
       </p>
@@ -23517,13 +23528,12 @@ const AUTO_BACKUP_DB_NAME = 'trpg-scenario-editor-backup';
 const AUTO_BACKUP_STORE_NAME = 'file-handles';
 const AUTO_BACKUP_HANDLE_KEY = 'trpg-scenarios-autobackup-handle';
 const AUTO_BACKUP_ENABLED_KEY = 'trpg-auto-backup-enabled';
-const AUTO_BACKUP_INTERVAL_KEY = 'trpg-auto-backup-interval-ms';
 const AUTO_BACKUP_LAST_KEY = 'trpg-auto-backup-last-at';
 const AUTO_BACKUP_DEFAULT_INTERVAL_MS = 5 * 60 * 1000;
 let autoBackupTimer = null;
 let autoBackupWarning = false; // 권한·파일 문제나 「건너뛰기」로 이번 방문에 자동 파일 백업이 꺼져 있는 상태
 let autoBackupFileHandle = null;
-let autoBackupIntervalMs = Number(localStorage.getItem(AUTO_BACKUP_INTERVAL_KEY)) || AUTO_BACKUP_DEFAULT_INTERVAL_MS;
+const autoBackupIntervalMs = AUTO_BACKUP_DEFAULT_INTERVAL_MS; // 5분 고정
 
 async function saveAll() {
   syncInfo({ commit: false });
@@ -23583,9 +23593,6 @@ function downloadBackupJson(filename) {
 function exportDatedBackup() {
   downloadBackupJson(`trpg-tool.backup.${getDateBackupStamp()}.json`);
 }
-function getAutoBackupIntervalLabel(ms = autoBackupIntervalMs) {
-  return ms <= 60 * 1000 ? '1분' : '5분';
-}
 function isAutoBackupSupported() {
   return typeof window.showSaveFilePicker === 'function' && typeof indexedDB !== 'undefined';
 }
@@ -23633,22 +23640,18 @@ async function verifyAutoBackupPermission(handle, request = false) {
   }
   return typeof handle.queryPermission !== 'function';
 }
+// 좌하단 「자동 백업」 버튼은 없다. 경고는 「백업」 버튼 색으로, 상태·설정은 백업 창(renderAutoBackupSettings)에 보인다.
 function updateAutoBackupButton() {
-  const btn = document.getElementById('auto-backup-btn');
-  if (!btn) return;
-  const running = !!autoBackupTimer;
-  btn.classList.toggle('active', running);
-  btn.classList.toggle('warning', !running && autoBackupWarning);
-  btn.textContent = running ? `자동 ${getAutoBackupIntervalLabel()}` : (autoBackupWarning ? '자동 백업 꺼짐' : '자동 백업');
-  const lastAt = localStorage.getItem(AUTO_BACKUP_LAST_KEY);
-  btn.title = running
-    ? `자동 백업 실행 중 (${getAutoBackupIntervalLabel()} 간격)${lastAt ? `\n마지막 백업: ${new Date(lastAt).toLocaleString()}` : ''}`
-    : (autoBackupWarning ? '자동 파일 백업이 꺼져 있습니다. 클릭하면 권한 요청 또는 파일 지정을 다시 진행합니다.' : '백업 파일을 지정하고 1분 또는 5분마다 자동 저장합니다.');
+  const btn = document.getElementById('snapshot-btn');
+  if (btn) {
+    const warn = !autoBackupTimer && autoBackupWarning;
+    btn.classList.toggle('warning', warn);
+    btn.title = warn ? '자동 파일 백업이 꺼져 있습니다. 클릭해서 백업 설정을 여세요.' : '자동 백업 설정과 앱 내부 스냅샷 목록';
+  }
+  renderAutoBackupSettings();
 }
-function startAutoBackupTimer(intervalMs) {
+function startAutoBackupTimer() {
   if (autoBackupTimer) clearInterval(autoBackupTimer);
-  autoBackupIntervalMs = intervalMs || AUTO_BACKUP_DEFAULT_INTERVAL_MS;
-  localStorage.setItem(AUTO_BACKUP_INTERVAL_KEY, String(autoBackupIntervalMs));
   localStorage.setItem(AUTO_BACKUP_ENABLED_KEY, '1');
   autoBackupTimer = setInterval(() => {
     writeAutoBackup({ silent: true });
@@ -23660,16 +23663,6 @@ function stopAutoBackup() {
   autoBackupTimer = null;
   localStorage.setItem(AUTO_BACKUP_ENABLED_KEY, '0');
   updateAutoBackupButton();
-}
-function chooseAutoBackupInterval() {
-  const current = autoBackupIntervalMs <= 60 * 1000 ? '1' : '5';
-  const raw = prompt('자동 백업 주기를 입력하세요.\n1 = 1분마다, 5 = 5분마다', current);
-  if (raw == null) return null;
-  const value = String(raw).trim();
-  if (value === '1') return 60 * 1000;
-  if (value === '5') return 5 * 60 * 1000;
-  alert('자동 백업 주기는 1 또는 5만 입력할 수 있습니다.');
-  return null;
 }
 async function selectAutoBackupFileHandle() {
   return await window.showSaveFilePicker({
@@ -23704,44 +23697,70 @@ async function writeAutoBackup(options = {}) {
     return false;
   }
 }
-async function toggleAutoBackup() {
-  if (autoBackupTimer) {
-    stopAutoBackup();
-    showToast('자동 백업이 중지되었습니다.');
-    return;
-  }
+// 백업 파일을 정하고(newFile=true 면 항상 새로 고름) 권한을 받아 5분 자동 백업을 시작한다. 반드시 사용자 클릭 안에서 불러야 한다.
+async function setupAutoBackup(options = {}) {
   if (!isAutoBackupSupported()) {
     alert('이 브라우저에서는 자동 파일 백업을 지원하지 않습니다. 날짜 백업 파일을 수동으로 내려받아 보관해주세요.');
-    return;
+    return false;
   }
-  const interval = chooseAutoBackupInterval();
-  if (!interval) return;
+  const previous = autoBackupFileHandle;
   try {
-    autoBackupFileHandle = await getStoredAutoBackupHandle();
+    autoBackupFileHandle = options.newFile ? null : await getStoredAutoBackupHandle();
     if (!autoBackupFileHandle) {
       autoBackupFileHandle = await selectAutoBackupFileHandle();
       try { await storeAutoBackupHandle(autoBackupFileHandle); }
       catch (storeErr) { console.warn('auto backup handle was not persisted:', storeErr); }
     }
-    const hasPermission = await verifyAutoBackupPermission(autoBackupFileHandle, true);
-    if (!hasPermission) {
+    if (!await verifyAutoBackupPermission(autoBackupFileHandle, true)) {
       alert('자동 백업 파일 권한이 허용되지 않았습니다.');
-      return;
+      return false;
     }
-    startAutoBackupTimer(interval);
+    autoBackupWarning = false;
+    startAutoBackupTimer();
     await writeAutoBackup({ silent: false });
+    return true;
   } catch (err) {
+    autoBackupFileHandle = previous;
     if (err?.name !== 'AbortError') {
       console.error('auto backup setup failed:', err);
       alert('자동 백업 설정에 실패했습니다.');
     }
+    return false;
   }
 }
+async function toggleAutoBackup() {
+  if (autoBackupTimer) {
+    stopAutoBackup();
+    autoBackupWarning = false;
+    updateAutoBackupButton();
+    showToast('자동 파일 백업을 껐습니다.');
+    return;
+  }
+  await setupAutoBackup();
+  autoBackupWarning = !autoBackupTimer && localStorage.getItem(AUTO_BACKUP_ENABLED_KEY) !== '0';
+  updateAutoBackupButton();
+}
+function renderAutoBackupSettings() {
+  const box = document.getElementById('ab-settings');
+  if (!box) return;
+  const lastAt = localStorage.getItem(AUTO_BACKUP_LAST_KEY);
+  const fileName = autoBackupFileHandle?.name ? ` · 파일: ${autoBackupFileHandle.name}` : '';
+  let text;
+  if (!isAutoBackupSupported()) text = '이 브라우저는 자동 파일 백업을 지원하지 않습니다.';
+  else if (autoBackupTimer) text = `켜짐 · 5분마다 저장${fileName}${lastAt ? ` · 마지막 백업: ${new Date(lastAt).toLocaleString()}` : ''}`;
+  else if (localStorage.getItem(AUTO_BACKUP_ENABLED_KEY) === '0' && !autoBackupWarning) text = `꺼져 있음${lastAt ? ` · 마지막 백업: ${new Date(lastAt).toLocaleString()}` : ''}`;
+  else text = `꺼짐: 백업 파일 권한이 필요하거나 파일이 지정되지 않았습니다. 아래 [자동 백업 켜기]를 누르세요.${lastAt ? ` · 마지막 백업: ${new Date(lastAt).toLocaleString()}` : ''}`;
+  const warn = !autoBackupTimer && autoBackupWarning;
+  box.querySelector('#ab-settings-status').textContent = text;
+  box.querySelector('#ab-settings-status').classList.toggle('ab-warn', warn);
+  box.querySelector('#ab-toggle-btn').textContent = autoBackupTimer ? '자동 백업 끄기' : '자동 백업 켜기';
+  box.querySelectorAll('button').forEach(b => { b.disabled = !isAutoBackupSupported(); });
+}
 // ── 앱 내부 자동 스냅샷 (#152) ──
-// 별도 IndexedDB 에 데이터가 바뀌었을 때만, 최소 10분 간격으로 저장(gzip). 최근 10개 + 최근 7일 하루 1개, 총 400MB 를 넘으면 오래된 것부터 삭제. 빈 데이터는 저장하지 않는다.
+// 별도 IndexedDB 에 데이터가 바뀌었을 때만, 최소 5분 간격으로 저장(gzip). 최근 10개 + 최근 7일 하루 1개, 총 400MB 를 넘으면 오래된 것부터 삭제. 빈 데이터는 저장하지 않는다.
 const SNAPSHOT_DB_NAME = 'trpg-scenario-editor-snapshots';
 const SNAPSHOT_STORE = 'snapshots';
-const SNAPSHOT_MIN_INTERVAL_MS = 10 * 60 * 1000;
+const SNAPSHOT_MIN_INTERVAL_MS = 5 * 60 * 1000;
 const SNAPSHOT_KEEP_RECENT = 10;
 const SNAPSHOT_KEEP_DAYS = 7;
 const SNAPSHOT_MAX_BYTES = 400 * 1024 * 1024;
@@ -23858,6 +23877,7 @@ async function renderSnapshotList() {
 }
 function openSnapshotModal() {
   setSnapshotStatus('');
+  renderAutoBackupSettings();
   document.getElementById('snapshot-backdrop')?.classList.add('open');
   renderSnapshotList();
 }
@@ -23936,7 +23956,7 @@ async function confirmAutoBackupStartupPopup() {
   const showError = message => { status.textContent = message; status.className = 'github-sync-status error'; status.style.display = ''; };
   if (kind === 'pick') {
     closeAutoBackupStartupPopup();
-    await toggleAutoBackup();
+    await setupAutoBackup();
     autoBackupWarning = !autoBackupTimer;
     updateAutoBackupButton();
     return;
@@ -23946,7 +23966,7 @@ async function confirmAutoBackupStartupPopup() {
     if (!granted) { showError('권한이 허용되지 않았습니다. 다시 시도하거나 건너뛰기를 누르세요.'); return; }
     closeAutoBackupStartupPopup();
     autoBackupWarning = false;
-    startAutoBackupTimer(autoBackupIntervalMs || AUTO_BACKUP_DEFAULT_INTERVAL_MS);
+    startAutoBackupTimer();
     await writeAutoBackup({ silent: true });
     showToast('자동 파일 백업을 다시 시작했습니다.');
   } catch (err) {
@@ -23973,7 +23993,7 @@ async function initAutoBackup() {
     }
     if (await verifyAutoBackupPermission(autoBackupFileHandle, false)) {
       autoBackupWarning = false;
-      startAutoBackupTimer(autoBackupIntervalMs || AUTO_BACKUP_DEFAULT_INTERVAL_MS);
+      startAutoBackupTimer();
       writeAutoBackup({ silent: true });
     } else {
       // 권한이 prompt: 브라우저는 클릭 없이 권한을 못 물으므로 앱 팝업의 [허용] 클릭에서 requestPermission 을 부른다.
@@ -23995,7 +24015,7 @@ const GITHUB_SYNC_ENABLED_KEY = 'trpg-github-sync-enabled';
 const GITHUB_SYNC_LAST_SHA_KEY = 'trpg-github-sync-last-sha';
 const GITHUB_SYNC_LAST_AT_KEY = 'trpg-github-sync-last-at';
 const GITHUB_SYNC_IDLE_MS = 60 * 1000;
-const GITHUB_SYNC_INTERVAL_MS = 10 * 60 * 1000;
+const GITHUB_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 let githubSyncDirty = false;
 let githubSyncDirtySince = 0;
 let githubSyncTimer = null;
