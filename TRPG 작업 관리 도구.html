@@ -166,12 +166,11 @@ tr.ct-child td.ct-drag-cell { border-left: 3px solid #cfd8e6; }
 tr.ct-child td.ct-title-cell { padding-left: 14px !important; }
 tr.ct-series-row td { background: #f3f5f9; border-bottom: 1px solid #e3e7ee; }
 tr.ct-series-row:hover td { background: #eef1f7 !important; }
-.ct-series-cell { padding: 2px 4px !important; }
+.ct-series-toggle-cell { text-align: center; }
 .ct-series-inner { display: flex; align-items: center; gap: 6px; }
 .ct-series-toggle { border: none; background: transparent; cursor: pointer; font-size: 12px; color: #667; padding: 2px 4px; font-family: inherit; }
 .ct-series-count { color: #889; font-size: 11px; white-space: nowrap; }
-.ct-series-inner textarea.ct-input { font-weight: 700; flex: 0 1 auto; min-width: 160px; }
-.ct-series-del { margin-left: auto; }
+.ct-series-inner textarea.ct-input { font-weight: 700; flex: 0 1 auto; }
 tr.ct-drop-before td { box-shadow: inset 0 2px 0 #4a9eff; }
 tr.ct-drop-after td { box-shadow: inset 0 -2px 0 #4a9eff; }
 tr.ct-drop-into td { background: #e6f1ff !important; box-shadow: inset 0 0 0 1px #4a9eff; }
@@ -29862,15 +29861,19 @@ function getVisibleCatalogRows(q) {
   });
   return out;
 }
+// 시리즈 머리 행: 일반 행과 같은 18칸 구조(핸들·룰·종류·난이도 2·스크립트·시나리오명·GM·PL·END·인원·소요시간·관계·배경·특이사항·작가·링크·삭제)로 나눈다.
+// 룰 칸에 ▸/▾, 시나리오명 칸에 시리즈 이름(굵게)과 접힌 개수, 삭제 칸에 ✕, 나머지는 빈 칸.
 function renderCatalogSeriesRow(c, count) {
+  const empty = n => '<td></td>'.repeat(n);
   return `<tr class="ct-series-row" data-cid="${c.id}" data-series="1" oncontextmenu="return onCatalogRowContextMenu(event,'${c.id}')">
     <td class="ct-drag-cell"><button type="button" class="ct-row-handle" onpointerdown="beginCatalogRowDrag(event,'${c.id}')" title="끌어서 시리즈 이동" aria-label="시리즈 끌어서 이동">≡</button></td>
-    <td class="ct-cell ct-series-cell" colspan="17"><div class="ct-series-inner">
-      <button type="button" class="ct-series-toggle" onclick="toggleCatalogSeries('${c.id}')" aria-expanded="${c.collapsed ? 'false' : 'true'}" title="접기/펼치기">${c.collapsed ? '▸' : '▾'}</button>
-      ${ctInput(c.id, 'title', c.title, '시리즈 이름')}
-      ${c.collapsed ? `<span class="ct-series-count">(${count})</span>` : ''}
-      <button class="catalog-del-btn ct-series-del" onclick="deleteCatalogSeries('${c.id}')" title="시리즈 삭제(하위 시나리오는 보존)">✕</button>
-    </div></td>
+    <td class="ct-cell ct-series-toggle-cell"><button type="button" class="ct-series-toggle" onclick="toggleCatalogSeries('${c.id}')" aria-expanded="${c.collapsed ? 'false' : 'true'}" title="접기/펼치기">${c.collapsed ? '▸' : '▾'}</button></td>
+    ${empty(3)}
+    <td class="ct-script-cell"></td>
+    <td class="ct-cell ct-title-cell"><div class="ct-series-inner">${ctInput(c.id, 'title', c.title, '시리즈 이름')}${c.collapsed ? `<span class="ct-series-count">(${count})</span>` : ''}</div></td>
+    ${empty(9)}
+    <td class="ct-chk"></td>
+    <td class="ct-act"><button class="catalog-del-btn" onclick="deleteCatalogSeries('${c.id}')" title="시리즈 삭제(하위 시나리오는 보존)">✕</button></td>
   </tr>`;
 }
 function renderCatalog() {
