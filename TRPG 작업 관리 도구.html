@@ -159,17 +159,17 @@ body {
 .catalog-del-btn { color: #ccc; }
 .catalog-del-btn:hover { background: #fff0f0; color: #e53e3e; }
 /* ─── 시리즈 묶음 (#153) ─── */
-.ct-drag-head, .ct-drag-cell { width: 24px !important; min-width: 24px !important; padding: 0 !important; text-align: center; }
+.ct-drag-head, .ct-drag-cell { width: 26px !important; min-width: 26px !important; padding: 0 0 0 2px !important; text-align: center; } /* 핸들 왼쪽 여백 2px — 머리글·일반 행·머리 행 공통 */
 .ct-row-handle { width: 20px; height: 24px; border: none; background: transparent; padding: 0; color: #c2c2c2; font-size: 13px; line-height: 1; cursor: grab; font-family: inherit; touch-action: none; }
 .ct-row-handle:hover { color: #777; }
-tr.ct-child td.ct-drag-cell { border-left: 3px solid #cfd8e6; }
+tr.ct-child td.ct-drag-cell { box-shadow: inset 3px 0 0 #c8c8c8; } /* 테두리가 아니라 안쪽 선이라 핸들 위치가 변하지 않는다 */
 tr.ct-child td.ct-title-cell { padding-left: 14px !important; }
-tr.ct-series-row td { background: #f3f5f9; border-bottom: 1px solid #e3e7ee; }
-tr.ct-series-row:hover td { background: #eef1f7 !important; }
-.ct-series-toggle-cell { text-align: center; }
-.ct-series-inner { display: flex; align-items: center; gap: 6px; }
-.ct-series-toggle { border: none; background: transparent; cursor: pointer; font-size: 12px; color: #667; padding: 2px 4px; font-family: inherit; }
-.ct-series-count { color: #889; font-size: 11px; white-space: nowrap; }
+tr.ct-series-row td { background: #f0f0f0; border-bottom: 1px solid #e0e0e0; }
+tr.ct-series-row:hover td { background: #e8e8e8 !important; }
+.ct-series-inner { display: flex; align-items: center; gap: 0; }
+/* 토글 폭 12px = 하위 행 제목 칸 들여쓰기(14px) − 칸 안쪽 여백(2px): 시리즈 이름 시작선이 하위 행 제목과 같다 */
+.ct-series-toggle { flex: 0 0 12px; width: 12px; border: none; background: transparent; cursor: pointer; font-size: 11px; color: #666; padding: 0; font-family: inherit; text-align: center; }
+.ct-series-count { color: #888; font-size: 11px; white-space: nowrap; margin-left: 4px; }
 .ct-series-inner textarea.ct-input, .ct-series-inner textarea.ct-input:focus { font-weight: 700; flex: 0 1 auto; color: #808080; } /* 시리즈 이름은 gray, 포커스 중에도 유지(#155) */
 tr.ct-drop-before td { box-shadow: inset 0 2px 0 #4a9eff; }
 tr.ct-drop-after td { box-shadow: inset 0 -2px 0 #4a9eff; }
@@ -30037,15 +30037,14 @@ function getVisibleCatalogRows(q) {
   return out;
 }
 // 시리즈 머리 행: 일반 행과 같은 18칸 구조(핸들·룰·종류·난이도 2·스크립트·시나리오명·GM·PL·END·인원·소요시간·관계·배경·특이사항·작가·링크·삭제)로 나눈다.
-// 룰 칸에 ▸/▾, 시나리오명 칸에 시리즈 이름(굵게)과 접힌 개수, 삭제 칸에 ✕, 나머지는 빈 칸.
+// 시나리오명 칸에 ▸/▾ 토글 + 시리즈 이름(굵게) + 접힌 개수, 삭제 칸에 ✕, 나머지는 빈 칸(룰 칸도 빈 칸).
 function renderCatalogSeriesRow(c, count) {
   const empty = n => '<td></td>'.repeat(n);
   return `<tr class="ct-series-row" data-cid="${c.id}" data-series="1" oncontextmenu="return onCatalogRowContextMenu(event,'${c.id}')">
     <td class="ct-drag-cell"><button type="button" class="ct-row-handle" onpointerdown="beginCatalogRowDrag(event,'${c.id}')" title="끌어서 시리즈 이동" aria-label="시리즈 끌어서 이동">≡</button></td>
-    <td class="ct-cell ct-series-toggle-cell"><button type="button" class="ct-series-toggle" onclick="toggleCatalogSeries('${c.id}')" aria-expanded="${c.collapsed ? 'false' : 'true'}" title="접기/펼치기">${c.collapsed ? '▸' : '▾'}</button></td>
-    ${empty(3)}
+    ${empty(4)}
     <td class="ct-script-cell"></td>
-    <td class="ct-cell ct-title-cell"><div class="ct-series-inner">${ctInput(c.id, 'title', c.title, '시리즈 이름')}${c.collapsed ? `<span class="ct-series-count">(${count})</span>` : ''}</div></td>
+    <td class="ct-cell ct-title-cell"><div class="ct-series-inner"><button type="button" class="ct-series-toggle" onclick="toggleCatalogSeries('${c.id}')" aria-expanded="${c.collapsed ? 'false' : 'true'}" title="접기/펼치기">${c.collapsed ? '▸' : '▾'}</button>${ctInput(c.id, 'title', c.title, '시리즈 이름')}${c.collapsed ? `<span class="ct-series-count">(${count})</span>` : ''}</div></td>
     ${empty(9)}
     <td class="ct-chk"></td>
     <td class="ct-act"><button class="catalog-del-btn" onclick="deleteCatalogSeries('${c.id}')" title="시리즈 삭제(하위 시나리오는 보존)">✕</button></td>
