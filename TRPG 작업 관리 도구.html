@@ -7947,7 +7947,7 @@ select.sh-field-input,
     <button onclick="document.getElementById('import-input').click()">가져오기</button>
     <button id="github-sync-btn" onclick="openGitHubSyncModal()">GitHub 동기화</button>
     <button id="snapshot-btn" onclick="openSnapshotModal()" title="자동 백업 설정과 앱 내부 스냅샷 목록">백업</button>
-    <input type="file" id="import-input" accept=".json" style="display:none" onchange="importAll(event)">
+    <input type="file" id="import-input" accept=".json,.zip" style="display:none" onchange="importAll(event)">
   </div>
 </div>
 <div class="sidebar-scrim" onclick="closeSidebarOnCompactViewport()" aria-hidden="true"></div>
@@ -9166,6 +9166,7 @@ select.sh-field-input,
       <div id="snapshot-list" class="snapshot-list"></div>
       <div id="snapshot-status" class="github-sync-status" aria-live="polite" style="display:none"></div>
       <div class="rb-modal-footer">
+        <button type="button" class="rb-modal-cancel" onclick="exportBackupWithAttachments()" title="데이터 + 첨부 파일 본문을 ZIP 으로 내려받습니다(기본 내보내기 JSON 은 첨부 메타만 담습니다).">첨부 포함 내보내기</button>
         <button type="button" class="rb-modal-cancel" onclick="saveSnapshotNow()">지금 스냅샷 저장</button>
         <button type="button" class="rb-modal-cancel" onclick="closeSnapshotModal()">닫기</button>
       </div>
@@ -24744,8 +24745,135 @@ function refreshAfterImport(replaceMode = false) {
 function formatImportSummary(payload) {
   return `${payload.scenarios.length}개의 시나리오, ${payload.folders.length}개의 시나리오 폴더, ${payload.cssMacroFolders.length}개의 CSS 매크로 폴더, ${payload.records.length}개의 세션 기록, ${payload.catalog.filter(c => c.kind !== 'series').length}개의 카탈로그 항목, ${payload.cssMacros.length}개의 매크로, ${payload.cssPopupDictionary.length}개의 CSS 팝업사전 항목, ${payload.bookmarks.length}개의 북마크, ${payload.rulebooks.length}개의 룰북, ${payload.characters.length}명의 캐릭터, ${payload.customFonts.length}개의 커스텀 폰트`;
 }
+// ── 첨부 포함 내보내기·가져오기 (ZIP: data.json + attachments/{sha256}) ──
+// 외부 라이브러리 없이 압축 없는(STORE) ZIP 을 만들고, 읽을 때는 STORE·DEFLATE 를 지원한다. ZIP32 한계(4GB, 65535개)를 넘으면 오류.
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n += 1) { let c = n; for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; table[n] = c >>> 0; }
+  return table;
+})();
+async function crc32OfBlob(blob) {
+  let crc = 0xFFFFFFFF;
+  const step = 8 * 1024 * 1024;
+  for (let offset = 0; offset < blob.size; offset += step) {
+    const bytes = new Uint8Array(await blob.slice(offset, offset + step).arrayBuffer());
+    for (let i = 0; i < bytes.length; i += 1) crc = CRC32_TABLE[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+async function buildZipBlob(entries) { // entries: [{ name, blob }]
+  const encoder = new TextEncoder();
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const parts = [];
+  const central = [];
+  let offset = 0;
+  if (entries.length > 65535) throw new Error('ZIP 항목이 너무 많습니다.');
+  for (const entry of entries) {
+    const name = encoder.encode(entry.name);
+    const crc = await crc32OfBlob(entry.blob);
+    if (entry.blob.size >= 0xFFFFFFFF || offset >= 0xFFFFFFFF) throw new Error('ZIP 이 4GB 를 넘어 만들 수 없습니다. 첨부를 나눠 내보내세요.');
+    const header = new DataView(new ArrayBuffer(30));
+    header.setUint32(0, 0x04034b50, true); header.setUint16(4, 20, true); header.setUint16(6, 0x0800, true); header.setUint16(8, 0, true);
+    header.setUint16(10, dosTime, true); header.setUint16(12, dosDate, true); header.setUint32(14, crc, true);
+    header.setUint32(18, entry.blob.size, true); header.setUint32(22, entry.blob.size, true); header.setUint16(26, name.length, true); header.setUint16(28, 0, true);
+    parts.push(header.buffer, name, entry.blob);
+    const dir = new DataView(new ArrayBuffer(46));
+    dir.setUint32(0, 0x02014b50, true); dir.setUint16(4, 20, true); dir.setUint16(6, 20, true); dir.setUint16(8, 0x0800, true); dir.setUint16(10, 0, true);
+    dir.setUint16(12, dosTime, true); dir.setUint16(14, dosDate, true); dir.setUint32(16, crc, true);
+    dir.setUint32(20, entry.blob.size, true); dir.setUint32(24, entry.blob.size, true); dir.setUint16(28, name.length, true); dir.setUint32(42, offset, true);
+    central.push(dir.buffer, name);
+    offset += 30 + name.length + entry.blob.size;
+  }
+  const centralSize = central.reduce((n, p) => n + (p.byteLength ?? p.length), 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, entries.length, true); end.setUint16(10, entries.length, true);
+  end.setUint32(12, centralSize, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, end.buffer], { type: 'application/zip' });
+}
+async function readZipEntries(blob) { // Map(name -> { blob(): Promise<Blob> })
+  const tail = new DataView(await blob.slice(Math.max(0, blob.size - 66000)).arrayBuffer());
+  let eocd = -1;
+  for (let i = tail.byteLength - 22; i >= 0; i -= 1) if (tail.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error('ZIP 파일이 아니거나 손상되었습니다.');
+  const count = tail.getUint16(eocd + 10, true);
+  const dirSize = tail.getUint32(eocd + 12, true);
+  const dirOffset = tail.getUint32(eocd + 16, true);
+  const dir = new DataView(await blob.slice(dirOffset, dirOffset + dirSize).arrayBuffer());
+  const decoder = new TextDecoder();
+  const entries = new Map();
+  let p = 0;
+  for (let i = 0; i < count; i += 1) {
+    if (dir.getUint32(p, true) !== 0x02014b50) throw new Error('ZIP 목록이 손상되었습니다.');
+    const method = dir.getUint16(p + 10, true);
+    const compressed = dir.getUint32(p + 20, true);
+    const nameLen = dir.getUint16(p + 28, true), extraLen = dir.getUint16(p + 30, true), commentLen = dir.getUint16(p + 32, true);
+    const localOffset = dir.getUint32(p + 42, true);
+    const name = decoder.decode(new Uint8Array(dir.buffer, p + 46, nameLen));
+    entries.set(name, {
+      blob: async () => {
+        const local = new DataView(await blob.slice(localOffset, localOffset + 30).arrayBuffer());
+        const start = localOffset + 30 + local.getUint16(26, true) + local.getUint16(28, true);
+        const raw = blob.slice(start, start + compressed);
+        if (method === 0) return raw;
+        if (method === 8) return await new Response(raw.stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
+        throw new Error(`지원하지 않는 ZIP 압축 방식(${method})입니다.`);
+      },
+    });
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return entries;
+}
+async function exportBackupWithAttachments() {
+  const shas = [...new Set(state.catalog.flatMap(c => (c.attachments || []).map(a => a.sha256)))];
+  const entries = [{ name: 'data.json', blob: new Blob([getBackupJson()], { type: 'application/json' }) }];
+  let missing = 0;
+  for (const sha of shas) {
+    const record = await getAttachmentRecord(sha);
+    if (record) entries.push({ name: `attachments/${sha}`, blob: record.blob });
+    else missing += 1;
+  }
+  try {
+    const zip = await buildZipBlob(entries);
+    const url = URL.createObjectURL(zip);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `trpg-tool.backup-with-attachments.${getDateBackupStamp()}.zip`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    setSnapshotStatus(`첨부 포함 내보내기: 데이터 + 첨부 ${shas.length - missing}개${missing ? ` (이 기기에 본문이 없는 ${missing}개는 제외)` : ''}`, missing ? 'error' : 'success');
+  } catch (err) {
+    setSnapshotStatus('첨부 포함 내보내기에 실패했습니다: ' + (err?.message || err), 'error');
+  }
+}
+// ZIP 가져오기: attachments/{sha256} 를 해시 검증 후 첨부 저장소에 넣고, data.json 은 기존 JSON 가져오기 흐름(importAll)에 그대로 넘긴다.
+async function importBackupZip(file, inputEl) {
+  try {
+    const entries = await readZipEntries(file);
+    const dataEntry = entries.get('data.json');
+    if (!dataEntry) throw new Error('ZIP 안에 data.json 이 없습니다.');
+    let stored = 0, bad = 0;
+    for (const [name, entry] of entries) {
+      const m = name.match(/^attachments\/([0-9a-f]{64})$/);
+      if (!m) continue;
+      const blob = await entry.blob();
+      if (await sha256Hex(blob) !== m[1]) { bad += 1; continue; }
+      await putAttachmentBlob(m[1], blob);
+      stored += 1;
+    }
+    if (bad) alert(`첨부 ${bad}개는 해시가 맞지 않아 건너뛰었습니다.`);
+    const json = await (await dataEntry.blob()).text();
+    importAll({ target: { files: [new File([json], 'data.json', { type: 'application/json' })], value: '' } });
+  } catch (err) {
+    alert('ZIP 가져오기에 실패했습니다: ' + (err?.message || err));
+  } finally {
+    if (inputEl) inputEl.value = '';
+  }
+}
 function importAll(e) {
   const file = e.target.files[0]; if (!file) return;
+  if (/\.zip$/i.test(file.name)) { importBackupZip(file, e.target); return; }
   const reader = new FileReader();
   reader.onerror = () => { alert('파일을 읽는 데 실패했습니다: ' + (reader.error?.message || '알 수 없는 오류')); e.target.value = ''; };
   reader.onload = async ev => {
