@@ -11,7 +11,9 @@ assert.match(html, /id="github-sync-btn"[^>]*onclick="openGitHubSyncModal\(\)"/,
 assert.match(html, /GITHUB_SYNC_INTERVAL_MS = 5 \* 60 \* 1000/, '원격 업로드는 5분 제한을 사용해야 합니다.');
 assert.match(html, /headers: \{ Accept: 'application\/vnd\.github\.raw\+json' \}/, '1MB가 넘는 최신본은 raw 응답으로 읽어야 합니다.');
 assert.match(html, /if \(input\.remoteChanged && input\.localChanged\) return 'conflict'/, '양쪽 변경 시 자동 덮어쓰기를 막아야 합니다.');
-assert.match(html, /await initGitHubSync\(\);[\s\S]*?loadCustomFonts\(\);/, '화면 렌더 전에 GitHub 최신본을 확인해야 합니다.');
+assert.match(html, /bootMark\('first-render-done'\);[\s\S]*?initGitHubSync\(\);/, 'GitHub 동기화는 첫 렌더 뒤 백그라운드로 시작해야 합니다(렌더를 막으면 안 됨).');
+assert.ok(!/await initGitHubSync\(\)/.test(html), '시작 동기화를 await 하면 첫 렌더가 지연됩니다.');
+assert.match(html, /const localChangedNow = localChanged \|\| githubSyncDirty;/, '받는 동안의 편집은 pull 이 덮어쓰지 않도록 다시 확인해야 합니다.');
 
 const decisionFunction = html.match(/function getGitHubSyncDecision\(input\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(decisionFunction, '동기화 결정 함수를 찾을 수 없습니다.');
