@@ -134,7 +134,7 @@ body {
 /* 머리글 2행(#150): 난이도(colspan 2) 아래 GM/PL. 전체 높이는 예전 두 줄 글자(GM<br>난이도)와 거의 같고, 2행 th 는 1행 높이(24px)만큼 아래에 sticky. */
 .catalog-table thead tr:first-child th { height: 24px; box-sizing: border-box; padding-top: 3px; padding-bottom: 3px; }
 .catalog-table thead tr.ct-head-row2 th { top: 24px; height: 24px; box-sizing: border-box; padding-top: 3px; padding-bottom: 3px; }
-.catalog-table th.ct-diff-head { border-bottom: 1px solid #e8e8e8; }
+.catalog-table th.ct-diff-head { border-bottom: 0; } /* 난이도와 GM/PL 사이에는 선이 없고, 머리글 맨 아래 2px 선만 남는다 */
 .ct-chk { width: 36px !important; text-align: center !important; }
 .ct-cell-center { text-align: center !important; }
 .ct-cell-center .ct-input,
