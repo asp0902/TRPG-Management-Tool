@@ -164,8 +164,11 @@ body {
 .ct-row-handle:hover { color: #777; }
 tr.ct-child td.ct-drag-cell { box-shadow: inset 3px 0 0 #c8c8c8; } /* 테두리가 아니라 안쪽 선이라 핸들 위치가 변하지 않는다 */
 tr.ct-child td.ct-title-cell { padding-left: 14px !important; }
-tr.ct-series-row td { background: #f0f0f0; border-bottom: 1px solid #e0e0e0; }
-tr.ct-series-row:hover td { background: #e8e8e8 !important; }
+tr.ct-series-row td { background: #c8c8c8; border-bottom: 0; }
+tr.ct-series-row:hover td { background: #bdbdbd !important; }
+/* 하위 행 바탕(#159). 체크 상태 색(GM/PL/END, !important)이 항상 우선한다. */
+.catalog-table tbody tr.ct-child td { background: #f0f0f0; }
+.catalog-table tbody tr.ct-child:hover td { background: #e8e8e8; }
 .ct-series-inner { display: flex; align-items: center; gap: 0; }
 /* 토글 폭 12px = 하위 행 제목 칸 들여쓰기(14px) − 칸 안쪽 여백(2px): 시리즈 이름 시작선이 하위 행 제목과 같다 */
 .ct-series-toggle { flex: 0 0 12px; width: 12px; border: none; background: transparent; cursor: pointer; font-size: 11px; color: #666; padding: 0; font-family: inherit; text-align: center; }
