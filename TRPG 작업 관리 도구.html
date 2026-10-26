@@ -23831,6 +23831,7 @@ async function githubSyncRequest(url, options = {}) {
   const token = getGitHubSyncToken();
   if (!token) throw new Error('GitHub 토큰이 없습니다.');
   const response = await fetch(url, {
+    cache: 'no-store',
     ...options,
     headers: {
       Accept: 'application/vnd.github+json',
@@ -23850,20 +23851,50 @@ async function githubSyncRequest(url, options = {}) {
 async function getGitHubSyncMeta() {
   const url = `${getGitHubSyncApiUrl()}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}`;
   const response = await githubSyncRequest(url, { allow404: true });
-  if (!response) return { exists: false, sha: '', size: 0 };
+  if (!response) {
+    // 토큰에 저장소 권한이 없어도 GitHub 는 404 를 돌려준다. 저장소에 접근되는지 먼저 확인한다.
+    const repo = await githubSyncRequest(`https://api.github.com/repos/${GITHUB_SYNC_REPO}`, { allow404: true });
+    if (!repo) throw new Error('토큰이 저장소에 접근할 수 없습니다. 토큰 권한과 저장소 이름을 확인하세요.');
+    return { exists: false, sha: '', size: 0 };
+  }
   const data = await response.json();
   return { exists: true, sha: data.sha || '', size: Number(data.size) || 0 };
 }
 async function getGitHubSyncRemote(meta) {
-  const url = `${getGitHubSyncApiUrl()}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}`;
+  // 메타 요청과 다른 URL(&raw=sha)로 받아 같은 URL 의 캐시 응답이 섞이지 않게 한다.
+  const url = `${getGitHubSyncApiUrl()}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}&raw=${encodeURIComponent(meta.sha || '1')}`;
   const response = await githubSyncRequest(url, {
     headers: { Accept: 'application/vnd.github.raw+json' },
   });
+  const text = await response.text();
   let data;
-  try { data = JSON.parse(await response.text()); }
+  try { data = JSON.parse(text); }
   catch (err) { throw new Error('GitHub 최신본 JSON이 손상되었습니다.'); }
+  validateGitHubSyncRemoteData(data, meta, new TextEncoder().encode(text).length);
   makeImportPayload(data);
   return { ...meta, data };
+}
+const GITHUB_SYNC_DATA_KEYS = ['scenarios', 'records', 'catalog', 'cssMacros', 'folders', 'rulebooks', 'characters', 'bookmarks', 'dataSheets'];
+// 받은 값이 앱 데이터가 아니면(메타데이터 JSON, 빈 객체 …) 적용하지 않는다.
+function validateGitHubSyncRemoteData(data, meta, byteLength) {
+  if (Array.isArray(data)) return;
+  if (!data || typeof data !== 'object') throw new Error('GitHub 최신본 형식이 올바르지 않습니다.');
+  const looksLikeMeta = 'sha' in data && 'content' in data && 'encoding' in data;
+  const hasAppKey = GITHUB_SYNC_DATA_KEYS.some(key => Array.isArray(data[key]));
+  if (looksLikeMeta || !hasAppKey) {
+    throw new Error('GitHub에서 받은 값이 앱 데이터가 아닙니다(파일 정보만 받았습니다). 적용하지 않았습니다. 잠시 후 다시 시도하세요.');
+  }
+  if (meta?.size > 1024 && byteLength < meta.size * 0.5) {
+    throw new Error(`GitHub에서 받은 크기(${byteLength}바이트)가 원격 파일 크기(${meta.size}바이트)와 크게 다릅니다. 적용하지 않았습니다.`);
+  }
+}
+function importPayloadHasData(payload) {
+  return GITHUB_SYNC_DATA_KEYS.concat(['cssMacroFolders', 'cssPopupDictionary', 'characterFolders'])
+    .some(key => Array.isArray(payload?.[key]) && payload[key].length > 0)
+    || (payload?.sharedMemoOwner?.memos?.length || 0) > 0;
+}
+function githubSyncCountText() {
+  return `시나리오 ${state.scenarios.length}개 · 기록 ${state.records.length}개 · CSS 매크로 ${state.cssMacros.length}개`;
 }
 function utf8ToBase64(text) {
   const bytes = new TextEncoder().encode(text);
@@ -23897,14 +23928,23 @@ function rememberGitHubSync(sha, syncedAt) {
 }
 async function applyGitHubSyncRemote(remote, refresh = true) {
   const payload = makeImportPayload(remote.data);
+  if (!importPayloadHasData(payload)) {
+    throw new Error(remote.size > 1024
+      ? 'GitHub 최신본이 큰데 받은 데이터가 비어 있어 적용하지 않았습니다.'
+      : 'GitHub 최신본이 비어 있어 적용하지 않았습니다.');
+  }
   replaceStateWithImportPayload(payload);
   normalizeSidebarState({ promoteLegacyContent: true });
   const saved = await persistNow();
   rememberGitHubSync(remote.sha, saved.savedAt);
   if (refresh) refreshAfterImport(true);
 }
-async function uploadGitHubSyncState(meta) {
+async function uploadGitHubSyncState(meta, options = {}) {
   if (currentPage === 'script' && state.currentId) syncInfo({ commit: false });
+  if (!hasGitHubSyncData() && meta.exists && meta.size > 1024) {
+    const message = `이 기기의 데이터가 비어 있는데 GitHub에는 ${Math.round(meta.size / 1024)}KB의 데이터가 있습니다. 빈 데이터로 덮어쓰지 않았습니다.`;
+    if (!options.manual || !confirm(`${message}\n\n정말 빈 데이터로 덮어쓸까요?`)) throw new Error(message);
+  }
   const payload = await persistNow();
   const sha = await putGitHubSyncPayload(payload, meta.exists ? meta.sha : '');
   rememberGitHubSync(sha, payload.savedAt);
@@ -23918,11 +23958,11 @@ async function runGitHubSync(options = {}) {
   if (options.forcePull) {
     if (!meta.exists) throw new Error('GitHub에 저장된 최신본이 없습니다.');
     await applyGitHubSyncRemote(await getGitHubSyncRemote(meta), !options.startup);
-    setGitHubSyncStatus('GitHub 최신본을 불러왔습니다.', 'success');
+    setGitHubSyncStatus(`GitHub 최신본을 불러왔습니다 (${githubSyncCountText()}).`, 'success');
     return true;
   }
   if (options.forcePush) {
-    await uploadGitHubSyncState(meta);
+    await uploadGitHubSyncState(meta, { manual: true });
     setGitHubSyncStatus('현재 데이터를 GitHub에 업로드했습니다.', 'success');
     return true;
   }
@@ -23949,7 +23989,7 @@ async function runGitHubSync(options = {}) {
   }
   if (decision === 'pull') {
     await applyGitHubSyncRemote(remote || await getGitHubSyncRemote(meta), !options.startup);
-    setGitHubSyncStatus('GitHub 최신본을 불러왔습니다.', 'success');
+    setGitHubSyncStatus(`GitHub 최신본을 불러왔습니다 (${githubSyncCountText()}).`, 'success');
     return true;
   }
   if (decision === 'push') {

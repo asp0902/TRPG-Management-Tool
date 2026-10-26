@@ -24,4 +24,23 @@ assert.equal(context.decide({ remoteExists: true, paired: true, remoteChanged: t
 assert.equal(context.decide({ remoteExists: true, paired: true, remoteChanged: false, localChanged: true }), 'push');
 assert.equal(context.decide({ remoteExists: true, paired: true, remoteChanged: true, localChanged: true }), 'conflict');
 
+// #147: 메타데이터 JSON·빈 데이터·크기 불일치는 적용하지 않는다
+assert.match(html, /cache: 'no-store',\s*\.\.\.options/, '모든 GitHub 요청은 HTTP 캐시를 쓰지 않아야 합니다.');
+assert.match(html, /&raw=\$\{encodeURIComponent\(meta\.sha/, '원본 요청은 메타 요청과 다른 URL 이어야 합니다.');
+const guard = ['GITHUB_SYNC_DATA_KEYS', 'validateGitHubSyncRemoteData', 'importPayloadHasData']
+  .map(name => html.match(new RegExp(`(?:const ${name} = [^;]*;|function ${name}\\([^]*?\\n\\})`))[0]).join('\n');
+const guardContext = {};
+vm.runInNewContext(`${guard}; v = validateGitHubSyncRemoteData; has = importPayloadHasData;`, guardContext);
+const metaJson = { name: 'x', sha: 'abc', size: 34279679, content: '', encoding: 'none' };
+assert.throws(() => guardContext.v(metaJson, { size: 34279679 }, 200), /앱 데이터가 아닙니다/);
+assert.throws(() => guardContext.v({}, { size: 10 }, 2), /앱 데이터가 아닙니다/);
+assert.throws(() => guardContext.v({ scenarios: [] }, { size: 34279679 }, 41), /크기/);
+assert.doesNotThrow(() => guardContext.v({ scenarios: [], records: [] }, { size: 100 }, 40));
+assert.doesNotThrow(() => guardContext.v([], { size: 0 }, 2));
+assert.equal(guardContext.has({ scenarios: [], records: [] }), false);
+assert.equal(guardContext.has({ scenarios: [{}] }), true);
+assert.match(html, /토큰이 저장소에 접근할 수 없습니다/);
+assert.match(html, /if \(!importPayloadHasData\(payload\)\) \{[\s\S]*?throw new Error/, '빈 결과는 적용하지 않아야 합니다.');
+assert.match(html, /if \(!hasGitHubSyncData\(\) && meta\.exists && meta\.size > 1024\)/, '빈 로컬이 원격을 덮어쓰면 안 됩니다.');
+
 console.log('github sync checks: OK');
