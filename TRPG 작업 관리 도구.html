@@ -131,6 +131,10 @@ body {
 .ct-title { min-width: 150px; font-weight: 600; }
 .ct-num { width: 46px !important; text-align: center !important; }
 .catalog-table th.ct-num { white-space: nowrap; line-height: 1.4; }
+/* 머리글 2행(#150): 난이도(colspan 2) 아래 GM/PL. 전체 높이는 예전 두 줄 글자(GM<br>난이도)와 거의 같고, 2행 th 는 1행 높이(24px)만큼 아래에 sticky. */
+.catalog-table thead tr:first-child th { height: 24px; box-sizing: border-box; padding-top: 3px; padding-bottom: 3px; }
+.catalog-table thead tr.ct-head-row2 th { top: 24px; height: 24px; box-sizing: border-box; padding-top: 3px; padding-bottom: 3px; }
+.catalog-table th.ct-diff-head { border-bottom: 1px solid #e8e8e8; }
 .ct-chk { width: 36px !important; text-align: center !important; }
 .ct-cell-center { text-align: center !important; }
 .ct-cell-center .ct-input,
@@ -8385,23 +8389,26 @@ select.sh-field-input,
         <table class="catalog-table">
           <thead>
             <tr>
-              <th class="ct-rule">룰</th>
-              <th class="ct-genre">종류</th>
-              <th class="ct-num" title="GM 난이도">GM<br>난이도</th>
-              <th class="ct-num" title="PL 난이도">PL<br>난이도</th>
-              <th class="ct-script-cell" title="연결된 스크립트로 이동"></th>
-              <th class="ct-title">시나리오명</th>
-              <th class="ct-chk" title="GM 스크립트 준비">GM</th>
-              <th class="ct-chk" title="PL 플레이 경험">PL</th>
-              <th class="ct-chk" title="배포 종료">END</th>
-              <th>인원</th>
-              <th>소요시간</th>
-              <th>관계</th>
-              <th>배경</th>
-              <th>특이사항</th>
-              <th>작가</th>
-              <th class="ct-chk" title="링크">링크</th>
-              <th class="ct-act"></th>
+              <th rowspan="2" class="ct-rule">룰</th>
+              <th rowspan="2" class="ct-genre">종류</th>
+              <th class="ct-diff-head" colspan="2">난이도</th>
+              <th rowspan="2" class="ct-script-cell" title="연결된 스크립트로 이동"></th>
+              <th rowspan="2" class="ct-title">시나리오명</th>
+              <th rowspan="2" class="ct-chk" title="GM 스크립트 준비">GM</th>
+              <th rowspan="2" class="ct-chk" title="PL 플레이 경험">PL</th>
+              <th rowspan="2" class="ct-chk" title="배포 종료">END</th>
+              <th rowspan="2">인원</th>
+              <th rowspan="2">소요시간</th>
+              <th rowspan="2">관계</th>
+              <th rowspan="2">배경</th>
+              <th rowspan="2">특이사항</th>
+              <th rowspan="2">작가</th>
+              <th rowspan="2" class="ct-chk" title="링크">링크</th>
+              <th rowspan="2" class="ct-act"></th>
+            </tr>
+            <tr class="ct-head-row2">
+              <th class="ct-num" title="GM 난이도">GM</th>
+              <th class="ct-num" title="PL 난이도">PL</th>
             </tr>
           </thead>
           <tbody id="catalog-tbody"></tbody>
