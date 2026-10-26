@@ -30199,7 +30199,7 @@ function openCatalogLinksPopover(id, anchorEl) {
   const pop = document.getElementById('catalog-links-popover');
   pop.style.display = 'flex';
   const rect = anchorEl.getBoundingClientRect();
-  _linksPopoverAnchor = { top: rect.top, bottom: rect.bottom, left: rect.left };
+  _linksPopoverAnchor = { top: rect.top, bottom: rect.bottom, left: rect.left, container: anchorEl.closest('.catalog-table-wrap') };
   positionLinksPopover();
 }
 let _linksPopoverAnchor = null;
@@ -30214,7 +30214,10 @@ function positionLinksPopover() {
     y = top - 4 - h >= margin ? top - 4 - h : Math.max(margin, window.innerHeight - margin - h);
   }
   pop.style.top = y + 'px';
-  pop.style.left = Math.max(margin, Math.min(left, window.innerWidth - w - margin)) + 'px';
+  // 오른쪽 경계는 세로 스크롤바를 뺀 컨테이너의 실제 오른쪽 끝 - 8px (스크롤바를 가리지 않는다)
+  const box = _linksPopoverAnchor.container;
+  const right = box ? box.getBoundingClientRect().left + box.clientWidth : document.documentElement.clientWidth;
+  pop.style.left = Math.max(margin, Math.min(left, right - w - margin)) + 'px';
 }
 window.addEventListener('resize', positionLinksPopover);
 function closeCatalogLinksPopover(save) {
