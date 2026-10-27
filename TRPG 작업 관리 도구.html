@@ -371,13 +371,14 @@ tr.ct-row-end .ct-select:focus {
 .clp-attach-status { font-size: 11px; color: #4a7; padding: 2px 0 4px; }
 .clp-attach-status.error { color: #c33; }
 .clp-attach-list { display: flex; flex-direction: column; gap: 4px; }
-.clp-att-row { display: flex; align-items: center; gap: 4px; padding: 3px 4px; border: 1px solid #eee; border-radius: 5px; }
-.clp-att-info { flex: 1; min-width: 0; }
-.clp-att-name { font-size: 12px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.clp-att-meta { font-size: 10px; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clp-att-row { position: relative; display: flex; gap: 5px; align-items: center; min-width: 0; min-height: 28px; border-radius: 5px; }
+.clp-att-row.editing { align-items: flex-start; }
+.clp-att-row.dragging { opacity: 0.45; }
+.clp-att-row.dragover-before { background: #f7fbff; box-shadow: inset 0 2px 0 #4a9eff; }
+.clp-att-row.dragover-after { background: #f7fbff; box-shadow: inset 0 -2px 0 #4a9eff; }
+.clp-att-size { flex-shrink: 0; font-size: 10px; color: #aaa; white-space: nowrap; }
+.clp-att-name { flex: 1; min-width: 0; font-size: 12px; color: #333; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 0; }
 .clp-att-state { flex-shrink: 0; width: 16px; text-align: center; font-size: 12px; color: #888; cursor: default; }
-.clp-att-btn { background: none; border: none; cursor: pointer; font-size: 12px; color: #888; padding: 2px 4px; border-radius: 3px; font-family: inherit; flex-shrink: 0; }
-.clp-att-btn:hover { background: #f0f0f0; color: #222; }
 .clp-footer { flex-shrink: 0; display: flex; justify-content: flex-end; gap: 6px; border-top: 1px solid #f0f0f0; padding-top: 10px; }
 .clp-close { background: none; border: 1px solid #ddd; border-radius: 5px; padding: 5px 11px; font-size: 11px; cursor: pointer; color: #888; font-family: inherit; }
 .clp-close:hover { background: #f5f5f5; }
@@ -30476,21 +30477,37 @@ function onAttachInput(input) {
   addCatalogAttachments(_linksPopover.id, files);
 }
 function getPopoverEntry() { return state.catalog.find(c => c.id === _linksPopover.id); }
+let attachMemoEditingId = null; // 메모를 편집 중인 첨부 id
 function renderAttachmentList() {
   const box = document.getElementById('clp-attach-list');
   if (!box) return;
   if (!renderAttachmentList.indexReady) { renderAttachmentList.indexReady = true; refreshAttachmentIndex().then(renderAttachmentList); }
   const entry = getPopoverEntry();
   const list = entry?.attachments || [];
-  box.innerHTML = list.length ? list.map(a => `<div class="clp-att-row" data-att-id="${esc(a.id)}">
-    <span class="clp-att-state" title="${esc(attachmentBackupBadge(a)[1])}">${attachmentBackupBadge(a)[0]}</span>
-    <div class="clp-att-info"><div class="clp-att-name" title="${esc(a.name)}">${esc(a.name)}</div>
-      <div class="clp-att-meta">${formatAttachmentSize(a.size)} · ${esc(new Date(a.addedAt).toLocaleDateString())}${a.memo ? ` · ${esc(a.memo)}` : ''}</div></div>
-    ${isOpenableAttachment(a) ? `<button type="button" class="clp-att-btn" onclick="openAttachmentIsolated('${esc(a.id)}')" title="열기(격리 화면)">▶</button>` : ''}
-    <button type="button" class="clp-att-btn" onclick="downloadAttachment('${esc(a.id)}')" title="다운로드">⬇</button>
-    <button type="button" class="clp-att-btn" onclick="editAttachment('${esc(a.id)}')" title="이름·메모 편집">✎</button>
-    <button type="button" class="clp-att-btn" onclick="removeAttachment('${esc(a.id)}')" title="삭제">✕</button>
-  </div>`).join('') : '<div class="clp-empty">첨부된 파일이 없습니다.</div>';
+  box.innerHTML = list.length ? list.map(a => {
+    const id = esc(a.id);
+    const badge = attachmentBackupBadge(a);
+    const handle = `<button type="button" class="clp-link-drag" onpointerdown="beginAttachmentDrag(event,'${id}')" title="순서 변경" aria-label="순서 변경">≡</button>`;
+    const state = `<span class="clp-att-state" title="${esc(badge[1])}">${badge[0]}</span>`;
+    if (attachMemoEditingId === a.id) {
+      return `<div class="clp-att-row editing" data-att-id="${id}">${handle}${state}
+        <div class="clp-link-fields"><div class="clp-att-name" title="${esc(a.name)}">${esc(a.name)}</div>
+          <input class="clp-input clp-link-memo" placeholder="메모" value="${esc(a.memo || '')}" spellcheck="false" onkeydown="handleAttachmentMemoKey(event,'${id}')" onblur="commitAttachmentMemo('${id}',this.value)"></div>
+        <button type="button" class="clp-link-confirm" onclick="commitAttachmentMemo('${id}',this.closest('.clp-att-row').querySelector('.clp-link-memo').value)" title="확정">✓</button>
+      </div>`;
+    }
+    return `<div class="clp-att-row" data-att-id="${id}">${handle}${state}
+      <span class="clp-att-name" title="${esc(a.name)} · ${esc(formatAttachmentSize(a.size))} · ${esc(new Date(a.addedAt).toLocaleDateString())}">${esc(a.name)}</span>
+      <span class="clp-att-size">${esc(formatAttachmentSize(a.size))}</span>
+      ${a.memo ? `<span class="clp-link-memo-display" title="${esc(a.memo)}">${esc(a.memo)}</span>` : ''}
+      ${isOpenableAttachment(a) ? `<button type="button" class="clp-link-edit" onclick="openAttachmentIsolated('${id}')" title="열기(격리 화면)">▶</button>` : ''}
+      <button type="button" class="clp-link-edit" onclick="downloadAttachment('${id}')" title="다운로드">⬇</button>
+      <button type="button" class="clp-link-edit" onclick="editAttachment('${id}')" title="메모 편집">✎</button>
+      <button type="button" class="clp-link-del" onclick="removeAttachment('${id}')" title="삭제">✕</button>
+    </div>`;
+  }).join('') : '<div class="clp-empty">첨부된 파일이 없습니다.</div>';
+  const memoInput = box.querySelector('.clp-att-row.editing .clp-link-memo');
+  if (memoInput) { memoInput.focus(); memoInput.setSelectionRange(memoInput.value.length, memoInput.value.length); }
   positionLinksPopover();
 }
 function findAttachment(attId) {
@@ -30534,15 +30551,87 @@ function closeAttachmentView() {
   const frame = document.getElementById('attach-view-frame');
   if (frame) frame.srcdoc = '';
 }
+// 첨부 메모 편집(링크 행 방식): ✎ → 행 안 입력칸, ✓/Enter 확정, Esc 취소, 다른 곳 클릭도 확정(조합 중이면 #164 지연 규칙으로 확정 값을 읽는다).
 function editAttachment(attId) {
-  const { entry, att } = findAttachment(attId);
-  if (!att) return;
-  const name = prompt('파일 이름', att.name);
-  if (name == null) return;
-  const memo = prompt('메모', att.memo || '');
-  if (memo == null) return;
-  att.name = name.trim() || att.name;
-  att.memo = memo.trim();
+  if (!findAttachment(attId).att) return;
+  attachMemoEditingId = attId;
+  renderAttachmentList();
+}
+function commitAttachmentMemo(attId, value) {
+  if (attachMemoEditingId !== attId) return; // 이미 확정·취소됨
+  const { att } = findAttachment(attId);
+  attachMemoEditingId = null;
+  if (att && att.memo !== String(value).trim()) { att.memo = String(value).trim(); persist(); }
+  renderAttachmentList();
+}
+function cancelAttachmentMemo() {
+  attachMemoEditingId = null;
+  renderAttachmentList();
+}
+function handleAttachmentMemoKey(event, attId) {
+  if (event.key === 'Enter' && !isImeComposing(event)) { event.preventDefault(); commitAttachmentMemo(attId, event.target.value); }
+  else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancelAttachmentMemo(); }
+}
+// ── 첨부 순서 드래그(≡ 핸들에서만 시작, 같은 항목의 첨부끼리만) ──
+let _attachDrag = null;
+function beginAttachmentDrag(e, attId) {
+  if (e.button !== 0) return;
+  const row = e.currentTarget.closest('.clp-att-row');
+  if (!row) return;
+  e.preventDefault();
+  _attachDrag = { attId, row, startY: e.clientY, dragging: false, target: null, pos: 'before' };
+  window.addEventListener('pointermove', onAttachmentDragMove, true);
+  window.addEventListener('pointerup', onAttachmentDragEnd, true);
+  window.addEventListener('keydown', onAttachmentDragKey, true);
+}
+function onAttachmentDragKey(e) { if (e.key === 'Escape') finishAttachmentDrag(false); }
+function onAttachmentDragMove(e) {
+  const d = _attachDrag;
+  if (!d) return;
+  if (!d.dragging) {
+    if (Math.abs(e.clientY - d.startY) < 4) return;
+    d.dragging = true;
+    d.row.classList.add('dragging');
+    document.body.classList.add('ct-row-dragging');
+  }
+  const box = document.getElementById('clp-attach');
+  if (box) { // 목록 가장자리에서 자동 스크롤(#149 높이 제한 안에서)
+    const r = box.getBoundingClientRect();
+    if (e.clientY < r.top + 24) box.scrollTop -= 10;
+    else if (e.clientY > r.bottom - 24) box.scrollTop += 10;
+  }
+  const rows = [...document.querySelectorAll('#clp-attach-list .clp-att-row')].filter(r => r !== d.row);
+  rows.forEach(r => r.classList.remove('dragover-before', 'dragover-after'));
+  d.target = null;
+  for (const r of rows) {
+    const rect = r.getBoundingClientRect();
+    if (e.clientY >= rect.top && e.clientY <= rect.bottom) { d.target = r; d.pos = e.clientY < (rect.top + rect.bottom) / 2 ? 'before' : 'after'; break; }
+  }
+  if (!d.target && rows.length) { // 목록 밖이면 가장 가까운 끝으로
+    const first = rows[0].getBoundingClientRect();
+    d.target = e.clientY < first.top ? rows[0] : rows[rows.length - 1];
+    d.pos = e.clientY < first.top ? 'before' : 'after';
+  }
+  d.target?.classList.add('dragover-' + d.pos);
+}
+function onAttachmentDragEnd() { finishAttachmentDrag(true); }
+function finishAttachmentDrag(apply) {
+  const d = _attachDrag;
+  _attachDrag = null;
+  window.removeEventListener('pointermove', onAttachmentDragMove, true);
+  window.removeEventListener('pointerup', onAttachmentDragEnd, true);
+  window.removeEventListener('keydown', onAttachmentDragKey, true);
+  document.body.classList.remove('ct-row-dragging');
+  document.querySelectorAll('#clp-attach-list .clp-att-row').forEach(r => r.classList.remove('dragging', 'dragover-before', 'dragover-after'));
+  if (!d || !d.dragging || !apply || !d.target) return;
+  const entry = getPopoverEntry();
+  if (!entry) return;
+  const list = entry.attachments;
+  const moving = list.find(a => a.id === d.attId);
+  const targetAtt = list.find(a => a.id === d.target.dataset.attId);
+  if (!moving || !targetAtt || moving === targetAtt) return;
+  list.splice(list.indexOf(moving), 1);
+  list.splice(list.indexOf(targetAtt) + (d.pos === 'after' ? 1 : 0), 0, moving);
   persist();
   renderAttachmentList();
 }
@@ -30670,6 +30759,7 @@ async function syncAttachmentsToGitHub() {
   } finally { attachSyncRunning = false; }
 }
 function renderAttachmentListIfOpen() {
+  if (attachMemoEditingId) return; // 메모 입력 중에는 입력칸을 다시 만들지 않는다(백그라운드 업로드 상태 갱신이 입력을 지우지 않게)
   if (document.getElementById('catalog-links-popover')?.style.display !== 'none') renderAttachmentList();
 }
 function attachmentBackupBadge(att) {
