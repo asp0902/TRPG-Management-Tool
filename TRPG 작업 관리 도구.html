@@ -321,7 +321,7 @@ tr.ct-row-end .ct-select:focus {
 .clp-link-label-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .clp-link-label-icon { width: 14px; height: 14px; object-fit: contain; flex-shrink: 0; opacity: 0.82; }
 .clp-link-label-icon.is-x { transform: scale(1.42); transform-origin: center; }
-.clp-link-label-icon.is-tobe { transform: scale(1.27); transform-origin: center; mix-blend-mode: multiply; } /* 256px 아이콘은 둘레 21%가 불투명 흰 여백(실측: 내용 79%) → 확대 보정, 흰 여백은 multiply 로 목록 hover 색 위에서도 안 보이게(#148) */
+.clp-link-label-icon.is-padded { transform: scale(1.27); transform-origin: center; mix-blend-mode: multiply; } /* 256px 아이콘은 둘레 21%가 불투명 흰 여백(실측: 투비컨티뉴드 내용 79%, Notion 77~80%) → 확대 보정, 흰 여백은 multiply 로 목록 hover 색 위에서도 안 보이게(#148) */
 .clp-link-label-arrow { display: none; }
 .clp-link-label-menu {
   display: none; position: fixed; left: 0; top: 0; width: 34px; min-width: 0; z-index: 720;
@@ -29892,13 +29892,16 @@ const CATALOG_LINK_TISTORY_LABEL_VALUE = 'TISTORY';
 const CATALOG_LINK_GOOGLE_DOCS_LABEL_VALUE = 'GOOGLE_DOCS';
 const CATALOG_LINK_TOBE_LABEL_VALUE = 'TOBE';
 const CATALOG_LINK_LABEL_TOBE_ICON_URL = 'https://image.aladin.co.kr/img/tobecontinued/tobecontinued.png';
+const CATALOG_LINK_NOTION_LABEL_VALUE = 'NOTION';
+const CATALOG_LINK_LABEL_NOTION_ICON_URL = 'https://www.notion.com/front-static/logo-ios.png';
 const CATALOG_LINK_LABEL_OPTIONS = [
   { value: '', text: '-' },
   { value: CATALOG_LINK_ICON_LABEL_VALUE, text: 'X', image: CATALOG_LINK_LABEL_ICON_URL },
   { value: CATALOG_LINK_POSTYPE_LABEL_VALUE, text: 'Postype', image: CATALOG_LINK_LABEL_POSTYPE_ICON_URL },
   { value: CATALOG_LINK_TISTORY_LABEL_VALUE, text: 'Tistory', image: CATALOG_LINK_LABEL_TISTORY_ICON_URL },
   { value: CATALOG_LINK_GOOGLE_DOCS_LABEL_VALUE, text: 'Google Docs', image: CATALOG_LINK_LABEL_GOOGLE_DOCS_ICON_URL },
-  { value: CATALOG_LINK_TOBE_LABEL_VALUE, text: '투비컨티뉴드', image: CATALOG_LINK_LABEL_TOBE_ICON_URL }
+  { value: CATALOG_LINK_TOBE_LABEL_VALUE, text: '투비컨티뉴드', image: CATALOG_LINK_LABEL_TOBE_ICON_URL },
+  { value: CATALOG_LINK_NOTION_LABEL_VALUE, text: 'Notion', image: CATALOG_LINK_LABEL_NOTION_ICON_URL }
 ];
 
 // ── 헬퍼: 인라인 입력 HTML 생성 ──
@@ -30763,7 +30766,8 @@ function catalogLinkLabelOptionHtml(opt, selected) {
   </button>`;
 }
 function catalogLinkIconClass(value) {
-  return value === CATALOG_LINK_ICON_LABEL_VALUE ? ' is-x' : (value === CATALOG_LINK_TOBE_LABEL_VALUE ? ' is-tobe' : '');
+  if (value === CATALOG_LINK_ICON_LABEL_VALUE) return ' is-x';
+  return value === CATALOG_LINK_TOBE_LABEL_VALUE || value === CATALOG_LINK_NOTION_LABEL_VALUE ? ' is-padded' : '';
 }
 function getCatalogLinkLabelOptions(value) {
   const normalized = value || '';
@@ -30837,6 +30841,7 @@ function detectCatalogLinkLabelFromUrl(url) {
     if (is('tistory.com')) return CATALOG_LINK_TISTORY_LABEL_VALUE;
     if (host === 'docs.google.com') return CATALOG_LINK_GOOGLE_DOCS_LABEL_VALUE;
     if (host === 'tobe.aladin.co.kr') return CATALOG_LINK_TOBE_LABEL_VALUE;
+    if (['notion.so', 'notion.site', 'notion.com'].some(d => host === d || host.endsWith('.' + d))) return CATALOG_LINK_NOTION_LABEL_VALUE;
   } catch(e) {}
   return '';
 }
