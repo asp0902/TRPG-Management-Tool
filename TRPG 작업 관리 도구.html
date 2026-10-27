@@ -24336,6 +24336,7 @@ async function runGitHubSync(options = {}) {
   let remote = null;
   if (meta.exists && (!lastSha || remoteChanged)) { remote = await getGitHubSyncRemote(meta); bootMark('gh-download-parse-done'); }
   const remoteSavedAt = Date.parse(remote?.data?.savedAt || remote?.data?.exportedAt || '') || 0;
+  if (options.automatic) await waitForTypingIdle(); // 입력·한글 조합 중에는 화면을 다시 그리지 않도록 입력이 멈춘 뒤에 적용
   // 받는 동안(백그라운드 시작 동기화 포함) 사용자가 편집했을 수 있으니 변경 여부를 다시 본다 — 편집이 있으면 pull 하지 않고 충돌 규칙을 따른다.
   const localChangedNow = localChanged || githubSyncDirty;
   const decision = getGitHubSyncDecision({
@@ -34936,6 +34937,32 @@ function fitCharacterPortraits(root) {
   root.querySelectorAll('.ch-sheet-basic-portrait.is-square').forEach(portrait => fitCharacterPortraitBox(portrait, 1));
 }
 
+// ── IME 조합 보호 (#164) ──
+// 한글 조합 중 Enter(isComposing=true, keyCode 229)를 일반 Enter 로 처리하면 입력칸이 blur·다시 그려지며 마지막 글자가 사라진다.
+// 조합 중에는 문서 캡처 단계에서 keydown 을 막아 앱의 모든 키 처리(인라인 onkeydown 포함)가 실행되지 않게 한다. 브라우저·IME 자체 동작은 막지 않는다.
+let imeComposing = false;
+let imeStartedAt = 0;
+let imeEndedAt = 0;
+let lastTypingAt = 0;
+function isImeComposing(e) {
+  if (!e) return imeComposing;
+  if (e.isComposing || e.keyCode === 229) return true;
+  if (imeComposing && performance.now() - imeStartedAt < 20000) return true; // compositionend 를 놓쳐도 20초 뒤에는 풀린다
+  return e.type === 'keydown' && e.key === 'Enter' && performance.now() - imeEndedAt < 30; // Safari: compositionend 직후 Enter keydown
+}
+document.addEventListener('compositionstart', () => { imeComposing = true; imeStartedAt = performance.now(); lastTypingAt = Date.now(); }, true);
+document.addEventListener('compositionend', () => { imeComposing = false; imeEndedAt = performance.now(); lastTypingAt = Date.now(); }, true);
+document.addEventListener('focusout', () => { imeComposing = false; }, true);
+document.addEventListener('input', () => { lastTypingAt = Date.now(); }, true);
+document.addEventListener('keydown', e => {
+  if (isImeComposing(e)) e.stopImmediatePropagation();
+  else lastTypingAt = Date.now();
+}, true);
+// 입력 중이거나 조합 중이면 백그라운드 다시 그리기(GitHub 최신본 적용 등)를 미룬다.
+async function waitForTypingIdle(maxMs = 60000) {
+  const until = Date.now() + maxMs;
+  while ((imeComposing || Date.now() - lastTypingAt < 1500) && Date.now() < until) await new Promise(resolve => setTimeout(resolve, 300));
+}
 function bootMark(label) {
   const timings = window.__bootTimings || (window.__bootTimings = {});
   timings[label] = Math.round(performance.now());
