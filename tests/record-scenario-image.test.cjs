@@ -55,6 +55,7 @@ const popupContext = {
   CSS: { escape: value => value },
   esc: value => String(value),
   setTimeout: fn => fn(),
+  whenImeIdle: fn => fn(),
   syncRecordGmCard() {},
   syncRecordPlayerRow() {},
   FileReader: class {

@@ -31960,7 +31960,7 @@ function addRecordPlayerRow(player = {}) {
   const row = createRecordPlayerRow(player);
   list.appendChild(row);
   const firstInput = row.querySelector('.record-player-pl');
-  if (!player?.plName && !player?.pcName && !player?.image) setTimeout(() => firstInput?.focus(), 10);
+  if (!player?.plName && !player?.pcName && !player?.image) setTimeout(() => whenImeIdle(() => firstInput?.focus()), 10);
 }
 
 function removeRecordPlayerRow(buttonEl) {
@@ -31991,7 +31991,7 @@ function openRecordImageUrlPopup(buttonEl) {
   const hidden = host.querySelector('.record-player-image, .record-gm-image, #rf-scenario-image');
   input.value = String(hidden?.value || '').trim();
   backdrop.style.display = 'flex';
-  setTimeout(() => input.focus(), 10);
+  setTimeout(() => whenImeIdle(() => input.focus()), 10);
 }
 
 function closeRecordImageUrlPopup() {
@@ -35102,6 +35102,18 @@ document.addEventListener('keydown', e => {
 async function waitForTypingIdle(maxMs = 60000) {
   const until = Date.now() + maxMs;
   while ((imeComposing || Date.now() - lastTypingAt < 1500) && Date.now() < until) await new Promise(resolve => setTimeout(resolve, 300));
+}
+// 프로그램으로 포커스를 옮기거나 다시 그리기 전에 조합 중인 글자를 먼저 확정한다(#170).
+// onmousedown preventDefault 버튼은 포커스를 바꾸지 않아 조합이 남은 채 focus() 가 불리면 마지막 글자가 취소된다.
+// 조합 중이면 현재 칸을 blur 해 확정시키고 compositionend 가 오면(최대 0.5초) fn 을 실행한다.
+function whenImeIdle(fn) {
+  if (!imeComposing) { fn(); return; }
+  try { document.activeElement?.blur?.(); } catch (_) {}
+  const started = Date.now();
+  (function wait() {
+    if (!imeComposing || Date.now() - started > 500) fn();
+    else setTimeout(wait, 20);
+  })();
 }
 function bootMark(label) {
   const timings = window.__bootTimings || (window.__bootTimings = {});
