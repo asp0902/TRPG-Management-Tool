@@ -573,6 +573,13 @@ tr.ct-row-end .ct-select:focus {
   width: min(360px, 100%); background: #fff; border: 1px solid #e4e4e4; border-radius: 12px;
   box-shadow: 0 16px 44px rgba(0,0,0,0.16); padding: 16px; display: flex; flex-direction: column; gap: 10px;
 }
+/* 기록 이미지 팝업: 파일 선택 + 붙여넣기 칸을 한 줄에(#171). 공유 .image-block-* 규칙은 건드리지 않고 이 래퍼 범위에서만 덮어쓴다. */
+.record-image-source-row { display: flex; flex-direction: row; align-items: stretch; gap: 8px; min-width: 0; }
+.record-image-source-row .image-block-source-btn { width: auto; flex: 0 0 auto; white-space: nowrap; }
+.record-image-source-row .image-block-paste-zone { flex: 1 1 0; min-width: 0; min-height: 0; padding: 8px 10px; white-space: nowrap; overflow: hidden; }
+.record-image-source-row .image-block-paste-zone span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.record-image-source-row .image-block-paste-zone kbd { flex: 0 0 auto; }
+@media (max-width: 420px) { .record-image-source-row .image-block-paste-zone kbd { display: none; } }
 .record-image-url-popup-title { font-size: 13px; font-weight: 800; color: #111; }
 .record-image-url-popup-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .record-image-url-popup-input {
@@ -8622,12 +8629,14 @@ select.sh-field-input,
         <div class="record-image-url-popup" onclick="event.stopPropagation()">
           <div class="record-image-url-popup-title">이미지 설정</div>
           <input type="text" id="record-image-url-popup-input" class="record-image-url-popup-input" placeholder="https://... (비우면 제거)">
-          <button type="button" class="image-block-source-btn" onclick="document.getElementById('record-image-file-input').click()">
-            <i class="fa-solid fa-folder-open"></i><span>파일 선택</span>
-          </button>
-          <input type="file" id="record-image-file-input" accept="image/*" hidden onchange="onRecordImageFile(event)">
-          <div class="image-block-paste-zone" tabindex="0" onpaste="onRecordImagePaste(event)">
-            <i class="fa-solid fa-paste"></i><span>클립보드에서 붙여넣기</span><kbd>Ctrl+V</kbd>
+          <div class="record-image-source-row">
+            <button type="button" class="image-block-source-btn" onclick="document.getElementById('record-image-file-input').click()">
+              <i class="fa-solid fa-folder-open"></i><span>파일 선택</span>
+            </button>
+            <input type="file" id="record-image-file-input" accept="image/*" hidden onchange="onRecordImageFile(event)">
+            <div class="image-block-paste-zone" tabindex="0" onpaste="onRecordImagePaste(event)">
+              <i class="fa-solid fa-paste"></i><span>클립보드에서 붙여넣기</span><kbd>Ctrl+V</kbd>
+            </div>
           </div>
           <div class="record-image-url-popup-actions">
             <button type="button" class="record-image-url-popup-btn" onclick="closeRecordImageUrlPopup()">취소</button>
