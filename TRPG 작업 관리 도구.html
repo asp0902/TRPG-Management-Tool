@@ -575,11 +575,10 @@ tr.ct-row-end .ct-select:focus {
 }
 /* 기록 이미지 팝업: 파일 선택 + 붙여넣기 칸을 한 줄에(#171). 공유 .image-block-* 규칙은 건드리지 않고 이 래퍼 범위에서만 덮어쓴다. */
 .record-image-source-row { display: flex; flex-direction: row; align-items: stretch; gap: 8px; min-width: 0; }
-.record-image-source-row .image-block-source-btn { width: auto; flex: 0 0 auto; white-space: nowrap; }
-.record-image-source-row .image-block-paste-zone { flex: 1 1 0; min-width: 0; min-height: 0; padding: 8px 10px; white-space: nowrap; overflow: hidden; }
+.record-image-source-row .image-block-source-btn,
+.record-image-source-row .image-block-paste-zone { flex: 1 1 0; width: auto; min-width: 0; min-height: 0; padding: 8px 12px; white-space: nowrap; overflow: hidden; box-sizing: border-box; }
+.record-image-source-row .image-block-source-btn span,
 .record-image-source-row .image-block-paste-zone span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.record-image-source-row .image-block-paste-zone kbd { flex: 0 0 auto; }
-@media (max-width: 420px) { .record-image-source-row .image-block-paste-zone kbd { display: none; } }
 .record-image-url-popup-title { font-size: 13px; font-weight: 800; color: #111; }
 .record-image-url-popup-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .record-image-url-popup-input {
@@ -8635,7 +8634,7 @@ select.sh-field-input,
             </button>
             <input type="file" id="record-image-file-input" accept="image/*" hidden onchange="onRecordImageFile(event)">
             <div class="image-block-paste-zone" tabindex="0" onpaste="onRecordImagePaste(event)">
-              <i class="fa-solid fa-paste"></i><span>클립보드에서 붙여넣기</span><kbd>Ctrl+V</kbd>
+              <i class="fa-solid fa-paste"></i><span>클립보드</span>
             </div>
           </div>
           <div class="record-image-url-popup-actions">
