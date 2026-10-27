@@ -263,6 +263,7 @@ tr.ct-row-end .ct-select:focus {
   background: none; border: 1px solid transparent; border-radius: 4px;
   font-size: 12px; cursor: pointer; padding: 3px 7px; color: #bbb; font-family: inherit; display: block; width: 100%;
 }
+.ct-links-btn .ct-att-icon { font-size: 9px; margin-right: 1px; vertical-align: baseline; }
 .ct-links-btn:hover { border-color: #ddd; background: #f5f5f5; color: #555; }
 .ct-links-btn.has-links { color: #4a9eff; font-weight: 700; border-color: #c7dfff; background: #f0f6ff; min-width: 24px; width: auto; height: 24px; padding: 0 4px; margin: 0 auto; white-space: nowrap; }
 /* ─── CATALOG LINKS POPOVER ─── */
@@ -30377,19 +30378,19 @@ function deleteCatalogEntry(id) {
   persist(); renderCatalog();
 }
 
-// ── 링크 버튼 표시: 링크 수와 첨부 수를 구분 (예: 3·📎2) ──
+// ── 링크 버튼 표시: 링크 수와 첨부 수를 구분 (예: 3·클립 아이콘 2). 이모지 대신 Font Awesome 아이콘을 쓴다(글자색을 따르고 Windows 에서 모양이 바뀌지 않는다). 반환값은 HTML 이며 숫자만 들어간다. ──
 function catalogLinksBtnLabel(c) {
   const lc = (c.links || []).length, ac = (c.attachments || []).length;
   if (!lc && !ac) return '＋';
-  return [lc ? String(lc) : '', ac ? `📎${ac}` : ''].filter(Boolean).join('·');
+  return [lc ? String(Number(lc)) : '', ac ? `<i class="fa-solid fa-paperclip ct-att-icon" aria-hidden="true"></i>${Number(ac)}` : ''].filter(Boolean).join('·');
 }
 function catalogLinksBtnTitle(c) {
-  return `링크 ${(c.links || []).length}개 · 첨부 파일 ${(c.attachments || []).length}개`;
+  return `링크 ${(c.links || []).length}개 · 첨부 ${(c.attachments || []).length}개`;
 }
 function updateCatalogLinksBtn(entry) {
   const btn = document.querySelector(`[data-cid="${entry.id}"] .ct-links-btn`);
   if (!btn) return;
-  btn.textContent = catalogLinksBtnLabel(entry);
+  btn.innerHTML = catalogLinksBtnLabel(entry);
   btn.title = catalogLinksBtnTitle(entry);
   btn.classList.toggle('has-links', !!((entry.links || []).length || (entry.attachments || []).length));
 }
