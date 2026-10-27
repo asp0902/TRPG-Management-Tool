@@ -34957,7 +34957,32 @@ function isImeComposing(e) {
 }
 document.addEventListener('compositionstart', () => { imeComposing = true; imeStartedAt = performance.now(); lastTypingAt = Date.now(); }, true);
 document.addEventListener('compositionend', () => { imeComposing = false; imeEndedAt = performance.now(); lastTypingAt = Date.now(); }, true);
-document.addEventListener('focusout', () => { imeComposing = false; }, true);
+// 조합 중 다른 곳을 클릭하면 브라우저가 조합을 확정하기 전에 blur·focusout 핸들러가 값을 읽거나 칸을 다시 그려 마지막 글자가 빠질 수 있다.
+// → 조합 중 도착한 실제 blur/focusout 은 막았다가, compositionend 다음 틱(안전장치 600ms)에 같은 이벤트를 다시 보낸다. 조합이 이미 끝난 뒤의 blur 는 그대로 지나간다.
+const imeDeferredFocus = new WeakMap();
+function deferFocusEvent(e) {
+  if (!e.isTrusted || !imeComposing || !(e.target instanceof Element)) return;
+  const el = e.target;
+  e.stopImmediatePropagation();
+  let rec = imeDeferredFocus.get(el);
+  if (!rec) {
+    rec = { types: new Set(), timer: 0 };
+    imeDeferredFocus.set(el, rec);
+    const flush = () => {
+      clearTimeout(rec.timer);
+      el.removeEventListener('compositionend', onEnd, true);
+      imeDeferredFocus.delete(el);
+      imeComposing = false;
+      rec.types.forEach(type => el.dispatchEvent(new FocusEvent(type, { bubbles: type === 'focusout', composed: true })));
+    };
+    const onEnd = () => setTimeout(flush, 0);
+    el.addEventListener('compositionend', onEnd, true);
+    rec.timer = setTimeout(flush, 600);
+  }
+  rec.types.add(e.type);
+}
+document.addEventListener('blur', deferFocusEvent, true);
+document.addEventListener('focusout', deferFocusEvent, true);
 document.addEventListener('input', () => { lastTypingAt = Date.now(); }, true);
 document.addEventListener('keydown', e => {
   if (isImeComposing(e)) e.stopImmediatePropagation();

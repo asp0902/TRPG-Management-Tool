@@ -29,4 +29,7 @@ assert.equal(ctx.check(ev({ key: 'a' })), false);
 ctx.imeEndedAt = 900;
 assert.equal(ctx.check(ev()), false);
 
+assert.match(html, /document\.addEventListener\('blur', deferFocusEvent, true\);\s*document\.addEventListener\('focusout', deferFocusEvent, true\);/, '조합 중 blur·focusout 은 조합 확정 뒤로 미뤄야 합니다.');
+assert.match(html, /if \(!e\.isTrusted \|\| !imeComposing/, '다시 보낸 합성 이벤트는 미루지 않아야 합니다.');
+
 console.log('ime guard checks: OK');
