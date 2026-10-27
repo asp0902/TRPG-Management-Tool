@@ -11878,15 +11878,18 @@ function updateScriptTopbarTitle() {
 function getCssMacroListTitle(item) {
   return String(item?.title || '').trim() || '제목 없음';
 }
-function normalizeRecordTimeLabel(value) {
+// 시작 시각은 00:00~23:59, 종료 시각(isEnd)은 다음 날로 넘어가면 24:00~47:59 까지 허용한다.
+function normalizeRecordTimeLabel(value, isEnd = false) {
   const raw = String(value || '').trim();
   const match = raw.match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return '';
   const hour = Number(match[1]);
   const minute = Number(match[2]);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return '';
+  const maxHour = isEnd ? 47 : 23;
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 0 || hour > maxHour || minute < 0 || minute > 59) return '';
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
+const recordMinutesToTimeLabel = minutes => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 function getRecordDateTimeInfo(value) {
   const raw = String(value || '').trim();
   const fallback = { raw, date: '', dateLabel: '', weekday: '', start: '', end: '', sortValue: 0, durationMinutes: null, display: raw };
@@ -11902,7 +11905,7 @@ function getRecordDateTimeInfo(value) {
   const rest = String(restRaw || '').trim();
   const timeMatch = rest.match(/(\d{1,2}:\d{2})(?:\s*[~～-]\s*(\d{1,2}:\d{2}))?/);
   const start = normalizeRecordTimeLabel(timeMatch?.[1] || '');
-  const end = normalizeRecordTimeLabel(timeMatch?.[2] || '');
+  let end = normalizeRecordTimeLabel(timeMatch?.[2] || '', true);
   let sortValue = Date.parse(`${date}T00:00:00`) || 0;
   let durationMinutes = null;
   if (start) {
@@ -11910,10 +11913,11 @@ function getRecordDateTimeInfo(value) {
     if (end) {
       const [sh, sm] = start.split(':').map(Number);
       const [eh, em] = end.split(':').map(Number);
-      let startMinutes = sh * 60 + sm;
+      const startMinutes = sh * 60 + sm;
       let endMinutes = eh * 60 + em;
-      if (endMinutes < startMinutes) endMinutes += 24 * 60;
+      if (endMinutes < startMinutes) endMinutes += 24 * 60; // 저장값 21:00~01:00 은 그대로 두고 계산·표시만 21:00~25:00 으로
       durationMinutes = endMinutes - startMinutes;
+      end = recordMinutesToTimeLabel(endMinutes);
     }
   }
   return {
@@ -11927,6 +11931,16 @@ function getRecordDateTimeInfo(value) {
     durationMinutes,
     display: dateLabel + (start ? ` ${start}${end ? `~${end}` : ''}` : ''),
   };
+}
+// 입력값의 종료 시각이 시작보다 이르면(다음 날) 24 이상으로 고쳐 돌려준다: 2026-04-14 21:00~01:00 → 2026-04-14 21:00~25:00. 그 밖의 입력은 그대로.
+function normalizeRecordDateTimeInput(value) {
+  const raw = String(value || '');
+  const info = getRecordDateTimeInfo(raw);
+  const timeMatch = raw.match(/(\d{1,2}:\d{2})\s*([~～-])\s*(\d{1,2}:\d{2})/);
+  if (!timeMatch || !info.start || !info.end) return raw;
+  const typedEnd = normalizeRecordTimeLabel(timeMatch[3], true);
+  if (!typedEnd || typedEnd === info.end) return raw;
+  return raw.replace(timeMatch[0], `${info.start}~${info.end}`);
 }
 function normalizeRecordDateValue(value) {
   return getRecordDateTimeInfo(value).date || '';
@@ -11968,6 +11982,7 @@ function getRecordSearchText(record) {
   return [
     getRecordDisplayTitle(record),
     record?.dateTime || record?.date || '',
+    getRecordDateTimeInfo(record?.dateTime || record?.date).display, // 21:00~01:00 으로 저장된 기록도 21:00~25:00 으로 검색된다
     record?.gm || '',
     getRecordPlayersText(record),
     formatRecordSessionTags(record?.sessionTags || record?.sessionTag || ''),
@@ -31756,6 +31771,10 @@ function ensureRecordFormEnhancements() {
     }
     if (!dateInput.dataset.recordBound) {
       dateInput.addEventListener('input', updateRecordDurationPreview);
+      dateInput.addEventListener('blur', () => {
+        const fixed = normalizeRecordDateTimeInput(dateInput.value);
+        if (fixed !== dateInput.value) { dateInput.value = fixed; updateRecordDurationPreview(); }
+      });
       dateInput.dataset.recordBound = '1';
     }
   }
