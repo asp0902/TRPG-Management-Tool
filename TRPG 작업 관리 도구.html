@@ -1597,7 +1597,7 @@ tr.ct-row-end .ct-select:focus {
   width: min(var(--r20-width), 100%); margin-inline: auto; /* 칸 안 가로 가운데 */
 }
 .roll20-chat, .roll20-chat * { box-sizing: content-box; }
-.roll20-chat { position: relative; overflow: hidden; font: var(--r20-size)/var(--r20-line-height) var(--r20-font); color: var(--r20-color); }
+.roll20-chat { position: relative; overflow: hidden; padding-top: var(--r20-top-pad); font: var(--r20-size)/var(--r20-line-height) var(--r20-font); color: var(--r20-color); }
 .roll20-msg { position: relative; display: block; padding: var(--r20-padding); }
 .roll20-spacer { height: 2px; margin-bottom: 7px; }
 .roll20-msg.desc { font-style: italic; font-weight: 700; text-align: center; }
@@ -33313,6 +33313,7 @@ const ROLL20_PREVIEW = {
   bg: '#f1f1f1',
   color: '#404040',
   link: '#e10085',
+  topPad: 6, // 실측값이 아니라 첫 메시지가 맨 위에 붙어 보이지 않게 두는 PREVIEW 전용 최소 여백(발신자 이름 줄 대신)
 };
 if (typeof document !== 'undefined') {
   const r20Style = document.documentElement.style;
@@ -33324,12 +33325,15 @@ if (typeof document !== 'undefined') {
   r20Style.setProperty('--r20-bg', ROLL20_PREVIEW.bg);
   r20Style.setProperty('--r20-color', ROLL20_PREVIEW.color);
   r20Style.setProperty('--r20-link', ROLL20_PREVIEW.link);
+  r20Style.setProperty('--r20-top-pad', ROLL20_PREVIEW.topPad + 'px');
 }
-// 롤20용 매크로 자동 판별: 롤20 전용 명령(/em /w /direct …, &{template:)이 있거나, (#" 조각과 같은 줄에 [글](https://…) 링크(이미지)가 섞인 줄이 있으면 롤20.
+// 롤20용 매크로 자동 판별: URL 링크형 style 조각이 있거나, 롤20 전용 명령(/em /w /direct …, &{template:)이 있거나, (#" 조각과 같은 줄에 [글](https://…) 링크(이미지)가 섞인 줄이 있으면 롤20.
 // 줄 전체가 이미지 링크 하나뿐인 경우는 기존 코코포리아 동작을 유지한다.
 function isRoll20Macro(raw) {
   const text = String(raw || '');
   if (/^\s*(?:\/(?:em|emas|w|direct|gmroll|as|fx)\b|&\{template:)/im.test(text)) return true;
+  // URL 링크형 토큰(](https://…#" style= / …" style=)은 롤20 에서 쓰는 형태라 그것만으로 롤20 으로 본다(#174). (#" style= 단독은 코코포리아 유지.)
+  if (text.split('\n').some(line => /\]\(\s*<?https?:\/\/[^\s")]+"\s*style\s*=/i.test(line))) return true;
   return text.split('\n').some(line => /\(#"/.test(line) && /\]\(\s*https?:\/\//i.test(line.replace(/\]\(\s*<?https?:\/\/[^\s")]+"/gi, '](X"')));
 }
 function renderRoll20PreviewLine(source) {

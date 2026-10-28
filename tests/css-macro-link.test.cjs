@@ -33,5 +33,18 @@ assert.equal(ctx.parse('[x](https://a.com/i.png)', 0), null, '이미지 링크�
 assert.equal(ctx.parse('[x](https://a.com/i.png "t")', 0), null);
 assert.equal(ctx.parse('[x](ftp://a.com" style="color:red)', 0), null, 'https?:// 만 허용');
 
+
+// #174: URL 링크형 style 조각이 있으면 롤20, (#" style= 단독은 코코포리아
+const r20 = html.match(/function isRoll20Macro\(raw\) \{[^]*?\n\}/);
+assert.ok(r20, 'isRoll20Macro 를 찾지 못했습니다.');
+const c2 = {};
+vm.runInNewContext(r20[0] + '; this.is = isRoll20Macro;', c2);
+assert.equal(c2.is(withHash), true);
+assert.equal(c2.is(noHash), true);
+assert.equal(c2.is(plain), false, '(#" style= 단독은 코코포리아 유지');
+assert.equal(c2.is('[i](https://i.imgur.com/a.png)'), false);
+assert.equal(c2.is(plain + ' [i](https://i.imgur.com/a.png)'), true);
+assert.equal(c2.is('/em x'), true);
+assert.match(html, /\.roll20-chat \{[^}]*padding-top: var\(--r20-top-pad\)/);
 assert.match(html, /line\.replace\(\/\\\]\\\(\\s\*<\?https\?:\\\/\\\/\[\^\\s"\)\]\+"\/gi, '\]\(X"'\)/, '롤20 판별은 URL 링크형 토큰을 이미지 링크로 세지 않는다');
 console.log('css macro link checks: OK');
