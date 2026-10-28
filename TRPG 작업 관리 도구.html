@@ -13040,7 +13040,9 @@ function renderInfoFieldPreviewHtml(value) {
     }
     parsedAny = true;
     const styleAttr = token.style ? ` style="${esc(token.style)}"` : '';
-    html += `<span${styleAttr}>${esc(token.text)}</span>`;
+    html += token.href
+      ? `<a href="${esc(token.href)}" target="_blank" rel="noopener noreferrer"${styleAttr}>${esc(token.text)}</a>`
+      : `<span${styleAttr}>${esc(token.text)}</span>`;
     cursor = token.end;
   }
   return parsedAny ? html : esc(raw).replace(/\n/g, '<br>');
@@ -33188,8 +33190,16 @@ function tryParseCssMacroToken(source, startIdx) {
   while (idx < source.length && /\s/.test(source[idx])) idx += 1;
   const angleWrapped = source[idx] === '<';
   if (angleWrapped) idx += 1;
-  if (source.slice(idx, idx + 2) !== '#"') return null;
-  idx += 2;
+  // (#" style=…) 와 URL 링크형 (https://…#" style=…) / (https://…" style=…) 를 받는다. URL 은 https?:// 로 시작하고 공백·"·) 가 없는 문자열이다(#173).
+  let href = '';
+  if (source.slice(idx, idx + 2) === '#"') {
+    idx += 2;
+  } else {
+    const urlMatch = source.slice(idx).match(/^(https?:\/\/[^\s")]+)"/i);
+    if (!urlMatch) return null;
+    href = urlMatch[1].replace(/#$/, '');
+    idx += urlMatch[0].length;
+  }
   while (idx < source.length && /\s/.test(source[idx])) idx += 1;
   const stylePrefixMatch = source.slice(idx).match(/^style\s*=\s*/i);
   if (!stylePrefixMatch) return null;
@@ -33257,6 +33267,7 @@ function tryParseCssMacroToken(source, startIdx) {
     end: idx,
     text: decodeCssMacroPreviewValue(tokenText),
     style: normalizeCssMacroPreviewStyleText(angleWrapped ? styleText.replace(/>\s*$/, '') : styleText),
+    href,
   };
 }
 // 코코포리아 채팅(CCFOLIA 1.37.4, Win Chrome, 창 1278px) 실측값. PREVIEW 의 배경·폭·기본 글자·조각 span 보정이 모두 여기서 나온다.
@@ -33319,7 +33330,7 @@ if (typeof document !== 'undefined') {
 function isRoll20Macro(raw) {
   const text = String(raw || '');
   if (/^\s*(?:\/(?:em|emas|w|direct|gmroll|as|fx)\b|&\{template:)/im.test(text)) return true;
-  return text.split('\n').some(line => /\(#"/.test(line) && /\]\(\s*https?:\/\//i.test(line));
+  return text.split('\n').some(line => /\(#"/.test(line) && /\]\(\s*https?:\/\//i.test(line.replace(/\]\(\s*<?https?:\/\/[^\s")]+"/gi, '](X"')));
 }
 function renderRoll20PreviewLine(source) {
   let html = '';
@@ -33329,7 +33340,7 @@ function renderRoll20PreviewLine(source) {
     if (open < 0) { html += esc(decodeCssMacroPreviewValue(source.slice(cursor))); break; }
     html += esc(decodeCssMacroPreviewValue(source.slice(cursor, open)));
     const token = tryParseCssMacroToken(source, open);
-    if (token) { html += `<a style="${esc(token.style)}">${esc(token.text)}</a>`; cursor = token.end; continue; }
+    if (token) { html += `<a${token.href ? ` href="${esc(token.href)}" target="_blank" rel="noopener noreferrer"` : ''} style="${esc(token.style)}">${esc(token.text)}</a>`; cursor = token.end; continue; }
     const image = source.slice(open).match(/^\[[^\]]*\]\(\s*(https?:\/\/[^\s)]+)\s*\)/i);
     if (image) { html += `<a><img src="${esc(normalizeImageBlockSource(image[1]))}" alt=""></a>`; cursor = open + image[0].length; continue; }
     html += '[';
@@ -33338,7 +33349,7 @@ function renderRoll20PreviewLine(source) {
   return html;
 }
 // Roll20 채팅 매크로(/desc + 링크 style 꼼수) → 핸드아웃용 HTML(검정 1칸 표). Roll20 핸드아웃 편집기는 붙여넣을 때 div 배경은 지우고 table/td 의 bgcolor·background-color 는 남긴다(사용자 실측).
-// 글자 서식(color/font-size/font-weight/font-style/text-decoration)만 유지하고, 음수 margin·%padding·height·'.' 스페이서는 간격 신호로만 쓴다. 출력 태그는 table/tr/td/p/span/img/br 뿐.
+// 글자 서식(color/font-size/font-weight/font-style/text-decoration)만 유지하고, 음수 margin·%padding·height·'.' 스페이서는 간격 신호로만 쓴다. 출력 태그는 table/tr/td/p/span/a/img/br 뿐(a 는 URL 링크형 토큰만).
 function buildRoll20HandoutHtml(macro, imageWidths = {}) {
   const escH = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const colorOk = value => /^(?:#[0-9a-f]{3,8}|rgba?\([\d\s.,%]+\)|[a-z]{3,20})$/i.test(value) && !/^(?:transparent|inherit|initial|unset|currentcolor)$/i.test(value);
@@ -33386,7 +33397,7 @@ function buildRoll20HandoutHtml(macro, imageWidths = {}) {
         const hidden = px(st['font-size']) === 0 || /^transparent$/i.test(st.color || '');
         const label = token.text.trim();
         pieces.push({
-          text: token.text, st, block: /^block$/i.test(st.display || ''), padTop: Math.max(0, Math.min(8, px(st['padding-top'] || String(st.padding || '').split(/\s+/)[0]) || 0)),
+          text: token.text, st, href: token.href, block: /^block$/i.test(st.display || ''), padTop: Math.max(0, Math.min(8, px(st['padding-top'] || String(st.padding || '').split(/\s+/)[0]) || 0)),
           spacer: hidden && (label === '.' || label === '' || label === 'x'), height: px(st.height) || 0,
         });
         cursor = token.end;
@@ -33438,7 +33449,7 @@ function buildRoll20HandoutHtml(macro, imageWidths = {}) {
         blockOpen = true;
         first = false;
       }
-      para.blocks[para.blocks.length - 1].push({ text: piece.text, st: textStyle(piece.st) });
+      para.blocks[para.blocks.length - 1].push({ text: piece.text, st: textStyle(piece.st), href: piece.href || '' });
     });
     flush();
   });
@@ -33451,6 +33462,7 @@ function buildRoll20HandoutHtml(macro, imageWidths = {}) {
     const inner = item.blocks.map(block => block.map(piece => {
       const diff = styleAttr(piece.st, item.st);
       const text = escH(piece.text.replace(/ /g, ' ').trim() === '' ? ' ' : piece.text);
+      if (piece.href) return `<a href="${escH(piece.href)}"${diff ? ` style="${diff}"` : ''}>${text}</a>`;
       return diff ? `<span style="${diff}">${text}</span>` : text;
     }).join('')).join('<br>');
     const own = styleAttr(item.st);
@@ -33617,6 +33629,14 @@ function replaceCssMacroPreviewTokens(source, options = {}) {
     parsedToken = true;
     const styleAttr = ` style="${esc(cssMacroPreviewSpanStyle(token.style, isDesc))}"`;
     const text = esc(token.text.trim() ? token.text : '\u00a0');
+    if (token.href) { // 링크 토큰은 합치지 않고 <a> 로 낸다
+      flush();
+      html += `<a href="${esc(token.href)}" target="_blank" rel="noopener noreferrer"${styleAttr}>${text}</a>`;
+      cursor = token.end;
+      const note = input.slice(cursor).match(/^[ \t]*@[^\r\n]*/);
+      if (note) cursor += note[0].length;
+      continue;
+    }
     const norm = normalizeCssMacroStyle(token.style);
     if (last && last.norm === norm) last.text += text;
     else { flush(); last = { styleAttr, text, norm }; }
