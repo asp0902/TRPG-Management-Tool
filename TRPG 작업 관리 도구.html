@@ -8131,7 +8131,7 @@ select.sh-field-input,
     </div>
     <div class="fr-row">
       <span class="fr-label">찾기</span>
-      <input class="fr-input" id="fr-find" placeholder="찾을 단어" oninput="frResetStatus()" onkeydown="if(event.key==='Enter')frFind()">
+      <input class="fr-input" id="fr-find" placeholder="찾을 단어" oninput="frResetStatus()" onkeydown="if(event.key==='Enter')frFind(event.shiftKey?-1:1)">
     </div>
     <div class="fr-row">
       <span class="fr-label">바꾸기</span>
@@ -8142,6 +8142,7 @@ select.sh-field-input,
       조사 자동 교정 (이/가, 은/는, 을/를, 으로/로 등)
     </label>
     <div class="fr-btns">
+      <button class="fr-btn" onclick="frFind(-1)">이전 찾기</button>
       <button class="fr-btn" onclick="frFind()">다음 찾기</button>
       <button class="fr-btn" onclick="frFindAll()">모두 찾기</button>
       <button class="fr-btn primary" onclick="frReplaceAll()">모두 바꾸기</button>
@@ -30051,7 +30052,9 @@ function frSetStatus(msg, ok) {
   el.textContent = msg;
   el.style.color = ok === true ? '#16a34a' : ok === false ? '#dc2626' : '#999';
 }
-function frFind() {
+// dir: 1 = 다음, -1 = 이전(첫 찾기에서 이전이면 마지막 결과부터). Shift+Enter 는 이전.
+function frFind(dir = 1) {
+  const step = dir === -1 ? -1 : 1;
   const term = document.getElementById('fr-find').value;
   if (!term) { frSetStatus('찾을 단어를 입력하세요.', false); return; }
   const sameTerm = frFindTerm === term && frFindMatches.length;
@@ -30061,7 +30064,8 @@ function frFind() {
     frFindIndex = -1;
   }
   if (!frFindMatches.length) { frSetStatus(`"${term}"을(를) 찾을 수 없습니다.`, false); return; }
-  frSelectMatch((frFindIndex + 1) % frFindMatches.length);
+  const count = frFindMatches.length;
+  frSelectMatch(step === 1 ? (frFindIndex + 1) % count : (frFindIndex <= 0 ? count - 1 : frFindIndex - 1));
 }
 function frReplaceAll() {
   const term  = document.getElementById('fr-find').value;
