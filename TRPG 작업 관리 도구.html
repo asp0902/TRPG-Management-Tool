@@ -3451,6 +3451,15 @@ body.is-block-range-selecting * {
 /* 컨텍스트 메뉴 */
 /* 사용자 지정 글머리: 문자열 ::marker는 기호가 글자 쪽에 붙어 기본 글머리(disc)보다 오른쪽 간격이 좁다. 자간으로 같은 간격을 맞춘다. */
 ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
+/* 엘더 사인 글머리(#176): 유니코드 문자가 없어 SVG 마스크 + currentColor 로 그려 글자색·크기를 따른다. 본문 줄 어디서든 같은 들여쓰기(ul 기본 padding)·여러 줄 정렬을 유지한다. */
+:root { --tb-elder-sign: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M50 5.5 L77.5 90 L5.5 37.5 L94 38 L22.5 89.5 Z' fill='none' stroke='black' stroke-width='4.6' stroke-linejoin='round' stroke-linecap='round'/%3E%3Cpath d='M39.5 56 Q50 46.5 60.5 56 Q50 65.5 39.5 56 Z' fill='none' stroke='black' stroke-width='3' stroke-linejoin='round'/%3E%3Ccircle cx='50' cy='56' r='3.2' fill='black'/%3E%3C/svg%3E"); }
+ul[data-tb-bullet="elder-sign"] { list-style: none; }
+ul[data-tb-bullet="elder-sign"] > li { position: relative; }
+ul[data-tb-bullet="elder-sign"] > li::before {
+  content: ''; position: absolute; left: -1.5em; top: 0.12em; width: 1em; height: 1em;
+  background: currentColor; -webkit-mask: var(--tb-elder-sign) center / contain no-repeat; mask: var(--tb-elder-sign) center / contain no-repeat;
+}
+.tb-elder-sign-icon { display: inline-block; width: 20px; height: 20px; background: #222; -webkit-mask: var(--tb-elder-sign) center / contain no-repeat; mask: var(--tb-elder-sign) center / contain no-repeat; }
 .tb-ctx-menu {
   position: fixed; z-index: 99999;
   background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
@@ -27924,6 +27933,14 @@ function tbValidBulletSymbol(value) {
 }
 const TB_DEFAULT_BULLET = '•';
 const TB_PRESET_BULLETS = [TB_DEFAULT_BULLET, '-'];
+// 엘더 사인: 사용자가 칠 수 없는 토큰(<>) 이라 일반 기호와 섞이지 않는다. CE 에서는 ul[data-tb-bullet="elder-sign"] 로, 입력칸(textarea)에서는 ⛤ 글자로 들어간다.
+const TB_ELDER_SIGN = '<elder-sign>';
+function tbBulletKind(symbol) {
+  return symbol === TB_DEFAULT_BULLET ? 'default' : (symbol === TB_ELDER_SIGN ? 'elder-sign' : 'custom');
+}
+function tbBulletListStyle(symbol) {
+  return symbol === TB_DEFAULT_BULLET ? 'disc' : (symbol === TB_ELDER_SIGN ? 'none' : tbBulletMarker(symbol));
+}
 function tbBulletMarker(symbol) {
   return JSON.stringify(symbol + ' ');
 }
@@ -28026,7 +28043,7 @@ function tbBuildCEBulletFragment(lines, marker, symbol) {
     if (!list) {
       list = document.createElement('ul');
       list.style.listStyleType = marker;
-      list.dataset.tbBullet = symbol === TB_DEFAULT_BULLET ? 'default' : 'custom';
+      list.dataset.tbBullet = tbBulletKind(symbol);
       output.appendChild(list);
     }
     const item = document.createElement('li');
@@ -28041,14 +28058,14 @@ function tbApplyCEBullet(root, sourceRange, symbol) {
   if (!root?.isConnected) return false;
   const range = sourceRange?.cloneRange?.();
   if (!range || !tbRangeInsideRoot(range, root)) return false;
-  const marker = symbol === TB_DEFAULT_BULLET ? 'disc' : tbBulletMarker(symbol);
+  const marker = tbBulletListStyle(symbol);
   const ancestor = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
     ? range.commonAncestorContainer
     : range.commonAncestorContainer.parentElement;
   const currentList = ancestor?.closest?.('ul');
   if (currentList && root.contains(currentList)) {
     currentList.style.listStyleType = marker;
-    currentList.dataset.tbBullet = symbol === TB_DEFAULT_BULLET ? 'default' : 'custom';
+    currentList.dataset.tbBullet = tbBulletKind(symbol);
   } else {
     if (range.collapsed) {
       const block = ancestor?.closest?.('p,div,h1,h2,h3,h4,blockquote');
@@ -28056,7 +28073,7 @@ function tbApplyCEBullet(root, sourceRange, symbol) {
         const list = document.createElement('ul');
         const item = document.createElement('li');
         list.style.listStyleType = marker;
-        list.dataset.tbBullet = symbol === TB_DEFAULT_BULLET ? 'default' : 'custom';
+        list.dataset.tbBullet = tbBulletKind(symbol);
         while (block.firstChild) item.appendChild(block.firstChild);
         list.appendChild(item);
         block.replaceWith(list);
@@ -28065,7 +28082,7 @@ function tbApplyCEBullet(root, sourceRange, symbol) {
         const list = document.createElement('ul');
         const item = document.createElement('li');
         list.style.listStyleType = marker;
-        list.dataset.tbBullet = symbol === TB_DEFAULT_BULLET ? 'default' : 'custom';
+        list.dataset.tbBullet = tbBulletKind(symbol);
         item.appendChild(document.createElement('br'));
         list.appendChild(item);
         range.insertNode(list);
@@ -28096,7 +28113,8 @@ function tbApplyCEBullet(root, sourceRange, symbol) {
   return true;
 }
 function tbInsertBullet(value = TB_DEFAULT_BULLET) {
-  const symbol = tbValidBulletSymbol(value);
+  const isElder = value === TB_ELDER_SIGN;
+  const symbol = isElder ? TB_ELDER_SIGN : tbValidBulletSymbol(value);
   const target = tbResolveFormatTarget();
   if (!symbol || !target?.ta?.isConnected) return false;
   const root = target.ta;
@@ -28110,7 +28128,7 @@ function tbInsertBullet(value = TB_DEFAULT_BULLET) {
   const lineEnd = root.value.indexOf('\n', end);
   const stop = lineEnd < 0 ? root.value.length : lineEnd;
   const selected = root.value.slice(lineStart, stop);
-  const prefix = symbol + ' ';
+  const prefix = (isElder ? '⛤' : symbol) + ' ';
   const next = selected.split('\n').map(line => prefix + line).join('\n');
   root.setRangeText(next, lineStart, stop, 'select');
   root.dispatchEvent(new Event('input', { bubbles: true }));
@@ -28144,6 +28162,14 @@ function tbOpenBulletMenu(button) {
       preset.onclick = () => { if (tbInsertBullet(symbol)) tbCloseCtxMenu(); };
       presets.appendChild(preset);
     });
+    const elder = document.createElement('button');
+    elder.type = 'button';
+    elder.className = 'tb-bullet-preset tb-bullet-elder';
+    elder.title = '엘더 사인';
+    elder.setAttribute('aria-label', '엘더 사인 글머리');
+    elder.innerHTML = '<span class="tb-elder-sign-icon" aria-hidden="true"></span>';
+    elder.onclick = () => { if (tbInsertBullet(TB_ELDER_SIGN)) tbCloseCtxMenu(); };
+    presets.appendChild(elder);
   };
   const apply = () => {
     const symbol = tbValidBulletSymbol(input.value);
@@ -33656,7 +33682,7 @@ function sanitizeCssMacroPreviewHtml(value) {
   wrap.innerHTML = String(value || '');
   wrap.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(node => node.remove());
   const allowedTags = new Set(['a', 'b', 'strong', 'i', 'em', 'u', 's', 'span', 'div', 'p', 'br', 'img', 'hr', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'ul', 'ol', 'li', 'blockquote', 'small', 'sub', 'sup', 'center']);
-  const allowedAttrs = new Set(['style', 'href', 'src', 'target', 'rel', 'colspan', 'rowspan', 'align', 'width', 'height', 'alt', 'class', 'title']);
+  const allowedAttrs = new Set(['data-tb-bullet', 'style', 'href', 'src', 'target', 'rel', 'colspan', 'rowspan', 'align', 'width', 'height', 'alt', 'class', 'title']);
   wrap.querySelectorAll('*').forEach(node => {
     const tag = String(node.tagName || '').toLowerCase();
     if (!allowedTags.has(tag)) {
