@@ -29931,18 +29931,42 @@ function frApplyFormat(all = false) {
     matches = [current];
   }
 
+  const wasAllActive = frFindAllActive;
   frClearFindHighlights();
   const changed = new Set();
+  let appliedSpan = null;
   [...matches].reverse().forEach(match => {
     const span = document.createElement('span');
     span.style.cssText = style;
     span.appendChild(match.range.extractContents());
     match.range.insertNode(span);
     changed.add(match.editable);
+    appliedSpan = span;
   });
   changed.forEach(editable => editable.dispatchEvent(new Event('input', { bubbles: true })));
   persist();
   frSetStatus(`${matches.length}개 결과에 서식 적용`, true);
+  // 「현재 결과 서식」(#181): 결과 목록을 다시 모으고 방금 서식을 입힌 결과를 현재 위치로 삼아 「다음 찾기」가 그다음부터 이어지게 한다(스크롤 없음).
+  if (!all && appliedSpan?.isConnected) frRestoreFindAfterFormat(term, appliedSpan, wasAllActive);
+}
+function frRestoreFindAfterFormat(term, appliedSpan, wasAllActive) {
+  const matches = frCollectFormatMatches(term);
+  const index = matches.findIndex(match => appliedSpan.contains(match.range.startContainer));
+  if (index < 0) return;
+  frFindMatches = matches;
+  frFindTerm = term;
+  frFindIndex = index;
+  const highlights = window.CSS?.highlights;
+  if (highlights && typeof Highlight === 'function') {
+    if (wasAllActive) {
+      highlights.set('trpg-find-all', new Highlight(...matches.map(match => match.range)));
+      frFindAllActive = true;
+    }
+    highlights.set('trpg-find-current', new Highlight(matches[index].range));
+  }
+  const selection = window.getSelection?.();
+  selection?.removeAllRanges();
+  selection?.addRange(matches[index].range.cloneRange());
 }
 
 let frFindMatches = [];

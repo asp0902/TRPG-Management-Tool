@@ -54,6 +54,7 @@ const context = {
   frGetFormatStyle: () => 'font-weight:bold;color:#ff0000',
   frCollectFormatMatches: () => matches,
   frGetFormatRoots: () => matches.map(match => match.editable),
+  frFindAllActive: false,
   frClearFindHighlights: () => calls.push('clear-highlights'),
   frSetStatus: message => calls.push(`status:${message}`),
   persist: () => calls.push('persist'),
