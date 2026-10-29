@@ -42472,6 +42472,24 @@ const _COC7E_STAT_ATTRS = [
   { id: 'luk', label: 'LUK 운',         rollFormula: '3D6*5',     desc: '운을 나타냅니다' },
 ];
 
+// 특성치 최소값(#175): 수기 입력은 모두 15 이상(SIZ·INT 도 15~39 허용), 굴림 결과는 15 (SIZ·INT·EDU 는 40) 아래로 내려가지 않게 한다.
+const COC7E_ATTR_MANUAL_MIN = 15;
+function _cocStatRollMin(attrId) {
+  return attrId === 'siz' || attrId === 'int' || attrId === 'edu' ? 40 : 15;
+}
+// 수기 입력은 oninput 에서 자르지 않고(타이핑 중 15 로 튀지 않게) 값이 확정될 때(change/blur) 1~14 를 15 로 고쳐 저장하고 반/1/5·수준 설명을 갱신한다. 빈 값·0·음수는 그대로 둔다.
+function commitCocAttrMin(inputEl, chId, sheetId, sectionId, attrId) {
+  var raw = inputEl.value;
+  if (raw === '') return;
+  var v = parseInt(raw, 10);
+  if (isNaN(v) || v < 1 || v >= COC7E_ATTR_MANUAL_MIN) return;
+  inputEl.value = String(COC7E_ATTR_MANUAL_MIN);
+  saveSheetField(chId, sheetId, sectionId, attrId, COC7E_ATTR_MANUAL_MIN);
+  _updateCocAttrSubVals(inputEl);
+  var attr = _COC7E_STAT_ATTRS.find(function(a) { return a.id === attrId; });
+  if (attr && attr.hasLevelDesc) _updateAttrLevelDesc(inputEl, 'coc7e', attrId);
+}
+
 function _updateCocAttrSubVals(inputEl) {
   var row = inputEl.parentElement;
   if (!row) return;
@@ -42485,6 +42503,7 @@ function _updateCocAttrSubVals(inputEl) {
 function rollCocStatField(chId, sheetId, sectionId, fieldId, formula) {
   var value = evalDiceFormula(formula);
   if (value === null) return;
+  value = Math.max(_cocStatRollMin(fieldId), value);
   saveSheetField(chId, sheetId, sectionId, fieldId, value);
   renderCharacterSheet(chId);
 }
@@ -42499,7 +42518,7 @@ function rollAllCocStats(chId, sheetId, sectionId) {
   _COC7E_STAT_ATTRS.forEach(function(attr) {
     if (!attr.rollFormula) return;
     var value = evalDiceFormula(attr.rollFormula);
-    if (value !== null) sheet.data[sectionId][attr.id] = value;
+    if (value !== null) sheet.data[sectionId][attr.id] = Math.max(_cocStatRollMin(attr.id), value);
   });
   persist();
   renderCharacterSheet(chId);
@@ -42520,12 +42539,13 @@ function renderCoc7eStatsSection(sec, sectionData, sheetData, chId, sheetId) {
     var oninput = sf(attr.id, false);
     if (attr.hasLevelDesc) oninput += ';_updateAttrLevelDesc(this,"coc7e",' + JSON.stringify(attr.id) + ')';
     oninput += ';_updateCocAttrSubVals(this)';
+    var onchange = 'commitCocAttrMin(this,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(secId) + ',' + JSON.stringify(attr.id) + ')';
     var levelHtml = attr.hasLevelDesc ? '<div class="sh-attr-level">' + esc(getFieldLevelDesc('coc7e', attr.id, val)) + '</div>' : '';
     var titleText = attr.desc || '';
     return '<div class="sh-coc-attr">'
       + '<div class="sh-field-label rollable" onclick="' + esc(rollH) + '" title="' + esc(titleText) + '">' + esc(attr.label) + '<span class="sh-coc-attr-formula">' + esc(attr.rollFormula) + '</span></div>'
       + '<div class="sh-coc-attr-row">'
-      + '<input class="sh-coc-attr-input" type="number" value="' + esc(String(val)) + '" oninput="' + esc(oninput) + '">'
+      + '<input class="sh-coc-attr-input" type="number" min="' + COC7E_ATTR_MANUAL_MIN + '" value="' + esc(String(val)) + '" oninput="' + esc(oninput) + '" onchange="' + esc(onchange) + '">'
       + '<div class="sh-coc-attr-subs"><span class="sh-coc-half">' + esc(String(half)) + '</span><span class="sh-coc-fifth">' + esc(String(fifth)) + '</span></div>'
       + levelHtml
       + '</div>'
