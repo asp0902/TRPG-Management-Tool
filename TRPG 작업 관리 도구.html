@@ -26519,6 +26519,87 @@ function tbCleanCEContainerStyle(el) {
   if (!el?.style) return;
   _CE_STRAY_PROPS.forEach(p => el.style.removeProperty(p));
 }
+// 글자색·형광펜처럼 같은 속성을 덮어쓰는 서식(#179): 새 span 이 같은 속성의 옛 span 안에 중첩되거나 조각 안에 옛 값이 남으면 좌우 끝에 이전 색이 보인다.
+// ① extract 한 조각 하위의 같은 속성을 지우고(빈 style 이면 span 해제) ② 같은 속성을 가진 조상 span 을 새 span 앞뒤로 쪼개 가운데에서 그 속성을 빼고 ③ 빈/무속성 span 정리·인접 동일 스타일 병합을 한다.
+function tbStripStyleProp(root, prop) {
+  root.querySelectorAll('[style]').forEach(el => {
+    if (!el.style[prop]) return;
+    el.style[prop] = '';
+    if (!el.getAttribute('style')?.trim()) el.removeAttribute('style');
+  });
+}
+function tbHasOwnStyleProp(el, prop) {
+  return el?.nodeType === Node.ELEMENT_NODE && el.tagName === 'SPAN' && !!el.style?.[prop];
+}
+// 같은 속성을 가진 조상 span 을 새 span 앞뒤로 쪼갠다: 앞·뒤 조각은 옛 서식을 그대로 두고, 새 span 을 품은 가운데 조각에서만 그 속성을 뺀다(다른 서식은 가운데 조각에도 남는다).
+function tbSplitStylePropAncestors(span, prop, root) {
+  for (let guard = 0; guard < 20; guard += 1) {
+    let anc = span.parentElement;
+    while (anc && anc !== root && !tbHasOwnStyleProp(anc, prop)) anc = anc.parentElement;
+    if (!anc || anc === root) break;
+    const before = document.createRange();
+    before.setStart(anc, 0);
+    before.setEndBefore(span);
+    const leftFrag = before.extractContents();
+    const after = document.createRange();
+    after.setStartAfter(span);
+    after.setEnd(anc, anc.childNodes.length);
+    const rightFrag = after.extractContents();
+    const left = anc.cloneNode(false);
+    left.appendChild(leftFrag);
+    const right = anc.cloneNode(false);
+    right.appendChild(rightFrag);
+    anc.before(left);
+    anc.after(right);
+    anc.style[prop] = '';
+    if (!anc.getAttribute('style')?.trim()) anc.removeAttribute('style');
+  }
+}
+function tbCleanInlineSpans(root) {
+  const onlyStyle = el => [...el.attributes].every(attr => attr.name === 'style');
+  const isEmptyInline = el => !el.textContent && !el.querySelector('img,br,hr,table,input,video,iframe,svg');
+  // extractContents 가 남기는 빈 껍데기(빈 span·b·i·u 등)를 안쪽부터 지운다.
+  [...root.querySelectorAll('span,b,i,u,s,strong,em,strike')].reverse().forEach(el => {
+    if (el.isConnected && onlyStyle(el) && isEmptyInline(el)) el.remove();
+  });
+  [...root.querySelectorAll('span')].reverse().forEach(el => {
+    if (!el.isConnected || !onlyStyle(el)) return;
+    const style = (el.getAttribute('style') || '').trim();
+    if (!el.childNodes.length) { el.remove(); return; }
+    if (!style) { while (el.firstChild) el.before(el.firstChild); el.remove(); }
+  });
+  [...root.querySelectorAll('span')].forEach(el => {
+    if (!el.isConnected || !onlyStyle(el) || !el.getAttribute('style')) return;
+    for (let next = el.nextSibling; next && next.nodeType === Node.ELEMENT_NODE && next.tagName === 'SPAN' && onlyStyle(next) && next.getAttribute('style') === el.getAttribute('style'); next = el.nextSibling) {
+      while (next.firstChild) el.appendChild(next.firstChild);
+      next.remove();
+    }
+  });
+  root.normalize();
+}
+// 정리(병합·normalize)로 노드가 바뀌어도 선택을 되살리도록 글자 위치로 저장·복원한다.
+function tbRangeTextOffsets(root, range) {
+  const pre = document.createRange();
+  pre.selectNodeContents(root);
+  pre.setEnd(range.startContainer, range.startOffset);
+  const start = pre.toString().length;
+  return { start, end: start + range.toString().length };
+}
+function tbRangeFromTextOffsets(root, offsets) {
+  const range = document.createRange();
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let pos = 0;
+  let started = false;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const len = node.nodeValue.length;
+    if (!started && offsets.start <= pos + len) { range.setStart(node, offsets.start - pos); started = true; }
+    if (started && offsets.end <= pos + len) { range.setEnd(node, offsets.end - pos); return range; }
+    pos += len;
+  }
+  if (!started) range.setStart(root, root.childNodes.length);
+  range.setEnd(root, root.childNodes.length);
+  return range;
+}
 function tbApplyCEInlineStyle(prop, val) {
   let range = null, ta = null;
   // 우선순위 1: 현재 브라우저 선택 영역
@@ -26559,12 +26640,18 @@ function tbApplyCEInlineStyle(prop, val) {
       const freshRange = s?.rangeCount > 0 ? s.getRangeAt(0) : range;
       const span = document.createElement('span');
       span.style[prop] = val;
-      span.appendChild(freshRange.extractContents());
+      const fragment = freshRange.extractContents();
+      tbStripStyleProp(fragment, prop);
+      span.appendChild(fragment);
       freshRange.insertNode(span);
+      tbSplitStylePropAncestors(span, prop, ta);
+      const selRange = document.createRange();
+      selRange.selectNodeContents(span);
+      const offsets = tbRangeTextOffsets(ta, selRange);
+      tbCleanInlineSpans(ta);
       tbCleanCEContainerStyle(ta);
       // 적용 후 선택 유지
-      const newRange = document.createRange();
-      newRange.selectNodeContents(span);
+      const newRange = tbRangeFromTextOffsets(ta, offsets);
       if (s) { s.removeAllRanges(); s.addRange(newRange); }
     }
     ta.dispatchEvent(new Event('input', { bubbles: true }));
