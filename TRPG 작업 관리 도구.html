@@ -3451,15 +3451,22 @@ body.is-block-range-selecting * {
 /* 컨텍스트 메뉴 */
 /* 사용자 지정 글머리: 문자열 ::marker는 기호가 글자 쪽에 붙어 기본 글머리(disc)보다 오른쪽 간격이 좁다. 자간으로 같은 간격을 맞춘다. */
 ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
-/* 엘더 사인 글머리(#176): 유니코드 문자가 없어 SVG 마스크 + currentColor 로 그려 글자색·크기를 따른다. 본문 줄 어디서든 같은 들여쓰기(ul 기본 padding)·여러 줄 정렬을 유지한다. */
-:root { --tb-elder-sign: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 2 92 82'%3E%3Cpath d='M3.5 12.3 L17.5 37.9 L20.5 36.1 L4.5 11.7ZM4.7 13.5 L31.2 29.6 L56.7 37.8 L57.3 36.2 L32.8 26.4 L5.3 12.5ZM35.4 12.6 L23.2 29.4 L13.9 78.6 L18.1 79.4 L26.8 30.6 L36.6 13.4ZM35.5 13.5 L55.3 38.4 L58.7 35.6 L36.5 12.5ZM86.0 28.4 L41.9 29.4 L42.1 32.6 L86.0 29.6ZM85.7 28.5 L37.9 53.0 L40.1 57.0 L86.3 29.5ZM73.6 71.7 L63.9 44.2 L60.1 45.8 L72.4 72.3ZM73.4 71.4 L25.1 40.1 L22.9 43.9 L72.6 72.6ZM17.5 80.3 L34.6 58.5 L33.4 57.5 L14.5 77.7Z' fill='black'/%3E%3Cpath d='M33.1 39.3 L33.9 38.5 L34.7 37.7 L35.5 37.0 L36.3 36.3 L37.1 35.7 L38.0 35.1 L38.8 34.7 L39.7 34.3 L40.5 34.0 L41.4 33.8 L42.3 33.8 L43.2 33.8 L44.2 33.9 L45.1 34.1 L46.0 34.4 L47.0 34.8 L48.0 35.2 L48.9 35.7 L49.9 36.2 L50.9 36.7 L50.9 36.7 L50.1 37.5 L49.3 38.3 L48.5 39.0 L47.7 39.7 L46.9 40.3 L46.0 40.9 L45.2 41.3 L44.3 41.7 L43.5 42.0 L42.6 42.2 L41.7 42.2 L40.8 42.2 L39.8 42.1 L38.9 41.9 L38.0 41.6 L37.0 41.2 L36.0 40.8 L35.1 40.3 L34.1 39.8 L33.1 39.3Z' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round'/%3E%3Cpath d='M43.6 37.8 L43.7 39.0 L43.6 40.1 L43.4 41.1 L43.0 41.7 L42.6 42.0 L42.0 41.8 L41.5 41.3 L41.0 40.5 L40.7 39.4 L40.4 38.2 L40.3 37.0 L40.4 35.9 L40.6 34.9 L41.0 34.3 L41.4 34.0 L42.0 34.2 L42.5 34.7 L43.0 35.5 L43.3 36.6Z' fill='black'/%3E%3C/svg%3E"); }
-ul[data-tb-bullet="elder-sign"] { list-style: none; }
-ul[data-tb-bullet="elder-sign"] > li { position: relative; }
-ul[data-tb-bullet="elder-sign"] > li::before {
-  content: ''; position: absolute; left: -1.5em; top: 0.12em; width: 1em; height: 1em;
-  background: currentColor; -webkit-mask: var(--tb-elder-sign) center / contain no-repeat; mask: var(--tb-elder-sign) center / contain no-repeat;
-}
-.tb-elder-sign-icon { display: inline-block; width: 20px; height: 20px; background: #222; -webkit-mask: var(--tb-elder-sign) center / contain no-repeat; mask: var(--tb-elder-sign) center / contain no-repeat; }
+/* 이미지 글머리(#177): 글머리 규칙은 tbRefreshBulletImageStyles 가 <style id="tb-bullet-image-styles"> 로 만든다. 여기는 메뉴 아이콘·관리 단추 */
+.tb-bullet-img-icon { display: inline-block; width: 22px; height: 22px; background: #222; -webkit-mask: var(--tb-bullet-img) center / contain no-repeat; mask: var(--tb-bullet-img) center / contain no-repeat; }
+.tb-bullet-img-item { position: relative; min-width: 0; }
+.tb-bullet-img-item > .tb-bullet-preset { width: 100%; }
+.tb-bullet-more { position: absolute; top: 1px; right: 1px; width: 16px; height: 16px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: #888; font-size: 12px; line-height: 14px; cursor: pointer; opacity: 0; }
+.tb-bullet-img-item:hover > .tb-bullet-more, .tb-bullet-more:focus-visible { opacity: 1; }
+.tb-bullet-more:hover { background: #e8e8e8; color: #222; }
+.tb-bullet-img-add { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.tb-bullet-img-add button { flex: 0 0 auto; padding: 4px 8px; border: 1px solid #ddd; border-radius: 5px; background: #fff; cursor: pointer; font-size: 12px; }
+.tb-bullet-img-add button:hover { border-color: #999; }
+.tb-bullet-img-add span, .tb-bullet-status { font-size: 11px; color: #888; }
+.tb-bullet-status { margin-top: 4px; min-height: 0; }
+.tb-bullet-status.error { color: #d33; }
+.tb-bullet-item-menu { position: absolute; z-index: 2; background: #fff; border: 1px solid #ddd; border-radius: 6px; box-shadow: 0 3px 10px rgba(0,0,0,0.15); padding: 3px 0; min-width: 96px; }
+.tb-bullet-item-menu button { display: block; width: 100%; padding: 5px 10px; border: 0; background: none; text-align: left; font-size: 12px; cursor: pointer; }
+.tb-bullet-item-menu button:hover { background: #f3f4f6; }
 .tb-ctx-menu {
   position: fixed; z-index: 99999;
   background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
@@ -9899,7 +9906,7 @@ const SHEET_TEMPLATES = {
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-let state = { scenarios: [], folders: [], cssMacroFolders: [], records: [], catalog: [], cssMacros: [], cssPopupDictionary: [], bookmarks: [], rulebooks: [], dataSheets: [], characters: [], characterFolders: [], customFonts: [], manualFonts: [], recentFonts: [], customBulletSymbols: [], findReplaceHistory: [], sharedMemoOwner: { memos: [] }, currentId: null };
+let state = { scenarios: [], folders: [], cssMacroFolders: [], records: [], catalog: [], cssMacros: [], cssPopupDictionary: [], bookmarks: [], rulebooks: [], dataSheets: [], characters: [], characterFolders: [], customFonts: [], manualFonts: [], recentFonts: [], customBulletSymbols: [], customBulletImages: [], findReplaceHistory: [], sharedMemoOwner: { memos: [] }, currentId: null };
 const characterSheetPopupParams = new URLSearchParams(location.search);
 const characterSheetPopupCharacterId = characterSheetPopupParams.get('characterPopup') || '';
 const characterSheetPopupSheetId = characterSheetPopupParams.get('sheet') || '';
@@ -10380,6 +10387,8 @@ function normalizeSidebarState(opts = {}) {
   state.manualFonts = uniqueFontNames(state.manualFonts).filter(name => state.customFonts.some(font => normalizeFontNameForCompare(font) === normalizeFontNameForCompare(name)));
   state.recentFonts = uniqueFontNames(state.recentFonts).slice(0, MAX_RECENT_FONTS);
   state.customBulletSymbols = [...new Set((Array.isArray(state.customBulletSymbols) ? state.customBulletSymbols : []).map(tbValidBulletSymbol).filter(Boolean))];
+  state.customBulletImages = tbNormalizeBulletImages(state.customBulletImages);
+  tbRefreshBulletImageStyles();
 }
 function getSidebarFolders(page = currentPage) {
   if (page === 'character' || getCharacterSheetIdFromPage(page)) return state.characterFolders;
@@ -10425,6 +10434,7 @@ function makeStatePayload() {
     manualFonts: state.manualFonts,
     recentFonts: state.recentFonts,
     customBulletSymbols: state.customBulletSymbols,
+    customBulletImages: state.customBulletImages,
     findReplaceHistory: state.findReplaceHistory,
     sharedMemoOwner: getSharedMemoOwner(),
   };
@@ -10447,6 +10457,7 @@ function applyStatePayload(raw) {
     state.manualFonts = [];
     state.recentFonts = [];
     state.customBulletSymbols = [];
+    state.customBulletImages = [];
     state.findReplaceHistory = [];
     state.sharedMemoOwner = { memos: [] };
   } else if (raw && typeof raw === 'object') {
@@ -10466,6 +10477,7 @@ function applyStatePayload(raw) {
     state.manualFonts = Array.isArray(raw.manualFonts) ? raw.manualFonts : [];
     state.recentFonts = Array.isArray(raw.recentFonts) ? raw.recentFonts : [];
     state.customBulletSymbols = Array.isArray(raw.customBulletSymbols) ? raw.customBulletSymbols : [];
+    state.customBulletImages = Array.isArray(raw.customBulletImages) ? raw.customBulletImages : [];
     state.findReplaceHistory = Array.isArray(raw.findReplaceHistory) ? raw.findReplaceHistory : [];
     state.sharedMemoOwner = raw.sharedMemoOwner && typeof raw.sharedMemoOwner === 'object' ? raw.sharedMemoOwner : { memos: [] };
   }
@@ -23669,6 +23681,7 @@ function getFullBackupPayload() {
     manualFonts: state.manualFonts,
     recentFonts: state.recentFonts,
     customBulletSymbols: state.customBulletSymbols,
+    customBulletImages: state.customBulletImages,
     findReplaceHistory: state.findReplaceHistory,
     sharedMemoOwner: getSharedMemoOwner(),
   };
@@ -24510,6 +24523,7 @@ function makeImportPayload(data) {
       manualFonts: [],
       recentFonts: [],
       customBulletSymbols: [],
+      customBulletImages: [],
       findReplaceHistory: [],
       sharedMemoOwner: { memos: [] },
     };
@@ -24535,6 +24549,7 @@ function makeImportPayload(data) {
     manualFonts: Array.isArray(data.manualFonts) ? data.manualFonts.filter(name => typeof name === 'string' && name.trim()) : [],
     recentFonts: Array.isArray(data.recentFonts) ? data.recentFonts.filter(name => typeof name === 'string' && name.trim()) : [],
     customBulletSymbols: Array.isArray(data.customBulletSymbols) ? data.customBulletSymbols.map(tbValidBulletSymbol).filter(Boolean) : [],
+    customBulletImages: tbNormalizeBulletImages(data.customBulletImages),
     findReplaceHistory: Array.isArray(data.findReplaceHistory) ? data.findReplaceHistory : [],
     sharedMemoOwner: { memos: Array.isArray(data.sharedMemoOwner?.memos) ? data.sharedMemoOwner.memos : [] },
   };
@@ -24658,6 +24673,7 @@ function replaceStateWithImportPayload(payload) {
   state.manualFonts = payload.manualFonts || [];
   state.recentFonts = payload.recentFonts;
   state.customBulletSymbols = payload.customBulletSymbols || [];
+  state.customBulletImages = payload.customBulletImages || [];
   state.sharedMemoOwner = payload.sharedMemoOwner;
   // 찾아 바꾸기 이력은 시나리오/블록 ID에 종속이므로 replace 모드에서만 통째로 복원
   state.findReplaceHistory = Array.isArray(payload.findReplaceHistory) ? payload.findReplaceHistory : [];
@@ -24680,6 +24696,7 @@ function mergeImportPayload(payload) {
   state.manualFonts = uniqueFontNames([...(state.manualFonts || []), ...(payload.manualFonts || [])]);
   state.recentFonts = uniqueFontNames([...(state.recentFonts || []), ...(payload.recentFonts || [])]).slice(0, MAX_RECENT_FONTS);
   state.customBulletSymbols = [...new Set([...(state.customBulletSymbols || []), ...(payload.customBulletSymbols || [])].map(tbValidBulletSymbol).filter(Boolean))];
+  state.customBulletImages = tbNormalizeBulletImages([...(state.customBulletImages || []), ...(payload.customBulletImages || [])]);
   getSharedMemos().push(...payload.sharedMemoOwner.memos);
 }
 function makeImportSnapshot() {
@@ -24700,6 +24717,7 @@ function makeImportSnapshot() {
     manualFonts: (state.manualFonts || []).slice(),
     recentFonts: state.recentFonts.slice(),
     customBulletSymbols: (state.customBulletSymbols || []).slice(),
+    customBulletImages: (state.customBulletImages || []).slice(),
     findReplaceHistory: Array.isArray(state.findReplaceHistory) ? state.findReplaceHistory.slice() : [],
     sharedMemoOwner: { memos: getSharedMemos().slice() },
     currentId: state.currentId,
@@ -24709,7 +24727,7 @@ function makeImportSnapshot() {
   };
 }
 function restoreImportSnapshot(snapshot) {
-  ['scenarios','folders','cssMacroFolders','records','catalog','cssMacros','cssPopupDictionary','bookmarks','rulebooks','dataSheets','characters','characterFolders','customFonts','manualFonts','recentFonts','customBulletSymbols','findReplaceHistory','sharedMemoOwner'].forEach(key => {
+  ['scenarios','folders','cssMacroFolders','records','catalog','cssMacros','cssPopupDictionary','bookmarks','rulebooks','dataSheets','characters','characterFolders','customFonts','manualFonts','recentFonts','customBulletSymbols','customBulletImages','findReplaceHistory','sharedMemoOwner'].forEach(key => {
     if (snapshot[key] !== undefined) state[key] = snapshot[key];
   });
   state.currentId = snapshot.currentId;
@@ -27932,14 +27950,190 @@ function tbValidBulletSymbol(value) {
   return symbol && !/[\r\n<>]/.test(symbol) && Array.from(symbol).length <= 8 ? symbol : '';
 }
 const TB_DEFAULT_BULLET = '•';
+// ── 이미지 글머리(#177): 한글의 「그림 글머리표」처럼 이미지를 글머리로 등록한다. 글자색을 따르도록 알파 마스크로 바꿔 저장한다. ──
+// 본문 HTML 에는 id 만 저장(ul[data-tb-bullet="image"][data-tb-bullet-img=id]), 그림은 state.customBulletImages 에 한 번만 둔다.
+// 엘더 사인은 기본 제공 이미지 항목(id elder-sign): 사용자가 교체·삭제하기 전에는 내장 SVG 를 쓰고, 삭제하면 표시(deleted)만 남겨 다시 만들지 않는다.
+const TB_IMG_BULLET_PREFIX = '<img>';
+const TB_ELDER_SIGN_ID = 'elder-sign';
+const TB_BULLET_IMAGE_MAX = 40;
+const TB_BULLET_IMAGE_SIZE = 96;
+const TB_ELDER_SIGN_URL = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 2 92 82'%3E%3Cpath d='M3.5 12.3 L17.5 37.9 L20.5 36.1 L4.5 11.7ZM4.7 13.5 L31.2 29.6 L56.7 37.8 L57.3 36.2 L32.8 26.4 L5.3 12.5ZM35.4 12.6 L23.2 29.4 L13.9 78.6 L18.1 79.4 L26.8 30.6 L36.6 13.4ZM35.5 13.5 L55.3 38.4 L58.7 35.6 L36.5 12.5ZM86.0 28.4 L41.9 29.4 L42.1 32.6 L86.0 29.6ZM85.7 28.5 L37.9 53.0 L40.1 57.0 L86.3 29.5ZM73.6 71.7 L63.9 44.2 L60.1 45.8 L72.4 72.3ZM73.4 71.4 L25.1 40.1 L22.9 43.9 L72.6 72.6ZM17.5 80.3 L34.6 58.5 L33.4 57.5 L14.5 77.7Z' fill='black'/%3E%3Cpath d='M33.1 39.3 L33.9 38.5 L34.7 37.7 L35.5 37.0 L36.3 36.3 L37.1 35.7 L38.0 35.1 L38.8 34.7 L39.7 34.3 L40.5 34.0 L41.4 33.8 L42.3 33.8 L43.2 33.8 L44.2 33.9 L45.1 34.1 L46.0 34.4 L47.0 34.8 L48.0 35.2 L48.9 35.7 L49.9 36.2 L50.9 36.7 L50.9 36.7 L50.1 37.5 L49.3 38.3 L48.5 39.0 L47.7 39.7 L46.9 40.3 L46.0 40.9 L45.2 41.3 L44.3 41.7 L43.5 42.0 L42.6 42.2 L41.7 42.2 L40.8 42.2 L39.8 42.1 L38.9 41.9 L38.0 41.6 L37.0 41.2 L36.0 40.8 L35.1 40.3 L34.1 39.8 L33.1 39.3Z' fill='none' stroke='black' stroke-width='1.8' stroke-linejoin='round'/%3E%3Cpath d='M43.6 37.8 L43.7 39.0 L43.6 40.1 L43.4 41.1 L43.0 41.7 L42.6 42.0 L42.0 41.8 L41.5 41.3 L41.0 40.5 L40.7 39.4 L40.4 38.2 L40.3 37.0 L40.4 35.9 L40.6 34.9 L41.0 34.3 L41.4 34.0 L42.0 34.2 L42.5 34.7 L43.0 35.5 L43.3 36.6Z' fill='black'/%3E%3C/svg%3E";
+function tbBulletImageId(symbol) {
+  const text = String(symbol || '');
+  return text.startsWith(TB_IMG_BULLET_PREFIX) ? text.slice(TB_IMG_BULLET_PREFIX.length) : '';
+}
+function tbSafeBulletId(id) {
+  const text = String(id || '');
+  return /^[A-Za-z0-9_-]{1,40}$/.test(text) ? text : '';
+}
+function tbNormalizeBulletImages(list) {
+  const seen = new Set();
+  const out = [];
+  (Array.isArray(list) ? list : []).forEach(item => {
+    const id = tbSafeBulletId(item?.id);
+    if (!id || seen.has(id)) return;
+    if (item.deleted === true) { seen.add(id); out.push({ id, name: '', deleted: true }); return; }
+    const dataUrl = String(item.dataUrl || '');
+    if (!dataUrl.startsWith('data:image/png;base64,') && !dataUrl.startsWith('data:image/svg+xml,')) return;
+    seen.add(id);
+    out.push({ id, name: String(item.name || '이미지 글머리').slice(0, 30), dataUrl });
+  });
+  return out.slice(0, TB_BULLET_IMAGE_MAX + 5);
+}
+// 메뉴·스타일에 쓰는 사용 가능한 이미지 목록(삭제 표시는 제외, 엘더 사인은 아직 건드리지 않았으면 내장본을 맨 앞에 넣는다).
+function tbGetBulletImages() {
+  state.customBulletImages = tbNormalizeBulletImages(state.customBulletImages);
+  const list = state.customBulletImages.filter(item => !item.deleted);
+  if (!state.customBulletImages.some(item => item.id === TB_ELDER_SIGN_ID)) {
+    list.unshift({ id: TB_ELDER_SIGN_ID, name: '엘더 사인', dataUrl: TB_ELDER_SIGN_URL, builtin: true });
+  }
+  return list;
+}
+// 이미지 글머리 스타일: id 마다 li::before 에 mask + currentColor. 없는 id 는 규칙이 없어 기본 글머리(disc)로 보인다.
+function tbRefreshBulletImageStyles() {
+  if (typeof document === 'undefined' || !document.head) return;
+  let el = document.getElementById('tb-bullet-image-styles');
+  if (!el) {
+    el = document.createElement('style');
+    el.id = 'tb-bullet-image-styles';
+    document.head.appendChild(el);
+  }
+  const rules = tbGetBulletImages().map(img => {
+    const ul = ['ul[data-tb-bullet="image"][data-tb-bullet-img="' + img.id + '"]'];
+    if (img.id === TB_ELDER_SIGN_ID) ul.push('ul[data-tb-bullet="elder-sign"]');
+    const url = 'url("' + String(img.dataUrl).split('"').join('%22') + '")';
+    return ul.join(',') + '{list-style:none}'
+      + ul.map(s => s + ' > li').join(',') + '{position:relative}'
+      + ul.map(s => s + ' > li::before').join(',')
+      + "{content:'';position:absolute;left:-1.5em;top:0.12em;width:1em;height:1em;background:currentColor;-webkit-mask:" + url + ' center / contain no-repeat;mask:' + url + ' center / contain no-repeat}';
+  });
+  // 엘더 사인을 삭제했다면 예전 문서의 data-tb-bullet="elder-sign" 목록(인라인 list-style none)은 기본 글머리로 보인다.
+  if (!tbGetBulletImages().some(img => img.id === TB_ELDER_SIGN_ID)) rules.push('ul[data-tb-bullet="elder-sign"]{list-style-type:disc !important}');
+  el.textContent = rules.join('\n');
+}
+function tbLoadImageFromBlob(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지를 읽을 수 없습니다.')); };
+    img.src = url;
+  });
+}
+// 이미지 → 글자색 추종용 알파 마스크(PNG data URL): 긴 변 96px 로 줄이고, 여백을 잘라내고, 투명도가 없으면 밝기를 알파로 바꾼다(종이 질감은 임계값으로 제거).
+async function tbBulletMaskFromBlob(blob) {
+  const img = await tbLoadImageFromBlob(blob);
+  const iw = img.naturalWidth || img.width;
+  const ih = img.naturalHeight || img.height;
+  if (!iw || !ih) throw new Error('이미지를 읽을 수 없습니다.');
+  const work = Math.min(1, 256 / Math.max(iw, ih));
+  const w = Math.max(1, Math.round(iw * work));
+  const h = Math.max(1, Math.round(ih * work));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const g = canvas.getContext('2d', { willReadFrequently: true });
+  g.drawImage(img, 0, 0, w, h);
+  const px = g.getImageData(0, 0, w, h).data;
+  const n = w * h;
+  let translucent = 0;
+  for (let i = 0; i < n; i += 1) if (px[i * 4 + 3] < 250) translucent += 1;
+  const alpha = new Uint8Array(n);
+  if (translucent > n * 0.01) {
+    for (let i = 0; i < n; i += 1) alpha[i] = px[i * 4 + 3];
+  } else {
+    const lum = new Float32Array(n);
+    for (let i = 0; i < n; i += 1) lum[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+    const border = [];
+    for (let x = 0; x < w; x += 1) border.push(lum[x], lum[(h - 1) * w + x]);
+    for (let y = 0; y < h; y += 1) border.push(lum[y * w], lum[y * w + w - 1]);
+    border.sort((a, b) => a - b);
+    const bg = border[border.length >> 1];
+    const inkDark = bg >= 128;
+    const diff = new Float32Array(n);
+    for (let i = 0; i < n; i += 1) diff[i] = Math.max(0, inkDark ? bg - lum[i] : lum[i] - bg);
+    const sorted = Float32Array.from(diff).sort();
+    const hi = Math.max(sorted[Math.min(n - 1, Math.floor(n * 0.98))] || 0, 24);
+    const lo = hi * 0.2;
+    for (let i = 0; i < n; i += 1) {
+      const t = Math.max(0, Math.min(1, (diff[i] - lo) / (hi - lo)));
+      alpha[i] = Math.round(t * t * (3 - 2 * t) * 255);
+    }
+  }
+  let x0 = w; let y0 = h; let x1 = -1; let y1 = -1;
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (alpha[y * w + x] > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    }
+  }
+  if (x1 < 0) throw new Error('글머리로 쓸 그림을 찾지 못했습니다.');
+  const cw = x1 - x0 + 1;
+  const ch = y1 - y0 + 1;
+  const mask = document.createElement('canvas');
+  mask.width = cw;
+  mask.height = ch;
+  const mg = mask.getContext('2d');
+  const out = mg.createImageData(cw, ch);
+  for (let y = 0; y < ch; y += 1) {
+    for (let x = 0; x < cw; x += 1) out.data[(y * cw + x) * 4 + 3] = alpha[(y0 + y) * w + (x0 + x)];
+  }
+  mg.putImageData(out, 0, 0);
+  const scale = Math.min(1, TB_BULLET_IMAGE_SIZE / Math.max(cw, ch));
+  const final = document.createElement('canvas');
+  final.width = Math.max(1, Math.round(cw * scale));
+  final.height = Math.max(1, Math.round(ch * scale));
+  const fg = final.getContext('2d');
+  fg.imageSmoothingQuality = 'high';
+  fg.drawImage(mask, 0, 0, final.width, final.height);
+  return final.toDataURL('image/png');
+}
+function tbBulletImageNameFromFile(file) {
+  const raw = String(file?.name || '');
+  const base = raw.includes('.') ? raw.split('.').slice(0, -1).join('.') : raw;
+  return (base || '이미지 글머리').slice(0, 20);
+}
+async function tbAddBulletImage(blob, name) {
+  const dataUrl = await tbBulletMaskFromBlob(blob);
+  const list = tbNormalizeBulletImages(state.customBulletImages);
+  if (list.filter(item => !item.deleted).length >= TB_BULLET_IMAGE_MAX) throw new Error('이미지 글머리는 최대 ' + TB_BULLET_IMAGE_MAX + '개까지 등록할 수 있습니다.');
+  const id = 'img-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  list.push({ id, name: name || '이미지 글머리', dataUrl });
+  state.customBulletImages = list;
+  persist();
+  tbRefreshBulletImageStyles();
+  return id;
+}
+// 교체: 같은 id 의 그림만 바꾼다(그 id 를 쓰는 모든 목록이 함께 바뀐다).
+async function tbReplaceBulletImage(id, blob) {
+  const dataUrl = await tbBulletMaskFromBlob(blob);
+  const list = tbNormalizeBulletImages(state.customBulletImages);
+  const item = list.find(entry => entry.id === id);
+  if (item) { item.dataUrl = dataUrl; delete item.deleted; if (!item.name) item.name = id === TB_ELDER_SIGN_ID ? '엘더 사인' : '이미지 글머리'; }
+  else list.push({ id, name: id === TB_ELDER_SIGN_ID ? '엘더 사인' : '이미지 글머리', dataUrl });
+  state.customBulletImages = list;
+  persist();
+  tbRefreshBulletImageStyles();
+}
+function tbDeleteBulletImage(id) {
+  const list = tbNormalizeBulletImages(state.customBulletImages).filter(entry => entry.id !== id);
+  if (id === TB_ELDER_SIGN_ID) list.push({ id, name: '', deleted: true });
+  state.customBulletImages = list;
+  persist();
+  tbRefreshBulletImageStyles();
+}
 const TB_PRESET_BULLETS = [TB_DEFAULT_BULLET, '-'];
-// 엘더 사인: 사용자가 칠 수 없는 토큰(<>) 이라 일반 기호와 섞이지 않는다. CE 에서는 ul[data-tb-bullet="elder-sign"] 로, 입력칸(textarea)에서는 ⛤ 글자로 들어간다.
-const TB_ELDER_SIGN = '<elder-sign>';
+// 이미지 글머리는 '<img>id' 토큰(사용자가 칠 수 없는 <> 포함)으로 다룬다. CE 에서는 ul[data-tb-bullet="image"][data-tb-bullet-img=id], 입력칸(textarea)에서는 문자(⛤ / ●)로 들어간다.
 function tbBulletKind(symbol) {
-  return symbol === TB_DEFAULT_BULLET ? 'default' : (symbol === TB_ELDER_SIGN ? 'elder-sign' : 'custom');
+  return symbol === TB_DEFAULT_BULLET ? 'default' : (String(symbol || '').startsWith(TB_IMG_BULLET_PREFIX) ? 'image' : 'custom');
 }
 function tbBulletListStyle(symbol) {
-  return symbol === TB_DEFAULT_BULLET ? 'disc' : (symbol === TB_ELDER_SIGN ? 'none' : tbBulletMarker(symbol));
+  return symbol === TB_DEFAULT_BULLET ? 'disc' : (tbBulletKind(symbol) === 'image' ? '' : tbBulletMarker(symbol));
+}
+function tbSetListBullet(list, symbol) {
+  const kind = tbBulletKind(symbol);
+  list.dataset.tbBullet = kind;
+  if (kind === 'image') list.dataset.tbBulletImg = tbBulletImageId(symbol);
+  else delete list.dataset.tbBulletImg;
 }
 function tbBulletMarker(symbol) {
   return JSON.stringify(symbol + ' ');
@@ -28043,7 +28237,7 @@ function tbBuildCEBulletFragment(lines, marker, symbol) {
     if (!list) {
       list = document.createElement('ul');
       list.style.listStyleType = marker;
-      list.dataset.tbBullet = tbBulletKind(symbol);
+      tbSetListBullet(list, symbol);
       output.appendChild(list);
     }
     const item = document.createElement('li');
@@ -28065,7 +28259,7 @@ function tbApplyCEBullet(root, sourceRange, symbol) {
   const currentList = ancestor?.closest?.('ul');
   if (currentList && root.contains(currentList)) {
     currentList.style.listStyleType = marker;
-    currentList.dataset.tbBullet = tbBulletKind(symbol);
+    tbSetListBullet(currentList, symbol);
   } else {
     if (range.collapsed) {
       const block = ancestor?.closest?.('p,div,h1,h2,h3,h4,blockquote');
@@ -28073,7 +28267,7 @@ function tbApplyCEBullet(root, sourceRange, symbol) {
         const list = document.createElement('ul');
         const item = document.createElement('li');
         list.style.listStyleType = marker;
-        list.dataset.tbBullet = tbBulletKind(symbol);
+        tbSetListBullet(list, symbol);
         while (block.firstChild) item.appendChild(block.firstChild);
         list.appendChild(item);
         block.replaceWith(list);
@@ -28082,7 +28276,7 @@ function tbApplyCEBullet(root, sourceRange, symbol) {
         const list = document.createElement('ul');
         const item = document.createElement('li');
         list.style.listStyleType = marker;
-        list.dataset.tbBullet = tbBulletKind(symbol);
+        tbSetListBullet(list, symbol);
         item.appendChild(document.createElement('br'));
         list.appendChild(item);
         range.insertNode(list);
@@ -28113,8 +28307,8 @@ function tbApplyCEBullet(root, sourceRange, symbol) {
   return true;
 }
 function tbInsertBullet(value = TB_DEFAULT_BULLET) {
-  const isElder = value === TB_ELDER_SIGN;
-  const symbol = isElder ? TB_ELDER_SIGN : tbValidBulletSymbol(value);
+  const imgId = tbBulletImageId(value);
+  const symbol = imgId ? (tbSafeBulletId(imgId) ? TB_IMG_BULLET_PREFIX + imgId : '') : tbValidBulletSymbol(value);
   const target = tbResolveFormatTarget();
   if (!symbol || !target?.ta?.isConnected) return false;
   const root = target.ta;
@@ -28128,7 +28322,7 @@ function tbInsertBullet(value = TB_DEFAULT_BULLET) {
   const lineEnd = root.value.indexOf('\n', end);
   const stop = lineEnd < 0 ? root.value.length : lineEnd;
   const selected = root.value.slice(lineStart, stop);
-  const prefix = (isElder ? '⛤' : symbol) + ' ';
+  const prefix = (imgId ? (imgId === TB_ELDER_SIGN_ID ? '⛤' : '●') : symbol) + ' ';
   const next = selected.split('\n').map(line => prefix + line).join('\n');
   root.setRangeText(next, lineStart, stop, 'select');
   root.dispatchEvent(new Event('input', { bubbles: true }));
@@ -28139,7 +28333,7 @@ function tbOpenBulletMenu(button) {
   tbCloseCtxMenu();
   const menu = document.createElement('div');
   menu.className = 'tb-ctx-menu tb-bullet-menu';
-  menu.innerHTML = '<div class="tb-bullet-presets"></div><div class="tb-bullet-custom"><input type="text" maxlength="8" placeholder="기호 직접 입력" aria-label="사용자 지정 글머리 기호"><button type="button">적용</button></div>';
+  menu.innerHTML = '<div class="tb-bullet-presets"></div><div class="tb-bullet-custom"><input type="text" maxlength="8" placeholder="기호 직접 입력" aria-label="사용자 지정 글머리 기호"><button type="button">적용</button></div><div class="tb-bullet-img-add"><button type="button">이미지 글머리 추가</button><span>파일 선택 또는 Ctrl+V</span></div><div class="tb-bullet-status" role="status"></div><input type="file" accept="image/*" hidden>';
   menu.style.left = Math.min(rect.left, window.innerWidth - 206) + 'px';
   menu.style.top = (rect.bottom + 4) + 'px';
   document.body.appendChild(menu);
@@ -28162,14 +28356,31 @@ function tbOpenBulletMenu(button) {
       preset.onclick = () => { if (tbInsertBullet(symbol)) tbCloseCtxMenu(); };
       presets.appendChild(preset);
     });
-    const elder = document.createElement('button');
-    elder.type = 'button';
-    elder.className = 'tb-bullet-preset tb-bullet-elder';
-    elder.title = '엘더 사인';
-    elder.setAttribute('aria-label', '엘더 사인 글머리');
-    elder.innerHTML = '<span class="tb-elder-sign-icon" aria-hidden="true"></span>';
-    elder.onclick = () => { if (tbInsertBullet(TB_ELDER_SIGN)) tbCloseCtxMenu(); };
-    presets.appendChild(elder);
+    tbGetBulletImages().forEach(image => {
+      const item = document.createElement('div');
+      item.className = 'tb-bullet-img-item';
+      const preset = document.createElement('button');
+      preset.type = 'button';
+      preset.className = 'tb-bullet-preset tb-bullet-image';
+      preset.title = image.name;
+      preset.setAttribute('aria-label', '이미지 글머리 ' + image.name);
+      const icon = document.createElement('span');
+      icon.className = 'tb-bullet-img-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.style.setProperty('--tb-bullet-img', 'url("' + String(image.dataUrl).split('"').join('%22') + '")');
+      preset.append(icon);
+      preset.onclick = () => { if (tbInsertBullet(TB_IMG_BULLET_PREFIX + image.id)) tbCloseCtxMenu(); };
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'tb-bullet-more';
+      more.title = '이미지 교체·삭제';
+      more.setAttribute('aria-label', image.name + ' 관리');
+      more.textContent = '⋯';
+      more.onclick = event => { event.stopPropagation(); openItemMenu(image, item); };
+      item.oncontextmenu = event => { event.preventDefault(); openItemMenu(image, item); };
+      item.append(preset, more);
+      presets.appendChild(item);
+    });
   };
   const apply = () => {
     const symbol = tbValidBulletSymbol(input.value);
@@ -28177,6 +28388,55 @@ function tbOpenBulletMenu(button) {
     tbRememberBulletSymbol(symbol);
     tbCloseCtxMenu();
   };
+  const status = menu.querySelector('.tb-bullet-status');
+  const fileInput = menu.querySelector('input[type="file"]');
+  let replaceId = '';
+  const say = (text, isError) => { status.textContent = text || ''; status.classList.toggle('error', !!isError); };
+  const closeItemMenu = () => menu.querySelectorAll('.tb-bullet-item-menu').forEach(node => node.remove());
+  const openItemMenu = (image, anchor) => {
+    closeItemMenu();
+    const pop = document.createElement('div');
+    pop.className = 'tb-bullet-item-menu';
+    const replaceBtn = document.createElement('button');
+    replaceBtn.type = 'button';
+    replaceBtn.textContent = '이미지 교체';
+    replaceBtn.onclick = () => { closeItemMenu(); replaceId = image.id; fileInput.click(); };
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.textContent = '삭제';
+    deleteBtn.onclick = () => {
+      closeItemMenu();
+      if (!confirm('「' + image.name + '」 글머리 이미지를 삭제할까요? 이 글머리를 쓰는 목록은 기본 글머리로 표시됩니다.')) return;
+      tbDeleteBulletImage(image.id);
+      renderPresets();
+    };
+    pop.append(replaceBtn, deleteBtn);
+    menu.appendChild(pop);
+    const box = menu.getBoundingClientRect();
+    const rect = anchor.getBoundingClientRect();
+    pop.style.left = Math.max(0, Math.min(rect.left - box.left, box.width - 100)) + 'px';
+    pop.style.top = (rect.bottom - box.top) + 'px';
+  };
+  const handleImageFile = async (file, targetId) => {
+    if (!file || !String(file.type || '').startsWith('image/')) { say('이미지 파일만 등록할 수 있습니다.', true); return; }
+    say('이미지를 처리하는 중…');
+    try {
+      if (targetId) await tbReplaceBulletImage(targetId, file);
+      else await tbAddBulletImage(file, tbBulletImageNameFromFile(file));
+      say(targetId ? '이미지를 교체했습니다.' : '이미지 글머리를 추가했습니다.');
+      renderPresets();
+    } catch (error) {
+      say(error?.message || '이미지를 등록하지 못했습니다.', true);
+    }
+  };
+  fileInput.onchange = () => { const file = fileInput.files?.[0]; const target = replaceId; replaceId = ''; fileInput.value = ''; handleImageFile(file, target); };
+  menu.querySelector('.tb-bullet-img-add button').onclick = () => { replaceId = ''; fileInput.click(); };
+  menu.addEventListener('paste', event => {
+    const file = [...(event.clipboardData?.files || [])].find(item => String(item.type || '').startsWith('image/'));
+    if (!file) return;
+    event.preventDefault();
+    handleImageFile(file, '');
+  });
   renderPresets();
   menu.querySelector('.tb-bullet-custom button').onclick = apply;
   input.onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); apply(); } };
@@ -33682,7 +33942,7 @@ function sanitizeCssMacroPreviewHtml(value) {
   wrap.innerHTML = String(value || '');
   wrap.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(node => node.remove());
   const allowedTags = new Set(['a', 'b', 'strong', 'i', 'em', 'u', 's', 'span', 'div', 'p', 'br', 'img', 'hr', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'ul', 'ol', 'li', 'blockquote', 'small', 'sub', 'sup', 'center']);
-  const allowedAttrs = new Set(['data-tb-bullet', 'style', 'href', 'src', 'target', 'rel', 'colspan', 'rowspan', 'align', 'width', 'height', 'alt', 'class', 'title']);
+  const allowedAttrs = new Set(['data-tb-bullet', 'data-tb-bullet-img', 'style', 'href', 'src', 'target', 'rel', 'colspan', 'rowspan', 'align', 'width', 'height', 'alt', 'class', 'title']);
   wrap.querySelectorAll('*').forEach(node => {
     const tag = String(node.tagName || '').toLowerCase();
     if (!allowedTags.has(tag)) {
