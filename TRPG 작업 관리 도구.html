@@ -3547,6 +3547,10 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 }
 .tb-ctx-sep { border-top: 1px solid #f0f0f0; margin: 3px 0; }
 .tb-bullet-menu { width: 204px; padding: 8px; }
+.tb-bullet-clear { display: flex; align-items: center; gap: 6px; width: 100%; margin: 0 0 6px; padding: 6px 8px; border: 1px solid #e0e0e0; border-radius: 5px; background: #fff; font-size: 12px; color: #333; cursor: pointer; }
+.tb-bullet-clear:hover:not(:disabled) { background: #f3f4f6; border-color: #bbb; }
+.tb-bullet-clear:disabled { opacity: 0.4; cursor: default; }
+.tb-bullet-preset.active { border-color: #111; box-shadow: inset 0 0 0 1px #111; }
 .tb-bullet-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; max-height: 188px; overflow-y: auto; padding: 1px; }
 .tb-bullet-preset { height: 44px; min-width: 0; border: 1px solid #e0e0e0; border-radius: 5px; background: #fff; cursor: pointer; padding: 0 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .tb-bullet-preset:hover { background: #f3f4f6; border-color: #bbb; }
@@ -28306,6 +28310,134 @@ function tbApplyCEBullet(root, sourceRange, symbol) {
   root.dispatchEvent(new Event('input', { bubbles: true }));
   return true;
 }
+// ── 글머리 해제(#178) ──
+// 선택에 걸친 li(자기 내용이 선택과 겹치는 것만)를 일반 블록(div)으로 바꾼다. 목록 중간이면 위/아래로 나누고 나머지 항목은 기호(data-tb-bullet·data-tb-bullet-img·list-style)를 유지한다.
+// 중첩: 해제한 항목 아래의 하위 목록은 그대로(기호 유지) 해제한 항목 바로 뒤로 한 단계 올라온다.
+function tbCEBulletTargets(root, range) {
+  if (!root || !range) return [];
+  return [...root.querySelectorAll('li')].filter(li => {
+    const list = li.parentElement;
+    if (!list || !list.matches('ul,ol') || !root.contains(list)) return false;
+    return [...li.childNodes].some(node => !(node.nodeType === Node.ELEMENT_NODE && node.matches('ul,ol')) && range.intersectsNode(node))
+      || (li.childNodes.length === 0 && range.intersectsNode(li));
+  });
+}
+function tbCEListSymbolMatches(list, symbol) {
+  if (!list || !symbol) return false;
+  if (symbol === TB_DEFAULT_BULLET) return list.dataset.tbBullet === 'default';
+  if (tbBulletKind(symbol) === 'image') {
+    const id = tbBulletImageId(symbol);
+    return (list.dataset.tbBullet === 'image' && list.dataset.tbBulletImg === id) || (id === TB_ELDER_SIGN_ID && list.dataset.tbBullet === 'elder-sign');
+  }
+  return list.dataset.tbBullet === 'custom' && list.style.listStyleType === tbBulletMarker(symbol);
+}
+function tbUnwrapCEListItem(li) {
+  const list = li.parentElement;
+  const holder = list.parentNode;
+  const block = document.createElement('div');
+  if (li.className) block.className = li.className;
+  if (li.getAttribute('style')) block.setAttribute('style', li.getAttribute('style'));
+  const nested = [];
+  [...li.childNodes].forEach(node => {
+    if (node.nodeType === Node.ELEMENT_NODE && node.matches('ul,ol')) nested.push(node);
+    else block.appendChild(node);
+  });
+  if (!block.childNodes.length) block.appendChild(document.createElement('br'));
+  const after = [];
+  for (let next = li.nextSibling; next; next = next.nextSibling) after.push(next);
+  let tail = null;
+  if (after.some(node => node.nodeType === Node.ELEMENT_NODE)) {
+    tail = list.cloneNode(false);
+    after.forEach(node => tail.appendChild(node));
+  }
+  li.remove();
+  const anchor = list.nextSibling;
+  holder.insertBefore(block, anchor);
+  nested.forEach(node => holder.insertBefore(node, anchor));
+  if (tail) holder.insertBefore(tail, anchor);
+  if (!list.children.length) list.remove();
+  return block;
+}
+function tbRemoveCEBullet(root, sourceRange) {
+  if (!root?.isConnected) return false;
+  const range = sourceRange?.cloneRange?.();
+  if (!range || !tbRangeInsideRoot(range, root)) return false;
+  if (!tbCEBulletTargets(root, range).length) return false;
+  const startMarker = document.createElement('span');
+  const endMarker = document.createElement('span');
+  startMarker.setAttribute('data-tb-sel', 's');
+  endMarker.setAttribute('data-tb-sel', 'e');
+  const endRange = range.cloneRange();
+  endRange.collapse(false);
+  endRange.insertNode(endMarker);
+  const startRange = range.cloneRange();
+  startRange.collapse(true);
+  startRange.insertNode(startMarker);
+  // 대상은 처음 한 번만 정한다(해제한 항목 안에 들어 있던 하위 항목이 다시 대상으로 잡히지 않게).
+  const targets = tbCEBulletTargets(root, (() => {
+    const r = document.createRange();
+    r.setStartBefore(startMarker);
+    r.setEndAfter(endMarker);
+    return r;
+  })());
+  targets.forEach(li => {
+    if (li.isConnected && li.parentElement?.matches('ul,ol')) tbUnwrapCEListItem(li);
+  });
+  const next = document.createRange();
+  next.setStartAfter(startMarker);
+  next.setEndBefore(endMarker);
+  const parents = [startMarker.parentNode, endMarker.parentNode];
+  startMarker.remove();
+  endMarker.remove();
+  parents.forEach(node => node?.normalize?.());
+  const selection = window.getSelection();
+  selection?.removeAllRanges();
+  selection?.addRange(next);
+  savedCERange = next.cloneRange();
+  _savedFormatSel = { ta: root, range: next.cloneRange() };
+  savedFormatTarget = { type: 'ce', ta: root, range: next.cloneRange() };
+  root.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+}
+function tbBulletPrefixes() {
+  return [TB_DEFAULT_BULLET, '-', '⛤', '●', ...tbGetCustomBulletSymbols()].filter(Boolean).sort((a, b) => b.length - a.length);
+}
+function tbTextBulletLines(root, start, end) {
+  const lineStart = root.value.lastIndexOf('\n', start - 1) + 1;
+  const lineEnd = root.value.indexOf('\n', end);
+  const stop = lineEnd < 0 ? root.value.length : lineEnd;
+  return { lineStart, stop, lines: root.value.slice(lineStart, stop).split('\n') };
+}
+function tbStripBulletPrefix(line) {
+  const hit = tbBulletPrefixes().find(symbol => line.startsWith(symbol + ' '));
+  return hit ? line.slice(hit.length + 1) : line;
+}
+// 메뉴의 「글머리 해제」 활성 여부: CE 는 선택이 목록 항목과 겹칠 때, textarea 는 선택 줄 앞에 글머리 접두어가 있을 때
+function tbCanRemoveBullet() {
+  const target = tbResolveFormatTarget();
+  if (!target?.ta?.isConnected) return false;
+  if (target.type === 'ce') return tbCEBulletTargets(target.ta, target.range).length > 0;
+  const root = target.ta;
+  if (typeof root.value !== 'string') return false;
+  const { lines } = tbTextBulletLines(root, target.start ?? root.selectionStart, target.end ?? root.selectionEnd);
+  return lines.some(line => tbStripBulletPrefix(line) !== line);
+}
+function tbRemoveBullet() {
+  const target = tbResolveFormatTarget();
+  if (!target?.ta?.isConnected) return false;
+  const root = target.ta;
+  focusWithoutScroll(root);
+  if (target.type === 'ce') return tbRemoveCEBullet(root, target.range);
+  if (typeof root.value !== 'string') return false;
+  const start = target.start ?? root.selectionStart;
+  const end = target.end ?? root.selectionEnd;
+  const { lineStart, stop, lines } = tbTextBulletLines(root, start, end);
+  const next = lines.map(tbStripBulletPrefix).join('\n');
+  if (next === lines.join('\n')) return false;
+  root.setRangeText(next, lineStart, stop, 'select');
+  root.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+}
 function tbInsertBullet(value = TB_DEFAULT_BULLET) {
   const imgId = tbBulletImageId(value);
   const symbol = imgId ? (tbSafeBulletId(imgId) ? TB_IMG_BULLET_PREFIX + imgId : '') : tbValidBulletSymbol(value);
@@ -28314,6 +28446,10 @@ function tbInsertBullet(value = TB_DEFAULT_BULLET) {
   const root = target.ta;
   focusWithoutScroll(root);
   if (target.type === 'ce') {
+    // 이미 같은 기호의 목록 안이면 다시 눌러 해제(토글)
+    const common = target.range?.commonAncestorContainer;
+    const currentList = (common?.nodeType === Node.ELEMENT_NODE ? common : common?.parentElement)?.closest?.('ul');
+    if (currentList && root.contains(currentList) && tbCEListSymbolMatches(currentList, symbol)) return tbRemoveCEBullet(root, target.range);
     return tbApplyCEBullet(root, target.range, symbol);
   }
   const start = target.start ?? root.selectionStart;
@@ -28333,12 +28469,15 @@ function tbOpenBulletMenu(button) {
   tbCloseCtxMenu();
   const menu = document.createElement('div');
   menu.className = 'tb-ctx-menu tb-bullet-menu';
-  menu.innerHTML = '<div class="tb-bullet-presets"></div><div class="tb-bullet-custom"><input type="text" maxlength="8" placeholder="기호 직접 입력" aria-label="사용자 지정 글머리 기호"><button type="button">적용</button></div><div class="tb-bullet-img-add"><button type="button">이미지 글머리 추가</button><span>파일 선택 또는 Ctrl+V</span></div><div class="tb-bullet-status" role="status"></div><input type="file" accept="image/*" hidden>';
+  menu.innerHTML = '<button type="button" class="tb-bullet-clear"><i class="fa-solid fa-ban" aria-hidden="true"></i><span>글머리 해제</span></button><div class="tb-bullet-presets"></div><div class="tb-bullet-custom"><input type="text" maxlength="8" placeholder="기호 직접 입력" aria-label="사용자 지정 글머리 기호"><button type="button">적용</button></div><div class="tb-bullet-img-add"><button type="button">이미지 글머리 추가</button><span>파일 선택 또는 Ctrl+V</span></div><div class="tb-bullet-status" role="status"></div><input type="file" accept="image/*" hidden>';
   menu.style.left = Math.min(rect.left, window.innerWidth - 206) + 'px';
   menu.style.top = (rect.bottom + 4) + 'px';
   document.body.appendChild(menu);
   _ctxMenu = menu;
   const input = menu.querySelector('input');
+  const bulletTarget = tbResolveFormatTarget();
+  const bulletCommon = bulletTarget?.type === 'ce' ? bulletTarget.range?.commonAncestorContainer : null;
+  const currentBulletList = (bulletCommon?.nodeType === Node.ELEMENT_NODE ? bulletCommon : bulletCommon?.parentElement)?.closest?.('ul') || null;
   const renderPresets = () => {
     const presets = menu.querySelector('.tb-bullet-presets');
     presets.replaceChildren();
@@ -28353,6 +28492,7 @@ function tbOpenBulletMenu(button) {
       symbolEl.className = 'tb-bullet-symbol';
       symbolEl.textContent = symbol;
       preset.append(symbolEl);
+      if (currentBulletList && tbCEListSymbolMatches(currentBulletList, symbol)) { preset.classList.add('active'); preset.setAttribute('aria-pressed', 'true'); }
       preset.onclick = () => { if (tbInsertBullet(symbol)) tbCloseCtxMenu(); };
       presets.appendChild(preset);
     });
@@ -28369,6 +28509,7 @@ function tbOpenBulletMenu(button) {
       icon.setAttribute('aria-hidden', 'true');
       icon.style.setProperty('--tb-bullet-img', 'url("' + String(image.dataUrl).split('"').join('%22') + '")');
       preset.append(icon);
+      if (currentBulletList && tbCEListSymbolMatches(currentBulletList, TB_IMG_BULLET_PREFIX + image.id)) { preset.classList.add('active'); preset.setAttribute('aria-pressed', 'true'); }
       preset.onclick = () => { if (tbInsertBullet(TB_IMG_BULLET_PREFIX + image.id)) tbCloseCtxMenu(); };
       const more = document.createElement('button');
       more.type = 'button';
@@ -28388,6 +28529,9 @@ function tbOpenBulletMenu(button) {
     tbRememberBulletSymbol(symbol);
     tbCloseCtxMenu();
   };
+  const clearBtn = menu.querySelector('.tb-bullet-clear');
+  clearBtn.disabled = !tbCanRemoveBullet();
+  clearBtn.onclick = () => { if (!clearBtn.disabled && tbRemoveBullet()) tbCloseCtxMenu(); };
   const status = menu.querySelector('.tb-bullet-status');
   const fileInput = menu.querySelector('input[type="file"]');
   let replaceId = '';
