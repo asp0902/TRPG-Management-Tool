@@ -2258,6 +2258,12 @@ tr.ct-row-end .ct-select:focus {
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+  /* 3줄을 넘으면 「…」(#184). 전체 메모는 title 툴팁으로 본다. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
 }
 .bookmark-card-footer {
   display: flex;
@@ -33331,7 +33337,7 @@ function renderBookmarkPage() {
         ${bookmark.tags?.length ? `<div class="bookmark-card-tags">${renderBookmarkCardTags(bookmark.tags)}</div>` : ''}
         <div class="bookmark-card-title">${esc(getBookmarkDisplayTitle(bookmark))}</div>
         <div class="bookmark-card-url">${esc(bookmark.url || '')}</div>
-        ${bookmark.notes ? `<div class="bookmark-card-notes">${esc(bookmark.notes)}</div>` : ''}
+        ${bookmark.notes ? `<div class="bookmark-card-notes" title="${esc(bookmark.notes)}">${esc(bookmark.notes)}</div>` : ''}
       </div>
       <div class="bookmark-card-footer">
         <button class="bookmark-card-btn" onclick="openBookmarkLink('${bookmark.id}')">열기</button>
