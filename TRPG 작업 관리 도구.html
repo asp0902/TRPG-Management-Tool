@@ -4937,8 +4937,8 @@ body.block-pointer-dragging {
 #blocks-container .block > .block-drag-handle:active { cursor: grabbing; }
 /* 본문 영역 */
 .block-body { flex: 1; padding: 8px 12px; min-width: 0; }
-/* 토글 블록만 위쪽 바깥 여백 +3px(#190 후속): 위 블록·부모 상자 경계 ~ 회색 타이틀바 위 끝 */
-.block-body:has(> .toggle-block-head) { padding-top: 11px; }
+/* 토글 블록은 사방 여백을 같게(#190 후속): 좌우는 .block-body 의 12px(드래그 핸들 8px 는 투명하게 그 안에 겹쳐 있어 보이는 여백은 12px)이므로 위·아래도 12px */
+.block-body:has(> .toggle-block-head) { padding-top: 12px; padding-bottom: 12px; }
 /* 제목 글자 위(블록 위 테두리~제목)와 아래(제목~구분선 / 접힘 시 블록 아래 테두리) 여백을 6px로 같게 */
 #blocks-container .block-handout > .block-body { padding-top: 4px; padding-bottom: 7px; }
 #blocks-container .block-handout:has(.handout-toggle[aria-expanded="false"]) > .block-body { padding-bottom: 0px; }
