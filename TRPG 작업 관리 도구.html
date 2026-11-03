@@ -6210,6 +6210,15 @@ body.block-pointer-dragging {
 .toggle-content-wrap.collapsed {
   display: none;
 }
+/* 펼친 토글은 머리 줄과 내용 칸을 하나의 회색 상자로 보이게 한다(#190): 머리도 같은 바탕·좌우 기준선, 위·아래 여백 균형, 빈 내용도 한 줄 높이. */
+.toggle-block-head.open {
+  background: #f9f9f9; border-radius: 4px 4px 0 0; padding: 4px 8px 2px;
+}
+.toggle-block-head.open + .toggle-content-wrap {
+  margin-top: 0; border-radius: 0 0 4px 4px; padding: 0 8px 4px;
+}
+.toggle-content-wrap > .block-children-wrap > .block.block-text.block-child { min-height: 22px; }
+.toggle-content-wrap > .block-children-wrap > .block.block-text.block-child .block-text-ce { min-height: 22px; }
 
 /* Info */
 .info-block-wrap {
