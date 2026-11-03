@@ -13,4 +13,5 @@ assert.match(html, /\.toggle-content-wrap > \.block-children-wrap \{\s*--child-i
 assert.match(html, /\.toggle-block-head\.open \{\s*background: #f9f9f9; border-radius: 4px 4px 0 0; padding: 4px 8px 2px;/);
 assert.match(html, /\.toggle-block-head\.open \+ \.toggle-content-wrap \{\s*margin-top: 0; border-radius: 0 0 4px 4px; padding: 0 8px 4px;/);
 assert.match(html, /\.toggle-content-wrap > \.block-children-wrap > \.block\.block-text\.block-child \{ min-height: 22px; \}/);
+assert.match(html, /\.toggle-block-head \{\s*display: flex;\s*align-items: center;\s*gap: 5px;/, '기호~제목 간격 5px');
 console.log('toggle spacing checks: OK');
