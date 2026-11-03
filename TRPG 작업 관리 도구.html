@@ -11,6 +11,7 @@
 
 :root {
   --callout-line-height: calc(1.7em - 2px); /* 콜아웃 내용 줄 간격(자동 줄넘김 줄 사이) */
+  --callout-line-height-px: calc(1.7 * 14px - 2px); /* 위와 같은 값을 14px 기준 px 로(자식 텍스트 블록용, #185) */
   --sidebar-bg: #111111;
   --main-bg: #f5f5f5;
   --border: #e2e2e2;
@@ -4518,9 +4519,17 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
    좌우 inset(padding)을 줄여 텍스트가 콜아웃 폭을 최대한 쓰도록 한다
    (우측 padding 때문에 글자 하나 들어갈 공간을 남기고 줄바뀜하던 문제 해소). */
 .callout-body > .block-children-wrap > .block.block-text.block-child {
-  min-height: 24px;
+  min-height: var(--callout-line-height-px); /* 입력 직후 줄 간격과 같게(#185). 내용 줄이 자식 텍스트 블록으로 승격돼도 간격이 넓어지지 않는다 */
   padding: 0 5px; /* 좌우 5px inset */
 }
+/* 승격된 줄 사이의 같은 종류 블록 틈(3px)은 레이아웃에서 상쇄한다(마우스 올림 대상 영역은 유지). */
+.callout-body > .block-children-wrap > .block-gap.gap-same-type {
+  margin-block: -1.5px;
+}
+/* 줄이 촘촘해져 22px 「+」 버튼이 줄 중앙을 가리지 않게, 눈에 안 보일 때(마우스가 틈에 없을 때)는 클릭을 통과시킨다. */
+.callout-body > .block-children-wrap > .block-gap.gap-same-type .block-gap-btn { pointer-events: none; }
+.callout-body > .block-children-wrap > .block-gap.gap-same-type:hover .block-gap-btn,
+.callout-body > .block-children-wrap > .block-gap.gap-same-type.gap-open .block-gap-btn { pointer-events: auto; }
 /* 콜아웃 내부 자식 블록의 액션 메뉴는 우측 거터(left:100%) 대신 블록 안 우상단에 둔다.
    좁은 콜아웃/분기 안에서 우측 거터가 overflow로 잘리던 문제 해소(판정 블록과 동일 방식). */
 /* 모든 콜아웃 컨테이너(.callout-body=루트/generic, .nested-callout=분기 bib/내부) 공통.
@@ -4543,9 +4552,9 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
   box-sizing: border-box;
 }
 .callout-body > .block-children-wrap > .block.block-text.block-child .block-text-ce {
-  min-height: 24px;
-  line-height: 1.4;
-  padding: 2px 2px 2px 0;
+  min-height: var(--callout-line-height-px);
+  line-height: var(--callout-line-height-px);
+  padding: 0 2px 0 0;
   box-sizing: border-box;
 }
 .bib-item-callout .nested-callout > .block-children-wrap,
