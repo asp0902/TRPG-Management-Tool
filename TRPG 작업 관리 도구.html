@@ -4806,7 +4806,7 @@ body.block-drag-active .block-gap-line {
 .handout-fold.css-macro-preview-wrap { display: block; }
 .handout-toggle[aria-expanded="true"] i { transform: rotate(180deg); }
 .handout-header:has(.handout-toggle[aria-expanded="false"]) { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
-.handout-shared { border-top: 1px solid var(--border); padding-top: 12px; }
+.handout-shared { border-top: 1px solid var(--border); padding-top: 8px; }
 .handout-shared:not([hidden]) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 .handout-fold { min-width: 0; overflow-x: auto; }
 .handout-fold > summary { cursor: pointer; padding: 3px 0; color: #888; font-size: 11px; font-weight: 700; }
@@ -4826,7 +4826,7 @@ body:not(.rule-insane) #blocks-container .handout-columns:not(:has(> [data-secre
 .handout-info-toggle { border: 0; background: transparent; color: inherit; font: inherit; width: 100%; padding: 0; cursor: pointer; }
 .handout-column { min-width: 0; padding-inline: 10px; }
 .handout-column h3 { font-size: 14px; font-weight: 700; margin-bottom: 11px; padding-bottom: 9px; border-bottom: 1px solid var(--border); text-align: center; }
-.handout-column .block-ce { min-height: 88px; margin-bottom: 14px; }
+.handout-column .block-ce { min-height: 1.7em; margin-bottom: 6px; } /* 내용만큼 자동(#187). 빈 내용도 1줄 높이 */
 .handout-column:has(> .handout-shared[hidden]) > .block-ce { min-height: 1.7em; margin-bottom: 0; }
 .handout-preview { flex: 1; min-height: 120px; overflow: auto; }
 .handout-preview > img { display: block; max-width: 100%; max-height: 280px; object-fit: contain; margin: 0 auto 8px; }
