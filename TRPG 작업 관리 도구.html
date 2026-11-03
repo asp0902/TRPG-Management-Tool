@@ -6169,6 +6169,8 @@ body.block-pointer-dragging {
   cursor: pointer;
   user-select: none;
   margin-bottom: 0; /* 머리 줄 위·아래 여백을 같게(#190): 접힌 상태에서 위=아래 */
+  /* 접힘·펼침 모두 같은 타이틀바(같은 높이·바탕·패딩)라 열고 닫아도 ▼·제목 위치가 변하지 않는다. */
+  background: #f9f9f9; border-radius: 4px; padding: 3px 8px;
 }
 .toggle-block-btn {
   width: 22px;
@@ -6212,7 +6214,7 @@ body.block-pointer-dragging {
 }
 /* 펼친 토글은 머리 줄과 내용 칸을 하나의 회색 상자로 보이게 한다(#190): 머리도 같은 바탕·좌우 기준선, 위·아래 여백 균형, 빈 내용도 한 줄 높이. */
 .toggle-block-head.open {
-  background: #f9f9f9; border-radius: 4px 4px 0 0; padding: 4px 8px 2px;
+  border-radius: 4px 4px 0 0; /* 아래는 내용 칸과 이어진다 */
 }
 .toggle-block-head.open + .toggle-content-wrap {
   margin-top: 0; border-radius: 0 0 4px 4px; padding: 0 8px 4px;
