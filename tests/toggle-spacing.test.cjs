@@ -15,4 +15,5 @@ assert.match(html, /\.toggle-block-head\.open \{\s*border-radius: 4px 4px 0 0;/)
 assert.match(html, /\.toggle-block-head\.open \+ \.toggle-content-wrap \{\s*margin-top: 0; border-radius: 0 0 4px 4px; padding: 0 8px 4px;/);
 assert.match(html, /\.toggle-content-wrap > \.block-children-wrap > \.block\.block-text\.block-child \{ min-height: 22px; \}/);
 assert.match(html, /\.toggle-block-head \{\s*display: flex;\s*align-items: center;\s*gap: 5px;/, '기호~제목 간격 5px');
+assert.match(html, /\.block-body:has\(> \.toggle-block-head\) \{ padding-top: 11px; \}/, '토글 블록만 위쪽 +3px');
 console.log('toggle spacing checks: OK');
