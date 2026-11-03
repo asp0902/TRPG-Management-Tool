@@ -20812,6 +20812,36 @@ function hasNativeCopySelection() {
   if (editable && editable.contains(range.commonAncestorContainer)) return true;
   return !!String(sel.toString() || '').trim();
 }
+// 분기점 내용 블록의 항목(텍스트·콜아웃 등) 아래에 우클릭 「하위 블록 추가」로 들어간 대사는 그 항목의 children 이라 다른 항목과 위치를 바꿀 수 없었다.
+// 맨 앞(↑)·맨 뒤(↓)에서 이동하면 부모 항목 바로 앞/뒤의 ib.items 대사 항목으로 바꿔 올린다(대사 필드 그대로, 하위 블록 보존).
+function promoteIbChildSpeechOut(info, dir) {
+  const child = info?.block;
+  const parent = info?.parent;
+  if (!child || child.type !== 'speech' || info.relation !== 'children' || !parent?.id) return false;
+  const parentInfo = getBlockArrayInfo(parent.id, info.rootCid);
+  if (!parentInfo || parentInfo.relation !== 'items' || !parentInfo.parent?.id) return false;
+  const innerBlock = parentInfo.parent;
+  const branchBlock = getBlockArrayInfo(innerBlock.id, info.rootCid)?.parent;
+  if (!branchBlock?.id) return false;
+  // getBlockArrayInfo 는 조회할 때마다 정규화로 배열을 새로 만들 수 있어, 배열이 아닌 객체(parent·innerBlock)로 바로 고친다.
+  const at = Array.isArray(parent.children) ? parent.children.indexOf(child) : -1;
+  if (at < 0 || !Array.isArray(innerBlock.items)) return false;
+  parent.children.splice(at, 1);
+  const item = {
+    id: child.id,
+    type: 'speech',
+    speaker: child.speaker || DEFAULT_SPEAKER_NAME,
+    speakerColor: child.speakerColor || DEFAULT_SPEECH_COLOR,
+    content: child.content || '',
+    children: Array.isArray(child.children) ? child.children : [],
+  };
+  const index = innerBlock.items.indexOf(parent) + (dir === 'up' ? 0 : 1);
+  innerBlock.items.splice(index, 0, item);
+  commitBlockTreeChange(`block:${child.id}:move-out`, info.rootCid, { force: true });
+  renderRootBlocksByCid(info.rootCid);
+  focusIbItemAfterRender(item.id, branchBlock.id);
+  return true;
+}
 function moveBlock(id, dir, cid = 'blocks-container') {
   let info = getBlockArrayInfo(id, cid);
   if (!info) return;
@@ -20823,7 +20853,11 @@ function moveBlock(id, dir, cid = 'blocks-container') {
   const arr = info.array;
   const i = info.index;
   const to = dir === 'up' ? i - 1 : i + 1;
-  if (to < 0 || to >= arr.length) return;
+  if (to < 0 || to >= arr.length) {
+    // 분기점 내용 블록 항목 아래의 대사 하위 블록은 맨 앞/뒤에서 한 번 더 누르면 항목 사이(ib.items)로 올라온다(#189).
+    promoteIbChildSpeechOut(info, dir);
+    return;
+  }
 
   [arr[i], arr[to]] = [arr[to], arr[i]];
 
