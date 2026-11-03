@@ -4639,7 +4639,7 @@ body.block-drag-active .block-children-wrap[data-empty="1"] > .block-gap {
 /* 토글 본문 안 (접힐 때 같이 접힘) */
 .toggle-content-wrap > .block-children-wrap {
   --child-indent: 6px;
-  margin-top: 4px;
+  margin-top: 0; /* 회색 칸 안 위쪽 여백은 칸 패딩만 쓴다(#190) */
 }
 /* 토글 안 상자형 하위 블록: 좌측 --child-indent 만큼 우측도 줄여 좌우 대칭 */
 .toggle-content-wrap > .block-children-wrap > .block:is(.block-branch, .block-roll, .block-image, .block-handout, .block-speech, .block-chapter, :has(> .block-body > .column-grid)) {
@@ -6168,7 +6168,7 @@ body.block-pointer-dragging {
   gap: 8px;
   cursor: pointer;
   user-select: none;
-  margin-bottom: 2px;
+  margin-bottom: 0; /* 머리 줄 위·아래 여백을 같게(#190): 접힌 상태에서 위=아래 */
 }
 .toggle-block-btn {
   width: 22px;
@@ -6185,7 +6185,8 @@ body.block-pointer-dragging {
   font-family: inherit;
 }
 .toggle-block-icon {
-  font-size: 10px;
+  font-size: 12px;
+  line-height: 1;
   transition: transform 0.15s ease;
 }
 .toggle-block-head.open .toggle-block-icon {
@@ -6204,7 +6205,7 @@ body.block-pointer-dragging {
   align-self: center;
 }
 .toggle-content-wrap {
-  background: #f9f9f9; border-radius: 4px; padding: 8px; margin-top: 10px;
+  background: #f9f9f9; border-radius: 4px; padding: 6px 8px; margin-top: 6px;
 }
 .toggle-content-wrap.collapsed {
   display: none;
