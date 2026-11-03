@@ -2719,6 +2719,20 @@ tr.ct-row-end .ct-select:focus {
   left: 50% !important; top: 50% !important;
   transform: translate(-50%, -50%);
 }
+.cp-picker { margin-top: 8px; }
+.cp-picker[hidden] { display: none; }
+.cp-sv { position: relative; width: 100%; height: 110px; border-radius: 6px; cursor: crosshair; touch-action: none;
+  background: linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, hsl(var(--cp-hue, 0) 100% 50%)); }
+.cp-sv-thumb { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,0.5); pointer-events: none; }
+.cp-picker-row { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.cp-picker-prev { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 5px; outline: 1.5px solid rgba(0,0,0,0.1); outline-offset: -1.5px; }
+.cp-hue { flex: 1; min-width: 0; height: 10px; appearance: none; border-radius: 5px; outline: none; cursor: pointer;
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+.cp-hue::-webkit-slider-thumb { appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.5); }
+.cp-hue::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.5); }
+.cp-rgb-row label { flex: 1; display: flex; align-items: center; gap: 3px; font-size: 11px; color: #777; min-width: 0; }
+.cp-rgb-row input { width: 100%; min-width: 0; box-sizing: border-box; padding: 3px 4px; border: 1px solid #ddd; border-radius: 5px; font-size: 12px; font-family: inherit; }
+.cp-rgb-row input:focus { border-color: #000; outline: none; }
 .cp-backdrop {
   display: none; position: fixed; inset: 0; z-index: 9998;
   background: rgba(17,17,17,0.18);
@@ -8272,6 +8286,19 @@ select.sh-field-input,
       <input type="color" id="cp-native" value="#000000">
       <input type="text" id="cp-hex" class="cp-hex-inp" placeholder="#rrggbb" maxlength="7" spellcheck="false">
       <button class="cp-icon-btn" onclick="cpAddFavorite()" title="즐겨찾기에 추가">★</button>
+    </div>
+    <div id="cp-picker" class="cp-picker" hidden>
+      <div id="cp-sv" class="cp-sv" aria-label="채도·명도"><div id="cp-sv-thumb" class="cp-sv-thumb"></div></div>
+      <div class="cp-picker-row">
+        <span id="cp-picker-prev" class="cp-picker-prev" aria-hidden="true"></span>
+        <input id="cp-hue" class="cp-hue" type="range" min="0" max="360" step="1" aria-label="색상">
+        <button id="cp-eye" class="cp-icon-btn" type="button" title="스포이드" aria-label="스포이드" hidden><i class="fa-solid fa-eye-dropper" aria-hidden="true"></i></button>
+      </div>
+      <div class="cp-picker-row cp-rgb-row">
+        <label>R<input id="cp-r" type="number" min="0" max="255"></label>
+        <label>G<input id="cp-g" type="number" min="0" max="255"></label>
+        <label>B<input id="cp-b" type="number" min="0" max="255"></label>
+      </div>
     </div>
     <div class="cp-footer">
       <button class="cp-cancel-btn" onclick="closeColorPanel()">취소</button>
@@ -26698,6 +26725,7 @@ function cpSetColorInputs(color) {
   const hex = normalizePickerColor(color);
   document.getElementById('cp-native').value = hex;
   document.getElementById('cp-hex').value = hex;
+  if (typeof cpPickerSync === 'function') cpPickerSync(hex);
 }
 
 function cpGetCurrentColor() {
@@ -26757,6 +26785,8 @@ function cpOpenPanel(mode, color, options = {}) {
   cpMode = mode;
   cpSetColorInputs(color);
   cpRenderPalette();
+  const picker = document.getElementById('cp-picker');
+  if (picker) picker.hidden = true;
   panel.style.display = 'block';
   panel.classList.toggle('centered', centered);
   backdrop.classList.toggle('open', centered);
@@ -26772,6 +26802,7 @@ function cpOpenPanel(mode, color, options = {}) {
     if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
     panel.style.left = left + 'px';
     panel.style.top = (rect.bottom + 4) + 'px';
+    cpClampPanel();
   }
   if (centered) {
     if (lastFocusedTA) lastFocusedTA.blur();
@@ -26858,6 +26889,8 @@ function closeColorPanel(options = {}) {
   panel.classList.remove('centered');
   panel.style.transform = '';
   backdrop.classList.remove('open');
+  const pickerEl = document.getElementById('cp-picker');
+  if (pickerEl) pickerEl.hidden = true;
   cpTarget = null;
 }
 
@@ -26932,17 +26965,170 @@ function applyColorPanel() {
   document.getElementById('cp-native').value = '#000000';
 }
 
+// ── 색상 패널 자체 선택기(#188): 브라우저 기본 색상 창은 패널 아래로 열려 「적용」을 덮는다. 패널 안에 펼쳐지는 선택기로 대신한다. ──
+// 값은 기존 경로(#cp-native 값 + #cp-hex + cpPreviewCurrentColor)에 그대로 동기화한다.
+const cpPick = { h: 0, s: 0, v: 0, hex: '' };
+function cpHexToRgb(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+function cpRgbToHex255(r, g, b) {
+  return '#' + [r, g, b].map(n => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')).join('');
+}
+function cpRgbToHsv(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const d = max - min;
+  let h = 0;
+  if (d) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return { h, s: max ? d / max : 0, v: max };
+}
+function cpHsvToHex(h, s, v) {
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
+  const sector = Math.floor(h / 60) % 6;
+  const [r, g, b] = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]][sector];
+  return cpRgbToHex255((r + m) * 255, (g + m) * 255, (b + m) * 255);
+}
+function cpPickerIsOpen() {
+  const picker = document.getElementById('cp-picker');
+  return !!picker && !picker.hidden;
+}
+// 선택기 화면을 현재 h/s/v 에 맞춘다(색을 직접 쓴 hex 가 같으면 색상(h)을 보존해 회색에서 슬라이더가 튀지 않게 한다).
+function cpPickerRender() {
+  const sv = document.getElementById('cp-sv');
+  if (!sv) return;
+  const hex = cpHsvToHex(cpPick.h, cpPick.s, cpPick.v);
+  sv.style.setProperty('--cp-hue', cpPick.h);
+  const thumb = document.getElementById('cp-sv-thumb');
+  thumb.style.left = (cpPick.s * 100) + '%';
+  thumb.style.top = ((1 - cpPick.v) * 100) + '%';
+  document.getElementById('cp-hue').value = String(Math.round(cpPick.h));
+  document.getElementById('cp-picker-prev').style.background = hex;
+  const rgb = cpHexToRgb(hex);
+  ['r', 'g', 'b'].forEach(key => {
+    const input = document.getElementById('cp-' + key);
+    if (document.activeElement !== input) input.value = String(rgb[key]);
+  });
+}
+function cpPickerSync(color) {
+  const hex = normalizePickerColor(color);
+  if (hex === cpHsvToHex(cpPick.h, cpPick.s, cpPick.v)) { cpPickerRender(); return; }
+  const rgb = cpHexToRgb(hex);
+  if (!rgb) return;
+  const hsv = cpRgbToHsv(rgb.r, rgb.g, rgb.b);
+  cpPick.h = hsv.s > 0 && hsv.v > 0 ? hsv.h : cpPick.h;
+  cpPick.s = hsv.s;
+  cpPick.v = hsv.v;
+  cpPickerRender();
+}
+// 선택기에서 사용자가 바꾼 값: #cp-native·#cp-hex 에 쓰고 미리보기를 갱신한다.
+function cpPickerCommit() {
+  const hex = cpHsvToHex(cpPick.h, cpPick.s, cpPick.v);
+  document.getElementById('cp-native').value = hex;
+  document.getElementById('cp-hex').value = hex;
+  cpPickerRender();
+  cpPreviewCurrentColor();
+}
+function cpClampPanel() {
+  const panel = document.getElementById('cp-panel');
+  if (!panel || panel.style.display === 'none' || panel.classList.contains('centered')) return;
+  const rect = panel.getBoundingClientRect();
+  if (rect.bottom > window.innerHeight - 8) panel.style.top = Math.max(8, window.innerHeight - rect.height - 8) + 'px';
+}
+function cpTogglePicker(force) {
+  const picker = document.getElementById('cp-picker');
+  if (!picker) return;
+  const open = typeof force === 'boolean' ? force : picker.hidden;
+  picker.hidden = !open;
+  if (open) cpPickerSync(cpGetCurrentColor());
+  cpClampPanel();
+}
+function cpPickerFromPointer(event) {
+  const sv = document.getElementById('cp-sv');
+  const rect = sv.getBoundingClientRect();
+  cpPick.s = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  cpPick.v = 1 - Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+  cpPickerCommit();
+}
+(function cpInitPicker() {
+  const sv = document.getElementById('cp-sv');
+  const native = document.getElementById('cp-native');
+  if (!sv || !native) return;
+  // 견본을 누르면 기본 색상 창 대신 선택기를 펼친다.
+  native.addEventListener('click', event => { event.preventDefault(); cpTogglePicker(); });
+  sv.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    sv.setPointerCapture?.(event.pointerId);
+    cpPickerFromPointer(event);
+    const move = e => cpPickerFromPointer(e);
+    const up = () => { sv.removeEventListener('pointermove', move); sv.removeEventListener('pointerup', up); sv.removeEventListener('pointercancel', up); };
+    sv.addEventListener('pointermove', move);
+    sv.addEventListener('pointerup', up);
+    sv.addEventListener('pointercancel', up);
+  });
+  document.getElementById('cp-hue').addEventListener('input', function() {
+    cpPick.h = Number(this.value) || 0;
+    cpPickerCommit();
+  });
+  ['r', 'g', 'b'].forEach(key => {
+    document.getElementById('cp-' + key).addEventListener('input', function() {
+      const rgb = cpHexToRgb(cpHsvToHex(cpPick.h, cpPick.s, cpPick.v));
+      const value = parseInt(this.value, 10);
+      if (!Number.isFinite(value)) return;
+      rgb[key] = Math.max(0, Math.min(255, value));
+      const hsv = cpRgbToHsv(rgb.r, rgb.g, rgb.b);
+      cpPick.h = hsv.s > 0 && hsv.v > 0 ? hsv.h : cpPick.h;
+      cpPick.s = hsv.s;
+      cpPick.v = hsv.v;
+      const hex = cpRgbToHex255(rgb.r, rgb.g, rgb.b);
+      document.getElementById('cp-native').value = hex;
+      document.getElementById('cp-hex').value = hex;
+      cpPickerRender();
+      cpPreviewCurrentColor();
+    });
+  });
+  const eye = document.getElementById('cp-eye');
+  if (window.EyeDropper) {
+    eye.hidden = false;
+    eye.addEventListener('click', async () => {
+      try {
+        const result = await new window.EyeDropper().open();
+        cpSetColorInputs(result.sRGBHex);
+        cpPreviewCurrentColor();
+      } catch (e) { /* 취소 */ }
+    });
+  }
+  // 선택기 안: Enter = 적용, Esc = 선택기 접기(패널은 유지)
+  document.getElementById('cp-picker').addEventListener('keydown', event => {
+    if (event.key === 'Enter') { event.preventDefault(); applyColorPanel(); }
+    else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cpTogglePicker(false); document.getElementById('cp-hex').focus(); }
+  });
+  window.addEventListener('resize', cpClampPanel);
+})();
+
 document.getElementById('cp-native').addEventListener('input', function() {
   document.getElementById('cp-hex').value = this.value;
+  cpPickerSync(this.value);
   cpPreviewCurrentColor();
 });
 document.getElementById('cp-hex').addEventListener('input', function() {
-  if (/^#[0-9a-fA-F]{6}$/.test(this.value)) document.getElementById('cp-native').value = this.value;
+  if (/^#[0-9a-fA-F]{6}$/.test(this.value)) { document.getElementById('cp-native').value = this.value; cpPickerSync(this.value); }
   cpPreviewCurrentColor();
 });
 document.getElementById('cp-hex').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') { e.preventDefault(); applyColorPanel(); }
-  if (e.key === 'Escape') { closeColorPanel(); }
+  if (e.key === 'Escape') { if (cpPickerIsOpen()) cpTogglePicker(false); else closeColorPanel(); }
 });
 document.addEventListener('mousedown', function(e) {
   const panel = document.getElementById('cp-panel');
