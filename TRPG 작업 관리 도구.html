@@ -477,8 +477,11 @@ tr.ct-row-end .ct-select:focus {
 .record-timeline-icon-btn { width: 26px; height: 26px; border: 1px solid #ddd; background: #fff; color: #555; cursor: pointer; }
 .record-timeline-icon-btn:hover { border-color: #999; color: #111; }
 .record-timeline-note { margin-left: 24px; padding: 6px 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; background: #f3f3f3; font-size: 9pt; color: #555; }
-.record-timeline-note-add { display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: 6px; align-items: start; }
-.record-timeline-note.editing { margin-left: 0; padding: 0; gap: 6px; background: none; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+/* 보충사항 추가·편집 입력칸은 설명 입력칸(.record-timeline-row)과 같은 열(84px 라벨 열 + 6px gap 뒤)에서 시작한다. */
+.record-timeline-note-add { display: grid; grid-template-columns: 84px minmax(0, 1fr) 56px; gap: 6px; align-items: start; }
+.record-timeline-note-add > .record-timeline-note-ce, .record-timeline-note.editing > .record-timeline-note-ce { grid-column: 2; }
+.record-timeline-note-add > .record-inline-add-btn, .record-timeline-note.editing > .record-timeline-actions { grid-column: 3; }
+.record-timeline-note.editing { margin-left: 0; padding: 0; gap: 6px; background: none; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: start; }
 .record-timeline-note.editing .record-timeline-actions { justify-content: flex-end; }
 .record-timeline-empty { padding: 8px; color: #999; font-size: 9pt; text-align: center; }
 .record-session-tag-editor {
