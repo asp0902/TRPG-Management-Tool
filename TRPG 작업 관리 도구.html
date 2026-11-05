@@ -481,8 +481,10 @@ tr.ct-row-end .ct-select:focus {
 .record-timeline-note-add { display: grid; grid-template-columns: 84px minmax(0, 1fr) 56px; gap: 6px; align-items: start; }
 .record-timeline-note-add > .record-timeline-note-ce, .record-timeline-note.editing > .record-timeline-note-ce { grid-column: 2; }
 .record-timeline-note-add > .record-inline-add-btn, .record-timeline-note.editing > .record-timeline-actions { grid-column: 3; }
-/* 저장된 보충사항 줄도 입력칸과 같은 열(84px+6px)에서 시작: 배경 박스 left = 입력칸 박스 left, 글자는 padding 8px 뒤. */
-.record-timeline-editor .record-timeline-note:not(.editing) { margin-left: 90px; }
+/* 보충사항 보기·편집 모드는 같은 박스 구조: 행은 배경·여백 없이 84px 열 + 글자 박스(2열) + 버튼(3열). 보기 모드 글자 박스는 입력칸(.info-ce)과 같은 크기·테두리·여백·글꼴이고 배경만 회색이다. */
+.record-timeline-editor .record-timeline-note { margin-left: 0; padding: 0; gap: 6px; background: none; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: start; }
+.record-timeline-editor .record-timeline-note > .record-timeline-note-text { grid-column: 2; box-sizing: border-box; min-height: 34px; padding: 6px 8px; border: 1px solid #f3f3f3; border-radius: 5px; background: #f3f3f3; font-size: 13px; line-height: 20px; color: #555; overflow-wrap: anywhere; word-break: break-word; }
+.record-timeline-editor .record-timeline-note > .record-timeline-actions { grid-column: 3; justify-content: flex-end; }
 .record-timeline-note.editing { margin-left: 0; padding: 0; gap: 6px; background: none; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: start; }
 .record-timeline-note.editing .record-timeline-actions { justify-content: flex-end; }
 .record-timeline-empty { padding: 8px; color: #999; font-size: 9pt; text-align: center; }
