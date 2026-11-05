@@ -454,7 +454,6 @@ tr.ct-row-end .ct-select:focus {
 .record-timeline-anchor, .record-timeline-event-form { display: grid; gap: 6px; }
 .record-timeline-anchor { grid-template-columns: 84px minmax(0, 1fr); align-items: center; }
 .record-timeline-event-form { grid-template-columns: minmax(160px, 1fr) minmax(110px, 150px) 84px 84px minmax(180px, 1fr) auto; }
-.record-timeline-anchor-list { display: flex; flex-direction: column; gap: 6px; }
 /* 타임라인 탭: 모든 입력칸은 같은 가로 폭(1fr)이고 오른쪽에 56px 버튼 칸을 둔다. 글 길이에 따라 높이가 늘고 줄어든다. */
 .record-timeline-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) 56px; gap: 6px; align-items: start; }
 .record-timeline-row > .record-timeline-label { line-height: 34px; }
@@ -32221,6 +32220,7 @@ function renderRecordTimelineItems(input, editable = false, rid = '') {
       <div class="record-timeline-item ${item.type === 'anchor' ? 'anchor' : ''}">
         <div class="record-timeline-time">${esc(getRecordTimelineTimeLabel(item))}</div>
         <div><div class="record-timeline-name">${esc(item.title || '이름 없음')}</div>${item.description ? `<div class="record-timeline-desc">${recordTimelineDescriptionHtml(item.description)}</div>` : ''}</div>
+        ${editable && item.type === 'anchor' ? `<div class="record-timeline-actions"><button type="button" class="record-timeline-icon-btn" title="기준 삭제" aria-label="기준 삭제" onclick="deleteRecordTimelineAnchor(${key},${ridArg},event)"><i class="fa-solid fa-trash"></i></button></div>` : ''}
         ${editable && item.type === 'event' ? `<div class="record-timeline-actions"><button type="button" class="record-timeline-icon-btn" title="사건 편집" aria-label="사건 편집" onclick="editRecordTimelineEvent(${key},${ridArg})"><i class="fa-solid fa-pen"></i></button><button type="button" class="record-timeline-icon-btn" title="사건 삭제" aria-label="사건 삭제" onclick="deleteRecordTimelineEvent(${key},${ridArg})"><i class="fa-solid fa-trash"></i></button></div>` : ''}
       </div>
       ${notes.map(note => {
@@ -32276,16 +32276,6 @@ function commitRecordTimeline(rid, options = {}) {
 function renderRecordTimelineEditor(rid = '', options = {}) {
   const events = getRecordTimelineEvents(rid);
   const anchors = events.filter(item => item.type === 'anchor');
-  const anchorList = recordTimelineEl(rid, 'anchor-list');
-  if (anchorList && !options.keepAnchorRows) {
-    const ridArg = esc(JSON.stringify(rid || ''));
-    anchorList.innerHTML = anchors.map((anchor, index) => {
-      const key = esc(JSON.stringify(anchor.id));
-      return `<div class="record-timeline-row"><span class="record-timeline-label">${index === 0 ? '기준 사건' : ''}</span>`
-        + `<textarea rows="1" class="record-form-input record-timeline-text" aria-label="기준 사건 이름" oninput="btcpAutoResize(this);renameRecordTimelineAnchor(${key},this.value,${ridArg})" onkeydown="if(event.key==='Enter'&&!event.isComposing){event.preventDefault();this.blur()}" onblur="this.value=getRecordTimelineEvents(${ridArg}).find(item => item.id === ${key})?.title || '';btcpAutoResize(this)">${esc(anchor.title)}</textarea>`
-        + `<button type="button" class="record-timeline-icon-btn" title="기준 삭제" aria-label="기준 삭제" onclick="deleteRecordTimelineAnchor(${key},${ridArg},event)"><i class="fa-solid fa-trash"></i></button></div>`;
-    }).join('');
-  }
   // 사건 입력의 기준 선택: 현재 선택을 유지하고, 없으면 가장 최근에 추가한 기준을 기본으로 한다.
   const select = recordTimelineEl(rid, 'anchor-select');
   if (select) {
@@ -32328,13 +32318,6 @@ function handleRecordTimelineAnchorKey(event, rid = '') {
     event.preventDefault();
     addRecordTimelineAnchor(rid);
   }
-}
-function renameRecordTimelineAnchor(id, value, rid = '') {
-  const anchor = getRecordTimelineEvents(rid).find(item => item.id === id && item.type === 'anchor');
-  const title = String(value || '').trim();
-  if (!anchor || !title) return;
-  anchor.title = title;
-  commitRecordTimeline(rid, { keepAnchorRows: true });
 }
 // 기준 삭제: 소속 사건이 있으면 앱 메뉴로 「앞 기준으로 이동 / 함께 삭제 / 취소」를 고르게 한다(브라우저 confirm 은 선택지를 줄 수 없다).
 function deleteRecordTimelineAnchor(id, rid = '', event = null) {
@@ -32484,7 +32467,6 @@ function renderRecordTimelinePage(recordId) {
   host.innerHTML = `<div class="record-timeline-page-inner">
     <div class="record-timeline-page-title">${esc(getRecordTimelineTabLabel(recordId))}</div>
     <div class="record-timeline-editor">
-      <div class="record-timeline-anchor-list" id="rt-timeline-anchor-list"></div>
       <div class="record-timeline-row">
         <span class="record-timeline-label">기준 추가</span>
         <textarea rows="1" class="record-form-input record-timeline-text" id="rt-timeline-anchor" placeholder="세션 시작, 사건 발생 등" aria-label="기준 사건 추가" oninput="btcpAutoResize(this)" onkeydown="handleRecordTimelineAnchorKey(event,${rid})"></textarea>
