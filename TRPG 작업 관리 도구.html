@@ -8841,7 +8841,7 @@ select.sh-field-input,
           <div class="bookmark-form-label">URL</div>
           <div class="bookmark-url-row">
             <input class="bookmark-form-input" id="bookmark-url" placeholder="https://..." spellcheck="false" oninput="bookmarkAutofillTouched=false;updateBookmarkThumbPreview()">
-            <button class="bookmark-fetch-btn" type="button" onclick="fetchBookmarkMetadata()">정보 가져오기</button>
+            <button class="bookmark-fetch-btn" type="button" onclick="fetchBookmarkMetadata()" title="사이트가 직접 조회를 막으면(CORS) 외부 조회 서비스(microlink)로 이 URL을 보내 다시 시도합니다.">정보 가져오기</button>
           </div>
           <div class="bookmark-fetch-status" id="bookmark-fetch-status"></div>
         </div>
@@ -33771,6 +33771,49 @@ async function fetchBookmarkPageDocument(targetUrl, signal) {
   const html = await response.text();
   return new DOMParser().parseFromString(html, 'text/html');
 }
+// 직접 조회(CORS)가 막힐 때만 쓰는 외부 조회 서비스(microlink). 엔드포인트는 여기만 바꾸면 된다(#191).
+const BOOKMARK_META_SERVICE_URL = 'https://api.microlink.io/';
+const BOOKMARK_META_SERVICE_NOTICE = '이 URL이 외부 조회 서비스(microlink)로 전송됩니다.';
+class BookmarkMetaServiceError extends Error {
+  constructor(kind, message) { super(message || kind); this.kind = kind; }
+}
+async function fetchBookmarkMetaViaService(targetUrl, signal) {
+  let response;
+  try {
+    response = await fetch(`${BOOKMARK_META_SERVICE_URL}?url=${encodeURIComponent(targetUrl)}`, {
+      method: 'GET', mode: 'cors', credentials: 'omit', signal,
+    });
+  } catch (error) {
+    if (signal?.aborted || error?.name === 'AbortError') throw new BookmarkMetaServiceError('timeout');
+    throw new BookmarkMetaServiceError('network');
+  }
+  if (response.status === 429) throw new BookmarkMetaServiceError('rate-limit');
+  let data = null;
+  try { data = await response.json(); } catch {}
+  if (!response.ok || !data || data.status !== 'success') throw new BookmarkMetaServiceError('service', `HTTP ${response.status}`);
+  // logo 는 쓰지 않는다(사이트 로고가 썸네일로 들어가는 것을 막음).
+  return { title: String(data.data?.title || '').trim(), image: String(data.data?.image?.url || '').trim() };
+}
+// 직접 조회가 실패했을 때에만(시간 초과 제외) 외부 서비스로 다시 조회한다. 성공하면 {title, image}.
+async function fetchBookmarkGenericMeta(targetUrl, signal, onFallback = null) {
+  try {
+    const doc = await fetchBookmarkPageDocument(targetUrl, signal);
+    return extractBookmarkGenericMetadata(doc, targetUrl);
+  } catch (error) {
+    if (signal?.aborted || error?.name === 'AbortError') throw new BookmarkMetaServiceError('timeout');
+    if (onFallback) onFallback();
+    return fetchBookmarkMetaViaService(targetUrl, signal);
+  }
+}
+function describeBookmarkFetchError(error) {
+  const base = '자동으로 정보를 가져오지 못했습니다. 제목과 썸네일은 직접 입력할 수 있어요.';
+  const kind = error?.kind || (error?.name === 'AbortError' ? 'timeout' : '');
+  if (kind === 'timeout') return `${base} (시간 초과: 12초 안에 응답이 없었습니다)`;
+  if (kind === 'rate-limit') return `${base} (자동 조회 서비스 사용량 초과, 잠시 후 다시 시도해 주세요)`;
+  if (kind === 'service') return `${base} (외부 조회 서비스가 이 URL의 정보를 가져오지 못했습니다)`;
+  if (kind === 'network') return `${base} (외부 조회 서비스에 연결하지 못했습니다)`;
+  return '이 URL은 브라우저 보안 정책(CORS) 때문에 자동 정보를 가져오지 못할 수 있습니다. 제목과 썸네일은 직접 입력할 수 있어요.';
+}
 function extractBookmarkGenericMetadata(doc, normalizedUrl) {
   const title =
     getBookmarkMetaContent(doc, [
@@ -33875,6 +33918,8 @@ async function fetchBookmarkMetadata() {
   setBookmarkFetchStatus('정보를 가져오는 중입니다...');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12000);
+  // 직접 조회가 막혀 외부 서비스로 다시 시도할 때 상태 문구(같은 12초 제한을 공유한다)
+  const notifyFallback = () => setBookmarkFetchStatus(`외부 조회 서비스로 다시 시도하는 중… ${BOOKMARK_META_SERVICE_NOTICE}`);
   try {
     const tweetInfo = parseBookmarkXTwitterStatusUrl(normalizedUrl);
     let fetchedTitle = '';
@@ -33888,8 +33933,7 @@ async function fetchBookmarkMetadata() {
       shouldOverwriteTweetThumb = !!(fetchedTitle || fetchedImage);
       if (!fetchedTitle || !fetchedImage) {
         try {
-          const doc = await fetchBookmarkPageDocument(normalizedUrl, controller.signal);
-          const genericMeta = extractBookmarkGenericMetadata(doc, normalizedUrl);
+          const genericMeta = await fetchBookmarkGenericMeta(normalizedUrl, controller.signal, notifyFallback);
           if (genericMeta.title || genericMeta.image) shouldOverwriteTweetThumb = true;
           if (!fetchedTitle) {
             const inferredName = inferBookmarkXTwitterDisplayName(genericMeta.title, resolvedHandle);
@@ -33906,8 +33950,7 @@ async function fetchBookmarkMetadata() {
       }
       if (!fetchedTitle) fetchedTitle = buildBookmarkXTwitterTitle('', resolvedHandle);
     } else {
-      const doc = await fetchBookmarkPageDocument(normalizedUrl, controller.signal);
-      const genericMeta = extractBookmarkGenericMetadata(doc, normalizedUrl);
+      const genericMeta = await fetchBookmarkGenericMeta(normalizedUrl, controller.signal, notifyFallback);
       fetchedTitle = genericMeta.title;
       fetchedImage = genericMeta.image;
     }
@@ -33925,7 +33968,7 @@ async function fetchBookmarkMetadata() {
       setBookmarkFetchStatus('가져올 수 있는 제목이나 썸네일 정보를 찾지 못했습니다.', true);
     }
   } catch (error) {
-    setBookmarkFetchStatus('이 URL은 브라우저 보안 정책(CORS) 때문에 자동 정보를 가져오지 못할 수 있습니다. 제목과 썸네일은 직접 입력할 수 있어요.', true);
+    setBookmarkFetchStatus(describeBookmarkFetchError(error), true);
   } finally {
     clearTimeout(timer);
   }
