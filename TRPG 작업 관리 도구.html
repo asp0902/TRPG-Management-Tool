@@ -481,6 +481,8 @@ tr.ct-row-end .ct-select:focus {
 .record-timeline-note-add { display: grid; grid-template-columns: 84px minmax(0, 1fr) 56px; gap: 6px; align-items: start; }
 .record-timeline-note-add > .record-timeline-note-ce, .record-timeline-note.editing > .record-timeline-note-ce { grid-column: 2; }
 .record-timeline-note-add > .record-inline-add-btn, .record-timeline-note.editing > .record-timeline-actions { grid-column: 3; }
+/* 저장된 보충사항 줄도 입력칸과 같은 열(84px+6px)에서 시작: 배경 박스 left = 입력칸 박스 left, 글자는 padding 8px 뒤. */
+.record-timeline-editor .record-timeline-note:not(.editing) { margin-left: 90px; }
 .record-timeline-note.editing { margin-left: 0; padding: 0; gap: 6px; background: none; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: start; }
 .record-timeline-note.editing .record-timeline-actions { justify-content: flex-end; }
 .record-timeline-empty { padding: 8px; color: #999; font-size: 9pt; text-align: center; }
