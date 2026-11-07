@@ -33813,10 +33813,13 @@ const BOOKMARK_META_SERVICE_NOTICE = '이 URL이 외부 조회 서비스(microli
 class BookmarkMetaServiceError extends Error {
   constructor(kind, message) { super(message || kind); this.kind = kind; }
 }
-async function fetchBookmarkMetaViaService(targetUrl, signal) {
+// microlink 기본값은 헤드리스 렌더링(prerender)이 붙어 캐시 MISS 에서 4~5초 걸린다. 1차는 렌더링 없이(빠름), 제목·썸네일이 둘 다 비면 기본값으로 한 번 더 시도한다(#196).
+const BOOKMARK_META_SERVICE_FAST_QUERY = '&prerender=false&palette=false&audio=false&video=false&iframe=false';
+const bookmarkMetaServiceCache = new Map();
+async function requestBookmarkMetaService(targetUrl, signal, extraQuery) {
   let response;
   try {
-    response = await fetch(`${BOOKMARK_META_SERVICE_URL}?url=${encodeURIComponent(targetUrl)}`, {
+    response = await fetch(`${BOOKMARK_META_SERVICE_URL}?url=${encodeURIComponent(targetUrl)}${extraQuery}`, {
       method: 'GET', mode: 'cors', credentials: 'omit', signal,
     });
   } catch (error) {
@@ -33826,9 +33829,18 @@ async function fetchBookmarkMetaViaService(targetUrl, signal) {
   if (response.status === 429) throw new BookmarkMetaServiceError('rate-limit');
   let data = null;
   try { data = await response.json(); } catch {}
+  // 한도 초과는 HTTP 200 + {status:'fail', code:'ERATE'} 로도 온다.
+  if (data && (data.code === 'ERATE' || /rate limit/i.test(String(data.message || '')))) throw new BookmarkMetaServiceError('rate-limit');
   if (!response.ok || !data || data.status !== 'success') throw new BookmarkMetaServiceError('service', `HTTP ${response.status}`);
   // logo 는 쓰지 않는다(사이트 로고가 썸네일로 들어가는 것을 막음).
   return { title: String(data.data?.title || '').trim(), image: String(data.data?.image?.url || '').trim() };
+}
+async function fetchBookmarkMetaViaService(targetUrl, signal) {
+  if (bookmarkMetaServiceCache.has(targetUrl)) return { ...bookmarkMetaServiceCache.get(targetUrl) };
+  let result = await requestBookmarkMetaService(targetUrl, signal, BOOKMARK_META_SERVICE_FAST_QUERY);
+  if (!result.title && !result.image) result = await requestBookmarkMetaService(targetUrl, signal, '');
+  if (result.title || result.image) bookmarkMetaServiceCache.set(targetUrl, result);
+  return { ...result };
 }
 // 직접 조회가 실패했을 때에만(시간 초과 제외) 외부 서비스로 다시 조회한다. 성공하면 {title, image}.
 async function fetchBookmarkGenericMeta(targetUrl, signal, onFallback = null) {
