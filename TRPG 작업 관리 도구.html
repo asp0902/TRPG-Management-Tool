@@ -2291,6 +2291,9 @@ tr.ct-row-end .ct-select:focus {
   background: #f5f5f5;
   color: #333;
 }
+.bookmark-card-btn.clip { display: inline-flex; align-items: center; gap: 4px; }
+.bookmark-attach-box { border: 1px solid #e4e4e4; border-radius: 10px; padding: 8px 10px; max-height: 32vh; overflow-y: auto; box-sizing: border-box; background: #fff; }
+.bookmark-modal.drop-over { outline: 2px dashed #4a9eff; outline-offset: -4px; }
 .bookmark-card-btn.del:hover {
   background: #fff2f2;
   color: #ef4444;
@@ -8584,6 +8587,14 @@ select.sh-field-input,
     </div>
   </div>
 
+  <!-- BOOKMARK ATTACHMENTS POPOVER (카드의 클립 아이콘) -->
+  <div id="bookmark-attach-popover" class="catalog-links-popover" style="display:none">
+    <div class="clp-head">첨부 파일</div>
+    <div id="bmp-attach-status" class="clp-attach-status" style="display:none"></div>
+    <div class="clp-attach-list" id="bmp-attach-list" style="overflow-y:auto"></div>
+    <div class="clp-footer"><button class="clp-close" onclick="closeBookmarkAttachPopover()">닫기</button></div>
+  </div>
+
   <!-- DIFF NOTE POPUP -->
   <div id="diff-note-popup" class="diff-note-popup" style="display:none">
     <div class="diff-note-popup-label" id="diff-note-popup-label">GM 난이도 메모</div>
@@ -8869,6 +8880,16 @@ select.sh-field-input,
         <div class="bookmark-form-row">
           <div class="bookmark-form-label">메모</div>
           <textarea class="bookmark-form-textarea" id="bookmark-notes" placeholder="간단한 메모를 남겨둘 수 있어요." spellcheck="false"></textarea>
+        </div>
+        <div class="bookmark-form-row">
+          <div class="bookmark-form-label">첨부 파일</div>
+          <div class="bookmark-attach-box" id="bookmark-attach-box">
+            <div class="clp-attach-head"><span>이 창에 파일을 끌어다 놓아도 됩니다</span>
+              <button type="button" class="clp-attach-add" onclick="document.getElementById('bookmark-attach-input').click()">＋ 파일 첨부</button>
+              <input type="file" id="bookmark-attach-input" multiple style="display:none" onchange="onAttachInput(this)"></div>
+            <div id="bookmark-attach-status" class="clp-attach-status" style="display:none"></div>
+            <div class="clp-attach-list" id="bookmark-attach-list"></div>
+          </div>
         </div>
         <div class="bookmark-modal-footer">
           <button class="bookmark-delete-btn" id="bookmark-delete-btn" type="button" style="display:none" onclick="deleteBookmarkFromModal()">삭제</button>
@@ -10047,6 +10068,7 @@ function mkBookmark(url = '') {
     thumbnail: '',
     tags: [],
     notes: '',
+    attachments: [],
   };
 }
 function mkRecordPlayer(input = {}) {
@@ -10408,6 +10430,7 @@ function normalizeBookmarkRecord(input = {}) {
     thumbnail: typeof input?.thumbnail === 'string' ? input.thumbnail : '',
     tags: normalizeCssMacroTags(input?.tags ?? input?.tagText ?? input?.tag),
     notes: typeof input?.notes === 'string' ? input.notes : '',
+    attachments: normalizeCatalogAttachments(input?.attachments),
   };
 }
 // opts.promoteLegacyContent: 로드 경계(applyStatePayload)에서만 true.
@@ -24983,7 +25006,7 @@ async function readZipEntries(blob) { // Map(name -> { blob(): Promise<Blob> })
   return entries;
 }
 async function exportBackupWithAttachments() {
-  const shas = [...new Set(state.catalog.flatMap(c => (c.attachments || []).map(a => a.sha256)))];
+  const shas = getAllAttachmentShas();
   const entries = [{ name: 'data.json', blob: new Blob([getBackupJson()], { type: 'application/json' }) }];
   let missing = 0;
   for (const sha of shas) {
@@ -31245,41 +31268,72 @@ async function putAttachmentBlob(sha, blob) {
   if (await hasAttachmentBlob(sha)) return;
   await attachTx('blobs', 'readwrite', store => store.put({ sha256: sha, blob, size: blob.size }));
 }
+// ── 첨부 UI 컨텍스트(#198): 시나리오 링크 팝오버·북마크 수정 모달·북마크 카드 팝오버가 같은 목록/동작 함수를 쓴다. ──
+// ctx = { kind, listId, statusId, scrollId, owner():{attachments[]}, onChange(), isOpen(), afterRender?(), readonly?, draft?, addedShas? }
+let _attachCtx = null;
+function getAttachmentOwner() { return _attachCtx?.owner?.() || null; }
+// 시나리오(catalog)와 북마크가 가진 모든 첨부 메타. 참조 판정·GitHub 업로드 대기·백업 내보내기는 모두 이 함수를 거친다(한쪽 삭제로 본문이 지워지지 않게).
+// includeDraft: 북마크 수정 모달의 저장 전 목록도 참조로 센다(본문 오삭제 방지). 업로드·내보내기는 저장된 것만 본다.
+function getAllAttachmentRefs(opts = {}) {
+  const refs = [];
+  (state.catalog || []).forEach(c => (c.attachments || []).forEach(a => refs.push(a)));
+  (state.bookmarks || []).forEach(b => (b.attachments || []).forEach(a => refs.push(a)));
+  if (opts.includeDraft && _attachCtx?.draft) (_attachCtx.draft.attachments || []).forEach(a => refs.push(a));
+  return refs;
+}
+function getAllAttachmentShas() { return [...new Set(getAllAttachmentRefs().map(a => a.sha256))]; }
 function isAttachmentReferenced(sha) {
-  return state.catalog.some(c => (c.attachments || []).some(a => a.sha256 === sha));
+  return getAllAttachmentRefs({ includeDraft: true }).some(a => a.sha256 === sha);
+}
+// 어디서도 참조되지 않는 본문만 이 기기에서 지운다(GitHub 의 파일은 지우지 않는다).
+async function cleanupUnreferencedAttachments(shas) {
+  for (const sha of new Set(shas || [])) {
+    if (!sha || isAttachmentReferenced(sha)) continue;
+    try {
+      await attachTx('blobs', 'readwrite', store => store.delete(sha));
+      await attachTx('status', 'readwrite', store => store.delete(sha));
+      attachLocalSet.delete(sha);
+      attachDoneSet.delete(sha);
+    } catch (err) { console.warn(err); }
+  }
 }
 function formatAttachmentSize(bytes) {
   if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + 'MB';
   if (bytes >= 1024) return Math.round(bytes / 1024) + 'KB';
   return bytes + 'B';
 }
-async function addCatalogAttachments(entryId, files) {
-  const entry = state.catalog.find(c => c.id === entryId && !isCatalogSeries(c));
-  if (!entry || !files?.length) return;
-  if (!Array.isArray(entry.attachments)) entry.attachments = [];
+async function addAttachmentFiles(files) {
+  const ctx = _attachCtx;
+  const owner = ctx?.owner?.();
+  if (!owner || ctx.readonly || !files?.length) return;
+  if (!Array.isArray(owner.attachments)) owner.attachments = [];
   setAttachmentStatusText(`파일 ${files.length}개 저장 중...`);
   let added = 0;
+  const addedShas = [];
   for (const file of [...files]) {
     try {
       const sha = await sha256Hex(file);
       await putAttachmentBlob(sha, file);
-      entry.attachments.push({
+      owner.attachments.push({
         id: mkId(), name: file.name || '첨부 파일', size: file.size, type: file.type || '',
         addedAt: new Date().toISOString(), sha256: sha, memo: '',
       });
+      ctx.addedShas?.add(sha);
+      addedShas.push(sha);
       added += 1;
     } catch (err) {
       console.error('attachment failed:', err);
       setAttachmentStatusText(`"${file.name}" 저장에 실패했습니다: ${err?.message || err}`, true);
     }
   }
-  if (added) { persist(); updateCatalogLinksBtn(entry); setAttachmentStatusText(`${added}개를 첨부했습니다.`); }
+  if (_attachCtx !== ctx) { await cleanupUnreferencedAttachments(addedShas); return; } // 저장 중 창이 닫힌 경우
+  if (added) { ctx.onChange?.(); setAttachmentStatusText(`${added}개를 첨부했습니다.`); }
   await refreshAttachmentIndex();
   renderAttachmentList();
   syncAttachmentsToGitHub();
 }
 function setAttachmentStatusText(text, isError = false) {
-  const el = document.getElementById('clp-attach-status');
+  const el = document.getElementById(_attachCtx?.statusId || 'clp-attach-status');
   if (!el) return;
   el.textContent = text;
   el.classList.toggle('error', !!isError);
@@ -31288,22 +31342,34 @@ function setAttachmentStatusText(text, isError = false) {
 function onAttachInput(input) {
   const files = [...input.files];
   input.value = '';
-  addCatalogAttachments(_linksPopover.id, files);
+  addAttachmentFiles(files);
 }
 function getPopoverEntry() { return state.catalog.find(c => c.id === _linksPopover.id); }
+function makeCatalogAttachCtx(entryId) {
+  const getEntry = () => state.catalog.find(c => c.id === entryId && !isCatalogSeries(c));
+  return {
+    kind: 'catalog', listId: 'clp-attach-list', statusId: 'clp-attach-status', scrollId: 'clp-attach',
+    owner: getEntry,
+    onChange() { persist(); const entry = getEntry(); if (entry) updateCatalogLinksBtn(entry); },
+    isOpen: () => document.getElementById('catalog-links-popover')?.style.display !== 'none',
+    afterRender: () => positionLinksPopover(),
+  };
+}
 let attachMemoEditingId = null; // 메모를 편집 중인 첨부 id
 function renderAttachmentList() {
-  const box = document.getElementById('clp-attach-list');
+  const ctx = _attachCtx;
+  const box = ctx ? document.getElementById(ctx.listId) : null;
   if (!box) return;
   if (!renderAttachmentList.indexReady) { renderAttachmentList.indexReady = true; refreshAttachmentIndex().then(renderAttachmentList); }
-  const entry = getPopoverEntry();
+  const entry = getAttachmentOwner();
   const list = entry?.attachments || [];
+  const readonly = !!ctx.readonly;
   box.innerHTML = list.length ? list.map(a => {
     const id = esc(a.id);
     const badge = attachmentBackupBadge(a);
-    const handle = `<button type="button" class="clp-link-drag" onpointerdown="beginAttachmentDrag(event,'${id}')" title="순서 변경" aria-label="순서 변경">≡</button>`;
+    const handle = readonly ? '' : `<button type="button" class="clp-link-drag" onpointerdown="beginAttachmentDrag(event,'${id}')" title="순서 변경" aria-label="순서 변경">≡</button>`;
     const state = `<span class="clp-att-state" title="${esc(badge[1])}">${badge[0]}</span>`;
-    if (attachMemoEditingId === a.id) {
+    if (!readonly && attachMemoEditingId === a.id) {
       return `<div class="clp-att-row editing" data-att-id="${id}">${handle}${state}
         <div class="clp-link-fields"><div class="clp-att-name" title="${esc(a.name)}">${esc(a.name)}</div>
           <input class="clp-input clp-link-memo" placeholder="메모" value="${esc(a.memo || '')}" spellcheck="false" onkeydown="handleAttachmentMemoKey(event,'${id}')" onblur="commitAttachmentMemo('${id}',this.value)"></div>
@@ -31316,16 +31382,16 @@ function renderAttachmentList() {
       ${a.memo ? `<span class="clp-link-memo-display" title="${esc(a.memo)}">${esc(a.memo)}</span>` : ''}
       ${isOpenableAttachment(a) ? `<button type="button" class="clp-link-edit" onclick="openAttachmentIsolated('${id}')" title="열기(격리 화면)">▶</button>` : ''}
       <button type="button" class="clp-link-edit" onclick="downloadAttachment('${id}')" title="다운로드">⬇</button>
-      <button type="button" class="clp-link-edit" onclick="editAttachment('${id}')" title="메모 편집">✎</button>
-      <button type="button" class="clp-link-del" onclick="removeAttachment('${id}')" title="삭제">✕</button>
+      ${readonly ? '' : `<button type="button" class="clp-link-edit" onclick="editAttachment('${id}')" title="메모 편집">✎</button>
+      <button type="button" class="clp-link-del" onclick="removeAttachment('${id}')" title="삭제">✕</button>`}
     </div>`;
   }).join('') : '<div class="clp-empty">첨부된 파일이 없습니다.</div>';
   const memoInput = box.querySelector('.clp-att-row.editing .clp-link-memo');
   if (memoInput) { memoInput.focus(); memoInput.setSelectionRange(memoInput.value.length, memoInput.value.length); }
-  positionLinksPopover();
+  ctx.afterRender?.();
 }
 function findAttachment(attId) {
-  const entry = getPopoverEntry();
+  const entry = getAttachmentOwner();
   return { entry, att: entry?.attachments?.find(a => a.id === attId) };
 }
 async function downloadAttachment(attId) {
@@ -31375,7 +31441,7 @@ function commitAttachmentMemo(attId, value) {
   if (attachMemoEditingId !== attId) return; // 이미 확정·취소됨
   const { att } = findAttachment(attId);
   attachMemoEditingId = null;
-  if (att && att.memo !== String(value).trim()) { att.memo = String(value).trim(); persist(); }
+  if (att && att.memo !== String(value).trim()) { att.memo = String(value).trim(); _attachCtx?.onChange?.(); }
   renderAttachmentList();
 }
 function cancelAttachmentMemo() {
@@ -31408,13 +31474,13 @@ function onAttachmentDragMove(e) {
     d.row.classList.add('dragging');
     document.body.classList.add('ct-row-dragging');
   }
-  const box = document.getElementById('clp-attach');
+  const box = document.getElementById(_attachCtx?.scrollId || 'clp-attach');
   if (box) { // 목록 가장자리에서 자동 스크롤(#149 높이 제한 안에서)
     const r = box.getBoundingClientRect();
     if (e.clientY < r.top + 24) box.scrollTop -= 10;
     else if (e.clientY > r.bottom - 24) box.scrollTop += 10;
   }
-  const rows = [...document.querySelectorAll('#clp-attach-list .clp-att-row')].filter(r => r !== d.row);
+  const rows = [...document.querySelectorAll(`#${_attachCtx?.listId || 'clp-attach-list'} .clp-att-row`)].filter(r => r !== d.row);
   rows.forEach(r => r.classList.remove('dragover-before', 'dragover-after'));
   d.target = null;
   for (const r of rows) {
@@ -31436,9 +31502,9 @@ function finishAttachmentDrag(apply) {
   window.removeEventListener('pointerup', onAttachmentDragEnd, true);
   window.removeEventListener('keydown', onAttachmentDragKey, true);
   document.body.classList.remove('ct-row-dragging');
-  document.querySelectorAll('#clp-attach-list .clp-att-row').forEach(r => r.classList.remove('dragging', 'dragover-before', 'dragover-after'));
+  document.querySelectorAll('.clp-att-row').forEach(r => r.classList.remove('dragging', 'dragover-before', 'dragover-after'));
   if (!d || !d.dragging || !apply || !d.target) return;
-  const entry = getPopoverEntry();
+  const entry = getAttachmentOwner();
   if (!entry) return;
   const list = entry.attachments;
   const moving = list.find(a => a.id === d.attId);
@@ -31446,20 +31512,17 @@ function finishAttachmentDrag(apply) {
   if (!moving || !targetAtt || moving === targetAtt) return;
   list.splice(list.indexOf(moving), 1);
   list.splice(list.indexOf(targetAtt) + (d.pos === 'after' ? 1 : 0), 0, moving);
-  persist();
+  _attachCtx?.onChange?.();
   renderAttachmentList();
 }
 async function removeAttachment(attId) {
   const { entry, att } = findAttachment(attId);
-  if (!att) return;
+  if (!att || _attachCtx?.readonly) return;
   if (!confirm(`첨부 파일 "${att.name}"을(를) 삭제할까요?`)) return;
   entry.attachments = entry.attachments.filter(a => a.id !== att.id);
-  persist();
-  updateCatalogLinksBtn(entry);
-  // 같은 내용을 다른 항목이 쓰고 있지 않을 때만 이 기기의 본문을 지운다(GitHub 의 파일은 지우지 않는다)
-  if (!isAttachmentReferenced(att.sha256)) {
-    try { await attachTx('blobs', 'readwrite', store => store.delete(att.sha256)); await attachTx('status', 'readwrite', store => store.delete(att.sha256)); attachLocalSet.delete(att.sha256); attachDoneSet.delete(att.sha256); } catch (err) { console.warn(err); }
-  }
+  _attachCtx?.onChange?.();
+  // 같은 내용을 다른 항목(시나리오·북마크)이 쓰고 있지 않을 때만 이 기기의 본문을 지운다(GitHub 의 파일은 지우지 않는다)
+  await cleanupUnreferencedAttachments([att.sha256]);
   renderAttachmentList();
 }
 // ── 첨부 파일 GitHub 백업 ──
@@ -31553,7 +31616,7 @@ async function syncAttachmentsToGitHub() {
   attachSyncRunning = true;
   try {
     await refreshAttachmentIndex();
-    const pending = [...new Set(state.catalog.flatMap(c => (c.attachments || []).map(a => a.sha256)))].filter(sha => attachLocalSet.has(sha) && !attachDoneSet.has(sha));
+    const pending = getAllAttachmentShas().filter(sha => attachLocalSet.has(sha) && !attachDoneSet.has(sha));
     for (const sha of pending) {
       attachBackupState.set(sha, 'uploading');
       renderAttachmentListIfOpen();
@@ -31574,7 +31637,7 @@ async function syncAttachmentsToGitHub() {
 }
 function renderAttachmentListIfOpen() {
   if (attachMemoEditingId) return; // 메모 입력 중에는 입력칸을 다시 만들지 않는다(백그라운드 업로드 상태 갱신이 입력을 지우지 않게)
-  if (document.getElementById('catalog-links-popover')?.style.display !== 'none') renderAttachmentList();
+  if (_attachCtx?.isOpen?.()) renderAttachmentList();
 }
 function attachmentBackupBadge(att) {
   const state = attachBackupState.get(att.sha256);
@@ -31584,19 +31647,22 @@ function attachmentBackupBadge(att) {
   if (attachDoneSet.has(att.sha256)) return ['☁', 'GitHub에 백업됨'];
   return ['·', isGitHubSyncEnabled() ? 'GitHub 업로드 대기 중' : 'GitHub 동기화가 꺼져 있어 올리지 않았습니다.'];
 }
-// 파일 끌어다 놓기(팝오버 위)
+// 파일 끌어다 놓기(시나리오 링크 팝오버 위, 북마크 수정 모달 위)
 function initAttachmentDrop() {
-  const pop = document.getElementById('catalog-links-popover');
-  if (!pop || pop.dataset.dropReady) return;
-  pop.dataset.dropReady = '1';
   const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
-  pop.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); pop.classList.add('drop-over'); });
-  pop.addEventListener('dragleave', e => { if (!pop.contains(e.relatedTarget)) pop.classList.remove('drop-over'); });
-  pop.addEventListener('drop', e => {
-    if (!hasFiles(e)) return;
-    e.preventDefault();
-    pop.classList.remove('drop-over');
-    addCatalogAttachments(_linksPopover.id, [...e.dataTransfer.files]);
+  [['catalog-links-popover', 'catalog'], ['bookmark-modal', 'bookmark-modal']].forEach(([cls, kind]) => {
+    const pop = document.getElementById(cls) || document.querySelector('.' + cls);
+    if (!pop || pop.dataset.dropReady) return;
+    pop.dataset.dropReady = '1';
+    const active = () => _attachCtx?.kind === kind;
+    pop.addEventListener('dragover', e => { if (!hasFiles(e) || !active()) return; e.preventDefault(); pop.classList.add('drop-over'); });
+    pop.addEventListener('dragleave', e => { if (!pop.contains(e.relatedTarget)) pop.classList.remove('drop-over'); });
+    pop.addEventListener('drop', e => {
+      if (!hasFiles(e) || !active()) return;
+      e.preventDefault();
+      pop.classList.remove('drop-over');
+      addAttachmentFiles([...e.dataTransfer.files]);
+    });
   });
 }
 initAttachmentDrop();
@@ -31610,6 +31676,8 @@ function openCatalogLinksPopover(id, anchorEl) {
   _linksPopover = { id, links: JSON.parse(JSON.stringify(entry.links || [])) };
   ensureLinkPopoverKeys();
   renderLinksPopover();
+  attachMemoEditingId = null;
+  _attachCtx = makeCatalogAttachCtx(id);
   setAttachmentStatusText('');
   renderAttachmentList();
   const pop = document.getElementById('catalog-links-popover');
@@ -31650,6 +31718,7 @@ function closeCatalogLinksPopover(save) {
     }
   }
   document.getElementById('catalog-links-popover').style.display = 'none';
+  if (_attachCtx?.kind === 'catalog') { _attachCtx = null; attachMemoEditingId = null; }
   _linksPopoverAnchor = null;
   _linksPopover = { id: null, links: [] };
 }
@@ -33610,6 +33679,7 @@ function renderBookmarkPage() {
     grid.innerHTML = `<div class="bookmark-empty">${state.bookmarks.length ? '검색 결과가 없습니다.<br>다른 제목이나 태그로 다시 찾아보세요.' : '등록된 북마크가 없습니다.<br>＋ 북마크 추가 버튼으로 첫 링크를 저장해보세요.'}</div>`;
     return;
   }
+  closeBookmarkAttachPopover();
   grid.innerHTML = visible.map(bookmark => `
     <article class="bookmark-card" data-bookmark-id="${bookmark.id}">
       <div class="bookmark-thumb-wrap">
@@ -33624,6 +33694,7 @@ function renderBookmarkPage() {
         ${bookmark.notes ? `<div class="bookmark-card-notes" title="${esc(bookmark.notes)}">${esc(bookmark.notes)}</div>` : ''}
       </div>
       <div class="bookmark-card-footer">
+        ${(bookmark.attachments || []).length ? `<button class="bookmark-card-btn clip" type="button" onclick="event.stopPropagation();openBookmarkAttachPopover('${bookmark.id}',this)" title="첨부 파일 ${(bookmark.attachments || []).length}개"><i class="fa-solid fa-paperclip" aria-hidden="true"></i>${(bookmark.attachments || []).length}</button>` : ''}
         <button class="bookmark-card-btn" onclick="openBookmarkLink('${bookmark.id}')">열기</button>
         <button class="bookmark-card-btn" onclick="openBookmarkModal('${bookmark.id}')">수정</button>
         <button class="bookmark-card-btn del" onclick="deleteBookmark('${bookmark.id}')">삭제</button>
@@ -33644,11 +33715,29 @@ function openBookmarkModal(bookmarkId = '') {
   setBookmarkFetchStatus('');
   renderBookmarkTagSuggestions();
   updateBookmarkThumbPreview();
+  closeBookmarkAttachPopover();
+  attachMemoEditingId = null;
+  _attachCtx = {
+    kind: 'bookmark-modal', listId: 'bookmark-attach-list', statusId: 'bookmark-attach-status', scrollId: 'bookmark-attach-box',
+    // 저장 전까지는 복사본만 고친다. 저장 시 반영, 취소 시 버린다.
+    draft: { attachments: JSON.parse(JSON.stringify(bookmark?.attachments || [])) }, addedShas: new Set(),
+    owner() { return this.draft; }, onChange() {},
+    isOpen: () => document.getElementById('bookmark-modal-backdrop')?.classList.contains('open'),
+  };
+  setAttachmentStatusText('');
+  renderAttachmentList();
   document.getElementById('bookmark-modal-backdrop').classList.add('open');
   setTimeout(() => document.getElementById('bookmark-url')?.focus(), 20);
 }
 function closeBookmarkModal() {
   document.getElementById('bookmark-modal-backdrop').classList.remove('open');
+  const ctx = _attachCtx;
+  if (ctx?.kind === 'bookmark-modal') {
+    _attachCtx = null;
+    attachMemoEditingId = null;
+    // 취소로 닫으면 이번 창에서 새로 넣었지만 어디에도 저장되지 않은 본문을 정리한다(저장했다면 참조 중이라 남는다).
+    cleanupUnreferencedAttachments([...ctx.addedShas]);
+  }
   editingBookmarkId = null;
   setBookmarkFetchStatus('');
 }
@@ -33674,19 +33763,63 @@ function saveBookmark() {
   target.thumbnail = String(document.getElementById('bookmark-thumb')?.value || '').trim();
   target.tags = normalizeCssMacroTags(document.getElementById('bookmark-tags')?.value || '');
   target.notes = String(document.getElementById('bookmark-notes')?.value || '').trim();
+  const prevShas = (target.attachments || []).map(a => a.sha256);
+  target.attachments = normalizeCatalogAttachments(_attachCtx?.draft?.attachments || target.attachments);
   if (!editingBookmarkId) state.bookmarks.unshift(target);
   persist();
   renderBookmarkPage();
   closeBookmarkModal();
+  cleanupUnreferencedAttachments(prevShas); // 편집에서 뺀 첨부 중 어디서도 안 쓰는 본문 정리
+  syncAttachmentsToGitHub();
 }
 function deleteBookmark(bookmarkId) {
   const bookmark = getBookmarkById(bookmarkId);
   if (!bookmark) return;
-  if (!confirm(`"${getBookmarkDisplayTitle(bookmark)}" 북마크를 삭제할까요?`)) return;
+  const attCount = (bookmark.attachments || []).length;
+  if (!confirm(`"${getBookmarkDisplayTitle(bookmark)}" 북마크를 삭제할까요?${attCount ? ` 첨부 파일 ${attCount}개도 함께 삭제됩니다.(다른 항목이 같은 파일을 쓰고 있으면 그 파일은 남습니다)` : ''}`)) return;
+  const shas = (bookmark.attachments || []).map(a => a.sha256);
   state.bookmarks = state.bookmarks.filter(item => item.id !== bookmarkId);
   persist();
   renderBookmarkPage();
+  cleanupUnreferencedAttachments(shas);
 }
+// 카드의 클립 아이콘: 첨부 목록(열기·다운로드만) 팝오버
+function positionBookmarkAttachPopover() {
+  const pop = document.getElementById('bookmark-attach-popover');
+  const anchor = _attachCtx?.anchor;
+  if (!pop || pop.style.display === 'none' || !anchor) return;
+  const margin = 8, h = pop.offsetHeight, w = pop.offsetWidth;
+  let y = anchor.bottom + 4;
+  if (y + h > window.innerHeight - margin) y = anchor.top - 4 - h >= margin ? anchor.top - 4 - h : Math.max(margin, window.innerHeight - margin - h);
+  pop.style.top = y + 'px';
+  pop.style.left = Math.max(margin, Math.min(anchor.left, window.innerWidth - w - margin)) + 'px';
+}
+function openBookmarkAttachPopover(bookmarkId, anchorEl) {
+  const bookmark = getBookmarkById(bookmarkId);
+  if (!bookmark || !(bookmark.attachments || []).length) return;
+  closeBookmarkAttachPopover();
+  attachMemoEditingId = null;
+  const rect = anchorEl.getBoundingClientRect();
+  _attachCtx = {
+    kind: 'bookmark-card', readonly: true, listId: 'bmp-attach-list', statusId: 'bmp-attach-status', scrollId: 'bmp-attach-list',
+    anchor: { top: rect.top, bottom: rect.bottom, left: rect.left },
+    owner: () => getBookmarkById(bookmarkId),
+    isOpen: () => document.getElementById('bookmark-attach-popover')?.style.display !== 'none',
+    afterRender: positionBookmarkAttachPopover,
+  };
+  document.getElementById('bookmark-attach-popover').style.display = 'flex';
+  setAttachmentStatusText('');
+  renderAttachmentList();
+}
+function closeBookmarkAttachPopover() {
+  const pop = document.getElementById('bookmark-attach-popover');
+  if (pop) pop.style.display = 'none';
+  if (_attachCtx?.kind === 'bookmark-card') _attachCtx = null;
+}
+document.addEventListener('mousedown', e => {
+  const pop = document.getElementById('bookmark-attach-popover');
+  if (pop && pop.style.display !== 'none' && !pop.contains(e.target) && !e.target.closest('.bookmark-card-btn.clip')) closeBookmarkAttachPopover();
+});
 function deleteBookmarkFromModal() {
   if (!editingBookmarkId) return;
   const bookmarkId = editingBookmarkId;
