@@ -8859,7 +8859,7 @@ select.sh-field-input,
           <div class="bookmark-form-label">URL</div>
           <div class="bookmark-url-row">
             <input class="bookmark-form-input" id="bookmark-url" placeholder="https://..." spellcheck="false" oninput="bookmarkAutofillTouched=false;updateBookmarkThumbPreview()">
-            <button class="bookmark-fetch-btn" type="button" onclick="fetchBookmarkMetadata()" title="사이트가 직접 조회를 막으면(CORS) 외부 조회 서비스(microlink)로 이 URL을 보내 다시 시도합니다.">가져오기</button>
+            <button class="bookmark-fetch-btn" type="button" onclick="fetchBookmarkMetadata()" title="사이트가 직접 조회를 막으면(CORS) 외부 조회 서비스(jina / microlink)로 이 URL을 보내 다시 시도합니다.">가져오기</button>
           </div>
           <div class="bookmark-fetch-status" id="bookmark-fetch-status"></div>
         </div>
@@ -33940,16 +33940,50 @@ async function fetchBookmarkPageDocument(targetUrl, signal) {
   const html = await response.text();
   return new DOMParser().parseFromString(html, 'text/html');
 }
-// 직접 조회(CORS)가 막힐 때만 쓰는 외부 조회 서비스(microlink). 엔드포인트는 여기만 바꾸면 된다(#191).
+// 직접 조회(CORS)가 막힐 때만 쓰는 외부 조회 서비스. 순서대로 시도하고, 앞이 실패·한도 초과·결과 없음일 때만 다음으로 간다(#191, #199).
+// 1순위 jina reader(키 없이 분당 한도, CORS 허용), 2순위 microlink(무료 한도가 IP당 하루 5회 수준이라 보조). 엔드포인트는 여기만 바꾸면 된다.
+const BOOKMARK_META_JINA_URL = 'https://r.jina.ai/';
 const BOOKMARK_META_SERVICE_URL = 'https://api.microlink.io/';
-const BOOKMARK_META_SERVICE_NOTICE = '이 URL이 외부 조회 서비스(microlink)로 전송됩니다.';
+const BOOKMARK_META_SERVICE_NOTICE = '이 URL이 외부 조회 서비스(jina / microlink)로 전송됩니다.';
 class BookmarkMetaServiceError extends Error {
   constructor(kind, message) { super(message || kind); this.kind = kind; }
 }
 // microlink 기본값은 헤드리스 렌더링(prerender)이 붙어 캐시 MISS 에서 4~5초 걸린다. 1차는 렌더링 없이(빠름), 제목·썸네일이 둘 다 비면 기본값으로 한 번 더 시도한다(#196).
 const BOOKMARK_META_SERVICE_FAST_QUERY = '&prerender=false&palette=false&audio=false&video=false&iframe=false';
 const bookmarkMetaServiceCache = new Map();
-async function requestBookmarkMetaService(targetUrl, signal, extraQuery) {
+// HTML 엔티티(&amp; 등) 정규화: 서비스가 og 값을 이스케이프된 채로 주는 경우가 있다.
+function decodeBookmarkMetaEntities(text) {
+  const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+  return String(text || '')
+    .replace(/&#(\d+);/g, (m, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (m, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&([a-z]+);/gi, (m, n) => (n.toLowerCase() in named ? named[n.toLowerCase()] : m));
+}
+async function requestBookmarkMetaJina(targetUrl, signal) {
+  let response;
+  try {
+    // 사용자 지정 헤더는 CORS 사전요청이 필요해 Accept 만 쓴다.
+    response = await fetch(BOOKMARK_META_JINA_URL + targetUrl, {
+      method: 'GET', mode: 'cors', credentials: 'omit', headers: { Accept: 'application/json' }, signal,
+    });
+  } catch (error) {
+    if (signal?.aborted || error?.name === 'AbortError') throw new BookmarkMetaServiceError('timeout');
+    throw new BookmarkMetaServiceError('network');
+  }
+  if (response.status === 429) throw new BookmarkMetaServiceError('rate-limit');
+  let json = null;
+  try { json = await response.json(); } catch {}
+  if (json && (json.code === 429 || json.status === 42901)) throw new BookmarkMetaServiceError('rate-limit');
+  if (!response.ok || !json || !json.data) throw new BookmarkMetaServiceError('service', `HTTP ${response.status}`);
+  const data = json.data;
+  const meta = data.metadata || {};
+  const pick = (...values) => values.map(v => String(v || '').trim()).find(Boolean) || '';
+  const title = decodeBookmarkMetaEntities(pick(meta['og:title'], meta['twitter:title'], data.title));
+  let image = decodeBookmarkMetaEntities(pick(meta['og:image'], meta['twitter:image']));
+  if (image) { try { image = new URL(image, pick(data.url, targetUrl)).href; } catch {} }
+  return { title, image };
+}
+async function requestBookmarkMetaMicrolink(targetUrl, signal, extraQuery) {
   let response;
   try {
     response = await fetch(`${BOOKMARK_META_SERVICE_URL}?url=${encodeURIComponent(targetUrl)}${extraQuery}`, {
@@ -33968,12 +34002,32 @@ async function requestBookmarkMetaService(targetUrl, signal, extraQuery) {
   // logo 는 쓰지 않는다(사이트 로고가 썸네일로 들어가는 것을 막음).
   return { title: String(data.data?.title || '').trim(), image: String(data.data?.image?.url || '').trim() };
 }
+async function requestBookmarkMetaMicrolinkAuto(targetUrl, signal) {
+  let result = await requestBookmarkMetaMicrolink(targetUrl, signal, BOOKMARK_META_SERVICE_FAST_QUERY);
+  if (!result.title && !result.image) result = await requestBookmarkMetaMicrolink(targetUrl, signal, '');
+  return result;
+}
+const BOOKMARK_META_SERVICES = [requestBookmarkMetaJina, requestBookmarkMetaMicrolinkAuto];
 async function fetchBookmarkMetaViaService(targetUrl, signal) {
   if (bookmarkMetaServiceCache.has(targetUrl)) return { ...bookmarkMetaServiceCache.get(targetUrl) };
-  let result = await requestBookmarkMetaService(targetUrl, signal, BOOKMARK_META_SERVICE_FAST_QUERY);
-  if (!result.title && !result.image) result = await requestBookmarkMetaService(targetUrl, signal, '');
-  if (result.title || result.image) bookmarkMetaServiceCache.set(targetUrl, result);
-  return { ...result };
+  const failures = [];
+  for (const request of BOOKMARK_META_SERVICES) {
+    try {
+      const result = await request(targetUrl, signal);
+      if (result.title || result.image) {
+        bookmarkMetaServiceCache.set(targetUrl, result);
+        return { ...result };
+      }
+      failures.push('empty');
+    } catch (error) {
+      if (error?.kind === 'timeout' || signal?.aborted || error?.name === 'AbortError') throw new BookmarkMetaServiceError('timeout');
+      failures.push(error?.kind || 'service');
+    }
+  }
+  // 한도 초과 문구는 시도한 모든 서비스가 한도 초과일 때만, 연결 실패는 모두 연결 실패일 때만 보인다.
+  if (failures.length && failures.every(kind => kind === 'rate-limit')) throw new BookmarkMetaServiceError('rate-limit');
+  if (failures.length && failures.every(kind => kind === 'network')) throw new BookmarkMetaServiceError('network');
+  throw new BookmarkMetaServiceError('service', failures.join(','));
 }
 // 직접 조회가 실패했을 때에만(시간 초과 제외) 외부 서비스로 다시 조회한다. 성공하면 {title, image}.
 async function fetchBookmarkGenericMeta(targetUrl, signal, onFallback = null) {
