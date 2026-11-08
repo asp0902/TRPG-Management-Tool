@@ -2234,6 +2234,7 @@ tr.ct-row-end .ct-select:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-top: auto; /* 카드 본문 맨 아래(푸터 바로 위)에 붙인다: 같은 행 카드의 태그 높이가 정렬된다(#200) */
 }
 .bookmark-card-tag,
 .bookmark-tag-suggestion {
@@ -33688,10 +33689,10 @@ function renderBookmarkPage() {
           : `<div class="bookmark-thumb-placeholder">🔖</div>`}
       </div>
       <div class="bookmark-card-body">
-        ${bookmark.tags?.length ? `<div class="bookmark-card-tags">${renderBookmarkCardTags(bookmark.tags)}</div>` : ''}
         <div class="bookmark-card-title">${esc(getBookmarkDisplayTitle(bookmark))}</div>
         <div class="bookmark-card-url">${esc(bookmark.url || '')}</div>
         ${bookmark.notes ? `<div class="bookmark-card-notes" title="${esc(bookmark.notes)}">${esc(bookmark.notes)}</div>` : ''}
+        ${bookmark.tags?.length ? `<div class="bookmark-card-tags">${renderBookmarkCardTags(bookmark.tags)}</div>` : ''}
       </div>
       <div class="bookmark-card-footer">
         ${(bookmark.attachments || []).length ? `<button class="bookmark-card-btn clip" type="button" onclick="event.stopPropagation();openBookmarkAttachPopover('${bookmark.id}',this)" title="첨부 파일 ${(bookmark.attachments || []).length}개"><i class="fa-solid fa-paperclip" aria-hidden="true"></i>${(bookmark.attachments || []).length}</button>` : ''}
