@@ -566,6 +566,34 @@ tr.ct-row-end .ct-select:focus {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .record-player-thumb:hover { border-color: #c9c9c9; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+/* 기록 이미지 여러 장(#203): 편집 폼은 썸네일을 세로로 쌓고 마지막에 「＋ 이미지」 카드 */
+.record-player-media { justify-content: flex-start; }
+.record-img-card { position: relative; width: 64px; height: 64px; flex: 0 0 auto; }
+.record-img-card .record-img-thumb { height: 64px; min-height: 64px; cursor: default; }
+.record-img-main { position: absolute; top: 3px; left: 3px; padding: 1px 5px; border-radius: 999px; background: #111; color: #fff; font-size: 9px; font-weight: 700; line-height: 14px; pointer-events: none; }
+.record-img-actions { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; padding: 2px; background: rgba(0,0,0,0.45); border-radius: 0 0 10px 10px; opacity: 0; transition: opacity 0.12s ease; }
+.record-img-card:hover .record-img-actions, .record-img-card:focus-within .record-img-actions { opacity: 1; }
+.record-img-actions button { width: 18px; height: 18px; padding: 0; border: none; border-radius: 4px; background: transparent; color: #fff; font-size: 13px; line-height: 18px; cursor: pointer; }
+.record-img-actions button:hover:not(:disabled) { background: rgba(255,255,255,0.28); }
+.record-img-actions button:disabled { opacity: 0.3; cursor: default; }
+.record-player-thumb.record-img-add { height: 40px; min-height: 40px; flex: 0 0 auto; }
+.record-player-chip-thumb { position: relative; }
+.record-img-more { position: absolute; right: 2px; bottom: 2px; padding: 0 4px; border-radius: 999px; background: rgba(17,17,17,0.82); color: #fff; font-size: 9px; font-weight: 700; line-height: 14px; }
+.record-img-strip { display: flex; flex-wrap: wrap; gap: 6px; }
+.record-img-strip-thumb { padding: 0; border: 1px solid #ebebeb; cursor: zoom-in; background: #f1f1f1; }
+.record-img-strip-thumb:hover { border-color: #999; }
+.record-detail-players .record-player-chip.multi { grid-template-columns: minmax(0, 1fr); }
+.record-detail-players .record-player-chip.multi .record-img-strip { order: 2; }
+.record-image-viewer { display: none; position: fixed; inset: 0; z-index: 10020; background: rgba(0,0,0,0.82); align-items: center; justify-content: center; }
+.record-image-viewer.open { display: flex; }
+.record-image-viewer .riv-img { max-width: min(92vw, 1400px); max-height: 88vh; object-fit: contain; border-radius: 6px; background: #111; }
+.record-image-viewer .riv-close { position: absolute; top: 14px; right: 18px; width: 36px; height: 36px; border: none; border-radius: 50%; background: rgba(255,255,255,0.16); color: #fff; font-size: 16px; cursor: pointer; }
+.record-image-viewer .riv-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 64px; border: none; border-radius: 10px; background: rgba(255,255,255,0.16); color: #fff; font-size: 30px; cursor: pointer; }
+.record-image-viewer .riv-nav.prev { left: 16px; }
+.record-image-viewer .riv-nav.next { right: 16px; }
+.record-image-viewer .riv-nav:disabled { opacity: 0.25; cursor: default; }
+.record-image-viewer.single .riv-nav, .record-image-viewer.single .riv-count { display: none; }
+.record-image-viewer .riv-count { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); padding: 3px 12px; border-radius: 999px; background: rgba(0,0,0,0.55); color: #fff; font-size: 12px; }
 .record-player-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .record-player-fields { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .record-player-remove-btn {
@@ -8662,9 +8690,7 @@ select.sh-field-input,
                       <span class="record-inline-add-btn record-inline-add-btn-placeholder" aria-hidden="true">+ PL 추가</span>
                     </div>
                     <div class="record-gm-card" id="rf-gm-card">
-                      <div class="record-player-media">
-                        <div class="record-player-thumb record-gm-thumb" title="클릭하여 이미지 설정" onclick="openRecordImageUrlPopup(this)"></div>
-                      </div>
+                      <div class="record-player-media"></div>
                       <div class="record-player-fields">
                         <input type="text" class="record-form-input" id="rf-gm-name" placeholder="GM 이름">
                         <input type="text" class="record-form-input" id="rf-gm-pc-name" placeholder="GMPC 이름">
@@ -10072,12 +10098,31 @@ function mkBookmark(url = '') {
     attachments: [],
   };
 }
+// 기록 이미지(GM·PL): 여러 장. 단일 필드(gmImage / image)는 항상 images[0] 과 같게 두어 구버전·기존 화면과 호환한다(#203).
+// 이미지는 줄이지 않고 원본 그대로(dataURL) 저장한다. 같은 값의 중복은 제거한다.
+function normalizeRecordImageList(list, single = '') {
+  const out = [];
+  (Array.isArray(list) ? list : []).forEach(value => {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (text && !out.includes(text)) out.push(text);
+  });
+  // 구버전 기기에서 단일 필드만 바꿨다면 그 값을 대표(맨 앞)로 본다.
+  const first = typeof single === 'string' ? single.trim() : '';
+  if (first && out[0] !== first) {
+    const at = out.indexOf(first);
+    if (at > 0) out.splice(at, 1);
+    out.unshift(first);
+  }
+  return out;
+}
 function mkRecordPlayer(input = {}) {
+  const images = normalizeRecordImageList(input?.images, typeof input?.image === 'string' ? input.image : '');
   return {
     id: input?.id || mkId(),
     plName: typeof input?.plName === 'string' ? input.plName : (typeof input?.name === 'string' ? input.name : ''),
     pcName: typeof input?.pcName === 'string' ? input.pcName : '',
-    image: typeof input?.image === 'string' ? input.image : '',
+    image: images[0] || '',
+    images,
   };
 }
 function mkRecordGm(input = {}) {
@@ -10086,10 +10131,13 @@ function mkRecordGm(input = {}) {
     : (typeof input?.name === 'string'
       ? input.name
       : (typeof input?.gm === 'string' ? input.gm : ''));
+  const single = typeof input?.gmImage === 'string' ? input.gmImage : (typeof input?.image === 'string' ? input.image : '');
+  const gmImages = normalizeRecordImageList(input?.gmImages, single);
   return {
     gmName,
     gmPcName: typeof input?.gmPcName === 'string' ? input.gmPcName : (typeof input?.pcName === 'string' ? input.pcName : ''),
-    gmImage: typeof input?.gmImage === 'string' ? input.gmImage : (typeof input?.image === 'string' ? input.image : ''),
+    gmImage: gmImages[0] || '',
+    gmImages,
   };
 }
 function normalizeRecordPlayersData(input, fallbackPlayers = '') {
@@ -10102,7 +10150,7 @@ function normalizeRecordPlayersData(input, fallbackPlayers = '') {
   if (!pool.length && typeof fallbackPlayers === 'string' && fallbackPlayers.trim()) {
     fallbackPlayers.split(/[,/\n]+/g).forEach(name => pool.push(mkRecordPlayer({ plName: name.trim() })));
   }
-  return pool.filter(player => (player.plName || player.pcName || player.image));
+  return pool.filter(player => (player.plName || player.pcName || player.images.length));
 }
 function normalizeRecordSessionTags(input, fallbackTag = '') {
   const pool = [];
@@ -10213,6 +10261,7 @@ function mkRecordEntry(input = {}) {
     gmName: gmData.gmName,
     gmPcName: gmData.gmPcName,
     gmImage: gmData.gmImage,
+    gmImages: gmData.gmImages,
     players: typeof input?.players === 'string'
       ? input.players
       : playersData.map(player => player.plName || player.pcName).filter(Boolean).join(', '),
@@ -32251,6 +32300,7 @@ function buildRecordFormSeedFromRecord(record) {
     gmName: record?.gmName || record?.gm || '',
     gmPcName: record?.gmPcName || '',
     gmImage: record?.gmImage || '',
+    gmImages: record?.gmImages || [],
     players: playersData.map(player => player.plName || player.pcName).filter(Boolean).join(', '),
     playersData,
     rule: record?.rule || '',
@@ -32737,37 +32787,79 @@ function createRecordPlayerRow(player = {}) {
   row.dataset.playerId = player.id || mkId();
   row.innerHTML = `
     <div class="record-player-media">
-      <div class="record-player-thumb" title="클릭하여 이미지 설정" onclick="openRecordImageUrlPopup(this)"></div>
     </div>
     <div class="record-player-fields">
       <input type="text" class="record-form-input record-player-pl" placeholder="PL 이름" value="${esc(player.plName || '')}">
       <input type="text" class="record-form-input record-player-pc" placeholder="PC 이름" value="${esc(player.pcName || '')}">
     </div>
     <button type="button" class="record-player-remove-btn" onmousedown="event.preventDefault()" onclick="removeRecordPlayerRow(this)">✕</button>
-    <input type="hidden" class="record-player-image" value="${esc(player.image || '')}">`;
+    <input type="hidden" class="record-player-image" value="${esc(JSON.stringify(normalizeRecordImageList(player.images, player.image || '')))}">`;
   syncRecordPlayerRow(row);
   return row;
 }
 
-function syncRecordImageCard(rootEl, imageSelector, thumbSelector) {
+// GM·PL 이미지 목록: 숨김 입력칸에 JSON 배열로 둔다(단일 문자열이 들어 있어도 읽는다).
+function readRecordImageList(hidden) {
+  const raw = String(hidden?.value || '').trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return normalizeRecordImageList(parsed);
+  } catch (_) { /* 단일 URL 문자열 */ }
+  return normalizeRecordImageList([raw]);
+}
+function writeRecordImageList(hidden, list) {
+  if (hidden) hidden.value = JSON.stringify(normalizeRecordImageList(list));
+}
+function syncRecordImageCard(rootEl, imageSelector) {
   if (!rootEl) return;
-  const imageInput = rootEl.querySelector(imageSelector);
-  const thumb = rootEl.querySelector(thumbSelector);
-  const src = String(imageInput?.value || '').trim();
-  if (thumb) {
-    thumb.innerHTML = src
-      ? `<img src="${esc(src)}" alt="" onerror="this.parentNode.innerHTML='<span>IMAGE</span>'">`
-      : '<span>IMAGE</span>';
-  }
+  const media = rootEl.querySelector('.record-player-media');
+  if (!media) return;
+  const list = readRecordImageList(rootEl.querySelector(imageSelector));
+  media.innerHTML = list.map((src, index) => `
+    <div class="record-img-card" data-idx="${index}">
+      <div class="record-player-thumb record-img-thumb"><img src="${esc(src)}" alt="" onerror="this.parentNode.innerHTML='<span>IMAGE</span>'"></div>
+      ${index === 0 ? '<span class="record-img-main">대표</span>' : ''}
+      <div class="record-img-actions">
+        <button type="button" title="앞으로" aria-label="앞으로" ${index === 0 ? 'disabled' : ''} onmousedown="event.preventDefault()" onclick="moveRecordImage(this,-1)">‹</button>
+        <button type="button" title="뒤로" aria-label="뒤로" ${index === list.length - 1 ? 'disabled' : ''} onmousedown="event.preventDefault()" onclick="moveRecordImage(this,1)">›</button>
+        <button type="button" title="삭제" aria-label="이미지 삭제" onmousedown="event.preventDefault()" onclick="removeRecordImage(this)">×</button>
+      </div>
+    </div>`).join('') + `<div class="record-player-thumb record-img-add" title="이미지 추가" onclick="openRecordImageUrlPopup(this)"><span>＋ 이미지</span></div>`;
+}
+function getRecordImageHost(buttonEl) {
+  const host = buttonEl?.closest('.record-player-row, #rf-gm-card');
+  const hidden = host?.querySelector('.record-player-image, .record-gm-image');
+  return { host, hidden };
+}
+function moveRecordImage(buttonEl, dir) {
+  const { host, hidden } = getRecordImageHost(buttonEl);
+  const index = Number(buttonEl?.closest('.record-img-card')?.dataset.idx);
+  if (!host || !hidden || !Number.isInteger(index)) return;
+  const list = readRecordImageList(hidden);
+  const to = index + dir;
+  if (to < 0 || to >= list.length) return;
+  [list[index], list[to]] = [list[to], list[index]];
+  writeRecordImageList(hidden, list);
+  syncRecordImageCard(host, host.id === 'rf-gm-card' ? '.record-gm-image' : '.record-player-image');
+}
+function removeRecordImage(buttonEl) {
+  const { host, hidden } = getRecordImageHost(buttonEl);
+  const index = Number(buttonEl?.closest('.record-img-card')?.dataset.idx);
+  if (!host || !hidden || !Number.isInteger(index)) return;
+  const list = readRecordImageList(hidden);
+  list.splice(index, 1);
+  writeRecordImageList(hidden, list);
+  syncRecordImageCard(host, host.id === 'rf-gm-card' ? '.record-gm-image' : '.record-player-image');
 }
 
 function syncRecordPlayerRow(row) {
-  syncRecordImageCard(row, '.record-player-image', '.record-player-thumb');
+  syncRecordImageCard(row, '.record-player-image');
 }
 
 function syncRecordGmCard() {
   const gmCard = document.getElementById('rf-gm-card');
-  syncRecordImageCard(gmCard, '.record-gm-image', '.record-gm-thumb');
+  syncRecordImageCard(gmCard, '.record-gm-image');
 }
 
 function syncRecordScenarioImageCard() {
@@ -32859,7 +32951,7 @@ function addRecordPlayerRow(player = {}) {
   const row = createRecordPlayerRow(player);
   list.appendChild(row);
   const firstInput = row.querySelector('.record-player-pl');
-  if (!player?.plName && !player?.pcName && !player?.image) setTimeout(() => whenImeIdle(() => firstInput?.focus()), 10);
+  if (!player?.plName && !player?.pcName && !(player?.images || []).length && !player?.image) setTimeout(() => whenImeIdle(() => firstInput?.focus()), 10);
 }
 
 function removeRecordPlayerRow(buttonEl) {
@@ -32870,10 +32962,11 @@ function clearRecordImage(buttonEl) {
   const host = buttonEl?.closest('.record-player-row, #rf-gm-card, #rf-custom-scenario-fields');
   if (!host) return;
   const hidden = host.querySelector('.record-player-image, .record-gm-image, #rf-scenario-image');
-  if (hidden) hidden.value = '';
+  if (hidden) hidden.value = host.id === '' || host.classList.contains('record-player-row') || host.id === 'rf-gm-card' ? '[]' : '';
   if (host.id === 'rf-gm-card') {
     syncRecordGmCard();
   } else if (host.id === 'rf-custom-scenario-fields') {
+    if (hidden) hidden.value = '';
     syncRecordScenarioImageCard();
   } else {
     syncRecordPlayerRow(host);
@@ -32888,7 +32981,8 @@ function openRecordImageUrlPopup(buttonEl) {
   backdrop.dataset.targetType = host.id === 'rf-gm-card' ? 'gm' : (host.id === 'rf-custom-scenario-fields' ? 'scenario' : 'player');
   backdrop.dataset.targetId = host.id === 'rf-gm-card' ? 'rf-gm-card' : (host.dataset.playerId || '');
   const hidden = host.querySelector('.record-player-image, .record-gm-image, #rf-scenario-image');
-  input.value = String(hidden?.value || '').trim();
+  // GM·PL 은 여러 장이라 팝업은 항상 「추가」(빈 입력). 시나리오 대표 이미지만 기존 값을 보여 준다.
+  input.value = host.id === 'rf-custom-scenario-fields' ? String(hidden?.value || '').trim() : '';
   backdrop.style.display = 'flex';
   setTimeout(() => whenImeIdle(() => input.focus()), 10);
 }
@@ -32950,7 +33044,11 @@ async function saveRecordImageUrlPopup() {
     return;
   }
   if (backdrop.imageRequest !== request || backdrop.style.display === 'none' || !host.isConnected || input.value.trim() !== value) return;
-  if (hidden) hidden.value = storedValue;
+  if (host.id === 'rf-custom-scenario-fields') {
+    if (hidden) hidden.value = storedValue;
+  } else if (hidden && storedValue) {
+    writeRecordImageList(hidden, [...readRecordImageList(hidden), storedValue]); // 여러 장: 끝에 추가(같은 이미지는 중복 제거)
+  }
   if (host.id === 'rf-gm-card') {
     syncRecordGmCard();
   } else if (host.id === 'rf-custom-scenario-fields') {
@@ -33002,15 +33100,15 @@ function collectRecordPlayersData() {
     id: row.dataset.playerId || mkId(),
     plName: row.querySelector('.record-player-pl')?.value.trim() || '',
     pcName: row.querySelector('.record-player-pc')?.value.trim() || '',
-    image: row.querySelector('.record-player-image')?.value.trim() || '',
-  })).filter(player => player.plName || player.pcName || player.image);
+    images: readRecordImageList(row.querySelector('.record-player-image')),
+  })).filter(player => player.plName || player.pcName || player.images.length);
 }
 
 function collectRecordGmData() {
   return mkRecordGm({
     gmName: document.getElementById('rf-gm-name')?.value.trim() || '',
     gmPcName: document.getElementById('rf-gm-pc-name')?.value.trim() || '',
-    gmImage: document.getElementById('rf-gm-image')?.value.trim() || '',
+    gmImages: readRecordImageList(document.getElementById('rf-gm-image')),
   });
 }
 
@@ -33135,11 +33233,11 @@ function renderRecordDetailContent(record) {
         <div class="record-detail-side">
           <div class="record-detail-section">
             <div class="record-detail-heading">GM</div>
-            <div class="record-detail-players">${renderRecordGmCell(record)}</div>
+            <div class="record-detail-players">${renderRecordGmCell(record, { detail: true })}</div>
           </div>
           <div class="record-detail-section">
             <div class="record-detail-heading">PL</div>
-            <div class="record-detail-players">${renderRecordPlayersCell(record)}</div>
+            <div class="record-detail-players">${renderRecordPlayersCell(record, { detail: true })}</div>
           </div>
         </div>
       </div>
@@ -33169,12 +33267,83 @@ function renderRecordPlayersSummary(record) {
     </span>`).join('')}</div>`;
 }
 
-function renderRecordPlayersCell(record) {
+// ── 기록 이미지 넘겨 보기 뷰어(#203) ──
+let _recordImageViewer = null; // { images, index }
+function getRecordImagesFor(recordId, who) {
+  const record = state.records.find(item => item.id === recordId);
+  if (!record) return [];
+  if (who === 'gm') return normalizeRecordImageList(record.gmImages, String(record.gmImage || ''));
+  const playerId = String(who || '').replace(/^pl:/, '');
+  const player = normalizeRecordPlayersData(record.playersData, record.players).find(item => item.id === playerId);
+  return player ? player.images : [];
+}
+function ensureRecordImageViewer() {
+  let el = document.getElementById('record-image-viewer');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'record-image-viewer';
+  el.className = 'record-image-viewer';
+  el.innerHTML = `<button type="button" class="riv-close" aria-label="닫기" onclick="closeRecordImageViewer()">✕</button>
+    <button type="button" class="riv-nav prev" aria-label="이전" onclick="stepRecordImageViewer(-1)">‹</button>
+    <img class="riv-img" alt="">
+    <button type="button" class="riv-nav next" aria-label="다음" onclick="stepRecordImageViewer(1)">›</button>
+    <div class="riv-count"></div>`;
+  el.addEventListener('mousedown', event => { if (event.target === el) closeRecordImageViewer(); });
+  document.body.appendChild(el);
+  return el;
+}
+function renderRecordImageViewer() {
+  const el = document.getElementById('record-image-viewer');
+  const v = _recordImageViewer;
+  if (!el || !v) return;
+  el.querySelector('.riv-img').src = v.images[v.index];
+  el.querySelector('.riv-count').textContent = `${v.index + 1} / ${v.images.length}`;
+  el.querySelector('.riv-nav.prev').disabled = v.index <= 0;
+  el.querySelector('.riv-nav.next').disabled = v.index >= v.images.length - 1;
+  el.classList.toggle('single', v.images.length < 2);
+}
+function openRecordImageViewer(recordId, who, index = 0) {
+  const images = getRecordImagesFor(recordId, who);
+  if (!images.length) return;
+  _recordImageViewer = { images, index: Math.max(0, Math.min(images.length - 1, Number(index) || 0)) };
+  ensureRecordImageViewer().classList.add('open');
+  renderRecordImageViewer();
+}
+function stepRecordImageViewer(dir) {
+  const v = _recordImageViewer;
+  if (!v) return;
+  v.index = Math.max(0, Math.min(v.images.length - 1, v.index + dir));
+  renderRecordImageViewer();
+}
+function closeRecordImageViewer() {
+  _recordImageViewer = null;
+  const el = document.getElementById('record-image-viewer');
+  if (el) { el.classList.remove('open'); el.querySelector('.riv-img').removeAttribute('src'); }
+}
+document.addEventListener('keydown', event => {
+  if (!_recordImageViewer) return;
+  if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); closeRecordImageViewer(); }
+  else if (event.key === 'ArrowLeft') { event.preventDefault(); event.stopImmediatePropagation(); stepRecordImageViewer(-1); }
+  else if (event.key === 'ArrowRight') { event.preventDefault(); event.stopImmediatePropagation(); stepRecordImageViewer(1); }
+}, true);
+
+// 기록 이미지 칩: 표에서는 대표 1장 + 2장 이상이면 「+N」, 상세(opts.detail)에서는 전부 나열하고 클릭하면 넘겨 보기(#203).
+function renderRecordChipImages(images, who, opts = {}) {
+  if (!images.length) return '<div class="record-player-chip-thumb">IMG</div>';
+  if (!opts.detail) {
+    return `<div class="record-player-chip-thumb"><img src="${esc(images[0])}" alt="">${images.length > 1 ? `<span class="record-img-more">+${images.length - 1}</span>` : ''}</div>`;
+  }
+  const rid = esc(JSON.stringify(opts.recordId || ''));
+  const whoArg = esc(JSON.stringify(who));
+  return `<div class="record-img-strip">${images.map((src, index) => `<button type="button" class="record-player-chip-thumb record-img-strip-thumb" title="크게 보기 (${index + 1} / ${images.length})" onclick="openRecordImageViewer(${rid},${whoArg},${index})"><img src="${esc(src)}" alt=""></button>`).join('')}</div>`;
+}
+function renderRecordPlayersCell(record, opts = {}) {
   const players = normalizeRecordPlayersData(record?.playersData, record?.players);
   if (!players.length) return '<span class="record-cell-empty">-</span>';
+  const detailOpts = { ...opts, recordId: record?.id };
   return `<div class="record-players-cell">${players.map(player => `
-    <div class="record-player-chip">
-      <div class="record-player-chip-thumb">${player.image ? `<img src="${esc(player.image)}" alt="">` : 'IMG'}</div>
+    <div class="record-player-chip${opts.detail && player.images.length > 1 ? ' multi' : ''}">
+      ${renderRecordChipImages(player.images, 'pl:' + player.id, detailOpts)}
       <div class="record-player-chip-meta">
         <div class="record-player-chip-pl">${esc(player.plName || '이름 미정')}</div>
         <div class="record-player-chip-pc">${esc(player.pcName || '')}</div>
@@ -33182,14 +33351,14 @@ function renderRecordPlayersCell(record) {
     </div>`).join('')}</div>`;
 }
 
-function renderRecordGmCell(record) {
+function renderRecordGmCell(record, opts = {}) {
   const gmName = String(record?.gmName || record?.gm || '').trim();
   const gmPcName = String(record?.gmPcName || '').trim();
-  const gmImage = String(record?.gmImage || '').trim();
-  if (!gmName && !gmPcName && !gmImage) return '<span class="record-cell-empty">-</span>';
+  const gmImages = normalizeRecordImageList(record?.gmImages, String(record?.gmImage || ''));
+  if (!gmName && !gmPcName && !gmImages.length) return '<span class="record-cell-empty">-</span>';
   return `<div class="record-players-cell">
-    <div class="record-player-chip">
-      <div class="record-player-chip-thumb">${gmImage ? `<img src="${esc(gmImage)}" alt="">` : 'IMG'}</div>
+    <div class="record-player-chip${opts.detail && gmImages.length > 1 ? ' multi' : ''}">
+      ${renderRecordChipImages(gmImages, 'gm', { ...opts, recordId: record?.id })}
       <div class="record-player-chip-meta">
         <div class="record-player-chip-pl">${esc(gmName || '이름 미정')}</div>
         <div class="record-player-chip-pc">${esc(gmPcName || '')}</div>
@@ -33323,7 +33492,7 @@ function openRecordForm(recordId) {
       if (gmInput) gmInput.value = rec.gm || rec.gmName || '';
       if (gmNameInput) gmNameInput.value = rec.gmName || rec.gm || '';
       if (gmPcInput) gmPcInput.value = rec.gmPcName || '';
-      if (gmImageInput) gmImageInput.value = rec.gmImage || '';
+      if (gmImageInput) gmImageInput.value = JSON.stringify(normalizeRecordImageList(rec.gmImages, rec.gmImage || ''));
       ruleInput.value = rec.rule || '';
       roomLinkInput.value = rec.roomLink || '';
       if (sessionTagInput) sessionTagInput.value = formatRecordSessionTags(rec.sessionTags || rec.sessionTag || '');
@@ -33411,6 +33580,7 @@ function saveRecord() {
     gmName: gmData.gmName,
     gmPcName: gmData.gmPcName,
     gmImage: gmData.gmImage,
+    gmImages: gmData.gmImages,
     players: playersField?.value || playersData.map(player => player.plName || player.pcName).filter(Boolean).join(', '),
     playersData,
     rule: document.getElementById('rf-rule')?.value.trim() || '',
