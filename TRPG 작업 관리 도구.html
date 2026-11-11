@@ -536,7 +536,7 @@ tr.ct-row-end .ct-select:focus {
   visibility: hidden; pointer-events: none;
 }
 .record-cast-layout {
-  display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 12px; align-items: start;
+  display: grid; grid-template-columns: 272px minmax(0, 1fr); gap: 12px; align-items: start;
 }
 .record-cast-column { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .record-cast-label-row {
@@ -547,17 +547,18 @@ tr.ct-row-end .ct-select:focus {
 }
 .record-player-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(272px, 100%), 272px)); /* 카드는 남는 폭으로 늘어나지 않는다(#204) */
   gap: 10px;
   align-items: start;
 }
 .record-player-row,
 .record-gm-card {
-  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px;
+  /* 이미지 64px + 입력칸 140px + 삭제 28px(GM 카드는 빈 칸) → 카드 폭 272px 고정(#204) */
+  display: grid; grid-template-columns: 64px minmax(0, 140px) 28px; gap: 10px;
   align-items: stretch; background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; padding: 10px;
 }
-.record-player-row { width: auto; min-width: 0; }
-.record-gm-card { width: 250px; max-width: 100%; }
+.record-player-row { width: 272px; max-width: 100%; min-width: 0; box-sizing: border-box; }
+.record-gm-card { width: 272px; max-width: 100%; box-sizing: border-box; }
 .record-player-media { display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: stretch; align-self: stretch; width: 64px; }
 .record-player-thumb {
   width: 64px; height: 100%; min-height: 64px; border-radius: 10px; border: 1px solid #ebebeb;
