@@ -421,7 +421,7 @@ tr.ct-row-end .ct-select:focus {
 }
 .record-form-modal-head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 16px 18px 0;
+  padding: 12px 18px 0;
 }
 .record-form-modal-title {
   font-size: 14px; font-weight: 800; color: #111; letter-spacing: 0.02em;
@@ -440,9 +440,11 @@ tr.ct-row-end .ct-select:focus {
 .record-form-wrap.open { display: flex; }
 .record-form-modal .record-form-wrap {
   display: flex; margin: 0; border: none; border-radius: 0; background: transparent;
-  padding: 14px 18px 18px; min-width: 0;
+  padding: 8px 18px 12px; min-width: 0;
 }
-.record-form-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+/* 모달 안 타임라인 요약 카드는 여백을 줄여 세로로 덜 차지한다(#206) */
+.record-form-modal .record-timeline-editor { padding: 8px 12px; gap: 6px; }
+.record-form-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px 12px; } /* 세로 간격을 줄여 복사·편집 모달이 화면 안에 들어가게(#206) */
 .record-form-row { display: flex; flex-direction: column; gap: 4px; }
 .record-form-grid > .record-form-row { grid-column: span 3; }
 .record-form-grid > .record-form-row.third { grid-column: span 2; }
@@ -555,7 +557,7 @@ tr.ct-row-end .ct-select:focus {
 .record-gm-card {
   /* 이미지 64px + 입력칸 140px + 삭제 28px(GM 카드는 빈 칸) → 카드 폭 272px 고정(#204) */
   display: grid; grid-template-columns: 64px minmax(0, 140px) 28px; gap: 10px;
-  align-items: stretch; background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; padding: 10px;
+  align-items: stretch; background: #fff; border: 1px solid #e6e6e6; border-radius: 8px; padding: 8px 10px;
 }
 .record-player-row { width: 272px; max-width: 100%; min-width: 0; box-sizing: border-box; }
 .record-gm-card { width: 272px; max-width: 100%; box-sizing: border-box; }
@@ -596,7 +598,8 @@ tr.ct-row-end .ct-select:focus {
 .record-image-viewer.single .riv-nav, .record-image-viewer.single .riv-count { display: none; }
 .record-image-viewer .riv-count { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); padding: 3px 12px; border-radius: 999px; background: rgba(0,0,0,0.55); color: #fff; font-size: 12px; }
 .record-player-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.record-player-fields { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.record-player-fields { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.record-player-fields .record-form-input { padding-top: 4px; padding-bottom: 4px; }
 .record-player-remove-btn {
   width: 28px; height: 28px; border: 1px solid #e2e2e2; border-radius: 6px; background: none;
   color: #888; cursor: pointer; font-size: 13px; align-self: start;
@@ -651,7 +654,7 @@ tr.ct-row-end .ct-select:focus {
 }
 .record-note-btn:hover { background: #f5f5f5; color: #111; }
 .record-note-editor {
-  min-height: 118px; border: 1px solid #e4e4e4; border-radius: 0 0 8px 8px; background: #fff;
+  min-height: 48px; border: 1px solid #e4e4e4; border-radius: 0 0 8px 8px; background: #fff;
   padding: 10px 12px; font-size: 13px; line-height: 1.7; color: #222; outline: none;
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
@@ -32623,8 +32626,8 @@ function renderRecordTimelineSummary() {
   const anchorTitles = sorted.filter(item => item.type === 'anchor').map(item => item.title || '이름 없음');
   const eventItems = sorted.filter(item => item.type === 'event');
   const top = eventItems.slice(0, 3).map(item => `<div>${esc(getRecordTimelineTimeLabel(item))} · ${esc(item.title || '이름 없음')}</div>`).join('');
-  box.innerHTML = `<div>기준 사건: <b>${esc(anchorTitles.join(', ') || '없음')}</b> · 사건 ${eventItems.length}개</div>${top}`
-    + (editingRecordId ? '' : '<div class="record-timeline-summary-hint">기록을 저장하면 타임라인 탭에서 편집할 수 있어요.</div>');
+  // 안내 문구는 첫 줄에 이어 붙여 한 줄을 아낀다(복사·추가 모달이 화면 안에 들어가게, #206).
+  box.innerHTML = `<div>기준 사건: <b>${esc(anchorTitles.join(', ') || '없음')}</b> · 사건 ${eventItems.length}개${editingRecordId ? '' : ' <span class="record-timeline-summary-hint">· 기록을 저장하면 타임라인 탭에서 편집할 수 있어요.</span>'}</div>${top}`;
   if (openBtn) openBtn.disabled = !editingRecordId;
 }
 function getRecordTimelineTabLabel(recordId) {
