@@ -566,17 +566,17 @@ tr.ct-row-end .ct-select:focus {
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .record-player-thumb:hover { border-color: #c9c9c9; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
-/* 기록 이미지 여러 장(#203): 편집 폼은 썸네일을 세로로 쌓고 마지막에 「＋ 이미지」 카드 */
-.record-player-media { justify-content: flex-start; }
+/* 기록 이미지 여러 장(#203): 편집 폼 카드는 대표 1장 + 「+N」, 이미지 설정 모달 아래 줄에 전부 나열 */
+.record-player-thumb { position: relative; }
+.record-image-popup-list { display: flex; flex-wrap: wrap; gap: 8px; max-height: 190px; overflow-y: auto; padding: 2px; }
+.record-image-popup-empty { font-size: 11px; color: #aaa; padding: 6px 2px; }
 .record-img-card { position: relative; width: 64px; height: 64px; flex: 0 0 auto; }
 .record-img-card .record-img-thumb { height: 64px; min-height: 64px; cursor: default; }
 .record-img-main { position: absolute; top: 3px; left: 3px; padding: 1px 5px; border-radius: 999px; background: #111; color: #fff; font-size: 9px; font-weight: 700; line-height: 14px; pointer-events: none; }
-.record-img-actions { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; padding: 2px; background: rgba(0,0,0,0.45); border-radius: 0 0 10px 10px; opacity: 0; transition: opacity 0.12s ease; }
-.record-img-card:hover .record-img-actions, .record-img-card:focus-within .record-img-actions { opacity: 1; }
+.record-img-actions { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; padding: 2px; background: rgba(0,0,0,0.45); border-radius: 0 0 10px 10px; }
 .record-img-actions button { width: 18px; height: 18px; padding: 0; border: none; border-radius: 4px; background: transparent; color: #fff; font-size: 13px; line-height: 18px; cursor: pointer; }
 .record-img-actions button:hover:not(:disabled) { background: rgba(255,255,255,0.28); }
 .record-img-actions button:disabled { opacity: 0.3; cursor: default; }
-.record-player-thumb.record-img-add { height: 40px; min-height: 40px; flex: 0 0 auto; }
 .record-player-chip-thumb { position: relative; }
 .record-img-more { position: absolute; right: 2px; bottom: 2px; padding: 0 4px; border-radius: 999px; background: rgba(17,17,17,0.82); color: #fff; font-size: 9px; font-weight: 700; line-height: 14px; }
 .record-img-strip { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -8760,9 +8760,10 @@ select.sh-field-input,
               <i class="fa-solid fa-paste"></i><span>클립보드</span>
             </div>
           </div>
+          <div class="record-image-popup-list" id="record-image-popup-list" style="display:none"></div>
           <div class="record-image-url-popup-actions">
             <button type="button" class="record-image-url-popup-btn" onclick="closeRecordImageUrlPopup()">취소</button>
-            <button type="button" class="record-image-url-popup-btn primary" onclick="saveRecordImageUrlPopup()">적용</button>
+            <button type="button" class="record-image-url-popup-btn primary" onclick="applyRecordImagePopup()">적용</button>
           </div>
         </div>
       </div>
@@ -32816,43 +32817,11 @@ function syncRecordImageCard(rootEl, imageSelector) {
   const media = rootEl.querySelector('.record-player-media');
   if (!media) return;
   const list = readRecordImageList(rootEl.querySelector(imageSelector));
-  media.innerHTML = list.map((src, index) => `
-    <div class="record-img-card" data-idx="${index}">
-      <div class="record-player-thumb record-img-thumb"><img src="${esc(src)}" alt="" onerror="this.parentNode.innerHTML='<span>IMAGE</span>'"></div>
-      ${index === 0 ? '<span class="record-img-main">대표</span>' : ''}
-      <div class="record-img-actions">
-        <button type="button" title="앞으로" aria-label="앞으로" ${index === 0 ? 'disabled' : ''} onmousedown="event.preventDefault()" onclick="moveRecordImage(this,-1)">‹</button>
-        <button type="button" title="뒤로" aria-label="뒤로" ${index === list.length - 1 ? 'disabled' : ''} onmousedown="event.preventDefault()" onclick="moveRecordImage(this,1)">›</button>
-        <button type="button" title="삭제" aria-label="이미지 삭제" onmousedown="event.preventDefault()" onclick="removeRecordImage(this)">×</button>
-      </div>
-    </div>`).join('') + `<div class="record-player-thumb record-img-add" title="이미지 추가" onclick="openRecordImageUrlPopup(this)"><span>＋ 이미지</span></div>`;
+  // 카드는 기존처럼 1개: 대표 이미지 + 2장 이상이면 「+N」. 클릭하면 이미지 설정 모달이 열린다(#203).
+  media.innerHTML = `<div class="record-player-thumb" title="클릭하여 이미지 설정" onclick="openRecordImageUrlPopup(this)">${list.length
+    ? `<img src="${esc(list[0])}" alt="" onerror="this.parentNode.innerHTML='<span>IMAGE</span>'">${list.length > 1 ? `<span class="record-img-more">+${list.length - 1}</span>` : ''}`
+    : '<span>IMAGE</span>'}</div>`;
 }
-function getRecordImageHost(buttonEl) {
-  const host = buttonEl?.closest('.record-player-row, #rf-gm-card');
-  const hidden = host?.querySelector('.record-player-image, .record-gm-image');
-  return { host, hidden };
-}
-function moveRecordImage(buttonEl, dir) {
-  const { host, hidden } = getRecordImageHost(buttonEl);
-  const index = Number(buttonEl?.closest('.record-img-card')?.dataset.idx);
-  if (!host || !hidden || !Number.isInteger(index)) return;
-  const list = readRecordImageList(hidden);
-  const to = index + dir;
-  if (to < 0 || to >= list.length) return;
-  [list[index], list[to]] = [list[to], list[index]];
-  writeRecordImageList(hidden, list);
-  syncRecordImageCard(host, host.id === 'rf-gm-card' ? '.record-gm-image' : '.record-player-image');
-}
-function removeRecordImage(buttonEl) {
-  const { host, hidden } = getRecordImageHost(buttonEl);
-  const index = Number(buttonEl?.closest('.record-img-card')?.dataset.idx);
-  if (!host || !hidden || !Number.isInteger(index)) return;
-  const list = readRecordImageList(hidden);
-  list.splice(index, 1);
-  writeRecordImageList(hidden, list);
-  syncRecordImageCard(host, host.id === 'rf-gm-card' ? '.record-gm-image' : '.record-player-image');
-}
-
 function syncRecordPlayerRow(row) {
   syncRecordImageCard(row, '.record-player-image');
 }
@@ -32978,11 +32947,15 @@ function openRecordImageUrlPopup(buttonEl) {
   const backdrop = document.getElementById('record-image-url-popup-backdrop');
   const input = document.getElementById('record-image-url-popup-input');
   if (!host || !backdrop || !input) return;
+  const isScenario = host.id === 'rf-custom-scenario-fields';
   backdrop.dataset.targetType = host.id === 'rf-gm-card' ? 'gm' : (host.id === 'rf-custom-scenario-fields' ? 'scenario' : 'player');
   backdrop.dataset.targetId = host.id === 'rf-gm-card' ? 'rf-gm-card' : (host.dataset.playerId || '');
   const hidden = host.querySelector('.record-player-image, .record-gm-image, #rf-scenario-image');
-  // GM·PL 은 여러 장이라 팝업은 항상 「추가」(빈 입력). 시나리오 대표 이미지만 기존 값을 보여 준다.
-  input.value = host.id === 'rf-custom-scenario-fields' ? String(hidden?.value || '').trim() : '';
+  // GM·PL: 입력은 항상 「추가」, 이미지 전부를 아래 줄에 나열(적용 전까지는 복사본 — 취소하면 원복). 시나리오 대표 이미지만 기존 단일 방식.
+  backdrop.draftImages = isScenario ? null : readRecordImageList(hidden);
+  input.value = isScenario ? String(hidden?.value || '').trim() : '';
+  input.placeholder = isScenario ? 'https://... (비우면 제거)' : 'https://... (입력하면 목록 끝에 추가)';
+  renderRecordImagePopupList();
   backdrop.style.display = 'flex';
   setTimeout(() => whenImeIdle(() => input.focus()), 10);
 }
@@ -32992,11 +32965,69 @@ function closeRecordImageUrlPopup() {
   const input = document.getElementById('record-image-url-popup-input');
   if (backdrop) {
     backdrop.imageRequest = null;
+    backdrop.draftImages = null;
     backdrop.style.display = 'none';
     delete backdrop.dataset.targetType;
     delete backdrop.dataset.targetId;
   }
   if (input) input.value = '';
+  const listEl = document.getElementById('record-image-popup-list');
+  if (listEl) { listEl.innerHTML = ''; listEl.style.display = 'none'; }
+}
+
+// 모달 아래 줄: 이 사람의 이미지 전부(대표 표시 · ‹ › 순서 변경 · × 삭제). 목록은 backdrop.draftImages 복사본이다.
+function renderRecordImagePopupList() {
+  const backdrop = document.getElementById('record-image-url-popup-backdrop');
+  const listEl = document.getElementById('record-image-popup-list');
+  if (!backdrop || !listEl) return;
+  const list = backdrop.draftImages;
+  if (!Array.isArray(list)) { listEl.innerHTML = ''; listEl.style.display = 'none'; return; }
+  listEl.style.display = '';
+  listEl.innerHTML = list.length ? list.map((src, index) => `
+    <div class="record-img-card" data-idx="${index}">
+      <div class="record-player-thumb record-img-thumb"><img src="${esc(src)}" alt="" onerror="this.parentNode.innerHTML='<span>IMAGE</span>'"></div>
+      ${index === 0 ? '<span class="record-img-main">대표</span>' : ''}
+      <div class="record-img-actions">
+        <button type="button" title="앞으로" aria-label="앞으로" ${index === 0 ? 'disabled' : ''} onclick="moveRecordImageDraft(${index},-1)">‹</button>
+        <button type="button" title="뒤로" aria-label="뒤로" ${index === list.length - 1 ? 'disabled' : ''} onclick="moveRecordImageDraft(${index},1)">›</button>
+        <button type="button" title="삭제" aria-label="이미지 삭제" onclick="removeRecordImageDraft(${index})">×</button>
+      </div>
+    </div>`).join('') : '<div class="record-image-popup-empty">이미지 없음</div>';
+}
+function moveRecordImageDraft(index, dir) {
+  const list = document.getElementById('record-image-url-popup-backdrop')?.draftImages;
+  if (!Array.isArray(list)) return;
+  const to = index + dir;
+  if (index < 0 || to < 0 || to >= list.length) return;
+  [list[index], list[to]] = [list[to], list[index]];
+  renderRecordImagePopupList();
+}
+function removeRecordImageDraft(index) {
+  const list = document.getElementById('record-image-url-popup-backdrop')?.draftImages;
+  if (!Array.isArray(list) || index < 0 || index >= list.length) return;
+  list.splice(index, 1);
+  renderRecordImagePopupList();
+}
+// 「적용」: 입력칸에 남은 값이 있으면 먼저 목록에 추가하고, 목록을 그 GM/PL 행에 반영한 뒤 닫는다. 시나리오 대표 이미지는 기존대로 바로 적용.
+async function applyRecordImagePopup() {
+  const backdrop = document.getElementById('record-image-url-popup-backdrop');
+  const input = document.getElementById('record-image-url-popup-input');
+  if (!backdrop || !input) return;
+  if (backdrop.dataset.targetType === 'scenario') { await saveRecordImageUrlPopup(); return; }
+  if (!Array.isArray(backdrop.draftImages)) { closeRecordImageUrlPopup(); return; }
+  if (input.value.trim()) {
+    await saveRecordImageUrlPopup();
+    if (input.value.trim()) return; // 추가에 실패하면(안내 후) 모달을 유지한다
+  }
+  const host = backdrop.dataset.targetType === 'gm'
+    ? document.getElementById('rf-gm-card')
+    : document.querySelector(`.record-player-row[data-player-id="${CSS.escape(backdrop.dataset.targetId || '')}"]`);
+  const hidden = host?.querySelector('.record-player-image, .record-gm-image');
+  if (host && hidden) {
+    writeRecordImageList(hidden, backdrop.draftImages);
+    if (host.id === 'rf-gm-card') syncRecordGmCard(); else syncRecordPlayerRow(host);
+  }
+  closeRecordImageUrlPopup();
 }
 
 async function retainRecordImage(value) {
@@ -33046,16 +33077,14 @@ async function saveRecordImageUrlPopup() {
   if (backdrop.imageRequest !== request || backdrop.style.display === 'none' || !host.isConnected || input.value.trim() !== value) return;
   if (host.id === 'rf-custom-scenario-fields') {
     if (hidden) hidden.value = storedValue;
-  } else if (hidden && storedValue) {
-    writeRecordImageList(hidden, [...readRecordImageList(hidden), storedValue]); // 여러 장: 끝에 추가(같은 이미지는 중복 제거)
-  }
-  if (host.id === 'rf-gm-card') {
-    syncRecordGmCard();
-  } else if (host.id === 'rf-custom-scenario-fields') {
-    syncRecordScenarioImageCard();
   } else {
-    syncRecordPlayerRow(host);
+    // GM·PL: 덮어쓰지 않고 목록 끝에 추가(같은 이미지는 중복 제거). 모달은 열어 둔 채 목록만 갱신한다.
+    if (storedValue && Array.isArray(backdrop.draftImages)) backdrop.draftImages = normalizeRecordImageList([...backdrop.draftImages, storedValue]);
+    input.value = '';
+    renderRecordImagePopupList();
+    return;
   }
+  syncRecordScenarioImageCard();
   closeRecordImageUrlPopup();
 }
 
