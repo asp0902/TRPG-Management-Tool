@@ -704,6 +704,7 @@ tr.ct-row-end .ct-select:focus {
 .record-table-row.expanded { background: #f7f7f7; }
 .record-col-datetime { min-width: 100px; }
 .record-col-duration { min-width: 40px; white-space: nowrap; }
+.record-duration-head { cursor: help; }
 .record-col-rule { min-width: 130px; }
 .record-col-scenario { min-width: 210px; }
 .record-scenario-cell {
@@ -12124,6 +12125,17 @@ function getRecordDurationMinutes(record) {
 function getRecordDurationLabel(record) {
   const minutes = getRecordDurationMinutes(record);
   return minutes == null ? '' : `${minutes}분`;
+}
+// 「플레이 시간」 헤더 호버 문구: 현재 표에 보이는 기록의 합계(#207). 1시간 미만이면 「45분」만, 시간이 없는 기록 수도 덧붙인다.
+function getRecordTotalDurationTitle(records) {
+  let total = 0, missing = 0;
+  records.forEach(record => {
+    const minutes = getRecordDurationMinutes(record);
+    if (minutes == null) missing += 1; else total += minutes;
+  });
+  const h = Math.floor(total / 60), m = total % 60;
+  const label = h ? `${h}시간${m ? ` ${m}분` : ''} (${total.toLocaleString('ko-KR')}분)` : `${total}분`;
+  return `총 플레이 시간: ${label} · 기록 ${records.length}개${missing ? ` · 시간 미입력 ${missing}개` : ''}`;
 }
 function getRecordPlayersText(record) {
   return normalizeRecordPlayersData(record?.playersData, record?.players)
@@ -33703,7 +33715,7 @@ function renderRecordPage() {
         <thead>
           <tr>
             <th class="record-col-datetime"><button type="button" class="record-sort-btn" onclick="toggleRecordDateSort()" title="날짜/시간 정렬">날짜/시간${recordDateSortDir ? `<span class="record-sort-mark">${recordDateSortDir === 'asc' ? '▲' : '▼'}</span>` : ''}</button></th>
-            <th class="record-col-duration">플레이 시간</th>
+            <th class="record-col-duration"><span class="record-duration-head" title="${esc(getRecordTotalDurationTitle(records))}">플레이 시간</span></th>
             <th class="record-col-rule">룰</th>
             <th class="record-col-scenario"><button type="button" class="record-sort-btn" onclick="toggleRecordScenarioSort()" title="시나리오 이름 정렬">시나리오 이름${recordScenarioSortDir ? `<span class="record-sort-mark">${recordScenarioSortDir === 'asc' ? '▲' : '▼'}</span>` : ''}</button></th>
             <th class="record-col-gm">GM</th>

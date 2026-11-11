@@ -1,0 +1,15 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
+const a = html.indexOf('function getRecordTotalDurationTitle');
+const b = html.indexOf('function getRecordPlayersText');
+assert.ok(a > 0 && b > a);
+const ctx = { getRecordDurationMinutes: r => r.m ?? null };
+vm.runInNewContext(`${html.slice(a, b)}\nthis.t = getRecordTotalDurationTitle;`, ctx);
+assert.equal(ctx.t([{ m: 90 }, { m: 30 }, {}]), '총 플레이 시간: 2시간 (120분) · 기록 3개 · 시간 미입력 1개');
+assert.equal(ctx.t([{ m: 45 }]), '총 플레이 시간: 45분 · 기록 1개');
+assert.equal(ctx.t([{ m: 6285 }]), '총 플레이 시간: 104시간 45분 (6,285분) · 기록 1개');
+assert.match(html, /<span class="record-duration-head" title="\$\{esc\(getRecordTotalDurationTitle\(records\)\)\}">플레이 시간<\/span>/);
+console.log('record duration total checks: OK');
