@@ -414,7 +414,7 @@ tr.ct-row-end .ct-select:focus {
 }
 .record-form-modal.open { display: flex; }
 .record-form-dialog {
-  width: min(860px, calc(100vw - 32px)); max-height: calc(100vh - 32px);
+  width: min(900px, calc(100vw - 32px)); max-height: calc(100vh - 32px); /* PL 카드(272px) 2장 + gap 10px = 554px 이상이 PL 영역에 확보되도록 860 → 900px(#205) */
   background: #fff; border: 1px solid #e4e4e4; border-radius: 14px;
   box-shadow: 0 20px 48px rgba(0,0,0,0.16); overflow: auto;
   display: flex; flex-direction: column;
