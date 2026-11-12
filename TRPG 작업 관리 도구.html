@@ -4096,6 +4096,10 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 #no-scenario .btn-primary { margin-top: 8px; padding: 9px 24px; font-size: 13px; }
 
 #editor { display: none; }
+/* 장면표 라벨 호버 안내(#214): 평소엔 숨김, 입력칸을 가리거나 가로채지 않는다 */
+.scene-table-label { position: relative; cursor: help; }
+.scene-table-tip { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; width: max-content; max-width: min(260px, 80vw); padding: 8px 10px; border-radius: 8px; background: #111; color: #fff; font-size: 11px; font-weight: 500; line-height: 1.5; letter-spacing: normal; text-transform: none; white-space: pre; text-align: left; box-shadow: 0 4px 14px rgba(0,0,0,0.25); pointer-events: none; }
+.scene-table-label:hover .scene-table-tip { display: block; }
 /* 스크립트 폴더 화면(#208): 캐릭터 폴더 섹션과 같은 모양 */
 #script-home { padding: 24px 32px 60px; box-sizing: border-box; max-width: 1100px; margin: 0 auto; }
 .script-home-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
@@ -8461,7 +8465,12 @@ select.sh-field-input,
             </div>
             <div class="info-grid-2" id="info-possibility-grid-insane" style="display:none">
               <div class="field"><label>광기카드</label><div class="info-basic-ce" id="i-insane-card" contenteditable="true" data-ph="광기카드" oninput="syncInfo()" spellcheck="false"></div></div>
-              <div class="field"><label>장면표</label><div class="info-basic-ce" id="i-scene-table" contenteditable="true" data-ph="장면표" oninput="syncInfo()" spellcheck="false"></div></div>
+              <div class="field"><label class="scene-table-label">장면표<span class="scene-table-tip" role="tooltip">/roll-table
+커맨드 이름
+커맨드 다이스(1D3)
+1: 커맨드 항목
+2: 커맨드 항목
+3: 커맨드 항목</span></label><div class="info-basic-ce" id="i-scene-table" contenteditable="true" data-ph="장면표" oninput="syncInfo()" spellcheck="false"></div></div>
             </div>
             <div class="section-heading">시나리오 정보</div>
             <div class="info-grid">
