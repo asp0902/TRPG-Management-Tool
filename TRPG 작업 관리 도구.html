@@ -10900,8 +10900,8 @@ function renderScriptHome() {
     <div class="script-home-cards">${list.length ? list.map(card).join('') : '<div class="character-empty">스크립트가 없습니다.</div>'}</div>
   </section>`;
   el.innerHTML = `<div class="script-home-top"><h2>스크립트 폴더</h2><button class="btn btn-primary" onclick="createNew()">＋ 새 시나리오</button></div>`
-    + folders.map(folder => section(folder.name, state.scenarios.filter(sc => sc.folderId === folder.id))).join('')
-    + section('폴더 없음', state.scenarios.filter(sc => !sc.folderId || !folderIds.has(sc.folderId)));
+    + folders.map(folder => section(folder.name, state.scenarios.filter(sc => sc.folderId === folder.id).sort(compareScenarioSidebarItems))).join('')
+    + section('폴더 없음', state.scenarios.filter(sc => !sc.folderId || !folderIds.has(sc.folderId)).sort(compareScenarioSidebarItems));
 }
 // 열려 있던 스크립트를 닫고 폴더 화면으로(상단 「폴더」 버튼).
 function goScriptHome() {
@@ -12298,7 +12298,7 @@ function getSidebarFolderEntries(folderId = '') {
   if (currentPage === 'css-macro') {
     return state.cssMacros.filter(item => item.folderId === folderId);
   }
-  return state.scenarios.filter(scenario => scenario.folderId === folderId);
+  return state.scenarios.filter(scenario => scenario.folderId === folderId).sort(compareScenarioSidebarItems); // 표시 시 제목순 정렬(#209), 저장 순서는 그대로
 }
 function updateSidebarPrimaryAction() {
   const btn = document.getElementById('sidebar-new-main-btn');
@@ -13082,6 +13082,7 @@ function renderList() {
   } else {
     state.scenarios
       .filter(scenario => !scenario.folderId || !folderIds.has(scenario.folderId))
+      .sort(compareScenarioSidebarItems) // #209
       .forEach(scenario => frag.appendChild(createScenarioItem(scenario)));
   }
   el.appendChild(frag);
