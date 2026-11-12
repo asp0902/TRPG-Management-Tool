@@ -42428,7 +42428,48 @@ syncStandaloneCocGrowthRows();
 document.querySelectorAll('.sh-coc-support-textarea').forEach(autoGrowStandaloneTextarea);
 updateStandaloneCocEraTheme(document.querySelector('[data-coc-era-select]')?.value || document.body.dataset.cocEra);
 ` : '';
-  const saveScript = isEditableSheet ? `<script>${standaloneCocScript}
+  // 인세인: 내보낸 HTML 은 on* 속성이 없으므로 위임 이벤트로 특기 색·판정치를 다시 계산한다(#229). 앱의 calcInsaneSpecialtyTargets/getInsaneOpenGaps/refreshInsaneFear 와 같은 규칙.
+  const standaloneInsaneScript = activeSheet.templateKey === 'insane' ? `
+function syncStandaloneInsane() {
+  var grid = document.querySelector('.sh-insane-specialties');
+  if (!grid) return;
+  var foot = grid.parentNode.querySelector('.isp-foot');
+  var sel = foot && foot.querySelector('select');
+  var fearInput = foot && foot.querySelector('input[type=text]');
+  var n = Number(((sel ? sel.value : '').match(/[1-6]/) || [0])[0]);
+  var gaps = [];
+  if (n === 1) gaps.push(0); else if (n === 6) gaps.push(4); else if (n >= 2 && n <= 5) gaps.push(n - 2, n - 1);
+  var fear = fearInput ? fearInput.value.trim() : '';
+  var cells = grid.querySelectorAll('.isp-skill');
+  var dist = [], queue = [], r, c;
+  for (r = 0; r < 11; r++) { dist.push([99, 99, 99, 99, 99, 99]); }
+  cells.forEach(function(cell, i) {
+    var row = Math.floor(i / 6), col = i % 6;
+    var owned = cell.querySelector('input').checked;
+    cell.classList.toggle('is-owned', owned);
+    cell.classList.toggle('is-fear', cell.querySelector('.isp-name').textContent === fear);
+    if (owned) { dist[row][col] = 0; queue.push([row, col]); }
+  });
+  for (var qi = 0; qi < queue.length; qi++) {
+    r = queue[qi][0]; c = queue[qi][1];
+    [[r - 1, c, 1], [r + 1, c, 1], [r, c - 1, gaps.indexOf(c - 1) >= 0 ? 1 : 2], [r, c + 1, gaps.indexOf(c) >= 0 ? 1 : 2]].forEach(function(next) {
+      if (next[0] < 0 || next[0] >= 11 || next[1] < 0 || next[1] >= 6) return;
+      if (dist[next[0]][next[1]] <= dist[r][c] + next[2]) return;
+      dist[next[0]][next[1]] = dist[r][c] + next[2];
+      queue.push([next[0], next[1]]);
+    });
+  }
+  cells.forEach(function(cell, i) {
+    var t = cell.querySelector('.isp-target');
+    if (t) t.textContent = Math.min(12, 5 + dist[Math.floor(i / 6)][i % 6]);
+  });
+  grid.querySelectorAll('.isp-gap-mark').forEach(function(mark, gap) { mark.classList.toggle('is-open', gaps.indexOf(gap) >= 0); });
+}
+document.addEventListener('change', syncStandaloneInsane);
+document.addEventListener('input', syncStandaloneInsane);
+syncStandaloneInsane();
+` : '';
+  const saveScript = isEditableSheet ? `<script>${standaloneCocScript}${standaloneInsaneScript}
 function saveStandaloneCharacterSheet() {
   const copy = document.documentElement.cloneNode(true);
   const currentFields = document.querySelectorAll('input, select, textarea');
