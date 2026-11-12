@@ -10074,7 +10074,7 @@ const RULEBOOK_TOC_MAX_WIDTH = 420;
 function cur() { return state.scenarios.find(s => s.id === state.currentId); }
 function loadLastScriptView() {
   try {
-    const raw = JSON.parse(localStorage.getItem(LAST_SCRIPT_VIEW_KEY) || 'null');
+    const raw = JSON.parse(sessionStorage.getItem(LAST_SCRIPT_VIEW_KEY) || 'null'); // 같은 탭 새로고침에서만 유지(#212)
     if (!raw || typeof raw !== 'object') return null;
     return {
       scenarioId: raw.scenarioId || '',
@@ -10087,10 +10087,16 @@ function loadLastScriptView() {
 function saveLastScriptView(tabOverride) {
   const scenarioId = state.currentId || '';
   const tab = tabOverride || getActiveTab();
-  localStorage.setItem(LAST_SCRIPT_VIEW_KEY, JSON.stringify({
-    scenarioId,
-    tab: tab === 'body' ? 'body' : 'info',
-  }));
+  try {
+    sessionStorage.setItem(LAST_SCRIPT_VIEW_KEY, JSON.stringify({
+      scenarioId,
+      tab: tab === 'body' ? 'body' : 'info',
+    }));
+  } catch {}
+}
+// 폴더 화면으로 가면 지운다(폴더 화면에서 새로고침하면 폴더 화면 유지).
+function clearLastScriptView() {
+  try { sessionStorage.removeItem(LAST_SCRIPT_VIEW_KEY); } catch {}
 }
 function mkId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function mkScenario(folderId = '') {
@@ -10913,6 +10919,7 @@ function goScriptHome() {
   renderList();
 }
 function showEmptyState() {
+  clearLastScriptView();
   const hasScenarios = state.scenarios.length > 0;
   document.getElementById('no-scenario').style.display = hasScenarios ? 'none' : 'flex';
   const home = document.getElementById('script-home');
@@ -36503,9 +36510,14 @@ async function bootstrapApp() {
   saveOpenAppPages();
   resetCssMacroHistory();
   renderList();
-  // 시작 시 마지막 스크립트를 열지 않고 폴더 화면(시나리오가 없으면 빈 상태)을 보인다(#208). 세션 중에는 열던 스크립트가 유지된다.
+  // 새로 열면 폴더 화면(시나리오가 없으면 빈 상태)(#208). 같은 탭 새로고침이면 sessionStorage 의 열던 스크립트·탭을 복원한다(#212). 삭제된 id 면 폴더 화면.
+  const _lastScriptView = loadLastScriptView();
   state.currentId = null;
-  showEmptyState();
+  if (_lastScriptView?.scenarioId && state.scenarios.some(sc => sc.id === _lastScriptView.scenarioId)) {
+    select(_lastScriptView.scenarioId, _lastScriptView.tab);
+  } else {
+    showEmptyState();
+  }
   if (isCharacterSheetPopupMode()) {
     const popupCharacter = state.characters.find(character => character.id === characterSheetPopupCharacterId);
     const popupSheet = popupCharacter?.sheets?.find(sheet => sheet.id === characterSheetPopupSheetId);
