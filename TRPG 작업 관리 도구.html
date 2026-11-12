@@ -41033,8 +41033,15 @@ function normalizeCharacterSheets(ch) {
   return [];
 }
 
+// 카드 이미지(#222): 활성 시트 이미지 → 이미지가 있는 첫 시트 → ch.image → 없으면 🎭
+function getCharacterCardImage(ch) {
+  const own = sheet => (sheet && typeof sheet.image === 'string') ? sheet.image.trim() : '';
+  const sheets = Array.isArray(ch.sheets) ? ch.sheets : [];
+  return own(sheets.find(sheet => sheet.id === ch.activeSheetId)) || sheets.map(own).find(Boolean) || String(ch.image || '').trim();
+}
 function renderCharacterCard(ch) {
-  const thumbHtml = ch.image ? `<img src="${esc(ch.image)}" alt="">` : '🎭';
+  const cardImage = getCharacterCardImage(ch);
+  const thumbHtml = cardImage ? `<img src="${esc(cardImage)}" alt="" loading="lazy" decoding="async" onerror="this.replaceWith(document.createTextNode('🎭'))">` : '🎭';
   const tagsHtml = ch.tags.map(t => `<span class="character-card-tag">${esc(t)}</span>`).join('');
   let ruleLabelHtml = '';
   if (ch.rulebookId) {
