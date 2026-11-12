@@ -41660,6 +41660,11 @@ function setCharacterSheetImage(chId, sheetId, image) {
   sheet.image = String(image || '').trim();
   persist();
   renderCharacterSheet(chId);
+  // 어떤 경로로 넣든 dataURL 이면 즉시 표시한 채 웹에 등록해 URL 로 바꾼다(#221). http(s) URL 은 그대로 쓴다. URL 로 교체할 땐 dataURL 이 아니라 다시 불리지 않는다.
+  if (/^data:image\//i.test(sheet.image)) {
+    const blob = dataUrlToBlob(sheet.image);
+    if (blob) registerCharacterSheetImageOnWeb(chId, sheetId, blob, sheet.image);
+  }
   return true;
 }
 function openCharacterSheetImageMenu(event, chId, sheetId, button) {
@@ -41745,8 +41750,7 @@ function dataUrlToBlob(dataUrl) {
 async function setCharacterSheetImageFromBlob(chId, sheetId, blob) {
   let dataUrl;
   try { dataUrl = await readBlobAsDataUrl(blob); } catch (error) { showToast('이미지를 읽지 못했습니다.'); return; }
-  if (!setCharacterSheetImage(chId, sheetId, dataUrl)) return;
-  await registerCharacterSheetImageOnWeb(chId, sheetId, blob, dataUrl);
+  setCharacterSheetImage(chId, sheetId, dataUrl); // dataURL 이므로 안에서 웹 등록까지 이어진다
 }
 async function registerCharacterSheetImageOnWeb(chId, sheetId, blob, dataUrl) {
   try {
@@ -41760,6 +41764,39 @@ async function registerCharacterSheetImageOnWeb(chId, sheetId, blob, dataUrl) {
   } catch (error) {
     showToast(describeImageUploadError(error));
   }
+}
+// 이미 저장된 dataURL 이미지(시트·레거시 ch.image)를 시트를 열 때 백그라운드로 하나씩 올린다(#221). 토큰이 없으면 건너뛰고, 실패하면 이번 세션엔 멈추며 토스트는 세션당 1회.
+let sheetImageAutoRunning = false, sheetImageAutoStopped = false, sheetImageAutoToasted = false;
+const sheetImageAutoSkipped = new Set();
+async function autoRegisterCharacterImages(chId) {
+  if (sheetImageAutoRunning || sheetImageAutoStopped || !getGitHubSyncToken()) return;
+  sheetImageAutoRunning = true;
+  const isData = value => /^data:image\//i.test(value || '') && !sheetImageAutoSkipped.has(value);
+  try {
+    for (;;) {
+      const ch = state.characters.find(item => item.id === chId);
+      if (!ch) break;
+      const sheet = (ch.sheets || []).find(item => typeof item.image === 'string' && isData(item.image.trim()));
+      const before = sheet ? sheet.image.trim() : (isData(ch.image) ? ch.image : '');
+      if (!before) break;
+      const blob = dataUrlToBlob(before);
+      let url = '';
+      try {
+        if (!blob) throw new Error('이미지 형식 미지원');
+        url = await uploadPublicImage(blob);
+      } catch (error) {
+        if (/형식 미지원|크기 초과/.test(String(error?.message || ''))) { sheetImageAutoSkipped.add(before); continue; }
+        sheetImageAutoStopped = true;
+        if (!sheetImageAutoToasted) { sheetImageAutoToasted = true; showToast(describeImageUploadError(error)); }
+        break;
+      }
+      const current = state.characters.find(item => item.id === chId);
+      const target = sheet && current ? (current.sheets || []).find(item => item.id === sheet.id) : null;
+      if (sheet && target && String(target.image || '').trim() === before) setCharacterSheetImage(chId, sheet.id, url);
+      else if (!sheet && current && current.image === before) { current.image = url; persist(); if (_openCharacterSheetId === chId) renderCharacterSheet(chId); }
+      else sheetImageAutoSkipped.add(before); // 그 사이 바뀜: 이번엔 건드리지 않는다
+    }
+  } finally { sheetImageAutoRunning = false; }
 }
 function onCharacterSheetImageFile(event, chId, sheetId) {
   const file = event.target.files?.[0];
@@ -42000,6 +42037,7 @@ function renderCharacterSheetPage(id) {
     subtitleEl.textContent = rbName || n.ruleName || '캐릭터 시트';
   }
   renderCharacterSheet(id);
+  autoRegisterCharacterImages(id);
 }
 
 function closeCharacterSheet() {
