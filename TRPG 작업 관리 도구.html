@@ -4095,6 +4095,19 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 #no-scenario .btn-primary { margin-top: 8px; padding: 9px 24px; font-size: 13px; }
 
 #editor { display: none; }
+/* 스크립트 폴더 화면(#208): 캐릭터 폴더 섹션과 같은 모양 */
+#script-home { padding: 24px 32px 60px; box-sizing: border-box; max-width: 1100px; margin: 0 auto; }
+.script-home-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.script-home-top h2 { font-size: 18px; color: #333; margin: 0; }
+.script-home-top .btn-primary { padding: 7px 16px; font-size: 12px; }
+.script-home-section { margin-bottom: 22px; min-width: 0; }
+.script-home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.script-home-card { text-align: left; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; min-width: 0; font: inherit; transition: box-shadow 0.15s; }
+.script-home-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.09); }
+.script-home-card-rule { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.05em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 12px; }
+.script-home-card-title { font-size: 14px; font-weight: 800; color: #111; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.script-home-cards .character-empty { padding: 12px 0; text-align: left; }
+.script-home-card-sub { font-size: 11px; color: #999; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 14px; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
 .panel-inner { width: 100%; max-width: 800px; margin: 0 auto; padding: 28px 32px 60px; box-sizing: border-box; }
@@ -8080,6 +8093,7 @@ select.sh-field-input,
   <div id="topbar">
     <button class="topbar-toggle" onclick="toggleSidebar()">☰</button>
     <div class="topbar-title" id="topbar-title">시나리오 목록</div>
+    <button class="tab-btn" id="script-home-btn" type="button" style="display:none" onclick="goScriptHome()" title="스크립트 폴더 화면으로 이동">📁 폴더</button>
     <div class="tab-group" id="tab-group" style="display:none">
       <button class="tab-btn active" onclick="switchTab('info')">정보</button>
       <button class="tab-btn" onclick="switchTab('body')">본문</button>
@@ -8381,6 +8395,8 @@ select.sh-field-input,
         <p>왼쪽에서 시나리오를 선택하거나 새로 만드세요.</p>
         <button class="btn btn-primary" onclick="createNew()">＋ 새 시나리오 만들기</button>
       </div>
+
+      <div id="script-home" style="display:none"></div>
 
       <div id="editor">
         <!-- INFO TAB -->
@@ -10864,8 +10880,43 @@ function clearBlockSelection() {
   selectedBlockId = null;
   document.querySelectorAll('.block.selected').forEach(el => el.classList.remove('selected'));
 }
+// 스크립트 폴더 화면(#208): 시나리오를 열지 않은 상태에서 가운데 영역에 보인다. 시나리오가 하나도 없으면 기존 빈 상태 안내.
+function renderScriptHome() {
+  const el = document.getElementById('script-home');
+  if (!el) return;
+  const folders = getSidebarFolders('script');
+  const folderIds = new Set(folders.map(folder => folder.id));
+  const card = scenario => {
+    const rule = String(scenario.info?.rule || '').trim();
+    const sub = String(scenario.info?.subtitle || '').trim();
+    return `<button type="button" class="script-home-card" onclick="select('${scenario.id}','info')" title="${esc(getScenarioListTitle(scenario))}">
+      <span class="script-home-card-rule">${esc(rule)}</span>
+      <span class="script-home-card-title">${esc(getScenarioListTitle(scenario))}</span>
+      <span class="script-home-card-sub">${esc(sub)}</span>
+    </button>`;
+  };
+  const section = (name, list) => `<section class="script-home-section">
+    <div class="character-folder-head"><strong class="character-folder-name">${esc(name)}</strong></div>
+    <div class="script-home-cards">${list.length ? list.map(card).join('') : '<div class="character-empty">스크립트가 없습니다.</div>'}</div>
+  </section>`;
+  el.innerHTML = `<div class="script-home-top"><h2>스크립트 폴더</h2><button class="btn btn-primary" onclick="createNew()">＋ 새 시나리오</button></div>`
+    + folders.map(folder => section(folder.name, state.scenarios.filter(sc => sc.folderId === folder.id))).join('')
+    + section('폴더 없음', state.scenarios.filter(sc => !sc.folderId || !folderIds.has(sc.folderId)));
+}
+// 열려 있던 스크립트를 닫고 폴더 화면으로(상단 「폴더」 버튼).
+function goScriptHome() {
+  if (cur()) { try { syncInfo({ commit: false }); persist({ remoteDirty: false }); } catch (e) {} }
+  state.currentId = null;
+  showEmptyState();
+  renderList();
+}
 function showEmptyState() {
-  document.getElementById('no-scenario').style.display = 'flex';
+  const hasScenarios = state.scenarios.length > 0;
+  document.getElementById('no-scenario').style.display = hasScenarios ? 'none' : 'flex';
+  const home = document.getElementById('script-home');
+  if (home) { home.style.display = hasScenarios ? '' : 'none'; if (hasScenarios) renderScriptHome(); }
+  const homeBtn = document.getElementById('script-home-btn');
+  if (homeBtn) homeBtn.style.display = 'none';
   document.getElementById('editor').style.display = 'none';
   document.getElementById('tab-group').style.display = 'none';
   updateScriptTopbarTitle();
@@ -10884,6 +10935,10 @@ function renderCurrentScenarioView(tab) {
     return;
   }
   document.getElementById('no-scenario').style.display = 'none';
+  const homeEl = document.getElementById('script-home');
+  if (homeEl) homeEl.style.display = 'none';
+  const homeBtnEl = document.getElementById('script-home-btn');
+  if (homeBtnEl) homeBtnEl.style.display = '';
   document.getElementById('editor').style.display = 'block';
   document.getElementById('tab-group').style.display = '';
   updateScriptTopbarTitle();
@@ -36238,7 +36293,8 @@ function switchPage(page) {
 
   const isScript = page === 'script';
   document.getElementById('workspace').style.display = isScript ? '' : 'none';
-  document.getElementById('tab-group').style.display = isScript ? '' : 'none';
+  document.getElementById('tab-group').style.display = isScript && cur() ? '' : 'none';
+  document.getElementById('script-home-btn').style.display = isScript && cur() ? '' : 'none';
   document.getElementById('save-btn').style.display = isScript ? '' : 'none';
   syncFormatBarVisibility();
 
@@ -36444,15 +36500,9 @@ async function bootstrapApp() {
   saveOpenAppPages();
   resetCssMacroHistory();
   renderList();
-  const _lastScriptView = loadLastScriptView();
-  if (state.scenarios.length > 0) {
-    const hasSavedScenario = _lastScriptView?.scenarioId && state.scenarios.some(s => s.id === _lastScriptView.scenarioId);
-    const scenarioIdToOpen = hasSavedScenario ? _lastScriptView.scenarioId : state.scenarios[0].id;
-    const tabToOpen = _lastScriptView?.tab === 'body' ? 'body' : 'info';
-    select(scenarioIdToOpen, tabToOpen);
-  } else {
-    showEmptyState();
-  }
+  // 시작 시 마지막 스크립트를 열지 않고 폴더 화면(시나리오가 없으면 빈 상태)을 보인다(#208). 세션 중에는 열던 스크립트가 유지된다.
+  state.currentId = null;
+  showEmptyState();
   if (isCharacterSheetPopupMode()) {
     const popupCharacter = state.characters.find(character => character.id === characterSheetPopupCharacterId);
     const popupSheet = popupCharacter?.sheets?.find(sheet => sheet.id === characterSheetPopupSheetId);
