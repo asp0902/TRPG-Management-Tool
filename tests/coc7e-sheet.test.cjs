@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
 const stats = html.slice(html.indexOf('function renderCoc7eStatsSection'), html.indexOf('// CoC 7판 기능 프리셋'));
 const exportedHtml = process.env.COC7E_EXPORTED_HTML ? fs.readFileSync(process.env.COC7E_EXPORTED_HTML, 'utf8') : html;
-const exported = exportedHtml.slice(exportedHtml.indexOf('function normalizeStandaloneCocEra'), exportedHtml.indexOf('function saveStandaloneCharacterSheet'));
+const exported = exportedHtml.slice(exportedHtml.indexOf('function normalizeStandaloneCocEra'), exportedHtml.indexOf('function saveStandaloneCharacterSheet')).replace(/`\s*:\s*'';[\s\S]*$/, ''); // 앱 소스에서는 CoC 스크립트 템플릿 끝(`: '';`)과 저장 스크립트 시작 부분을 잘라낸다(#228)
 
 assert.match(stats, /sh-coc-stats-main[\s\S]*?attrsHtml[\s\S]*?miscRow[\s\S]*?sh-coc-derived-section/);
 assert.match(html, /sh-coc-stats-main \.sh-coc-misc-row \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\); margin-top: 16px; \}/);

@@ -42138,9 +42138,11 @@ function exportCharacterSheetHtml() {
   const bodyEl = document.getElementById('ch-sheet-body');
   const clone = bodyEl.cloneNode(true);
   const isEditableCoc7e = activeSheet.templateKey === 'coc7e';
+  // 편집 가능 내보내기: CoC 7판 + 인세인(#228). CoC 전용 처리(시대 테마·기능 추가·장부)는 isEditableCoc7e 에만 둔다.
+  const isEditableSheet = isEditableCoc7e || activeSheet.templateKey === 'insane';
   const cocEraType = isEditableCoc7e ? normalizeCoc7eEraType(activeSheet.data?.basic?.eraType) : '';
 
-  if (isEditableCoc7e) {
+  if (isEditableSheet) {
     const sourceFields = bodyEl.querySelectorAll('input, select, textarea');
     clone.querySelectorAll('input, select, textarea').forEach((el, index) => {
       const source = sourceFields[index];
@@ -42200,9 +42202,10 @@ function exportCharacterSheetHtml() {
 
   const title = ch.name || '캐릭터';
   const appStyles = document.querySelector('style')?.textContent || '';
-  const editableStyles = isEditableCoc7e ? `
+  const editableStyles = (isEditableSheet ? `
 .standalone-sheet-header { display:flex; align-items:center; gap:16px; margin-bottom:20px; border-bottom:3px solid #111; padding-bottom:10px; }
 .standalone-sheet-header h1 { flex:1; min-width:0; }
+@media print { .standalone-sheet-save { display:none!important; } }` : '') + (isEditableCoc7e ? `
 .sh-coc-balance-titlebar { padding-right:0; }
 .sh-coc-balance-title { justify-content:center; }
 .sh-coc-balance-input { text-align:center; }
@@ -42218,7 +42221,7 @@ function exportCharacterSheetHtml() {
 .sh-coc-skills-table th:nth-child(n+3):nth-child(-n+6), .sh-coc-skills-table td:nth-child(n+3):nth-child(-n+6) { width:24px; min-width:24px; max-width:24px; }
 .sh-coc-skills-table th:nth-child(n+7), .sh-coc-skills-table td:nth-child(n+7) { width:22px; min-width:22px; max-width:22px; }
 .sh-section-hd, .sh-coc-support-title { font-size:14px; font-weight:800; text-align:center; }
-@media print { .standalone-sheet-save, .sk-add-btn, .standalone-coc-context-menu { display:none!important; } }` : '';
+@media print { .standalone-sheet-save, .sk-add-btn, .standalone-coc-context-menu { display:none!important; } }` : '');
   const eraThemeStyles = isEditableCoc7e ? `
 body[data-coc-era] { background:#dededb; color:#171717; color-scheme:light; }
 body[data-coc-era] .ch-sheet-body { width:min(1100px,100%); max-width:1100px; height:auto; overflow:visible; padding:28px; background-color:var(--coc-era-paper); border:4px solid var(--coc-era-accent); box-shadow:0 14px 40px rgba(0,0,0,.16); }
@@ -42240,8 +42243,10 @@ body[data-coc-era="기타"] { --coc-era-accent:#252a31; --coc-era-line:#c8ccd1; 
   const eraLabel = cocEraType === '기타' ? '기타 시대 탐사자' : cocEraType + ' 탐사자';
   const headerHtml = isEditableCoc7e
     ? `<div class="standalone-sheet-header"><div class="standalone-sheet-title"><span class="standalone-era-label">${esc(eraLabel)}</span><h1>${esc(title)}</h1></div><button type="button" class="ch-sheet-save standalone-sheet-save" onclick="saveStandaloneCharacterSheet()">저장</button></div>`
+    : isEditableSheet
+    ? `<div class="standalone-sheet-header"><h1>${esc(title)}</h1><button type="button" class="ch-sheet-save standalone-sheet-save" onclick="saveStandaloneCharacterSheet()">저장</button></div>`
     : `<h1 style="margin-bottom:20px;border-bottom:3px solid #111;padding-bottom:10px;">${esc(title)}</h1>`;
-  const saveScript = isEditableCoc7e ? `<script>
+  const standaloneCocScript = isEditableCoc7e ? `
 function normalizeStandaloneCocEra(value) {
   return ['1920년대', '현대', '기타'].includes(value) ? value : '1920년대';
 }
@@ -42422,6 +42427,8 @@ updateStandaloneCocLedgerTotals();
 syncStandaloneCocGrowthRows();
 document.querySelectorAll('.sh-coc-support-textarea').forEach(autoGrowStandaloneTextarea);
 updateStandaloneCocEraTheme(document.querySelector('[data-coc-era-select]')?.value || document.body.dataset.cocEra);
+` : '';
+  const saveScript = isEditableSheet ? `<script>${standaloneCocScript}
 function saveStandaloneCharacterSheet() {
   const copy = document.documentElement.cloneNode(true);
   const currentFields = document.querySelectorAll('input, select, textarea');
