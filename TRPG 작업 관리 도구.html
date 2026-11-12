@@ -7668,7 +7668,7 @@ tr:hover > .sh-coc-weapon-actions > *, tr:focus-within > .sh-coc-weapon-actions 
 .sh-sheet-insane .sh-section, .sh-sheet-insane input:not([role="switch"]), .sh-sheet-insane select, .sh-sheet-insane textarea, .sh-sheet-insane .sh-repeat-add-btn, .sh-sheet-insane .isp-skill, .sh-sheet-insane .isp-head, .sh-sheet-insane .ch-sheet-basic-portrait { border-radius: 0; }
 .sh-sheet-insane .sh-section-hd { padding-top: 4px; padding-bottom: 4px; }
 .sh-sheet-insane .ib-row:not(.ib-vitals) input { text-align: center; }
-.sh-sheet-insane [data-section-id="abilities"] select.sh-repeat-input { padding-left: 3px; padding-right: 20px; background-size: 10px; background-position: right 6px center; }
+.sh-sheet-insane [data-section-id="abilities"] select.sh-repeat-input { padding-left: 3px; padding-right: 3px; }
 .is-ability-effect[hidden] { display: none; }
 /* 효과·메모 펼침 입력창(#224): 왼쪽 끝은 윗줄 이름·인물 입력칸(토글 오른쪽), 오른쪽 끝은 윗줄 마지막 입력 칸(삭제 열 앞)에 맞춘다. */
 .is-ability-effect textarea { width: 100%; }
@@ -7680,7 +7680,7 @@ tr:hover > .sh-coc-weapon-actions > *, tr:focus-within > .sh-coc-weapon-actions 
 .sh-sheet-insane [data-section-id="missionSecret"] .sh-field-grid { flex: 1; }
 .sh-sheet-insane [data-section-id="missionSecret"] .sh-field { display: flex; flex-direction: column; }
 .sh-sheet-insane [data-section-id="missionSecret"] textarea { flex: 1; }
-.sh-sheet-insane [data-section-id="abilities"] select { appearance: none; text-align: center; text-align-last: center; padding-left: 8px; padding-right: 27px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23666' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; background-size: 12px; }
+.sh-sheet-insane [data-section-id="abilities"] select { appearance: none; text-align: center; text-align-last: center; padding-left: 8px; padding-right: 8px; background-image: none; } /* 화살표 없음·좌우 대칭 여백(#231) */
 .sh-insane-basic .ib-row.ib-vitals { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .ib-vitals > * { grid-column: auto; }
 .sh-insane-basic .ib-vitals .ib-field { min-width: 0; width: auto; flex: none; }
@@ -42516,7 +42516,7 @@ function saveStandaloneCharacterSheet() {
 <title>${esc(title)}</title>
 <style>${appStyles} body { background:#fff; padding:40px; height:auto; overflow:auto; } .ch-sheet-body { max-width:1000px; margin:0 auto; } ${editableStyles} ${eraThemeStyles} @media print { body { padding:0; } }</style>
 </head>
-<body${isEditableCoc7e ? ` data-coc-era="${esc(cocEraType)}"` : ''}><div class="ch-sheet-body">${headerHtml}<div class="sh-sheet-content">${clone.querySelector('.sh-sheet-content').innerHTML}</div></div>${saveScript}</body>
+<body${isEditableCoc7e ? ` data-coc-era="${esc(cocEraType)}"` : ''}><div class="ch-sheet-body">${headerHtml}<div class="sh-sheet-content${activeSheet.templateKey === 'insane' ? ' sh-sheet-insane' : ''}">${clone.querySelector('.sh-sheet-content').innerHTML}</div></div>${saveScript}</body>
 </html>`;
 
   const blob = new Blob([htmlContent], { type: 'text/html' });
