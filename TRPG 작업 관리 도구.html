@@ -9838,11 +9838,10 @@ const SHEET_TEMPLATES = {
         { name: '', trigger: '', revealed: false, effect: '' },
         { name: '', trigger: '', revealed: false, effect: '' },
       ]},
-      // 6분야 × 11행 특기표. 습득 여부만 체크하고 아래에 호기심·공포심·수정치를 둔다.
+      // 6분야 × 11행 특기표. 습득 여부만 체크하고 아래에 호기심·공포심을 둔다.
       { id: 'specialties', label: '특기', customType: 'insane-specialties', fields: [
         { id: 'curiosity', label: '호기심', type: 'select', options: ['', '1.폭력', '2.정서', '3.지각', '4.기술', '5.지식', '6.괴이'] },
         { id: 'fear', label: '공포심', type: 'text' },
-        { id: 'modifier', label: '전체 수정치', type: 'number' },
         { id: 'rootLaw', label: '이식 : 근원법칙', type: 'checkbox' },
       ]},
       { id: 'abilities', label: '어빌리티 리스트', repeatable: true, fields: [
@@ -44993,13 +44992,11 @@ function generateInsaneCocofoliaJSON(chId, sheetId) {
   var madness = (d.madnessState && typeof d.madnessState === 'object' && !Array.isArray(d.madnessState)) ? d.madnessState : {};
   var specialties = (d.specialties && typeof d.specialties === 'object' && !Array.isArray(d.specialties)) ? d.specialties : {};
   var targets = calcInsaneSpecialtyTargets(specialties);
-  var modifier = parseCocSheetNumber(specialties.modifier);
-  var modText = modifier > 0 ? '+' + modifier : (modifier < 0 ? String(modifier) : '');
   var cmd = ['──특기 판정──'];
   INSANE_SPECIALTY_COLUMNS.forEach(function(col, colIndex) {
     col.names.forEach(function(name, rowIndex) {
       var fieldId = getInsaneSpecialtyFieldId(colIndex, rowIndex);
-      cmd.push('2D6' + modText + '>=' + targets[fieldId] + ' ' + name);
+      cmd.push('2D6>=' + targets[fieldId] + ' ' + name);
     });
   });
   var tokenSize = normalizeCharacterTokenSize(ch.tokenSize);
@@ -45127,7 +45124,7 @@ function generateInsaneSheetTransferJSON(chId, sheetId) {
       removedGaps: Array.from({ length: 5 }, function(_, index) { return gaps.has(index); }),
       skills: skills,
       fear: fear,
-      modifier: _insaneTransferNumber(specialties.modifier, 0),
+      modifier: 0, // 「전체 수정치」 삭제(#223): 받는 쪽 형식 유지를 위해 필드는 남기고 항상 0
       rootLaw: isSheetCheckboxChecked(specialties.rootLaw),
       abilities: (Array.isArray(d.abilities) ? d.abilities : []).map(function(item) {
         item = _insaneTransferObject(item);
@@ -46755,10 +46752,6 @@ function renderInsaneSpecialtiesSection(sec, sectionData, chId, sheetId) {
       + '<label class="sh-field-label">공포심</label>'
       + '<input class="sh-field-input" type="text" value="' + esc(String(sectionData.fear || '')) + '"'
       + ' oninput="' + esc(saveExpr('fear', 'this.value') + ';refreshInsaneFear(this)') + '"></div>'
-    + '<div class="sh-field isp-foot-field is-narrow">'
-      + '<label class="sh-field-label">전체 수정치</label>'
-      + '<input class="sh-field-input" type="number" value="' + esc(String(sectionData.modifier !== undefined ? sectionData.modifier : '')) + '"'
-      + ' oninput="' + esc(saveExpr('modifier', 'this.value')) + '"></div>'
     + '<label class="sh-field-checkbox"><input type="checkbox" role="switch"' + (isSheetCheckboxChecked(sectionData.rootLaw) ? ' checked' : '')
       + ' onchange="' + esc(saveExpr('rootLaw', 'this.checked')) + '"><span>이식 : 근원법칙</span></label>';
   return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'
