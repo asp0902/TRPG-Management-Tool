@@ -24384,6 +24384,11 @@ async function initAutoBackup() {
 const GITHUB_SYNC_REPO = 'asp0902/TRPG-Management-Tool-data';
 const GITHUB_SYNC_BRANCH = 'sync';
 const GITHUB_SYNC_PATH = 'trpg-tool.latest.json';
+// 이미지 전용 「공개」 저장소(#219). 비공개 동기화 저장소와 완전히 분리되어 있고, 여기엔 이미지 파일만 올린다. 올린 이미지는 누구나 볼 수 있다.
+const GITHUB_IMAGE_REPO = 'asp0902/TRPG-Management-Tool-images';
+const GITHUB_IMAGE_BRANCH = 'main';
+const GITHUB_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
+const GITHUB_IMAGE_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 const GITHUB_SYNC_TOKEN_KEY = 'trpg-github-sync-token';
 const GITHUB_SYNC_ENABLED_KEY = 'trpg-github-sync-enabled';
 const GITHUB_SYNC_LAST_SHA_KEY = 'trpg-github-sync-last-sha';
@@ -31702,6 +31707,41 @@ async function putGitHubFile(path, blob, message) {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, content: await blobToBase64(blob), branch: GITHUB_SYNC_BRANCH }),
   });
+}
+// 이미지 전용 공개 저장소에 images/{sha256}.{ext} 로 올리고 raw URL 을 돌려준다. 이미 있으면 올리지 않는다(#219).
+function getGitHubImageRawUrl(path) {
+  return `https://raw.githubusercontent.com/${GITHUB_IMAGE_REPO}/${GITHUB_IMAGE_BRANCH}/${path}`;
+}
+async function uploadPublicImage(blob) {
+  const ext = GITHUB_IMAGE_EXT[String(blob?.type || '').toLowerCase()];
+  if (!ext) throw new Error('이미지 형식 미지원');
+  if (blob.size > GITHUB_IMAGE_MAX_BYTES) throw new Error('이미지 크기 초과');
+  const sha = await sha256Hex(blob);
+  const path = `images/${sha}.${ext}`;
+  const apiUrl = `https://api.github.com/repos/${GITHUB_IMAGE_REPO}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
+  const existing = await githubSyncRequest(`${apiUrl}?ref=${encodeURIComponent(GITHUB_IMAGE_BRANCH)}`, { allow404: true });
+  if (existing) return getGitHubImageRawUrl(path);
+  try {
+    await githubSyncRequest(apiUrl, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: `이미지 ${sha.slice(0, 8)}`, content: await blobToBase64(blob), branch: GITHUB_IMAGE_BRANCH }),
+    });
+  } catch (error) {
+    // 동시에 같은 이미지를 올려 이미 생긴 경우(422)는 성공으로 본다.
+    if (!/GitHub 422/.test(String(error?.message || ''))) throw error;
+  }
+  return getGitHubImageRawUrl(path);
+}
+function describeImageUploadError(error) {
+  const message = String(error?.message || '');
+  const tail = ' 이미지는 이 기기에만 저장됩니다.';
+  if (/토큰이 없/.test(message)) return '웹 등록 실패: GitHub 토큰이 없습니다(GitHub 동기화에서 토큰 입력).' + tail;
+  if (/GitHub 401/.test(message)) return '웹 등록 실패: 토큰이 올바르지 않거나 만료됐습니다.' + tail;
+  if (/GitHub (403|404)/.test(message)) return '웹 등록 실패: 이미지 저장소 권한이 없습니다(' + GITHUB_IMAGE_REPO + ' 쓰기 권한 확인).' + tail;
+  if (/크기 초과/.test(message)) return '웹 등록 안 함: 이미지가 25MB를 넘습니다.' + tail;
+  if (/형식 미지원/.test(message)) return '웹 등록 안 함: PNG·JPEG·GIF·WebP만 등록할 수 있습니다.' + tail;
+  if (error instanceof TypeError || /Failed to fetch|NetworkError/i.test(message)) return '웹 등록 실패: 네트워크에 연결할 수 없습니다.' + tail;
+  return '웹 등록 실패: ' + message + tail;
 }
 async function fetchGitHubBlob(path) {
   const response = await githubSyncRequest(`${githubContentsUrl(path)}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}&raw=1`, { headers: { Accept: 'application/vnd.github.raw+json' } });
@@ -41637,6 +41677,12 @@ function openCharacterSheetImageMenu(event, chId, sheetId, button) {
     { icon: '<i class="fa-regular fa-clipboard"></i>', label: '클립보드에서 붙여넣기', action: function() {
       pasteCharacterSheetImageFromClipboard(chId, sheetId);
     } },
+    ...(/^data:image\//i.test(getCharacterSheetImage(character, sheet)) ? [{ icon: '<i class="fa-solid fa-cloud-arrow-up"></i>', label: '웹에 등록(URL 만들기)', action: function() {
+      const dataUrl = getCharacterSheetImage(character, sheet);
+      const blob = dataUrlToBlob(dataUrl);
+      if (blob) registerCharacterSheetImageOnWeb(chId, sheetId, blob, dataUrl);
+      else showToast('이미지를 읽지 못했습니다.');
+    } }] : []),
     { sep: true },
     { icon: '<i class="fa-regular fa-trash-can"></i>', label: '시트 이미지 삭제', danger: true, disabled: !getCharacterSheetImage(character, sheet), action: function() {
       if (confirm('이 시트의 이미지를 삭제하시겠습니까?')) setCharacterSheetImage(chId, sheetId, '');
@@ -41668,7 +41714,7 @@ async function pasteCharacterSheetImageFromClipboard(chId, sheetId) {
     for (const item of items) {
       const imageType = item.types.find(type => /^image\//.test(type));
       if (imageType) {
-        setCharacterSheetImage(chId, sheetId, await readBlobAsDataUrl(await item.getType(imageType)));
+        await setCharacterSheetImageFromBlob(chId, sheetId, await item.getType(imageType));
         return;
       }
     }
@@ -41683,14 +41729,40 @@ async function pasteCharacterSheetImageFromClipboard(chId, sheetId) {
   }
   showToast('클립보드에 이미지가 없습니다.');
 }
+function dataUrlToBlob(dataUrl) {
+  const match = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(String(dataUrl || ''));
+  if (!match) return null;
+  const type = match[1] || 'application/octet-stream';
+  const binary = match[2] ? atob(match[3]) : decodeURIComponent(match[3]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: type });
+}
+// 파일·클립보드 이미지: 먼저 dataURL 로 즉시 표시하고(데이터 손실 방지), 공개 저장소 업로드에 성공하면 URL 로 바꾼다(#219).
+async function setCharacterSheetImageFromBlob(chId, sheetId, blob) {
+  let dataUrl;
+  try { dataUrl = await readBlobAsDataUrl(blob); } catch (error) { showToast('이미지를 읽지 못했습니다.'); return; }
+  if (!setCharacterSheetImage(chId, sheetId, dataUrl)) return;
+  await registerCharacterSheetImageOnWeb(chId, sheetId, blob, dataUrl);
+}
+async function registerCharacterSheetImageOnWeb(chId, sheetId, blob, dataUrl) {
+  try {
+    showToast('이미지를 웹에 등록하는 중입니다(공개 URL).');
+    const url = await uploadPublicImage(blob);
+    const character = state.characters.find(item => item.id === chId);
+    const sheet = character?.sheets?.find(item => item.id === sheetId);
+    if (!sheet || getCharacterSheetImage(character, sheet) !== dataUrl) return; // 그 사이 이미지가 바뀌었으면 건드리지 않는다
+    setCharacterSheetImage(chId, sheetId, url);
+    showToast('이미지를 웹에 등록했습니다(공개 URL).');
+  } catch (error) {
+    showToast(describeImageUploadError(error));
+  }
+}
 function onCharacterSheetImageFile(event, chId, sheetId) {
   const file = event.target.files?.[0];
   event.target.value = '';
   if (!file || !/^image\//.test(file.type)) return;
-  const reader = new FileReader();
-  reader.onload = loadEvent => setCharacterSheetImage(chId, sheetId, String(loadEvent.target?.result || ''));
-  reader.onerror = () => showToast('이미지 파일을 읽지 못했습니다.');
-  reader.readAsDataURL(file);
+  setCharacterSheetImageFromBlob(chId, sheetId, file);
 }
 
 function addCharacterSheet(chId, templateKey) {
@@ -41717,7 +41789,7 @@ document.addEventListener('paste', event => {
   const text = String(event.clipboardData?.getData('text/plain') || '').trim();
   if (file) {
     event.preventDefault();
-    readBlobAsDataUrl(file).then(url => setCharacterSheetImage(chId, sheetId, url)).catch(() => showToast('이미지를 읽지 못했습니다.'));
+    setCharacterSheetImageFromBlob(chId, sheetId, file);
   } else if (isRenderableImageSrc(text)) {
     event.preventDefault();
     setCharacterSheetImage(chId, sheetId, text);
