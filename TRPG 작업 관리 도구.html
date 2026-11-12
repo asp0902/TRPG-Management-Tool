@@ -8431,6 +8431,7 @@ select.sh-field-input,
               <div class="field"><label>형식</label><div class="info-basic-ce" id="i-format" contenteditable="true" data-ph="예) 타이만, 단발" oninput="syncInfo()" spellcheck="false"></div></div>
               <div class="field"><label>배경</label><div class="info-basic-ce" id="i-background" contenteditable="true" data-ph="예) 현대 일본" oninput="syncInfo()" spellcheck="false"></div></div>
               <div class="field"><label>플레이 타임</label><div class="info-basic-ce" id="i-playtime" contenteditable="true" data-ph="예) 2~3시간" oninput="syncInfo()" spellcheck="false"></div></div>
+              <div class="field"><label>플레이 사양</label><div class="info-basic-ce" id="i-playspec" contenteditable="true" data-ph="예) 보이스, 텍스트, 코코포리아" oninput="syncInfo()" spellcheck="false"></div></div>
               <div class="field" id="field-players"><label>추천 인원</label><div class="info-basic-ce" id="i-players" contenteditable="true" data-ph="예) 2~4인" oninput="syncInfo()" spellcheck="false"></div></div>
               <div class="field" id="field-skills"><label>추천 기능</label><div class="info-basic-ce" id="i-skills" contenteditable="true" data-ph="추천 기능" oninput="syncInfo()" spellcheck="false"></div></div>
               <div class="field"><label>추천 관계</label><div class="info-basic-ce" id="i-relations" contenteditable="true" data-ph="추천 관계" oninput="syncInfo()" spellcheck="false"></div></div>
@@ -10096,7 +10097,7 @@ function mkScenario(folderId = '') {
     id: mkId(), title: '제목 없음',
     info: {
       subtitle:'', writer:'', rule:'', format:'', background:'',
-      playtime:'', players:'', skills:'', relations:'',
+      playtime:'', playSpec:'', players:'', skills:'', relations:'',
       madness:'', combat:'', lost:'',
       insaneCard:'', sceneTable:'',
       overview:'', handout:'', truth:'', cautions:'', triggers:'', other:'', afterword:'',
@@ -13187,7 +13188,7 @@ function loadInfo(s) {
   v('i-title', s.title); v('i-subtitle', s.info.subtitle);
   v('i-writer', s.info.writer); v('i-rule', s.info.rule);
   v('i-format', s.info.format, next => { s.info.format = next; }); v('i-background', s.info.background, next => { s.info.background = next; });
-  v('i-playtime', s.info.playtime, next => { s.info.playtime = next; }); v('i-players', s.info.players, next => { s.info.players = next; });
+  v('i-playtime', s.info.playtime, next => { s.info.playtime = next; }); v('i-playspec', s.info.playSpec, next => { s.info.playSpec = next; }); v('i-players', s.info.players, next => { s.info.players = next; });
   v('i-skills', s.info.skills, next => { s.info.skills = next; }); v('i-relations', s.info.relations, next => { s.info.relations = next; });
   v('i-madness', s.info.madness); v('i-combat', s.info.combat); v('i-lost', s.info.lost);
   v('i-insane-card', s.info.insaneCard, next => { s.info.insaneCard = next; }); v('i-scene-table', s.info.sceneTable, next => { s.info.sceneTable = next; });
@@ -13471,7 +13472,7 @@ function syncInfo(options = {}) {
   }
   s.info.subtitle = g('i-subtitle'); s.info.writer = g('i-writer');
   s.info.rule = g('i-rule'); s.info.format = g('i-format');
-  s.info.background = g('i-background'); s.info.playtime = g('i-playtime');
+  s.info.background = g('i-background'); s.info.playtime = g('i-playtime'); s.info.playSpec = g('i-playspec');
   s.info.players = g('i-players'); s.info.skills = g('i-skills');
   s.info.relations = g('i-relations'); s.info.madness = g('i-madness');
   s.info.combat = g('i-combat'); s.info.lost = g('i-lost');
@@ -30123,7 +30124,7 @@ const FR_SKIP_FIELDS = new Set([
   'id','type','color','css','style','src','href','imageUrl',
   'blockType','collapsed','calloutType','ibType','rollType','className',
   // 찾아 바꾸기 제외 메타 필드 (서술 텍스트 아님)
-  'writer','rule','format','background','playtime','players',
+  'writer','rule','format','background','playtime','playSpec','players',
   'skills','relations','madness','combat','lost',
   'insaneCard','sceneTable',
   'sessionCard','speakerTokens','speakerTokenHiddenKeys','folderId','introCode'
