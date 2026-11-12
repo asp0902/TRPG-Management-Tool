@@ -41604,7 +41604,7 @@ function renderCharacterSheetPortrait(character, sheet, className) {
   const sheetId = sheet?.id || '';
   const manageHandler = 'openCharacterSheetImageMenu(event,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',this)';
   const fileHandler = 'onCharacterSheetImageFile(event,' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ')';
-  return '<div class="' + esc(className || 'ch-sheet-basic-portrait') + '">'
+  return '<div class="' + esc(className || 'ch-sheet-basic-portrait') + '" data-sheet-portrait="1" data-ch-id="' + esc(chId) + '" data-sheet-id="' + esc(sheetId) + '" tabindex="0">'
     + (image ? '<img src="' + esc(image) + '" alt="' + esc(character?.name || '캐릭터 이미지') + '" onload="fitCharacterPortrait(this)" onerror="this.style.display=\'none\'">' : '<span>NO IMAGE</span>')
     + '<button type="button" class="sh-sheet-image-manage" title="시트 이미지 관리" aria-label="시트 이미지 관리" onclick="' + esc(manageHandler) + '"><i class="fa-regular fa-image" aria-hidden="true"></i></button>'
     + '<input class="sh-sheet-image-file" id="sheet-image-file-' + esc(sheetId) + '" type="file" accept="image/*" onchange="' + esc(fileHandler) + '">'
@@ -41634,11 +41634,54 @@ function openCharacterSheetImageMenu(event, chId, sheetId, button) {
     { icon: '<i class="fa-regular fa-folder-open"></i>', label: '이미지 파일 선택', action: function() {
       document.getElementById('sheet-image-file-' + sheetId)?.click();
     } },
+    { icon: '<i class="fa-regular fa-clipboard"></i>', label: '클립보드에서 붙여넣기', action: function() {
+      pasteCharacterSheetImageFromClipboard(chId, sheetId);
+    } },
     { sep: true },
     { icon: '<i class="fa-regular fa-trash-can"></i>', label: '시트 이미지 삭제', danger: true, disabled: !getCharacterSheetImage(character, sheet), action: function() {
       if (confirm('이 시트의 이미지를 삭제하시겠습니까?')) setCharacterSheetImage(chId, sheetId, '');
     } },
   ], { rightAlign: true });
+}
+// 클립보드 붙여넣기(#215): 이미지면 dataURL, 이미지 URL 텍스트면 URL 로 시트 이미지를 설정한다. 이미지가 없으면 안내 토스트.
+function readBlobAsDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+async function pasteCharacterSheetImageFromClipboard(chId, sheetId) {
+  if (!navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+    showToast('이 브라우저에서는 메뉴 붙여넣기를 쓸 수 없습니다. 이미지 영역에 마우스를 올리고 Ctrl+V 를 눌러 주세요.');
+    return;
+  }
+  let items;
+  try {
+    items = await navigator.clipboard.read();
+  } catch (error) {
+    showToast('클립보드를 읽을 수 없습니다(권한 거부). 이미지 영역에 마우스를 올리고 Ctrl+V 를 눌러 주세요.');
+    return;
+  }
+  try {
+    for (const item of items) {
+      const imageType = item.types.find(type => /^image\//.test(type));
+      if (imageType) {
+        setCharacterSheetImage(chId, sheetId, await readBlobAsDataUrl(await item.getType(imageType)));
+        return;
+      }
+    }
+    for (const item of items) {
+      if (!item.types.includes('text/plain')) continue;
+      const text = String(await (await item.getType('text/plain')).text()).trim();
+      if (isRenderableImageSrc(text)) { setCharacterSheetImage(chId, sheetId, text); return; }
+    }
+  } catch (error) {
+    showToast('클립보드 내용을 읽지 못했습니다.');
+    return;
+  }
+  showToast('클립보드에 이미지가 없습니다.');
 }
 function onCharacterSheetImageFile(event, chId, sheetId) {
   const file = event.target.files?.[0];
@@ -41661,6 +41704,28 @@ function addCharacterSheet(chId, templateKey) {
   persist();
   renderCharacterSheet(chId);
 }
+
+// 보조: 초상 영역에 마우스를 올렸거나 포커스된 상태의 Ctrl+V. 입력칸(input·textarea·contenteditable)의 텍스트 붙여넣기는 건드리지 않는다.
+document.addEventListener('paste', event => {
+  const target = event.target;
+  if (target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+  const active = document.activeElement;
+  const portrait = (active && active.closest ? active.closest('[data-sheet-portrait]') : null) || document.querySelector('[data-sheet-portrait]:hover');
+  if (!portrait) return;
+  const chId = portrait.dataset.chId, sheetId = portrait.dataset.sheetId;
+  const file = getImageFileFromTransfer(event.clipboardData);
+  const text = String(event.clipboardData?.getData('text/plain') || '').trim();
+  if (file) {
+    event.preventDefault();
+    readBlobAsDataUrl(file).then(url => setCharacterSheetImage(chId, sheetId, url)).catch(() => showToast('이미지를 읽지 못했습니다.'));
+  } else if (isRenderableImageSrc(text)) {
+    event.preventDefault();
+    setCharacterSheetImage(chId, sheetId, text);
+  } else {
+    event.preventDefault();
+    showToast('클립보드에 이미지가 없습니다.');
+  }
+});
 
 function duplicateActiveCharacterSheet(chId) {
   var ch = state.characters.find(function(c) { return c.id === chId; });
