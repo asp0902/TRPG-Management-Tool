@@ -45101,7 +45101,9 @@ function generateInsaneSheetTransferJSON(chId, sheetId) {
   var itemSection = SHEET_TEMPLATES.insane.sections.find(function(section) { return section.id === 'items'; });
   var itemFields = itemSection ? itemSection.fields : [];
   // 템플릿 아이템은 빈칸이어도 템플릿 순서대로 항상 포함(빈칸 → 0, 키는 label). 템플릿에 없는 기존 키는 뒤에 유지한다(#218).
+  // 「보상 및 기타」(other)는 시트 API 에서 제외한다(#225). 뒤쪽 루프는 템플릿 키(other 포함)를 건너뛰므로 다시 넣지 않는다. 원본은 sourceData 에 남는다.
   itemFields.forEach(function(field) {
+    if (field.id === 'other') return;
     itemValues[field.label] = Math.max(0, _insaneTransferNumber(items[field.id], 0));
   });
   Object.keys(items).forEach(function(key) {

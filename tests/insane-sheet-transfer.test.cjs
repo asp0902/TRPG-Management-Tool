@@ -60,6 +60,13 @@ assert.equal(result.data.people[0].shelter, true);
 assert.equal(JSON.stringify(result.data.items), JSON.stringify({ 진통제: 2, 무기: 0 }));
 data.items = { custom: '5', painkiller: '3', blank: '' };
 assert.equal(JSON.stringify(context.generateInsaneSheetTransferJSON('character', 'sheet').data.items), JSON.stringify({ 진통제: 3, 무기: 0, custom: 5 }));
+// 「보상 및 기타」(other) 제외(#225): 템플릿 필드에 있어도 내보내지 않고, sourceData 에는 남는다
+context.SHEET_TEMPLATES.insane.sections[0].fields.push({ id: 'other', label: '보상 및 기타' });
+data.items = { painkiller: '1', other: '9' };
+const noOther = context.generateInsaneSheetTransferJSON('character', 'sheet');
+assert.equal(JSON.stringify(noOther.data.items), JSON.stringify({ 진통제: 1, 무기: 0 }));
+assert.equal(noOther.data.extensions.trpgManagement.sourceData.items.other, '9');
+context.SHEET_TEMPLATES.insane.sections[0].fields.pop();
 data.items = {};
 assert.equal(JSON.stringify(context.generateInsaneSheetTransferJSON('character', 'sheet').data.items), JSON.stringify({ 진통제: 0, 무기: 0 }));
 data.items = { painkiller: '2', weapon: '-1' };
