@@ -24384,9 +24384,10 @@ async function initAutoBackup() {
 const GITHUB_SYNC_REPO = 'asp0902/TRPG-Management-Tool-data';
 const GITHUB_SYNC_BRANCH = 'sync';
 const GITHUB_SYNC_PATH = 'trpg-tool.latest.json';
-// 이미지 전용 「공개」 저장소(#219). 비공개 동기화 저장소와 완전히 분리되어 있고, 여기엔 이미지 파일만 올린다. 올린 이미지는 누구나 볼 수 있다.
-const GITHUB_IMAGE_REPO = 'asp0902/TRPG-Management-Tool-images';
-const GITHUB_IMAGE_BRANCH = 'main';
+// 이미지 업로드 대상(#219): 앱 저장소의 `images` 브랜치. 비공개 동기화 저장소와 완전히 분리되어 있고, main 에는 절대 쓰지 않는다(Pages 재배포·코드 이력 오염 방지).
+// images 브랜치는 자동으로 만들지 않는다(없으면 안내만 한다). 올린 이미지는 누구나 볼 수 있다.
+const GITHUB_IMAGE_REPO = 'asp0902/TRPG-Management-Tool';
+const GITHUB_IMAGE_BRANCH = 'images';
 const GITHUB_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
 const GITHUB_IMAGE_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 const GITHUB_SYNC_TOKEN_KEY = 'trpg-github-sync-token';
@@ -31713,6 +31714,7 @@ function getGitHubImageRawUrl(path) {
   return `https://raw.githubusercontent.com/${GITHUB_IMAGE_REPO}/${GITHUB_IMAGE_BRANCH}/${path}`;
 }
 async function uploadPublicImage(blob) {
+  if (GITHUB_IMAGE_BRANCH === 'main' || GITHUB_IMAGE_BRANCH === 'master') throw new Error('이미지 업로드 대상이 기본 브랜치입니다');
   const ext = GITHUB_IMAGE_EXT[String(blob?.type || '').toLowerCase()];
   if (!ext) throw new Error('이미지 형식 미지원');
   if (blob.size > GITHUB_IMAGE_MAX_BYTES) throw new Error('이미지 크기 초과');
@@ -31727,8 +31729,11 @@ async function uploadPublicImage(blob) {
       body: JSON.stringify({ message: `이미지 ${sha.slice(0, 8)}`, content: await blobToBase64(blob), branch: GITHUB_IMAGE_BRANCH }),
     });
   } catch (error) {
-    // 동시에 같은 이미지를 올려 이미 생긴 경우(422)는 성공으로 본다.
-    if (!/GitHub 422/.test(String(error?.message || ''))) throw error;
+    const message = String(error?.message || '');
+    // 브랜치가 없으면 422 "Branch images not found": 자동 생성하지 않고 안내한다.
+    if (/GitHub 422/.test(message) && /branch/i.test(message)) throw new Error('이미지 브랜치 없음');
+    // 동시에 같은 이미지를 올려 이미 생긴 경우(그 밖의 422)는 성공으로 본다.
+    if (!/GitHub 422/.test(message)) throw error;
   }
   return getGitHubImageRawUrl(path);
 }
@@ -31737,7 +31742,8 @@ function describeImageUploadError(error) {
   const tail = ' 이미지는 이 기기에만 저장됩니다.';
   if (/토큰이 없/.test(message)) return '웹 등록 실패: GitHub 토큰이 없습니다(GitHub 동기화에서 토큰 입력).' + tail;
   if (/GitHub 401/.test(message)) return '웹 등록 실패: 토큰이 올바르지 않거나 만료됐습니다.' + tail;
-  if (/GitHub (403|404)/.test(message)) return '웹 등록 실패: 이미지 저장소 권한이 없습니다(' + GITHUB_IMAGE_REPO + ' 쓰기 권한 확인).' + tail;
+  if (/브랜치 없음/.test(message)) return '웹 등록 실패: ' + GITHUB_IMAGE_REPO + ' 저장소에 `' + GITHUB_IMAGE_BRANCH + '` 브랜치가 없습니다. 브랜치를 한 번 만들어 주세요.' + tail;
+  if (/GitHub (403|404)/.test(message)) return '웹 등록 실패: ' + GITHUB_IMAGE_REPO + ' 저장소 쓰기 권한이 없거나 `' + GITHUB_IMAGE_BRANCH + '` 브랜치가 없습니다(토큰 권한 확인).' + tail;
   if (/크기 초과/.test(message)) return '웹 등록 안 함: 이미지가 25MB를 넘습니다.' + tail;
   if (/형식 미지원/.test(message)) return '웹 등록 안 함: PNG·JPEG·GIF·WebP만 등록할 수 있습니다.' + tail;
   if (error instanceof TypeError || /Failed to fetch|NetworkError/i.test(message)) return '웹 등록 실패: 네트워크에 연결할 수 없습니다.' + tail;
