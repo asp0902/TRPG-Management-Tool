@@ -10,3 +10,8 @@ const rel = html.slice(html.indexOf("id: 'relations', label: '관계 목록'"), 
 assert.equal((rel.match(/\{ person: '', emotion: '', shelter: false \}/g) || []).length, 3);
 assert.doesNotMatch(rel, /shelter: false, emotion/);
 console.log('insane relations default rows checks: OK');
+// #224: 효과·메모 펼침 입력창은 토글 폭 변수로 윗줄 입력칸 왼쪽 끝과 맞춘다
+assert.match(html, /--is-toggle-w: 13px; --is-toggle-gap: 5px; --is-cell-pad: 4px;/);
+assert.match(html, /\.sh-sheet-insane \.is-ability-effect > td \{[^}]*padding-left: calc\(var\(--is-cell-pad\) \+ var\(--is-toggle-w\) \+ var\(--is-toggle-gap\)\)/);
+assert.match(html, /width: var\(--is-toggle-w\); height: var\(--is-toggle-w\);/);
+console.log('insane effect row alignment checks: OK');

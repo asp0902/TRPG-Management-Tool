@@ -7659,7 +7659,8 @@ tr:hover > .sh-coc-weapon-actions > *, tr:focus-within > .sh-coc-weapon-actions 
 .is-ability-name { display: flex; align-items: center; min-width: 0; }
 .is-ability-name input { min-width: 0; }
 .is-ability-toggle { flex: 0 0 20px; border: 0; background: transparent; padding: 0; cursor: pointer; font-size: 18px; color: #555; }
-.sh-sheet-insane input.is-ability-toggle { appearance: auto; flex: 0 0 auto; width: auto; height: auto; margin: 0 5px 0 0; padding: 0; cursor: pointer; }
+.sh-sheet-insane { --is-toggle-w: 13px; --is-toggle-gap: 5px; --is-cell-pad: 4px; }
+.sh-sheet-insane input.is-ability-toggle { appearance: auto; flex: 0 0 auto; width: var(--is-toggle-w); height: var(--is-toggle-w); margin: 0 var(--is-toggle-gap) 0 0; padding: 0; cursor: pointer; }
 .sh-sheet-insane [data-section-id="abilities"] input.sh-repeat-input { font-size: 13px; }
 .sh-sheet-insane [data-section-id="abilities"] tr > :last-child { width: 18px !important; padding-left: 0; padding-right: 0; }
 .sh-sheet-insane [data-section-id="abilities"] .sh-repeat-del { padding-left: 1px; padding-right: 1px; }
@@ -7668,7 +7669,10 @@ tr:hover > .sh-coc-weapon-actions > *, tr:focus-within > .sh-coc-weapon-actions 
 .sh-sheet-insane .ib-row:not(.ib-vitals) input { text-align: center; }
 .sh-sheet-insane [data-section-id="abilities"] select.sh-repeat-input { padding-left: 3px; padding-right: 20px; background-size: 10px; background-position: right 6px center; }
 .is-ability-effect[hidden] { display: none; }
+/* 효과·메모 펼침 입력창(#224): 왼쪽 끝은 윗줄 이름·인물 입력칸(토글 오른쪽), 오른쪽 끝은 윗줄 마지막 입력 칸(삭제 열 앞)에 맞춘다. */
 .is-ability-effect textarea { width: 100%; }
+.sh-sheet-insane .is-ability-effect > td { width: auto !important; padding-left: calc(var(--is-cell-pad) + var(--is-toggle-w) + var(--is-toggle-gap)) !important; padding-right: calc(var(--is-cell-pad) + var(--is-del-w, 28px)) !important; }
+.sh-sheet-insane [data-section-id="abilities"] { --is-del-w: 18px; }
 .sh-sheet-insane [data-section-id="abilities"] tbody td { border-bottom: none; }
 .sh-sheet-insane > [data-section-id="missionSecret"] { display: flex; flex-direction: column; }
 .sh-sheet-insane [data-section-id="missionSecret"] .sh-section-body { flex: 1; }
