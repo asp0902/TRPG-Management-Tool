@@ -7670,6 +7670,8 @@ tr:hover > .sh-coc-weapon-actions > *, tr:focus-within > .sh-coc-weapon-actions 
 .sh-sheet-insane .ib-row:not(.ib-vitals) input { text-align: center; }
 .sh-sheet-insane [data-section-id="abilities"] select.sh-repeat-input { padding-left: 3px; padding-right: 3px; }
 .is-ability-effect[hidden] { display: none; }
+.sh-sheet-insane textarea.is-macro-hidden { display: none; }
+.sh-macro-preview { min-height: 34px; height: auto; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; box-sizing: border-box; }
 /* 효과·메모 펼침 입력창(#224): 왼쪽 끝은 윗줄 이름·인물 입력칸(토글 오른쪽), 오른쪽 끝은 윗줄 마지막 입력 칸(삭제 열 앞)에 맞춘다. */
 .is-ability-effect textarea { width: 100%; }
 .sh-sheet-insane .is-ability-effect > td { width: auto !important; padding-left: calc(var(--is-cell-pad) + var(--is-toggle-w) + var(--is-toggle-gap)) !important; padding-right: calc(var(--is-cell-pad) + var(--is-del-w, 28px)) !important; }
@@ -26932,6 +26934,52 @@ document.getElementById('format-bar').addEventListener('mousedown', e => {
   tbCaptureFormatTarget();
   e.preventDefault();
 });
+// 인세인 시트 긴 글 칸(#232): 저장값은 Roll20 CSS 매크로 문자열 그대로 두고, 포커스가 없을 때만 서식이 적용된 미리보기를 보여 준다. 클릭·포커스하면 원문 textarea 로 편집.
+const INSANE_MACRO_RE = /\]\(#"style=/;
+function syncInsaneMacroPreviews(root) {
+  (root || document).querySelectorAll('.sh-sheet-insane textarea').forEach(ta => {
+    let preview = ta.nextElementSibling;
+    if (!preview || !preview.classList.contains('sh-macro-preview')) preview = null;
+    const want = INSANE_MACRO_RE.test(ta.value) && document.activeElement !== ta;
+    if (!want) {
+      if (preview) preview.remove();
+      ta.classList.remove('is-macro-hidden');
+      return;
+    }
+    if (!preview) {
+      preview = document.createElement('div');
+      preview.className = 'sh-macro-preview ' + ta.className.replace(/auto-grow/, '');
+      preview.tabIndex = 0;
+      preview.title = '클릭하면 원문을 편집합니다';
+      ta.after(preview);
+    }
+    if (preview._src !== ta.value) { preview._src = ta.value; preview.innerHTML = renderCssMacroPreviewHtml(ta.value); }
+    ta.classList.add('is-macro-hidden');
+  });
+}
+function editInsaneMacroPreview(preview) {
+  const ta = preview.previousElementSibling;
+  preview.remove();
+  if (!ta) return;
+  ta.classList.remove('is-macro-hidden');
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+  if (typeof autoResizeSheetTextarea === 'function') autoResizeSheetTextarea(ta);
+}
+document.addEventListener('focusin', e => {
+  const preview = e.target.closest && e.target.closest('.sh-macro-preview');
+  if (preview) editInsaneMacroPreview(preview);
+});
+document.addEventListener('click', e => {
+  if (e.target.closest('.sh-macro-preview a')) return;
+  const preview = e.target.closest && e.target.closest('.sh-macro-preview');
+  if (preview) editInsaneMacroPreview(preview);
+}, true);
+document.addEventListener('focusout', e => { if (e.target.matches && e.target.matches('.sh-sheet-insane textarea')) setTimeout(() => syncInsaneMacroPreviews(), 0); });
+(function() {
+  const body = document.getElementById('ch-sheet-body');
+  if (body) new MutationObserver(() => syncInsaneMacroPreviews(body)).observe(body, { childList: true, subtree: true });
+})();
 document.getElementById('tb-overflow-btn').addEventListener('click', toggleFormatToolbarOverflow);
 document.addEventListener('mousedown', e => {
   if (!e.target.closest('#tb-overflow-btn, #tb-overflow-menu')) closeFormatToolbarOverflow();
@@ -42137,6 +42185,9 @@ function exportCharacterSheetHtml() {
 
   const bodyEl = document.getElementById('ch-sheet-body');
   const clone = bodyEl.cloneNode(true);
+  // 매크로 미리보기(#232)는 앱 안에서만 쓴다: 내보내기에는 원문 textarea 를 그대로 둔다.
+  clone.querySelectorAll('.sh-macro-preview').forEach(el => el.remove());
+  clone.querySelectorAll('.is-macro-hidden').forEach(el => el.classList.remove('is-macro-hidden'));
   const isEditableCoc7e = activeSheet.templateKey === 'coc7e';
   // 편집 가능 내보내기: CoC 7판 + 인세인(#228). CoC 전용 처리(시대 테마·기능 추가·장부)는 isEditableCoc7e 에만 둔다.
   const isEditableSheet = isEditableCoc7e || activeSheet.templateKey === 'insane';
