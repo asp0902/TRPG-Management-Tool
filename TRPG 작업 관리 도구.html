@@ -44979,10 +44979,14 @@ function generateInsaneSheetTransferJSON(chId, sheetId) {
   var itemValues = {};
   var itemSection = SHEET_TEMPLATES.insane.sections.find(function(section) { return section.id === 'items'; });
   var itemFields = itemSection ? itemSection.fields : [];
+  // 템플릿 아이템은 빈칸이어도 템플릿 순서대로 항상 포함(빈칸 → 0, 키는 label). 템플릿에 없는 기존 키는 뒤에 유지한다(#218).
+  itemFields.forEach(function(field) {
+    itemValues[field.label] = Math.max(0, _insaneTransferNumber(items[field.id], 0));
+  });
   Object.keys(items).forEach(function(key) {
+    if (itemFields.some(function(candidate) { return candidate.id === key; })) return;
     if (items[key] === '' || items[key] === null || items[key] === undefined) return;
-    var field = itemFields.find(function(candidate) { return candidate.id === key; });
-    itemValues[field ? field.label : key] = Math.max(0, _insaneTransferNumber(items[key], 0));
+    itemValues[key] = Math.max(0, _insaneTransferNumber(items[key], 0));
   });
   return {
     kind: 'capybara.insane-sheet',

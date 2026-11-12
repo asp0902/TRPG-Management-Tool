@@ -55,7 +55,13 @@ assert.equal(result.data.abilities[0].target, '꿈');
 assert.equal(result.data.abilities[0].extensions.trpgManagement.specialtyCategory, 'occ');
 assert.equal(result.data.abilities[0].extensions.trpgManagement.source.future, '보존');
 assert.equal(result.data.people[0].shelter, true);
-assert.deepEqual(JSON.parse(JSON.stringify(result.data.items)), { 진통제: 2, 무기: 0 });
+// 템플릿 아이템은 빈칸이어도 템플릿 순서로 모두 포함, 템플릿 밖 키는 뒤에 유지(#218)
+assert.equal(JSON.stringify(result.data.items), JSON.stringify({ 진통제: 2, 무기: 0 }));
+data.items = { custom: '5', painkiller: '3', blank: '' };
+assert.equal(JSON.stringify(context.generateInsaneSheetTransferJSON('character', 'sheet').data.items), JSON.stringify({ 진통제: 3, 무기: 0, custom: 5 }));
+data.items = {};
+assert.equal(JSON.stringify(context.generateInsaneSheetTransferJSON('character', 'sheet').data.items), JSON.stringify({ 진통제: 0, 무기: 0 }));
+data.items = { painkiller: '2', weapon: '-1' };
 assert.equal(result.data.madness[0].extensions.trpgManagement.source.future, 1);
 assert.equal(result.data.extensions.trpgManagement.sourceData.futureSection.keep, true);
 assert.equal(vm.runInContext("findInsaneTransferSkillId('vio2')", context), '0:0');
