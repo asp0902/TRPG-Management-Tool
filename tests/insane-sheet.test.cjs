@@ -71,7 +71,9 @@ assert.equal(result.data.status[1].value, 0);
 assert.equal(result.data.status[1].max, 5);
 assert.deepEqual(JSON.parse(JSON.stringify(result.data.status.slice(3))), [
   { label: '진통제', value: 2, max: 2 },
+  { label: '무기', value: 0, max: 0 },
   { label: '부적', value: 0, max: 0 },
+  { label: '그물망 발사기', value: 0, max: 0 },
 ]);
 assert.equal('params' in result.data, false);
 vm.runInContext(html.match(/const INSANE_SPECIALTY_COLUMNS = \[[\s\S]*?\n\];/)[0] + '\n' + extract('renderInsaneAbilitySpecialty'), context);

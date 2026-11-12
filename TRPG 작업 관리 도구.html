@@ -44887,11 +44887,10 @@ function generateInsaneCocofoliaJSON(chId, sheetId) {
   var name = basic.charName || ch.name || '이름 없음';
   var items = (d.items && typeof d.items === 'object' && !Array.isArray(d.items)) ? d.items : {};
   var itemSection = SHEET_TEMPLATES.insane.sections.find(function(section) { return section.id === 'items'; });
-  var itemStatus = (itemSection ? itemSection.fields : []).flatMap(function(field) {
-    var raw = items[field.id];
-    if (raw === '' || raw === null || raw === undefined) return [];
-    var value = Math.max(0, parseCocSheetNumber(raw));
-    return [{ label: field.label, value: value, max: value }];
+  // 아이템은 빈칸이어도 템플릿 순서대로 모두 내보낸다(빈칸 → 0). max 는 기존대로 value 와 같다(#218).
+  var itemStatus = (itemSection ? itemSection.fields : []).map(function(field) {
+    var value = Math.max(0, parseCocSheetNumber(items[field.id]));
+    return { label: field.label, value: value, max: value };
   });
   return {
     kind: 'character',
