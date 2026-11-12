@@ -89,13 +89,20 @@ context.copyCharacterSheetAPI = () => called.push('API');
 context.copyInsaneSheetTransfer = () => called.push('시트 API');
 vm.runInContext(extract('openCharacterSheetExportMenu'), context);
 context.openCharacterSheetExportMenu({ preventDefault() {}, stopPropagation() {} }, { getBoundingClientRect: () => ({ right: 200, bottom: 100 }) });
-assert.deepEqual(Array.from(menuItems, item => item.label), ['HTML', 'API', '시트 API']);
-assert.deepEqual(Array.from(menuItems, item => !!item.disabled), [false, false, false]);
-menuItems.forEach(item => item.action());
+// 코코포리아 하나로 묶고 기본형/사이코로픽션형은 하위 메뉴(#226)
+assert.deepEqual(Array.from(menuItems, item => item.label), ['HTML', '코코포리아']);
+assert.deepEqual(Array.from(menuItems, item => !!item.disabled), [false, false]);
+assert.deepEqual(Array.from(menuItems[1].submenu, item => item.label), ['기본형', '사이코로픽션형']);
+assert.deepEqual(Array.from(menuItems[1].submenu, item => !!item.disabled), [false, false]);
+menuItems[0].action(); menuItems[1].submenu.forEach(item => item.action());
 assert.deepEqual(called, ['HTML', 'API', '시트 API']);
+context.state.characters[0].sheets[0].templateKey = 'coc7e';
+context.openCharacterSheetExportMenu({ preventDefault() {}, stopPropagation() {} }, { getBoundingClientRect: () => ({ right: 200, bottom: 100 }) });
+assert.deepEqual(Array.from(menuItems, item => !!item.disabled), [false, false]);
+assert.deepEqual(Array.from(menuItems[1].submenu, item => !!item.disabled), [false, true], '사이코로픽션형은 인세인만');
 context.state.characters[0].sheets[0].templateKey = 'generic';
 context.openCharacterSheetExportMenu({ preventDefault() {}, stopPropagation() {} }, { getBoundingClientRect: () => ({ right: 200, bottom: 100 }) });
-assert.deepEqual(Array.from(menuItems, item => !!item.disabled), [false, true, true]);
+assert.deepEqual(Array.from(menuItems, item => !!item.disabled), [false, true]);
 
 // 시트 이미지(#217): http(s) URL 만 iconUrl 로, dataURL·없음은 빈 문자열
 assert.equal(result.data.iconUrl, '');

@@ -3585,7 +3585,7 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.13);
 }
-.tb-ctx-item.has-submenu:hover > .tb-ctx-submenu { display: block; }
+.tb-ctx-item.has-submenu:hover > .tb-ctx-submenu, .tb-ctx-item.has-submenu.open > .tb-ctx-submenu { display: block; }
 .tb-ctx-submenu.flip-left {
   left: auto;
   right: calc(100% - 2px);
@@ -15968,6 +15968,9 @@ function tbShowCtxMenu(x, y, items, opts = {}) {
         row.onclick = e => {
           e.preventDefault();
           e.stopPropagation();
+          if (e.target.closest('.tb-ctx-submenu')) return;
+          row.classList.toggle('open'); // 호버가 없는 터치·클릭만으로도 하위 메뉴를 연다
+          row.onmouseenter();
         };
 
         row.onmouseenter = () => {
@@ -42115,8 +42118,11 @@ function openCharacterSheetExportMenu(event, btn) {
   var rect = btn.getBoundingClientRect();
   tbShowCtxMenu(rect.right, rect.bottom + 4, [
     { icon: '<i class="fa-regular fa-file-code"></i>', label: 'HTML', action: function() { exportCharacterSheetHtml(); } },
-    { icon: '<i class="fa-solid fa-code"></i>', label: 'API', disabled: !supportsNativeApi, action: function() { copyCharacterSheetAPI(btn); } },
-    { icon: '<i class="fa-solid fa-file-export"></i>', label: '시트 API', disabled: sheet.templateKey !== 'insane', action: function() { copyInsaneSheetTransfer(btn); } },
+    // 코코포리아 하나로 묶고 형식은 하위 메뉴에서 고른다(#226). 기본형은 CoC7·아리안로드·인세인, 사이코로픽션형은 인세인만.
+    { icon: '<i class="fa-solid fa-code"></i>', label: '코코포리아', disabled: !supportsNativeApi, submenu: [
+      { icon: '<i class="fa-solid fa-code"></i>', label: '기본형', action: function() { copyCharacterSheetAPI(btn); } },
+      { icon: '<i class="fa-solid fa-file-export"></i>', label: '사이코로픽션형', disabled: sheet.templateKey !== 'insane', action: function() { copyInsaneSheetTransfer(btn); } },
+    ] },
   ], { rightAlign: true });
 }
 
@@ -45238,13 +45244,13 @@ function copyCharacterSheetAPI(btn) {
   if (sheet.templateKey === 'coc7e') json = generateCoc7eCocofoliaJSON(chId, sheet.id);
   else if (sheet.templateKey === 'arianrhod2e') json = generateArianrhod2eCocofoliaJSON(chId, sheet.id);
   else if (sheet.templateKey === 'insane') json = generateInsaneCocofoliaJSON(chId, sheet.id);
-  if (!json) { alert('이 시트는 API 복사를 지원하지 않습니다. (CoC 7판, 아리안로드 2E, inSANe만 지원)'); return; }
+  if (!json) { alert('이 시트는 코코포리아 기본형 복사를 지원하지 않습니다. (CoC 7판, 아리안로드 2E, inSANe만 지원)'); return; }
   var jsonStr = JSON.stringify(json, null, 2);
   _copyTextWithFallback(jsonStr).then(function() {
     notifySheetApiIconOmitted(ch, sheet);
     if (!btn) return;
     if (btn._copyTimer) clearTimeout(btn._copyTimer);
-    var originalText = btn.dataset.originalText || btn.textContent || 'API';
+    var originalText = btn.dataset.originalText || btn.textContent || '내보내기';
     btn.dataset.originalText = originalText;
     btn.textContent = '복사됨 ✓';
     btn._copyTimer = setTimeout(function() {
@@ -45252,7 +45258,7 @@ function copyCharacterSheetAPI(btn) {
       btn._copyTimer = null;
     }, 1500);
   }).catch(function() {
-    alert('API 복사에 실패했습니다.');
+    alert('코코포리아 기본형 복사에 실패했습니다.');
   });
 }
 
@@ -45267,7 +45273,7 @@ function copyInsaneSheetTransfer(btn) {
     notifySheetApiIconOmitted(ch, sheet);
     if (!btn) return;
     if (btn._copyTimer) clearTimeout(btn._copyTimer);
-    var originalText = btn.dataset.originalText || btn.textContent || '시트 API';
+    var originalText = btn.dataset.originalText || btn.textContent || '내보내기';
     btn.dataset.originalText = originalText;
     btn.textContent = '복사됨 ✓';
     btn._copyTimer = setTimeout(function() {
@@ -45275,7 +45281,7 @@ function copyInsaneSheetTransfer(btn) {
       btn._copyTimer = null;
     }, 1500);
   }).catch(function() {
-    alert('시트 API 복사에 실패했습니다.');
+    alert('코코포리아 사이코로픽션형 복사에 실패했습니다.');
   });
 }
 
