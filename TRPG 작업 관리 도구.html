@@ -4103,7 +4103,10 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 .script-home-top .btn-primary { padding: 7px 16px; font-size: 12px; }
 .script-home-section { margin-bottom: 22px; min-width: 0; }
 .script-home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-.script-home-card { text-align: left; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; min-width: 0; font: inherit; transition: box-shadow 0.15s; }
+.script-home-card { text-align: left; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 0; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; min-width: 0; font: inherit; transition: box-shadow 0.15s; }
+.script-home-card-thumb { display: block; width: 100%; aspect-ratio: 16/9; background: #f0f0f0; overflow: hidden; flex-shrink: 0; }
+.script-home-card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.script-home-card-body { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; min-width: 0; }
 .script-home-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.09); }
 .script-home-card-rule { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.05em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 12px; }
 .script-home-card-title { font-size: 14px; font-weight: 800; color: #111; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -10897,10 +10900,15 @@ function renderScriptHome() {
   const card = scenario => {
     const rule = String(scenario.info?.rule || '').trim();
     const sub = String(scenario.info?.subtitle || '').trim();
+    // 대표 이미지 = 정보 탭의 세션 카드 이미지(#213). 없거나 로드 실패하면 회색 칸(높이 동일).
+    const image = String(scenario.info?.sessionCard || '').trim();
     return `<button type="button" class="script-home-card" onclick="select('${scenario.id}','info')" title="${esc(getScenarioListTitle(scenario))}">
-      <span class="script-home-card-rule">${esc(rule)}</span>
-      <span class="script-home-card-title">${esc(getScenarioListTitle(scenario))}</span>
-      <span class="script-home-card-sub">${esc(sub)}</span>
+      <span class="script-home-card-thumb">${image ? `<img src="${esc(image)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : ''}</span>
+      <span class="script-home-card-body">
+        <span class="script-home-card-rule">${esc(rule)}</span>
+        <span class="script-home-card-title">${esc(getScenarioListTitle(scenario))}</span>
+        <span class="script-home-card-sub">${esc(sub)}</span>
+      </span>
     </button>`;
   };
   const section = (name, list) => `<section class="script-home-section">

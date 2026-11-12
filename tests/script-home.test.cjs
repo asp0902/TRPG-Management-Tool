@@ -20,3 +20,8 @@ assert.match(html, /\.sort\(compareScenarioSidebarItems\) \/\/ #209\s*\.forEach\
 assert.match(html, /sc\.folderId === folder\.id\)\.sort\(compareScenarioSidebarItems\)/);
 assert.match(html, /!folderIds\.has\(sc\.folderId\)\)\.sort\(compareScenarioSidebarItems\)/);
 console.log('script sidebar sort checks: OK');
+// #213: 폴더 화면 카드 상단에 대표 이미지(info.sessionCard), 없거나 실패하면 회색 칸
+assert.match(html, /scenario\.info\?\.sessionCard \|\| ''/);
+assert.match(html, /<img src="\$\{esc\(image\)\}" alt="" loading="lazy" decoding="async" onerror="this\.remove\(\)">/);
+assert.match(html, /\.script-home-card-thumb \{[^}]*aspect-ratio: 16\/9;[^}]*background: #f0f0f0;/);
+console.log('script home thumb checks: OK');
