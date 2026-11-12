@@ -3585,6 +3585,7 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.13);
 }
+.tb-ctx-menu.compact-submenu .tb-ctx-submenu { min-width: 0; width: max-content; } /* 짧은 항목만 있는 하위 메뉴: 220px 고정 폭 때문에 오른쪽 공간이 있어도 왼쪽으로 뒤집히던 문제(#227) */
 .tb-ctx-item.has-submenu:hover > .tb-ctx-submenu, .tb-ctx-item.has-submenu.open > .tb-ctx-submenu { display: block; }
 .tb-ctx-submenu.flip-left {
   left: auto;
@@ -42123,7 +42124,7 @@ function openCharacterSheetExportMenu(event, btn) {
       { icon: '<i class="fa-solid fa-code"></i>', label: '기본형', action: function() { copyCharacterSheetAPI(btn); } },
       { icon: '<i class="fa-solid fa-file-export"></i>', label: '사이코로픽션형', disabled: sheet.templateKey !== 'insane', action: function() { copyInsaneSheetTransfer(btn); } },
     ] },
-  ], { rightAlign: true });
+  ], { rightAlign: true, menuClass: 'compact-submenu' });
 }
 
 function exportCharacterSheetHtml() {
