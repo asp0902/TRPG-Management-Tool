@@ -2326,7 +2326,11 @@ tr.ct-row-end .ct-select:focus {
   background: #f5f5f5;
   color: #333;
 }
-.bookmark-card-btn.clip { display: inline-flex; align-items: center; gap: 4px; }
+.bookmark-card-btn.clip, .bookmark-card-btn.tag { display: inline-flex; align-items: center; gap: 4px; }
+#bookmark-tag-popover { width: auto; max-width: min(360px, calc(100vw - 16px)); }
+#bookmark-tag-popover .bookmark-card-tags { margin-top: 0; overflow-y: auto; }
+#bookmark-tag-popover button.bookmark-card-tag { cursor: pointer; font-family: inherit; }
+#bookmark-tag-popover button.bookmark-card-tag:hover { background: #e5e7eb; }
 .bookmark-attach-box { border: 1px solid #e4e4e4; border-radius: 10px; padding: 8px 10px; max-height: 32vh; overflow-y: auto; box-sizing: border-box; background: #fff; }
 .bookmark-modal.drop-over { outline: 2px dashed #4a9eff; outline-offset: -4px; }
 .bookmark-card-btn.del:hover {
@@ -8659,6 +8663,8 @@ select.sh-field-input,
   </div>
 
   <!-- BOOKMARK ATTACHMENTS POPOVER (카드의 클립 아이콘) -->
+  <!-- BOOKMARK TAGS POPOVER (카드의 태그 아이콘, #235) -->
+  <div id="bookmark-tag-popover" class="catalog-links-popover" style="display:none"></div>
   <div id="bookmark-attach-popover" class="catalog-links-popover" style="display:none">
     <div class="clp-head">첨부 파일</div>
     <div id="bmp-attach-status" class="clp-attach-status" style="display:none"></div>
@@ -34033,6 +34039,7 @@ function renderBookmarkPage() {
     return;
   }
   closeBookmarkAttachPopover();
+  closeBookmarkTagPopover();
   grid.innerHTML = visible.map(bookmark => `
     <article class="bookmark-card" data-bookmark-id="${bookmark.id}">
       <div class="bookmark-thumb-wrap">
@@ -34044,9 +34051,9 @@ function renderBookmarkPage() {
         <div class="bookmark-card-title">${esc(getBookmarkDisplayTitle(bookmark))}</div>
         <div class="bookmark-card-url">${esc(bookmark.url || '')}</div>
         ${bookmark.notes ? `<div class="bookmark-card-notes" title="${esc(bookmark.notes)}">${esc(bookmark.notes)}</div>` : ''}
-        ${bookmark.tags?.length ? `<div class="bookmark-card-tags">${renderBookmarkCardTags(bookmark.tags)}</div>` : ''}
       </div>
       <div class="bookmark-card-footer">
+        ${normalizeCssMacroTags(bookmark.tags).length ? `<button class="bookmark-card-btn tag" type="button" onclick="event.stopPropagation();toggleBookmarkTagPopover('${bookmark.id}',this)" title="태그 ${normalizeCssMacroTags(bookmark.tags).length}개"><i class="fa-solid fa-tag" aria-hidden="true"></i></button>` : ''}
         ${(bookmark.attachments || []).length ? `<button class="bookmark-card-btn clip" type="button" onclick="event.stopPropagation();openBookmarkAttachPopover('${bookmark.id}',this)" title="첨부 파일 ${(bookmark.attachments || []).length}개"><i class="fa-solid fa-paperclip" aria-hidden="true"></i>${(bookmark.attachments || []).length}</button>` : ''}
         <button class="bookmark-card-btn" onclick="openBookmarkLink('${bookmark.id}')">열기</button>
         <button class="bookmark-card-btn" onclick="openBookmarkModal('${bookmark.id}')">수정</button>
@@ -34151,6 +34158,7 @@ function openBookmarkAttachPopover(bookmarkId, anchorEl) {
   const bookmark = getBookmarkById(bookmarkId);
   if (!bookmark || !(bookmark.attachments || []).length) return;
   closeBookmarkAttachPopover();
+  closeBookmarkTagPopover();
   attachMemoEditingId = null;
   const rect = anchorEl.getBoundingClientRect();
   _attachCtx = {
@@ -34172,6 +34180,36 @@ function closeBookmarkAttachPopover() {
 document.addEventListener('mousedown', e => {
   const pop = document.getElementById('bookmark-attach-popover');
   if (pop && pop.style.display !== 'none' && !pop.contains(e.target) && !e.target.closest('.bookmark-card-btn.clip')) closeBookmarkAttachPopover();
+});
+// 카드의 태그 아이콘(#235): 태그 팝오버. 첨부 팝오버와 동시에 하나만 열리고, 바깥 클릭·Esc·다시 클릭·다시 렌더링 때 닫힌다. 태그를 누르면 상단 태그 필터가 그 태그로 바뀐다.
+function closeBookmarkTagPopover() {
+  const pop = document.getElementById('bookmark-tag-popover');
+  if (pop) { pop.style.display = 'none'; pop.dataset.owner = ''; }
+}
+function toggleBookmarkTagPopover(bookmarkId, anchorEl) {
+  const pop = document.getElementById('bookmark-tag-popover');
+  const bookmark = getBookmarkById(bookmarkId);
+  if (!pop || !bookmark) return;
+  const reopen = pop.style.display === 'none' || pop.dataset.owner !== bookmarkId;
+  closeBookmarkTagPopover();
+  closeBookmarkAttachPopover();
+  if (!reopen) return;
+  pop.innerHTML = '<div class="clp-head">태그</div><div class="bookmark-card-tags">'
+    + normalizeCssMacroTags(bookmark.tags).map(tag => `<button type="button" class="bookmark-card-tag" data-tag="${esc(tag)}" onclick="setBookmarkTagFilter(this.dataset.tag)">#${esc(tag)}</button>`).join('') + '</div>';
+  pop.dataset.owner = bookmarkId;
+  pop.style.display = 'flex';
+  const rect = anchorEl.getBoundingClientRect(), margin = 8, h = pop.offsetHeight, w = pop.offsetWidth;
+  let y = rect.bottom + 4;
+  if (y + h > window.innerHeight - margin) y = rect.top - 4 - h >= margin ? rect.top - 4 - h : Math.max(margin, window.innerHeight - margin - h);
+  pop.style.top = y + 'px';
+  pop.style.left = Math.max(margin, Math.min(rect.left, window.innerWidth - w - margin)) + 'px';
+}
+document.addEventListener('mousedown', e => {
+  const pop = document.getElementById('bookmark-tag-popover');
+  if (pop && pop.style.display !== 'none' && !pop.contains(e.target) && !e.target.closest('.bookmark-card-btn.tag')) closeBookmarkTagPopover();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeBookmarkTagPopover(); closeBookmarkAttachPopover(); }
 });
 function deleteBookmarkFromModal() {
   if (!editingBookmarkId) return;
