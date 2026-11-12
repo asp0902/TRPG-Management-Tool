@@ -24390,12 +24390,8 @@ async function initAutoBackup() {
 const GITHUB_SYNC_REPO = 'asp0902/TRPG-Management-Tool-data';
 const GITHUB_SYNC_BRANCH = 'sync';
 const GITHUB_SYNC_PATH = 'trpg-tool.latest.json';
-// 이미지 업로드 대상(#219): 앱 저장소의 `images` 브랜치. 비공개 동기화 저장소와 완전히 분리되어 있고, main 에는 절대 쓰지 않는다(Pages 재배포·코드 이력 오염 방지).
-// images 브랜치는 자동으로 만들지 않는다(없으면 안내만 한다). 올린 이미지는 누구나 볼 수 있다.
-const GITHUB_IMAGE_REPO = 'asp0902/TRPG-Management-Tool';
-const GITHUB_IMAGE_BRANCH = 'images';
-const GITHUB_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
-const GITHUB_IMAGE_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
+// 캐릭터 이미지 웹 업로드는 껐다(#233). 예전에 올라간 이 접두사의 URL 은 시작할 때 dataURL 로 되돌린다.
+const LEGACY_WEB_IMAGE_URL_PREFIX = 'https://raw.githubusercontent.com/asp0902/TRPG-Management-Tool/images/';
 const GITHUB_SYNC_TOKEN_KEY = 'trpg-github-sync-token';
 const GITHUB_SYNC_ENABLED_KEY = 'trpg-github-sync-enabled';
 const GITHUB_SYNC_LAST_SHA_KEY = 'trpg-github-sync-last-sha';
@@ -31761,46 +31757,6 @@ async function putGitHubFile(path, blob, message) {
     body: JSON.stringify({ message, content: await blobToBase64(blob), branch: GITHUB_SYNC_BRANCH }),
   });
 }
-// 이미지 전용 공개 저장소에 images/{sha256}.{ext} 로 올리고 raw URL 을 돌려준다. 이미 있으면 올리지 않는다(#219).
-function getGitHubImageRawUrl(path) {
-  return `https://raw.githubusercontent.com/${GITHUB_IMAGE_REPO}/${GITHUB_IMAGE_BRANCH}/${path}`;
-}
-async function uploadPublicImage(blob) {
-  if (GITHUB_IMAGE_BRANCH === 'main' || GITHUB_IMAGE_BRANCH === 'master') throw new Error('이미지 업로드 대상이 기본 브랜치입니다');
-  const ext = GITHUB_IMAGE_EXT[String(blob?.type || '').toLowerCase()];
-  if (!ext) throw new Error('이미지 형식 미지원');
-  if (blob.size > GITHUB_IMAGE_MAX_BYTES) throw new Error('이미지 크기 초과');
-  const sha = await sha256Hex(blob);
-  const path = `images/${sha}.${ext}`;
-  const apiUrl = `https://api.github.com/repos/${GITHUB_IMAGE_REPO}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
-  const existing = await githubSyncRequest(`${apiUrl}?ref=${encodeURIComponent(GITHUB_IMAGE_BRANCH)}`, { allow404: true });
-  if (existing) return getGitHubImageRawUrl(path);
-  try {
-    await githubSyncRequest(apiUrl, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: `이미지 ${sha.slice(0, 8)}`, content: await blobToBase64(blob), branch: GITHUB_IMAGE_BRANCH }),
-    });
-  } catch (error) {
-    const message = String(error?.message || '');
-    // 브랜치가 없으면 422 "Branch images not found": 자동 생성하지 않고 안내한다.
-    if (/GitHub 422/.test(message) && /branch/i.test(message)) throw new Error('이미지 브랜치 없음');
-    // 동시에 같은 이미지를 올려 이미 생긴 경우(그 밖의 422)는 성공으로 본다.
-    if (!/GitHub 422/.test(message)) throw error;
-  }
-  return getGitHubImageRawUrl(path);
-}
-function describeImageUploadError(error) {
-  const message = String(error?.message || '');
-  const tail = ' 이미지는 이 기기에만 저장됩니다.';
-  if (/토큰이 없/.test(message)) return '웹 등록 실패: GitHub 토큰이 없습니다(GitHub 동기화에서 토큰 입력).' + tail;
-  if (/GitHub 401/.test(message)) return '웹 등록 실패: 토큰이 올바르지 않거나 만료됐습니다.' + tail;
-  if (/브랜치 없음/.test(message)) return '웹 등록 실패: ' + GITHUB_IMAGE_REPO + ' 저장소에 `' + GITHUB_IMAGE_BRANCH + '` 브랜치가 없습니다. 브랜치를 한 번 만들어 주세요.' + tail;
-  if (/GitHub (403|404)/.test(message)) return '웹 등록 실패: ' + GITHUB_IMAGE_REPO + ' 저장소 쓰기 권한이 없거나 `' + GITHUB_IMAGE_BRANCH + '` 브랜치가 없습니다(토큰 권한 확인).' + tail;
-  if (/크기 초과/.test(message)) return '웹 등록 안 함: 이미지가 25MB를 넘습니다.' + tail;
-  if (/형식 미지원/.test(message)) return '웹 등록 안 함: PNG·JPEG·GIF·WebP만 등록할 수 있습니다.' + tail;
-  if (error instanceof TypeError || /Failed to fetch|NetworkError/i.test(message)) return '웹 등록 실패: 네트워크에 연결할 수 없습니다.' + tail;
-  return '웹 등록 실패: ' + message + tail;
-}
 async function fetchGitHubBlob(path) {
   const response = await githubSyncRequest(`${githubContentsUrl(path)}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}&raw=1`, { headers: { Accept: 'application/vnd.github.raw+json' } });
   return await response.blob();
@@ -36656,7 +36612,8 @@ async function bootstrapApp() {
   restoreScriptSidePanelWidths();
   bootMark('first-render-done');
   // GitHub 동기화는 첫 렌더 뒤 백그라운드로(원격이 바뀌었으면 34MB 받기·적용이 끝나야 화면이 뜨던 지연 제거). 버튼은 「동기화 중」으로 보인다.
-  if (!isCharacterSheetPopupMode()) initGitHubSync();
+  // 동기화 pull 뒤에 웹 이미지를 dataURL 로 되돌린다(#233).
+  if (!isCharacterSheetPopupMode()) { const syncDone = initGitHubSync(); syncDone.catch(() => {}).then(restoreWebCharacterImages); }
   if (!isCharacterSheetPopupMode()) await initAutoBackup();
   bootMark('autobackup-init-done');
   initAppSnapshots();
@@ -41722,11 +41679,6 @@ function setCharacterSheetImage(chId, sheetId, image) {
   sheet.image = String(image || '').trim();
   persist();
   renderCharacterSheet(chId);
-  // 어떤 경로로 넣든 dataURL 이면 즉시 표시한 채 웹에 등록해 URL 로 바꾼다(#221). http(s) URL 은 그대로 쓴다. URL 로 교체할 땐 dataURL 이 아니라 다시 불리지 않는다.
-  if (/^data:image\//i.test(sheet.image)) {
-    const blob = dataUrlToBlob(sheet.image);
-    if (blob) registerCharacterSheetImageOnWeb(chId, sheetId, blob, sheet.image);
-  }
   return true;
 }
 function openCharacterSheetImageMenu(event, chId, sheetId, button) {
@@ -41747,12 +41699,6 @@ function openCharacterSheetImageMenu(event, chId, sheetId, button) {
     { icon: '<i class="fa-regular fa-clipboard"></i>', label: '클립보드에서 붙여넣기', action: function() {
       pasteCharacterSheetImageFromClipboard(chId, sheetId);
     } },
-    ...(/^data:image\//i.test(getCharacterSheetImage(character, sheet)) ? [{ icon: '<i class="fa-solid fa-cloud-arrow-up"></i>', label: '웹에 등록(URL 만들기)', action: function() {
-      const dataUrl = getCharacterSheetImage(character, sheet);
-      const blob = dataUrlToBlob(dataUrl);
-      if (blob) registerCharacterSheetImageOnWeb(chId, sheetId, blob, dataUrl);
-      else showToast('이미지를 읽지 못했습니다.');
-    } }] : []),
     { sep: true },
     { icon: '<i class="fa-regular fa-trash-can"></i>', label: '시트 이미지 삭제', danger: true, disabled: !getCharacterSheetImage(character, sheet), action: function() {
       if (confirm('이 시트의 이미지를 삭제하시겠습니까?')) setCharacterSheetImage(chId, sheetId, '');
@@ -41808,57 +41754,45 @@ function dataUrlToBlob(dataUrl) {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return new Blob([bytes], { type: type });
 }
-// 파일·클립보드 이미지: 먼저 dataURL 로 즉시 표시하고(데이터 손실 방지), 공개 저장소 업로드에 성공하면 URL 로 바꾼다(#219).
+// 파일·클립보드 이미지는 dataURL 그대로 저장한다(웹 업로드 없음, #233).
 async function setCharacterSheetImageFromBlob(chId, sheetId, blob) {
   let dataUrl;
   try { dataUrl = await readBlobAsDataUrl(blob); } catch (error) { showToast('이미지를 읽지 못했습니다.'); return; }
-  setCharacterSheetImage(chId, sheetId, dataUrl); // dataURL 이므로 안에서 웹 등록까지 이어진다
+  setCharacterSheetImage(chId, sheetId, dataUrl);
 }
-async function registerCharacterSheetImageOnWeb(chId, sheetId, blob, dataUrl) {
+// 예전에 웹(images 브랜치)에 올린 이미지를 dataURL 로 되돌린다(#233). 실패하면 URL 을 그대로 두고 다음 실행 때 다시 시도한다. 다른 URL 은 건드리지 않는다.
+let webImageRestoreRunning = false;
+async function restoreWebCharacterImages() {
+  if (webImageRestoreRunning) return;
+  webImageRestoreRunning = true;
+  let count = 0;
+  const cache = new Map();
+  const toDataUrl = url => {
+    if (!cache.has(url)) cache.set(url, fetch(url).then(async res => {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const blob = await res.blob();
+      if (!/^image\//i.test(blob.type)) throw new Error('이미지 아님');
+      return readBlobAsDataUrl(blob);
+    }));
+    return cache.get(url);
+  };
   try {
-    showToast('이미지를 웹에 등록하는 중입니다(공개 URL).');
-    const url = await uploadPublicImage(blob);
-    const character = state.characters.find(item => item.id === chId);
-    const sheet = character?.sheets?.find(item => item.id === sheetId);
-    if (!sheet || getCharacterSheetImage(character, sheet) !== dataUrl) return; // 그 사이 이미지가 바뀌었으면 건드리지 않는다
-    setCharacterSheetImage(chId, sheetId, url);
-    showToast('이미지를 웹에 등록했습니다(공개 URL).');
-  } catch (error) {
-    showToast(describeImageUploadError(error));
-  }
-}
-// 이미 저장된 dataURL 이미지(시트·레거시 ch.image)를 시트를 열 때 백그라운드로 하나씩 올린다(#221). 토큰이 없으면 건너뛰고, 실패하면 이번 세션엔 멈추며 토스트는 세션당 1회.
-let sheetImageAutoRunning = false, sheetImageAutoStopped = false, sheetImageAutoToasted = false;
-const sheetImageAutoSkipped = new Set();
-async function autoRegisterCharacterImages(chId) {
-  if (sheetImageAutoRunning || sheetImageAutoStopped || !getGitHubSyncToken()) return;
-  sheetImageAutoRunning = true;
-  const isData = value => /^data:image\//i.test(value || '') && !sheetImageAutoSkipped.has(value);
-  try {
-    for (;;) {
-      const ch = state.characters.find(item => item.id === chId);
-      if (!ch) break;
-      const sheet = (ch.sheets || []).find(item => typeof item.image === 'string' && isData(item.image.trim()));
-      const before = sheet ? sheet.image.trim() : (isData(ch.image) ? ch.image : '');
-      if (!before) break;
-      const blob = dataUrlToBlob(before);
-      let url = '';
-      try {
-        if (!blob) throw new Error('이미지 형식 미지원');
-        url = await uploadPublicImage(blob);
-      } catch (error) {
-        if (/형식 미지원|크기 초과/.test(String(error?.message || ''))) { sheetImageAutoSkipped.add(before); continue; }
-        sheetImageAutoStopped = true;
-        if (!sheetImageAutoToasted) { sheetImageAutoToasted = true; showToast(describeImageUploadError(error)); }
-        break;
+    for (const ch of state.characters) {
+      for (const holder of [ch, ...(ch.sheets || [])]) {
+        const url = typeof holder.image === 'string' ? holder.image.trim() : '';
+        if (!url.startsWith(LEGACY_WEB_IMAGE_URL_PREFIX)) continue;
+        try {
+          const dataUrl = await toDataUrl(url);
+          if (String(holder.image || '').trim() === url) { holder.image = dataUrl; count += 1; } // 그 사이 바뀌었으면 건드리지 않는다
+        } catch (error) { /* URL 유지, 다음 실행 때 재시도 */ }
       }
-      const current = state.characters.find(item => item.id === chId);
-      const target = sheet && current ? (current.sheets || []).find(item => item.id === sheet.id) : null;
-      if (sheet && target && String(target.image || '').trim() === before) setCharacterSheetImage(chId, sheet.id, url);
-      else if (!sheet && current && current.image === before) { current.image = url; persist(); if (_openCharacterSheetId === chId) renderCharacterSheet(chId); }
-      else sheetImageAutoSkipped.add(before); // 그 사이 바뀜: 이번엔 건드리지 않는다
     }
-  } finally { sheetImageAutoRunning = false; }
+    if (count) {
+      persist();
+      if (_openCharacterSheetId) renderCharacterSheet(_openCharacterSheetId);
+      showToast('웹 이미지 ' + count + '개를 앱 데이터로 되돌렸습니다');
+    }
+  } finally { webImageRestoreRunning = false; }
 }
 function onCharacterSheetImageFile(event, chId, sheetId) {
   const file = event.target.files?.[0];
@@ -42099,7 +42033,6 @@ function renderCharacterSheetPage(id) {
     subtitleEl.textContent = rbName || n.ruleName || '캐릭터 시트';
   }
   renderCharacterSheet(id);
-  autoRegisterCharacterImages(id);
 }
 
 function closeCharacterSheet() {
