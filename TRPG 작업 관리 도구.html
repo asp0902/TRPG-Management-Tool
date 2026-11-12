@@ -44592,6 +44592,16 @@ function normalizeCoc7eSheetData(sheetData) {
   return sheetData;
 }
 
+// API(코코포리아 JSON·인세인 시트 API)용 시트 이미지: http(s) URL 만 넣는다. 파일·클립보드로 넣은 dataURL 은 JSON 이 매우 커지고 받는 쪽 지원이 불확실해 제외한다(#217).
+function getSheetApiIconUrl(character, sheet) {
+  var image = String(getCharacterSheetImage(character, sheet) || '').trim();
+  return /^https?:\/\//i.test(image) ? image : '';
+}
+function notifySheetApiIconOmitted(character, sheet) {
+  if (/^data:/i.test(String(getCharacterSheetImage(character, sheet) || '').trim())) {
+    showToast('파일로 넣은 이미지는 API에 포함되지 않습니다(이미지 URL만 지원).');
+  }
+}
 function generateCoc7eCocofoliaJSON(chId, sheetId) {
   var ch = state.characters.find(function(c) { return c.id === chId; });
   if (!ch) return null;
@@ -44688,6 +44698,7 @@ function generateCoc7eCocofoliaJSON(chId, sheetId) {
       memo: memo,
       initiative: String(dex),
       externalUrl: '',
+      iconUrl: getSheetApiIconUrl(ch, sheet),
       status: status,
       params: params,
       width: tokenSize,
@@ -44829,6 +44840,7 @@ function generateArianrhod2eCocofoliaJSON(chId, sheetId) {
       memo: memoParts.join('\n'),
       initiative: initiative,
       externalUrl: '',
+      iconUrl: getSheetApiIconUrl(ch, sheet),
       status: status,
       params: params,
       width: tokenSize,
@@ -44888,6 +44900,7 @@ function generateInsaneCocofoliaJSON(chId, sheetId) {
       memo: [basic.occupation, basic.age, basic.gender].filter(Boolean).join(' / '),
       initiative: '',
       externalUrl: '',
+      iconUrl: getSheetApiIconUrl(ch, sheet),
       status: [
         { label: '생명력', value: countInsaneTrack(basic, 'lp'), max: getInsaneTrackMax(basic, 'lp') },
         { label: '이성치', value: countInsaneTrack(basic, 'sn'), max: getInsaneTrackMax(basic, 'sn') },
@@ -44977,6 +44990,7 @@ function generateInsaneSheetTransferJSON(chId, sheetId) {
     version: 1,
     data: {
       name: _insaneTransferText(basic.charName || ch.name || '이름 없음'),
+      iconUrl: getSheetApiIconUrl(ch, sheet),
       player: _insaneTransferText(basic.playerName),
       age: _insaneTransferText(basic.age),
       gender: _insaneTransferText(basic.gender),
@@ -45101,6 +45115,7 @@ function copyCharacterSheetAPI(btn) {
   if (!json) { alert('이 시트는 API 복사를 지원하지 않습니다. (CoC 7판, 아리안로드 2E, inSANe만 지원)'); return; }
   var jsonStr = JSON.stringify(json, null, 2);
   _copyTextWithFallback(jsonStr).then(function() {
+    notifySheetApiIconOmitted(ch, sheet);
     if (!btn) return;
     if (btn._copyTimer) clearTimeout(btn._copyTimer);
     var originalText = btn.dataset.originalText || btn.textContent || 'API';
@@ -45123,6 +45138,7 @@ function copyInsaneSheetTransfer(btn) {
   var json = sheet && generateInsaneSheetTransferJSON(chId, sheet.id);
   if (!json) { alert('활성 inSANe 시트가 없습니다.'); return; }
   _copyTextWithFallback(JSON.stringify(json, null, 2)).then(function() {
+    notifySheetApiIconOmitted(ch, sheet);
     if (!btn) return;
     if (btn._copyTimer) clearTimeout(btn._copyTimer);
     var originalText = btn.dataset.originalText || btn.textContent || '시트 API';

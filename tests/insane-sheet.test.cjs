@@ -53,13 +53,20 @@ assert.deepEqual(Array.from(context.getInsaneOpenGaps('1.폭력')), [0]);
 assert.deepEqual(Array.from(context.getInsaneOpenGaps('6.괴이')), [4]);
 assert.equal(context.getInsaneOpenGaps('').size, 0);
 assert.match(extract('renderInsaneSpecialtiesSection'), /\[0, 1, 2, 3, 4\]\.map/);
-vm.runInContext(['countInsaneTrack', 'getInsaneTrackMax', 'generateInsaneCocofoliaJSON'].map(extract).join('\n'), context);
+vm.runInContext(['countInsaneTrack', 'getInsaneTrackMax', 'getCharacterSheetImage', 'getSheetApiIconUrl', 'generateInsaneCocofoliaJSON'].map(extract).join('\n'), context);
 assert.equal(context.countInsaneTrack(basic, 'lp'), 2);
 assert.equal(context.getInsaneTrackMax(basic, 'sn'), 6);
 Object.assign(basic, { lpCurrent: '5', lpMax: '8', snCurrent: '0', snMax: '5' });
 const result = context.generateInsaneCocofoliaJSON('character', 'sheet');
 assert.equal(result.data.status[0].value, 5);
 assert.equal(result.data.status[0].max, 8);
+// 시트 이미지(#217): http(s) URL 만 iconUrl, dataURL·없음은 빈 문자열
+assert.equal(result.data.iconUrl, '');
+context.state.characters[0].sheets[0].image = 'https://example.com/a.png';
+assert.equal(context.generateInsaneCocofoliaJSON('character', 'sheet').data.iconUrl, 'https://example.com/a.png');
+context.state.characters[0].sheets[0].image = 'data:image/png;base64,AAAA';
+assert.equal(context.generateInsaneCocofoliaJSON('character', 'sheet').data.iconUrl, '');
+delete context.state.characters[0].sheets[0].image;
 assert.equal(result.data.status[1].value, 0);
 assert.equal(result.data.status[1].max, 5);
 assert.deepEqual(JSON.parse(JSON.stringify(result.data.status.slice(3))), [

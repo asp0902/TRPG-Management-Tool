@@ -35,7 +35,7 @@ vm.runInContext(html.match(/const INSANE_SPECIALTY_COLUMNS = \[[\s\S]*?\n\];/)[0
 vm.runInContext([
   'countInsaneTrack', 'getInsaneTrackMax', '_insaneTransferObject', '_insaneTransferText',
   '_insaneTransferNumber', '_cloneInsaneTransferValue', 'findInsaneTransferSkillId',
-  'getInsaneSpecialtyFieldId', 'getInsaneOpenGaps', 'generateInsaneSheetTransferJSON',
+  'getInsaneSpecialtyFieldId', 'getInsaneOpenGaps', 'getCharacterSheetImage', 'getSheetApiIconUrl', 'generateInsaneSheetTransferJSON',
 ].map(extract).join('\n'), context);
 
 const result = context.generateInsaneSheetTransferJSON('character', 'sheet');
@@ -83,4 +83,13 @@ context.state.characters[0].sheets[0].templateKey = 'generic';
 context.openCharacterSheetExportMenu({ preventDefault() {}, stopPropagation() {} }, { getBoundingClientRect: () => ({ right: 200, bottom: 100 }) });
 assert.deepEqual(Array.from(menuItems, item => !!item.disabled), [false, true, true]);
 
+// 시트 이미지(#217): http(s) URL 만 iconUrl 로, dataURL·없음은 빈 문자열
+assert.equal(result.data.iconUrl, '');
+const sheetRef = context.state.characters[0].sheets[0];
+sheetRef.templateKey = 'insane';
+sheetRef.image = 'https://example.com/a.png';
+assert.equal(context.generateInsaneSheetTransferJSON('character', 'sheet').data.iconUrl, 'https://example.com/a.png');
+sheetRef.image = 'data:image/png;base64,AAAA';
+assert.equal(context.generateInsaneSheetTransferJSON('character', 'sheet').data.iconUrl, '');
+assert.equal(context.generateInsaneSheetTransferJSON('character', 'sheet').version, 1);
 console.log('inSANe sheet transfer checks: OK');
