@@ -33,7 +33,7 @@ const context = {
 vm.createContext(context);
 vm.runInContext(html.match(/const INSANE_SPECIALTY_COLUMNS = \[[\s\S]*?\n\];/)[0], context);
 vm.runInContext([
-  'countInsaneTrack', 'getInsaneTrackMax', '_insaneTransferObject', '_insaneTransferText',
+  'countInsaneTrack', 'getInsaneTrackMax', 'isInsaneSanityMaxManual', 'getInsaneSanityMax', '_insaneTransferObject', '_insaneTransferText',
   '_insaneTransferNumber', '_cloneInsaneTransferValue', 'findInsaneTransferSkillId',
   'getInsaneSpecialtyFieldId', 'getInsaneOpenGaps', 'getCharacterSheetImage', 'getSheetApiIconUrl', 'generateInsaneSheetTransferJSON',
 ].map(extract).join('\n'), context);

@@ -42464,7 +42464,20 @@ function syncStandaloneInsane() {
     if (t) t.textContent = Math.min(12, 5 + dist[Math.floor(i / 6)][i % 6]);
   });
   grid.querySelectorAll('.isp-gap-mark').forEach(function(mark, gap) { mark.classList.toggle('is-open', gaps.indexOf(gap) >= 0); });
+  // 이성치 최대(#230): 자동 상태(data-auto-max)일 때만 괴이 분야(6번째 열) 체크 여부로 5/6 갱신
+  var snMax = document.querySelector('input[data-auto-max]');
+  if (snMax && document.activeElement !== snMax) {
+    var occ = false;
+    cells.forEach(function(cell, i) { if (i % 6 === 5 && cell.querySelector('input').checked) occ = true; });
+    snMax.value = occ ? 5 : 6;
+    snMax.setAttribute('value', snMax.value);
+  }
 }
+document.addEventListener('input', function(event) {
+  if (event.target.matches('[aria-label="이성치 최대"]')) {
+    if (event.target.value === '') event.target.setAttribute('data-auto-max', '1'); else event.target.removeAttribute('data-auto-max');
+  }
+});
 document.addEventListener('change', syncStandaloneInsane);
 document.addEventListener('input', syncStandaloneInsane);
 syncStandaloneInsane();
@@ -45078,7 +45091,7 @@ function generateInsaneCocofoliaJSON(chId, sheetId) {
       iconUrl: getSheetApiIconUrl(ch, sheet),
       status: [
         { label: '생명력', value: countInsaneTrack(basic, 'lp'), max: getInsaneTrackMax(basic, 'lp') },
-        { label: '이성치', value: countInsaneTrack(basic, 'sn'), max: getInsaneTrackMax(basic, 'sn') },
+        { label: '이성치', value: countInsaneTrack(basic, 'sn'), max: getInsaneSanityMax(d) },
         { label: '광기', value: parseCocSheetNumber(madness.current), max: 6 },
       ].concat(itemStatus),
       width: tokenSize,
@@ -45179,7 +45192,7 @@ function generateInsaneSheetTransferJSON(chId, sheetId) {
       life: countInsaneTrack(basic, 'lp'),
       lifeMax: getInsaneTrackMax(basic, 'lp'),
       sanity: countInsaneTrack(basic, 'sn'),
-      sanityMax: getInsaneTrackMax(basic, 'sn'),
+      sanityMax: getInsaneSanityMax(d),
       merit: Math.max(0, _insaneTransferNumber(basic.merit, 0)),
       curiosity: curiosity,
       removedGaps: Array.from({ length: 5 }, function(_, index) { return gaps.has(index); }),
@@ -46834,6 +46847,21 @@ function getInsaneTrackMax(data, prefix) {
   var value = data[prefix + 'Max'];
   return value === undefined || value === null || value === '' ? 6 : Math.max(0, parseCocSheetNumber(value));
 }
+// 이성치 최대(#230): 직접 입력한 snMax 가 우선, 비어 있으면 6 - (괴이 특기 occ2~occ12 중 하나라도 체크 시 1). 자동 값은 저장하지 않는다.
+function isInsaneSanityMaxManual(data) {
+  var raw = ((data && data.basic) || {}).snMax;
+  return !(raw === undefined || raw === null || raw === '');
+}
+function getInsaneSanityMax(data) {
+  data = data || {};
+  var basic = (data.basic && typeof data.basic === 'object') ? data.basic : {};
+  if (isInsaneSanityMaxManual(data)) return getInsaneTrackMax(basic, 'sn');
+  var specialties = (data.specialties && typeof data.specialties === 'object') ? data.specialties : {};
+  for (var row = 0; row < 11; row++) {
+    if (isSheetCheckboxChecked(specialties['occ' + (row + 2)])) return 5; // 6.괴이 열(key occ)
+  }
+  return 6;
+}
 
 // inSANe vitals preserve legacy checkbox counts until explicitly edited.
 function renderInsaneBasicSection(sec, sectionData, chId, sheetId) {
@@ -46855,7 +46883,7 @@ function renderInsaneBasicSection(sec, sectionData, chId, sheetId) {
   var vitalGroup = function(label, prefix) {
     return '<div class="sh-field ib-field"><label class="sh-field-label">' + label + '</label><div class="ib-vital-inputs">'
       + '<input class="sh-field-input" type="number" min="0" aria-label="' + label + ' 현재" value="' + countInsaneTrack(sectionData, prefix) + '" oninput="' + esc(saveExpr(prefix + 'Current', 'this.value')) + '"> / '
-      + '<input class="sh-field-input" type="number" min="0" aria-label="' + label + ' 최대" value="' + getInsaneTrackMax(sectionData, prefix) + '" oninput="' + esc(saveExpr(prefix + 'Max', 'this.value')) + '"></div></div>';
+      + '<input class="sh-field-input" type="number" min="0" aria-label="' + label + ' 최대" value="' + (prefix === 'sn' ? getInsaneSanityMax(sheet && sheet.data) : getInsaneTrackMax(sectionData, prefix)) + '"' + (prefix === 'sn' && !isInsaneSanityMaxManual(sheet && sheet.data) ? ' data-auto-max="1"' : '') + ' oninput="' + esc(saveExpr(prefix + 'Max', 'this.value')) + '"></div></div>';
   };
   var topRow = textField('playerName', '플레이어')
     + textField('charName', '캐릭터명')

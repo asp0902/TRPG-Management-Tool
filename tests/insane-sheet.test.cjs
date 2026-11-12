@@ -53,9 +53,15 @@ assert.deepEqual(Array.from(context.getInsaneOpenGaps('1.폭력')), [0]);
 assert.deepEqual(Array.from(context.getInsaneOpenGaps('6.괴이')), [4]);
 assert.equal(context.getInsaneOpenGaps('').size, 0);
 assert.match(extract('renderInsaneSpecialtiesSection'), /\[0, 1, 2, 3, 4\]\.map/);
-vm.runInContext(['countInsaneTrack', 'getInsaneTrackMax', 'getCharacterSheetImage', 'getSheetApiIconUrl', 'generateInsaneCocofoliaJSON'].map(extract).join('\n'), context);
+vm.runInContext(['countInsaneTrack', 'getInsaneTrackMax', 'isInsaneSanityMaxManual', 'getInsaneSanityMax', 'getCharacterSheetImage', 'getSheetApiIconUrl', 'generateInsaneCocofoliaJSON'].map(extract).join('\n'), context);
 assert.equal(context.countInsaneTrack(basic, 'lp'), 2);
 assert.equal(context.getInsaneTrackMax(basic, 'sn'), 6);
+// 이성치 최대 자동 계산(#230): 괴이 특기 체크 시 5, 수동 snMax 우선, 비우면 자동
+assert.equal(context.getInsaneSanityMax({ basic: {}, specialties: {} }), 6);
+assert.equal(context.getInsaneSanityMax({ basic: {}, specialties: { occ7: true } }), 5);
+assert.equal(context.getInsaneSanityMax({ basic: { snMax: '4' }, specialties: { occ7: true } }), 4);
+assert.equal(context.getInsaneSanityMax({ basic: { snMax: '' }, specialties: { occ12: true } }), 5);
+assert.equal(context.getInsaneSanityMax({ basic: {}, specialties: { vio2: true } }), 6);
 Object.assign(basic, { lpCurrent: '5', lpMax: '8', snCurrent: '0', snMax: '5' });
 const result = context.generateInsaneCocofoliaJSON('character', 'sheet');
 assert.equal(result.data.status[0].value, 5);
