@@ -34097,6 +34097,7 @@ function openBookmarkModal(bookmarkId = '') {
   setTimeout(() => document.getElementById('bookmark-url')?.focus(), 20);
 }
 function closeBookmarkModal() {
+  bookmarkFetchController?.abort(); bookmarkFetchController = null;
   document.getElementById('bookmark-modal-backdrop').classList.remove('open');
   const ctx = _attachCtx;
   if (ctx?.kind === 'bookmark-modal') {
@@ -34349,6 +34350,18 @@ class BookmarkMetaServiceError extends Error {
 // microlink 기본값은 헤드리스 렌더링(prerender)이 붙어 캐시 MISS 에서 4~5초 걸린다. 1차는 렌더링 없이(빠름), 제목·썸네일이 둘 다 비면 기본값으로 한 번 더 시도한다(#196).
 const BOOKMARK_META_SERVICE_FAST_QUERY = '&prerender=false&palette=false&audio=false&video=false&iframe=false';
 const bookmarkMetaServiceCache = new Map();
+// 시간 제한(#241): 직접 조회는 짧게, 외부 서비스는 서비스별로(jina 는 처음 조회하는 페이지에 17초쯤 걸릴 수 있다), 전체 상한은 따로.
+const BOOKMARK_META_DIRECT_TIMEOUT_MS = 8000;
+const BOOKMARK_META_SERVICE_TIMEOUT_MS = [25000, 20000]; // BOOKMARK_META_SERVICES 와 같은 순서(jina, microlink)
+const BOOKMARK_META_TOTAL_TIMEOUT_MS = 35000;
+// parent(전체 제한·사용자 중단)가 끊기면 같이 끊기고, ms 가 지나면 이 단계만 끊기는 signal.
+function bookmarkTimeoutSignal(parent, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  const onAbort = () => controller.abort();
+  if (parent?.aborted) controller.abort(); else parent?.addEventListener?.('abort', onAbort, { once: true });
+  return { signal: controller.signal, clear() { clearTimeout(timer); parent?.removeEventListener?.('abort', onAbort); } };
+}
 // HTML 엔티티(&amp; 등) 정규화: 서비스가 og 값을 이스케이프된 채로 주는 경우가 있다.
 function decodeBookmarkMetaEntities(text) {
   const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
@@ -34409,39 +34422,42 @@ const BOOKMARK_META_SERVICES = [requestBookmarkMetaJina, requestBookmarkMetaMicr
 async function fetchBookmarkMetaViaService(targetUrl, signal) {
   if (bookmarkMetaServiceCache.has(targetUrl)) return { ...bookmarkMetaServiceCache.get(targetUrl) };
   const failures = [];
-  for (const request of BOOKMARK_META_SERVICES) {
+  for (const [index, request] of BOOKMARK_META_SERVICES.entries()) {
+    const step = bookmarkTimeoutSignal(signal, BOOKMARK_META_SERVICE_TIMEOUT_MS[index] || 20000);
     try {
-      const result = await request(targetUrl, signal);
+      const result = await request(targetUrl, step.signal);
       if (result.title || result.image) {
         bookmarkMetaServiceCache.set(targetUrl, result);
         return { ...result };
       }
       failures.push('empty');
     } catch (error) {
-      if (error?.kind === 'timeout' || signal?.aborted || error?.name === 'AbortError') throw new BookmarkMetaServiceError('timeout');
-      failures.push(error?.kind || 'service');
-    }
+      if (signal?.aborted) throw new BookmarkMetaServiceError('timeout'); // 전체 제한·사용자 중단
+      failures.push(error?.kind || 'service'); // 이 서비스만 시간 초과면 다음 서비스로
+    } finally { step.clear(); }
   }
   // 한도 초과 문구는 시도한 모든 서비스가 한도 초과일 때만, 연결 실패는 모두 연결 실패일 때만 보인다.
   if (failures.length && failures.every(kind => kind === 'rate-limit')) throw new BookmarkMetaServiceError('rate-limit');
   if (failures.length && failures.every(kind => kind === 'network')) throw new BookmarkMetaServiceError('network');
+  if (failures.length && failures.every(kind => kind === 'timeout')) throw new BookmarkMetaServiceError('timeout');
   throw new BookmarkMetaServiceError('service', failures.join(','));
 }
 // 직접 조회가 실패했을 때에만(시간 초과 제외) 외부 서비스로 다시 조회한다. 성공하면 {title, image}.
 async function fetchBookmarkGenericMeta(targetUrl, signal, onFallback = null) {
+  const direct = bookmarkTimeoutSignal(signal, BOOKMARK_META_DIRECT_TIMEOUT_MS);
   try {
-    const doc = await fetchBookmarkPageDocument(targetUrl, signal);
+    const doc = await fetchBookmarkPageDocument(targetUrl, direct.signal);
     return extractBookmarkGenericMetadata(doc, targetUrl);
   } catch (error) {
-    if (signal?.aborted || error?.name === 'AbortError') throw new BookmarkMetaServiceError('timeout');
+    if (signal?.aborted) throw new BookmarkMetaServiceError('timeout'); // 직접 조회만 시간 초과면 외부 서비스로 넘어간다
     if (onFallback) onFallback();
     return fetchBookmarkMetaViaService(targetUrl, signal);
-  }
+  } finally { direct.clear(); }
 }
 function describeBookmarkFetchError(error) {
   const base = '자동으로 정보를 가져오지 못했습니다. 제목과 썸네일은 직접 입력할 수 있어요.';
   const kind = error?.kind || (error?.name === 'AbortError' ? 'timeout' : '');
-  if (kind === 'timeout') return `${base} (시간 초과: 12초 안에 응답이 없었습니다)`;
+  if (kind === 'timeout') return `${base} (시간 초과: ${BOOKMARK_META_TOTAL_TIMEOUT_MS / 1000}초 안에 응답이 없었습니다)`;
   if (kind === 'rate-limit') return `${base} (자동 조회 서비스 사용량 초과, 잠시 후 다시 시도해 주세요)`;
   if (kind === 'service') return `${base} (외부 조회 서비스가 이 URL의 정보를 가져오지 못했습니다)`;
   if (kind === 'network') return `${base} (외부 조회 서비스에 연결하지 못했습니다)`;
@@ -34529,6 +34545,7 @@ async function fetchBookmarkXTwitterMetadata(tweetInfo, signal) {
   if (oembedTitle) return { title: oembedTitle, image: '', handle: oembedHandle };
   return { title: '', image: '', handle: fallbackHandle };
 }
+let bookmarkFetchController = null;
 async function fetchBookmarkMetadata() {
   const urlInput = document.getElementById('bookmark-url');
   const titleInput = document.getElementById('bookmark-title');
@@ -34549,10 +34566,12 @@ async function fetchBookmarkMetadata() {
   }
   urlInput.value = normalizedUrl;
   setBookmarkFetchStatus('정보를 가져오는 중입니다...');
+  bookmarkFetchController?.abort(); // 다시 누르면 이전 요청을 중단한다(#241)
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
-  // 직접 조회가 막혀 외부 서비스로 다시 시도할 때 상태 문구(같은 12초 제한을 공유한다)
-  const notifyFallback = () => setBookmarkFetchStatus(`외부 조회 서비스로 다시 시도하는 중… ${BOOKMARK_META_SERVICE_NOTICE}`);
+  bookmarkFetchController = controller;
+  const timer = setTimeout(() => controller.abort(), BOOKMARK_META_TOTAL_TIMEOUT_MS);
+  // 직접 조회가 막혀 외부 서비스로 다시 시도할 때 상태 문구(전체 제한 안에서 서비스별 제한을 따로 둔다)
+  const notifyFallback = () => setBookmarkFetchStatus(`외부 조회 서비스로 가져오는 중… (처음 조회하는 페이지는 최대 30초 정도 걸릴 수 있습니다) ${BOOKMARK_META_SERVICE_NOTICE}`);
   try {
     const tweetInfo = parseBookmarkXTwitterStatusUrl(normalizedUrl);
     let fetchedTitle = '';
@@ -34601,9 +34620,10 @@ async function fetchBookmarkMetadata() {
       setBookmarkFetchStatus('가져올 수 있는 제목이나 썸네일 정보를 찾지 못했습니다.', true);
     }
   } catch (error) {
-    setBookmarkFetchStatus(describeBookmarkFetchError(error), true);
+    if (bookmarkFetchController === controller) setBookmarkFetchStatus(describeBookmarkFetchError(error), true); // 새 요청·모달 닫기로 중단된 이전 요청은 조용히 끝낸다
   } finally {
     clearTimeout(timer);
+    if (bookmarkFetchController === controller) bookmarkFetchController = null;
   }
 }
 

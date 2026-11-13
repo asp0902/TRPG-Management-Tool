@@ -19,9 +19,10 @@ const end = html.indexOf('function extractBookmarkGenericMetadata');
 assert.ok(start > 0 && end > start);
 const calls = [];
 // 서비스별 응답 모드(ctx.jina / ctx.ml): ok, 429, erate, fail, net, empty, empty-fast
+const hang = opts => new Promise((_, reject) => opts.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' }))));
 const ctx = {
   calls,
-  URL,
+  URL, AbortController, setTimeout, clearTimeout,
   fetch: async (url, opts) => {
     const u = String(url);
     calls.push(u);
@@ -29,6 +30,7 @@ const ctx = {
       assert.equal(opts?.headers?.Accept, 'application/json');
       assert.deepEqual(Object.keys(opts.headers), ['Accept'], 'CORS 사전요청을 피하려고 Accept 만 쓴다');
       const mode = ctx.jina;
+      if (mode === 'hang') return hang(opts);
       if (mode === 'ok') return { status: 200, ok: true, json: async () => ({ code: 200, data: { title: '본문 제목', url: 'https://a.com/p', metadata: { 'og:title': 'A &amp; B', 'og:image': '/img/x.png?a=1&amp;b=2' } } }) };
       if (mode === 'title-only') return { status: 200, ok: true, json: async () => ({ code: 200, data: { title: '그냥 제목', metadata: {} } }) };
       if (mode === 'empty') return { status: 200, ok: true, json: async () => ({ code: 200, data: { title: '', metadata: {} } }) };
@@ -38,6 +40,7 @@ const ctx = {
       throw new Error('net');
     }
     const mode = ctx.ml;
+    if (mode === 'hang') return hang(opts);
     if (mode === 'ok') return { status: 200, ok: true, json: async () => ({ status: 'success', data: { title: ' 제목 ', image: { url: 'https://img/x.png' }, logo: { url: 'https://logo' } } }) };
     if (mode === '429') return { status: 429, ok: false, json: async () => ({}) };
     if (mode === 'erate') return { status: 200, ok: true, json: async () => ({ status: 'fail', code: 'ERATE', message: 'Your daily rate limit has been reached' }) };
@@ -49,7 +52,7 @@ const ctx = {
   fetchBookmarkPageDocument: async () => { if (ctx.direct === 'fail') throw new Error('CORS'); return {}; },
   extractBookmarkGenericMetadata: () => ({ title: '직접', image: '' }),
 };
-vm.runInNewContext(`${html.slice(start, end)}\nthis.viaService = fetchBookmarkMetaViaService; this.generic = fetchBookmarkGenericMeta; this.describe = describeBookmarkFetchError; this.Err = BookmarkMetaServiceError;`, ctx);
+vm.runInNewContext(`${html.slice(start, end).replace('[25000, 20000]', '[30, 30]')}\nthis.viaService = fetchBookmarkMetaViaService; this.generic = fetchBookmarkGenericMeta; this.describe = describeBookmarkFetchError; this.Err = BookmarkMetaServiceError;`, ctx);
 
 const mlCalls = () => calls.filter(c => c.startsWith('https://api.microlink.io/'));
 const jinaCalls = () => calls.filter(c => c.startsWith('https://r.jina.ai/'));
@@ -113,6 +116,22 @@ const jinaCalls = () => calls.filter(c => c.startsWith('https://r.jina.ai/'));
   // 7) 시간 초과
   const aborted = { aborted: true };
   await assert.rejects(ctx.generic('https://to.com', aborted), e => e.kind === 'timeout');
+
+  // 8) 시간 제한 분리(#241): jina 단계만 시간 초과면 microlink 로 넘어가고, 둘 다면 시간 초과, 전체 중단이면 즉시 시간 초과
+  calls.length = 0; ctx.jina = 'hang'; ctx.ml = 'ok';
+  r = await ctx.viaService('https://hang1.com', undefined);
+  assert.equal(r.title, '제목'); assert.equal(jinaCalls().length, 1); assert.equal(mlCalls().length, 1);
+  ctx.jina = 'hang'; ctx.ml = 'hang';
+  await assert.rejects(ctx.viaService('https://hang2.com', undefined), e => e.kind === 'timeout');
+  calls.length = 0; ctx.jina = 'hang'; ctx.ml = 'ok';
+  const parent = new AbortController(); setTimeout(() => parent.abort(), 5);
+  await assert.rejects(ctx.viaService('https://hang3.com', parent.signal), e => e.kind === 'timeout');
+  assert.equal(mlCalls().length, 0, '전체 중단이면 microlink 로 넘어가지 않는다');
+  assert.match(html, /BOOKMARK_META_SERVICE_TIMEOUT_MS = \[25000, 20000\]/);
+  assert.match(html, /BOOKMARK_META_TOTAL_TIMEOUT_MS = 35000/);
+  assert.match(html, /최대 30초 정도 걸릴 수 있습니다/);
+  assert.doesNotMatch(html, /12초 안에/);
+  assert.match(ctx.describe(new ctx.Err('timeout')), /35초/);
 
   assert.match(ctx.describe(new ctx.Err('rate-limit')), /사용량 초과/);
   assert.match(ctx.describe(new ctx.Err('timeout')), /시간 초과/);
