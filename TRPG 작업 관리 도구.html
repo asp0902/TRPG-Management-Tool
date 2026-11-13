@@ -18987,7 +18987,7 @@ function mkBlockEl(b, cid, ctx = {}) {
             </div>
             <div class="css-macro-preview-chatbox">
               <div class="css-macro-preview-body intro-preview-body" data-intro-preview-id="${b.id}">
-                ${renderCssMacroPreviewHtml(introContent)}
+                ${renderIntroPreviewHtml(introContent)}
               </div>
             </div>
           </div>
@@ -18995,7 +18995,6 @@ function mkBlockEl(b, cid, ctx = {}) {
           <div class="intro-editor-pane">
             <div class="intro-pane-label">CSS MACRO</div>
             <textarea class="intro-macro-ta"
-              placeholder="/desc 인트로 매크로 코드를 입력하세요..."
               onfocus="lastFocusedTA=this"
               oninput="upd('${b.id}','content',this.value,'${cid}');updateIntroPreview('${b.id}',this.value)"
               spellcheck="false">${esc(introContent)}</textarea>
@@ -35487,6 +35486,10 @@ function syncAllIntroMacroTextareaSizes(root = document) {
     syncIntroMacroTextareaSize(preview.dataset.introPreviewId);
   });
 }
+// 인트로 블록은 비었을 때 예시·안내 문구 없이 빈 칸으로 둔다(#238). 공통 renderCssMacroPreviewHtml 의 안내 문구는 다른 화면용이라 그대로.
+function renderIntroPreviewHtml(value) {
+  return String(value || '').trim() ? renderCssMacroPreviewHtml(value) : '';
+}
 function updateIntroPreview(blockId, value) {
   const key = String(blockId || '');
   if (introPreviewRafIds.has(key)) cancelAnimationFrame(introPreviewRafIds.get(key));
@@ -35494,7 +35497,7 @@ function updateIntroPreview(blockId, value) {
     introPreviewRafIds.delete(key);
     const preview = document.querySelector(`.intro-preview-body[data-intro-preview-id="${blockId}"]`);
     if (!preview) return;
-    preview.innerHTML = renderCssMacroPreviewHtml(value || '');
+    preview.innerHTML = renderIntroPreviewHtml(value);
     syncIntroMacroTextareaSize(blockId);
   }));
 }
