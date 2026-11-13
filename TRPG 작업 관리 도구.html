@@ -17450,14 +17450,36 @@ function getCopyTextOrCssMacro(cssValue, contentEl, fallbackHtml = '') {
   return plain;
 }
 
+// 가장 가까운 스크롤 조상(없으면 문서 스크롤러).
+function findScrollParent(el) {
+  for (let node = el?.parentElement; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
+    const overflowY = getComputedStyle(node).overflowY;
+    if ((overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') && node.scrollHeight > node.clientHeight) return node;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+// fn 이 레이아웃 높이를 잠깐 줄였다 늘려도(auto-resize 등) 스크롤 위치와 anchorEl 의 화면 위치가 그대로 남게 한다(#250).
+function withStableScroll(anchorEl, fn) {
+  if (!anchorEl?.isConnected) return fn();
+  const scroller = findScrollParent(anchorEl);
+  const scrollTop = scroller.scrollTop;
+  const top = anchorEl.getBoundingClientRect().top;
+  const result = fn();
+  if (scroller.scrollTop !== scrollTop) scroller.scrollTop = scrollTop; // 접히는 순간 브라우저가 깎은 scrollTop 을 되돌린다
+  const delta = anchorEl.getBoundingClientRect().top - top;
+  if (Math.abs(delta) > 0.5) scroller.scrollTop += delta;
+  return result;
+}
 function btcpAutoResize(ta) {
   if (!ta) return;
-  const minHeight = parseFloat(getComputedStyle(ta).minHeight) || 0;
-  ta.style.height = '0px';
-  const cs = getComputedStyle(ta);
-  // border-box에서는 height에 상하 border가 포함되므로 scrollHeight(border 제외)에 더해야 첫 줄이 잘리지 않는다.
-  const border = cs.boxSizing === 'border-box' ? (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0) : 0;
-  ta.style.height = Math.max(Math.ceil(ta.scrollHeight + border), Math.ceil(minHeight)) + 'px';
+  withStableScroll(ta, () => {
+    const minHeight = parseFloat(getComputedStyle(ta).minHeight) || 0;
+    ta.style.height = '0px';
+    const cs = getComputedStyle(ta);
+    // border-box에서는 height에 상하 border가 포함되므로 scrollHeight(border 제외)에 더해야 첫 줄이 잘리지 않는다.
+    const border = cs.boxSizing === 'border-box' ? (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0) : 0;
+    ta.style.height = Math.max(Math.ceil(ta.scrollHeight + border), Math.ceil(minHeight)) + 'px';
+  });
 }
 function refreshCssMacroTextareaHeights(root = document) {
   const run = () => root.querySelectorAll?.('.css-macro-textarea')?.forEach?.(btcpAutoResize);
@@ -35771,11 +35793,29 @@ function renderCssMacroFieldControls(item) {
     </div>
   `;
 }
+// 미리보기를 다시 그리는 동안 높이를 잠깐 고정(min-height)하고, 이미지가 로드되거나 일정 시간이 지나면 풀면서 화면 위치를 맞춘다(#250).
+function setPreviewHtmlStable(preview, html) {
+  const lock = {};
+  preview._minLock = lock;
+  preview.style.minHeight = preview.offsetHeight + 'px';
+  preview.innerHTML = html;
+  const release = () => {
+    if (preview._minLock !== lock) return;
+    preview._minLock = null;
+    const anchorEl = document.activeElement?.matches?.('input, textarea') ? document.activeElement : preview;
+    withStableScroll(anchorEl, () => preview.style.removeProperty('min-height'));
+  };
+  const pending = [...preview.querySelectorAll('img')].filter(img => !img.complete);
+  if (!pending.length) { requestAnimationFrame(() => requestAnimationFrame(release)); return; }
+  let left = pending.length;
+  pending.forEach(img => { const done = () => { if (--left <= 0) release(); }; img.addEventListener('load', done, { once: true }); img.addEventListener('error', done, { once: true }); });
+  setTimeout(release, 1500);
+}
 function updateCssMacroItemPreview(itemId, value) {
   const preview = document.querySelector(`.css-macro-preview-body[data-css-macro-id="${itemId}"]`);
   if (!preview) return;
   const viewportAnchor = captureCssMacroEditViewportAnchor(itemId);
-  preview.innerHTML = renderMacroPreviewNoHint(value);
+  setPreviewHtmlStable(preview, renderMacroPreviewNoHint(value));
   restoreCssMacroEditViewportAnchor(viewportAnchor);
 }
 const introPreviewRafIds = new Map();
@@ -35805,6 +35845,10 @@ function bindIntroPreviewSizeObserver(preview, previewBox) {
   }
 }
 function syncIntroMacroTextareaSize(blockId) {
+  const introTa = document.querySelector(`.intro-split-wrap:has(.intro-preview-body[data-intro-preview-id="${blockId}"]) .intro-macro-ta`);
+  withStableScroll(introTa, () => syncIntroMacroTextareaSizeInner(blockId)); // 높이를 다시 잡는 동안 스크롤 유지(#250)
+}
+function syncIntroMacroTextareaSizeInner(blockId) {
   const preview = document.querySelector(`.intro-preview-body[data-intro-preview-id="${blockId}"]`);
   if (!preview) return;
   const wrap = preview.closest('.intro-split-wrap');
@@ -35843,8 +35887,11 @@ function updateIntroPreview(blockId, value) {
     introPreviewRafIds.delete(key);
     const preview = document.querySelector(`.intro-preview-body[data-intro-preview-id="${blockId}"]`);
     if (!preview) return;
-    preview.innerHTML = renderMacroPreviewNoHint(value);
-    syncIntroMacroTextareaSize(blockId);
+    const introTa = document.querySelector(`.intro-split-wrap:has(.intro-preview-body[data-intro-preview-id="${blockId}"]) .intro-macro-ta`);
+    withStableScroll(introTa || preview, () => {
+      setPreviewHtmlStable(preview, renderMacroPreviewNoHint(value));
+      syncIntroMacroTextareaSize(blockId);
+    });
   }));
 }
 function updateCssMacroItemTagsPreview(itemId) {
