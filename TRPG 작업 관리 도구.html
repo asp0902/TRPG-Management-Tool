@@ -8114,8 +8114,8 @@ select.sh-field-input,
     <div class="topbar-title" id="topbar-title">시나리오 목록</div>
     <button class="tab-btn" id="script-home-btn" type="button" style="display:none" onclick="goScriptHome()" title="스크립트 폴더 화면으로 이동">📁 폴더</button>
     <div class="tab-group" id="tab-group" style="display:none">
-      <button class="tab-btn active" onclick="switchTab('info')">정보</button>
-      <button class="tab-btn" onclick="switchTab('body')">본문</button>
+      <button class="tab-btn active" data-tab="info" onclick="switchTab('info')">정보</button>
+      <button class="tab-btn" data-tab="body" onclick="switchTab('body')">본문</button>
     </div>
     <button class="btn btn-primary" id="save-btn" onclick="saveAll()">저장</button>
   </div>
@@ -25277,8 +25277,7 @@ function showToast(message) {
 }
 function switchTab(tab, keepFindHighlights = false) {
   if (!keepFindHighlights) frClearFindHighlights();
-  document.querySelectorAll('.tab-btn').forEach((b, i) =>
-    b.classList.toggle('active', (tab==='info'&&i===0)||(tab==='body'&&i===1)));
+  document.querySelectorAll('.tab-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab)); // 폴더 버튼(#script-home-btn)은 data-tab 이 없어 제외(#237)
   document.getElementById('panel-info').classList.toggle('active', tab==='info');
   document.getElementById('panel-body').classList.toggle('active', tab==='body');
   document.getElementById('right-panel').classList.toggle('hidden', tab==='info');
