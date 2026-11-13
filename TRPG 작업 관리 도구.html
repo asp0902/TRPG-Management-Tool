@@ -7715,6 +7715,9 @@ tr:hover > .sh-coc-weapon-actions > *, tr:focus-within > .sh-coc-weapon-actions 
 .sh-sheet-insane [data-section-id="abilities"] select.sh-repeat-input { padding-left: 3px; padding-right: 3px; }
 .is-ability-effect[hidden] { display: none; }
 .sh-sheet-insane textarea.is-macro-hidden { display: none; }
+.sh-macro-editor { min-height: 34px; height: auto; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; box-sizing: border-box; line-height: 1.5; }
+.sh-macro-editor:empty::before { content: attr(data-placeholder); color: #bbb; }
+.sh-macro-rawbadge { display: inline-block; font-size: 10px; font-weight: 700; color: #999; border: 1px solid #ddd; border-radius: 999px; padding: 0 6px; margin: 0 0 2px; cursor: help; }
 .sh-macro-preview { min-height: 34px; height: auto; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; box-sizing: border-box; }
 /* 효과·메모 펼침 입력창(#224): 왼쪽 끝은 윗줄 이름·인물 입력칸(토글 오른쪽), 오른쪽 끝은 윗줄 마지막 입력 칸(삭제 열 앞)에 맞춘다. */
 .is-ability-effect textarea { width: 100%; }
@@ -27007,9 +27010,221 @@ document.getElementById('format-bar').addEventListener('mousedown', e => {
   e.preventDefault();
 });
 // 인세인 시트 긴 글 칸(#232): 저장값은 Roll20 CSS 매크로 문자열 그대로 두고, 포커스가 없을 때만 서식이 적용된 미리보기를 보여 준다. 클릭·포커스하면 원문 textarea 로 편집.
+// ── 인세인 시트 긴 글 칸 WYSIWYG 편집기(#251) ──
+// 저장값은 Roll20 CSS 매크로 문자열 그대로다(숨겨진 textarea 가 원천). 편집기는 매크로 → span 으로 보여 주고, 바뀐 만큼만 다시 매크로로 직렬화한다.
+// 이 아래 순수 함수(DOM 없음)는 tests/insane-macro-roundtrip.test.cjs 가 잘라서 실행한다.
+// 노드: {t:'text', s} | {t:'macro', text, text0, raw, tail}  — tail 은 "]" 뒤부터 토큰 끝까지의 원문(`(#"style= …;)`), raw 는 원문 라벨, text0 는 불러올 때의 표시 글자.
+// 원문 변환 불가 판정(null): 링크형·이미지 토큰, 롤20 명령(/desc 등), 닫히지 않은 토큰, 왕복 결과가 원문과 다른 경우.
+function macroEscapeText(text) {
+  return String(text).replace(/\]/g, '］'); // 라벨 안의 ] 는 토큰 문법을 깨므로 전각으로 바꾼다
+}
+function macroSerializeNodes(nodes) {
+  return nodes.map(node => node.t === 'text'
+    ? node.s
+    : '[' + (node.text === node.text0 ? node.raw : macroEscapeText(node.text)) + ']' + node.tail).join('');
+}
+function macroEditorParse(src) {
+  src = String(src || '');
+  if (/\]\(\s*<?https?:\/\//i.test(src)) return null; // 링크형 토큰·이미지 마크다운
+  if (/^\s*(?:\/(?:desc|em|emas|w|direct|gmroll|as|fx)\b|&\{template:)/im.test(src)) return null; // 롤20 명령
+  const nodes = [];
+  let cursor = 0, textStart = 0;
+  while (cursor < src.length) {
+    const open = src.indexOf('[', cursor);
+    if (open < 0) break;
+    const tok = tryParseCssMacroToken(src, open);
+    if (!tok) { cursor = open + 1; continue; }
+    if (tok.href || src[tok.end - 1] !== ')') return null;
+    const close = src.indexOf(']', open + 1);
+    if (open > textStart) nodes.push({ t: 'text', s: src.slice(textStart, open) });
+    nodes.push({ t: 'macro', text: tok.text, text0: tok.text, raw: src.slice(open + 1, close), tail: src.slice(close + 1, tok.end), css: tok.style });
+    cursor = textStart = tok.end;
+  }
+  if (textStart < src.length) nodes.push({ t: 'text', s: src.slice(textStart) });
+  return macroSerializeNodes(nodes) === src ? nodes : null;
+}
+// 스타일 문자열을 선언 목록으로(괄호·따옴표 안의 ; 는 나누지 않는다).
+function macroSplitDecls(css) {
+  const out = [];
+  let depth = 0, quote = '', buf = '';
+  for (const ch of String(css || '')) {
+    if (quote) { buf += ch; if (ch === quote) quote = ''; continue; }
+    if (ch === '"' || ch === "'") { quote = ch; buf += ch; continue; }
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth = Math.max(0, depth - 1);
+    if (ch === ';' && depth === 0) { out.push(buf); buf = ''; continue; }
+    buf += ch;
+  }
+  out.push(buf);
+  return out.map(part => part.trim()).filter(Boolean).map(part => {
+    const at = part.indexOf(':');
+    return at < 0 ? null : [part.slice(0, at).trim().toLowerCase(), part.slice(at + 1).trim()];
+  }).filter(Boolean);
+}
+function macroApplyProp(props, name, value) {
+  const next = { ...props };
+  if (name === 'text-decoration' || name === 'text-decoration-line') {
+    const words = new Set(String(next['text-decoration'] || '').split(/\s+/).filter(Boolean));
+    String(value).split(/\s+/).filter(Boolean).forEach(word => { if (word === 'none') words.clear(); else if (/^(underline|line-through|overline)$/.test(word)) words.add(word); });
+    if (words.size) next['text-decoration'] = [...words].join(' '); else delete next['text-decoration'];
+    return next;
+  }
+  next[name] = value;
+  return next;
+}
+// 편집 DOM 에서 만든 트리: {type:'text', text} | {type:'el', tag, css, data:{macroStyle,macroText0,macroRaw,css0}, color, children}
+function macroPropsOfEl(el, inherited) {
+  let props = { ...inherited };
+  const tag = el.tag;
+  if (tag === 'B' || tag === 'STRONG') props = macroApplyProp(props, 'font-weight', 'bold');
+  else if (tag === 'I' || tag === 'EM') props = macroApplyProp(props, 'font-style', 'italic');
+  else if (tag === 'U') props = macroApplyProp(props, 'text-decoration', 'underline');
+  else if (tag === 'S' || tag === 'STRIKE' || tag === 'DEL') props = macroApplyProp(props, 'text-decoration', 'line-through');
+  else if (tag === 'FONT' && el.color) props = macroApplyProp(props, 'color', el.color);
+  macroSplitDecls(el.css).forEach(([name, value]) => { props = macroApplyProp(props, name, value); });
+  return props;
+}
+const macroPropsKey = props => JSON.stringify(Object.keys(props).sort().map(key => [key, props[key]]));
+function macroTreeToNodes(root) {
+  const runs = [];
+  let blocks = 0;
+  const pushRun = (s, props, ctx) => {
+    if (!s) return;
+    const key = macroPropsKey(props);
+    runs.push({ s, key, props, tail: ctx && ctx.baseKey === key ? ctx.tail : null });
+  };
+  const walk = (children, props, ctx) => {
+    children.forEach((child, index) => {
+      const isLast = index === children.length - 1;
+      if (child.type === 'text') { pushRun(child.text, props, ctx); return; }
+      if (child.tag === 'BR') { if (!isLast) pushRun('\n', props, ctx); return; } // 블록·편집기 끝의 br 은 자리표시자
+      if (child.tag === 'DIV' || child.tag === 'P') {
+        if (blocks > 0 || runs.length) pushRun('\n', {}, null); // 블록마다 새 줄(빈 줄 div 도 한 줄)
+        blocks += 1;
+        walk(child.children, props, ctx);
+        return;
+      }
+      const data = child.data || {};
+      if (data.macroStyle !== undefined) {
+        const unchanged = child.css === data.macroCss0;
+        const simple = child.children.every(grand => grand.type === 'text' || grand.tag === 'BR');
+        if (unchanged && simple) {
+          const text = child.children.map(grand => grand.type === 'text' ? grand.text : '\n').join('');
+          runs.push({ atomic: true, s: text, tail: data.macroStyle, raw: data.macroRaw, text0: data.macroText0 });
+          return;
+        }
+        const baseProps = macroPropsOfEl(child, props);
+        walk(child.children, baseProps, unchanged ? { tail: data.macroStyle, baseKey: macroPropsKey(baseProps) } : null);
+        return;
+      }
+      walk(child.children, macroPropsOfEl(child, props), ctx);
+    });
+  };
+  walk(root.children, {}, null);
+  const merged = [];
+  runs.forEach(run => {
+    const last = merged[merged.length - 1];
+    if (last && !run.atomic && !last.atomic && last.key === run.key && last.tail === run.tail) last.s += run.s;
+    else merged.push({ ...run });
+  });
+  return merged.map(run => {
+    if (run.atomic) return { t: 'macro', text: run.s, text0: run.text0, raw: run.raw, tail: run.tail };
+    if (run.tail) return { t: 'macro', text: run.s, text0: null, raw: '', tail: run.tail };
+    const keys = Object.keys(run.props);
+    if (!keys.length) return { t: 'text', s: run.s };
+    return { t: 'macro', text: run.s, text0: null, raw: '', tail: '(#"style= ' + keys.map(key => key + ':' + run.props[key] + ';').join(' ') + ')' };
+  });
+}
+// ── 인세인 편집기 DOM 층 ──
+const MACRO_EDITOR_UNSAFE_CSS = /(?:^|;)\s*(?:position|z-index|top|left|right|bottom|float|transform)\s*:[^;]*/gi; // 편집기 안에서 화면을 가리거나 밀어내는 값은 표시에서만 뺀다(저장값은 원문 그대로)
+function macroNodesToFragment(nodes, src) {
+  const frag = document.createDocumentFragment();
+  const addText = (parent, text) => text.split('\n').forEach((part, index) => {
+    if (index) parent.appendChild(document.createElement('br'));
+    if (part) parent.appendChild(document.createTextNode(part));
+  });
+  nodes.forEach(node => {
+    if (node.t === 'text') { addText(frag, node.s); return; }
+    const span = document.createElement('span');
+    span.setAttribute('style', String(node.css || '').replace(MACRO_EDITOR_UNSAFE_CSS, ''));
+    span.dataset.macroStyle = node.tail; // 원문 style(토큰 꼬리) 보존
+    span.dataset.macroText0 = node.text0;
+    span.dataset.macroRaw = node.raw;
+    span.dataset.macroCss0 = span.style.cssText; // 바뀌지 않았는지 비교하는 기준
+    addText(span, node.text);
+    frag.appendChild(span);
+  });
+  if (/\n$/.test(src)) frag.appendChild(document.createElement('br')); // 끝 줄바꿈의 자리표시자
+  return frag;
+}
+function macroDomToTree(el) {
+  return {
+    type: 'el', tag: el.nodeName, css: el.style ? el.style.cssText : '', color: el.nodeName === 'FONT' ? (el.getAttribute('color') || '') : '',
+    data: { macroStyle: el.dataset?.macroStyle, macroText0: el.dataset?.macroText0, macroRaw: el.dataset?.macroRaw, macroCss0: el.dataset?.macroCss0 },
+    children: [...el.childNodes].map(node => node.nodeType === 3 ? { type: 'text', text: node.nodeValue } : node.nodeType === 1 ? macroDomToTree(node) : null).filter(Boolean),
+  };
+}
+const macroEditorValue = editor => macroSerializeNodes(macroTreeToNodes(macroDomToTree(editor)));
+function macroEditorSetup(ta) {
+  const src = ta.value;
+  const nodes = macroEditorParse(src);
+  const editor = document.createElement('div');
+  if (nodes) editor.appendChild(macroNodesToFragment(nodes, src));
+  // 안전장치: 직렬화(파싱(원문)) 가 원문과 다르면 이 칸은 WYSIWYG 을 쓰지 않고 #232 방식(미리보기 + 원문 편집)으로 돌아간다.
+  if (!nodes || macroEditorValue(editor) !== src) {
+    ta.dataset.macroFallback = '1';
+    ta.classList.remove('is-macro-hidden');
+    if (!ta.previousElementSibling?.classList.contains('sh-macro-rawbadge')) {
+      const badge = document.createElement('span');
+      badge.className = 'sh-macro-rawbadge';
+      badge.textContent = '원문 편집';
+      badge.title = '서식 편집으로 바꿀 수 없는 내용(링크·이미지·명령 등)이 있어 원문으로 편집합니다';
+      ta.before(badge);
+    }
+    return false;
+  }
+  editor.className = 'sh-macro-editor ' + ta.className.replace(/\bauto-grow\b/, '');
+  editor.contentEditable = 'true';
+  editor.spellcheck = false;
+  editor.setAttribute('role', 'textbox');
+  editor.setAttribute('aria-multiline', 'true');
+  if (ta.placeholder) editor.dataset.placeholder = ta.placeholder;
+  editor._src = src;
+  const commit = () => {
+    const value = macroEditorValue(editor);
+    if (value === ta.value) return;
+    ta.value = value;
+    editor._src = value;
+    ta.dispatchEvent(new Event('input', { bubbles: true })); // 기존 저장 경로(saveSheetField 등)
+  };
+  new MutationObserver(commit).observe(editor, { childList: true, subtree: true, characterData: true, attributes: true });
+  editor.addEventListener('focus', () => { lastFocusedTA = editor; }); // 서식 도구모음이 isCE() 경로로 동작
+  editor.addEventListener('paste', event => { // 외부 서식 유입을 막고 일반 텍스트만 받는다
+    event.preventDefault();
+    const text = event.clipboardData?.getData('text/plain') || '';
+    if (text) document.execCommand('insertText', false, text);
+  });
+  editor.addEventListener('drop', event => {
+    event.preventDefault();
+    const text = event.dataTransfer?.getData('text/plain') || '';
+    if (text) document.execCommand('insertText', false, text);
+  });
+  ta.classList.add('is-macro-hidden');
+  ta.after(editor);
+  return true;
+}
+function syncInsaneMacroEditors(root) {
+  (root || document).querySelectorAll('.sh-sheet-insane textarea').forEach(ta => {
+    if (ta.dataset.macroFallback === '1') return;
+    const editor = ta.nextElementSibling?.classList.contains('sh-macro-editor') ? ta.nextElementSibling : null;
+    if (editor && (editor._src === ta.value || editor.contains(document.activeElement))) return;
+    editor?.remove();
+    macroEditorSetup(ta);
+  });
+}
 const INSANE_MACRO_RE = /\]\(#"style=/;
 function syncInsaneMacroPreviews(root) {
-  (root || document).querySelectorAll('.sh-sheet-insane textarea').forEach(ta => {
+  (root || document).querySelectorAll('.sh-sheet-insane textarea[data-macro-fallback="1"]').forEach(ta => {
     let preview = ta.nextElementSibling;
     if (!preview || !preview.classList.contains('sh-macro-preview')) preview = null;
     const want = INSANE_MACRO_RE.test(ta.value) && document.activeElement !== ta;
@@ -27047,10 +27262,10 @@ document.addEventListener('click', e => {
   const preview = e.target.closest && e.target.closest('.sh-macro-preview');
   if (preview) editInsaneMacroPreview(preview);
 }, true);
-document.addEventListener('focusout', e => { if (e.target.matches && e.target.matches('.sh-sheet-insane textarea')) setTimeout(() => syncInsaneMacroPreviews(), 0); });
+document.addEventListener('focusout', e => { if (e.target.matches && e.target.matches('.sh-sheet-insane textarea[data-macro-fallback="1"]')) setTimeout(() => syncInsaneMacroPreviews(), 0); });
 (function() {
   const body = document.getElementById('ch-sheet-body');
-  if (body) new MutationObserver(() => syncInsaneMacroPreviews(body)).observe(body, { childList: true, subtree: true });
+  if (body) new MutationObserver(() => { syncInsaneMacroEditors(body); syncInsaneMacroPreviews(body); }).observe(body, { childList: true, subtree: true });
 })();
 document.getElementById('tb-overflow-btn').addEventListener('click', toggleFormatToolbarOverflow);
 document.addEventListener('mousedown', e => {
@@ -42553,7 +42768,7 @@ function exportCharacterSheetHtml() {
   const bodyEl = document.getElementById('ch-sheet-body');
   const clone = bodyEl.cloneNode(true);
   // 매크로 미리보기(#232)는 앱 안에서만 쓴다: 내보내기에는 원문 textarea 를 그대로 둔다.
-  clone.querySelectorAll('.sh-macro-preview').forEach(el => el.remove());
+  clone.querySelectorAll('.sh-macro-preview, .sh-macro-editor, .sh-macro-rawbadge').forEach(el => el.remove());
   clone.querySelectorAll('.is-macro-hidden').forEach(el => el.classList.remove('is-macro-hidden'));
   const isEditableCoc7e = activeSheet.templateKey === 'coc7e';
   // 편집 가능 내보내기: CoC 7판 + 인세인(#228). CoC 전용 처리(시대 테마·기능 추가·장부)는 isEditableCoc7e 에만 둔다.

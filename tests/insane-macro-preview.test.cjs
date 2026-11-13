@@ -8,5 +8,5 @@ assert.match(html, /function syncInsaneMacroPreviews\(root\)/);
 assert.match(html, /preview\.innerHTML = renderCssMacroPreviewHtml\(ta\.value\)/);
 assert.match(html, /textarea\.is-macro-hidden \{ display: none; \}/);
 // 내보내기는 미리보기를 제거하고 원문 textarea 를 그대로 둔다
-assert.match(html, /clone\.querySelectorAll\('\.sh-macro-preview'\)\.forEach\(el => el\.remove\(\)\)/);
+assert.ok(html.includes("clone.querySelectorAll('.sh-macro-preview, .sh-macro-editor, .sh-macro-rawbadge').forEach(el => el.remove());")); // #251: 편집기도 함께 제거
 console.log('insane macro preview checks: OK');
