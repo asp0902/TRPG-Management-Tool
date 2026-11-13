@@ -12,5 +12,5 @@ assert.match(html, /showToast\('클립보드에 이미지가 없습니다\.'\)/)
 assert.match(html, /target\?\.closest\?\.\('input, textarea, select, \[contenteditable="true"\]'\)\) return;/);
 console.log('character sheet image paste checks: OK');
 // #233: 웹 자동 업로드는 껐다 — 업로드 코드·메뉴·호출이 없어야 한다
-assert.doesNotMatch(html, /autoRegisterCharacterImages|registerCharacterSheetImageOnWeb|uploadPublicImage|웹에 등록\(URL/);
+assert.doesNotMatch(html, /autoRegisterCharacterImages|registerCharacterSheetImageOnWeb|웹에 등록\(URL/);
 console.log('sheet image no web upload checks: OK');

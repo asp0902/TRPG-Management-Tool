@@ -1634,6 +1634,8 @@ tr.ct-row-end .ct-select:focus {
 /* PREVIEW 머리글의 「핸드아웃용 복사」: PREVIEW 가 롤20 모양(.roll20-chat)일 때만 보인다 */
 .r20-copy-btn { display: none; margin-left: auto; padding: 1px 6px; font-size: 11px; font-weight: 400; line-height: 1.4; color: #666; background: transparent; border: 1px solid #c8c8c8; border-radius: 3px; cursor: pointer; white-space: nowrap; }
 .r20-copy-btn:hover { color: #222; border-color: #999; }
+.macro-img-btn { display: inline-block; margin-left: auto; padding: 1px 6px; font-size: 11px; font-weight: 400; line-height: 1.4; color: #666; background: transparent; border: 1px solid #c8c8c8; border-radius: 3px; cursor: pointer; white-space: nowrap; }
+.macro-img-btn:hover { color: #222; border-color: #999; }
 .css-macro-preview-wrap:has(.roll20-chat) .r20-copy-btn { display: inline-block; }
 .handout-fold > summary .r20-copy-btn { position: absolute; right: 6px; top: 2px; margin: 0; }
 /* 롤20 채팅: 매크로를 롤20 채팅 모양으로 그린다(값은 ROLL20_PREVIEW). 코코포리아와 달리 조각 style 을 거르지 않는다. */
@@ -19001,7 +19003,7 @@ function mkBlockEl(b, cid, ctx = {}) {
           </div>
 
           <div class="intro-editor-pane">
-            <div class="intro-pane-label">CSS MACRO</div>
+            <div class="css-macro-preview-head"><div class="intro-pane-label">CSS MACRO</div><button type="button" class="macro-img-btn" onclick="pickMacroImage(this)" title="이미지를 공개 저장소에 올리고 [](주소)를 넣습니다">이미지</button></div>
             <textarea class="intro-macro-ta"
               onfocus="lastFocusedTA=this"
               oninput="upd('${b.id}','content',this.value,'${cid}');updateIntroPreview('${b.id}',this.value)"
@@ -24404,6 +24406,11 @@ const GITHUB_SYNC_REPO = 'asp0902/TRPG-Management-Tool-data';
 const GITHUB_SYNC_BRANCH = 'sync';
 const GITHUB_SYNC_PATH = 'trpg-tool.latest.json';
 // 캐릭터 이미지 웹 업로드는 껐다(#233). 예전에 올라간 이 접두사의 URL 은 시작할 때 dataURL 로 되돌린다.
+// CSS 매크로 이미지 공개 업로드(#243) 대상: 앱 저장소의 `images` 브랜치(main 에는 절대 쓰지 않는다, 브랜치는 자동으로 만들지 않는다). 캐릭터 시트 이미지는 올리지 않는다(#233).
+const GITHUB_IMAGE_REPO = 'asp0902/TRPG-Management-Tool';
+const GITHUB_IMAGE_BRANCH = 'images';
+const GITHUB_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
+const GITHUB_IMAGE_EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' };
 const LEGACY_WEB_IMAGE_URL_PREFIX = 'https://raw.githubusercontent.com/asp0902/TRPG-Management-Tool/images/';
 const GITHUB_SYNC_TOKEN_KEY = 'trpg-github-sync-token';
 const GITHUB_SYNC_ENABLED_KEY = 'trpg-github-sync-enabled';
@@ -31773,6 +31780,104 @@ async function putGitHubFile(path, blob, message) {
     body: JSON.stringify({ message, content: await blobToBase64(blob), branch: GITHUB_SYNC_BRANCH }),
   });
 }
+// 이미지 전용 공개 저장소에 images/{sha256}.{ext} 로 올리고 raw URL 을 돌려준다. 이미 있으면 올리지 않는다(#243).
+function getGitHubImageRawUrl(path) {
+  return `https://raw.githubusercontent.com/${GITHUB_IMAGE_REPO}/${GITHUB_IMAGE_BRANCH}/${path}`;
+}
+async function uploadPublicImage(blob) {
+  if (GITHUB_IMAGE_BRANCH === 'main' || GITHUB_IMAGE_BRANCH === 'master') throw new Error('이미지 업로드 대상이 기본 브랜치입니다');
+  const ext = GITHUB_IMAGE_EXT[String(blob?.type || '').toLowerCase()];
+  if (!ext) throw new Error('이미지 형식 미지원');
+  if (blob.size > GITHUB_IMAGE_MAX_BYTES) throw new Error('이미지 크기 초과');
+  const sha = await sha256Hex(blob);
+  const path = `images/${sha}.${ext}`;
+  const apiUrl = `https://api.github.com/repos/${GITHUB_IMAGE_REPO}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
+  const existing = await githubSyncRequest(`${apiUrl}?ref=${encodeURIComponent(GITHUB_IMAGE_BRANCH)}`, { allow404: true });
+  if (existing) return getGitHubImageRawUrl(path);
+  try {
+    await githubSyncRequest(apiUrl, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: `이미지 ${sha.slice(0, 8)}`, content: await blobToBase64(blob), branch: GITHUB_IMAGE_BRANCH }),
+    });
+  } catch (error) {
+    const message = String(error?.message || '');
+    // 브랜치가 없으면 422 "Branch images not found": 자동 생성하지 않고 안내한다.
+    if (/GitHub 422/.test(message) && /branch/i.test(message)) throw new Error('이미지 브랜치 없음');
+    // 동시에 같은 이미지를 올려 이미 생긴 경우(그 밖의 422)는 성공으로 본다.
+    if (!/GitHub 422/.test(message)) throw error;
+  }
+  return getGitHubImageRawUrl(path);
+}
+function describeImageUploadError(error) {
+  const message = String(error?.message || '');
+  const perm = '이미지 업로드 실패: 토큰에 앱 저장소(' + GITHUB_IMAGE_REPO + ') Contents 쓰기 권한이 필요합니다.';
+  if (/토큰이 없/.test(message)) return '이미지 업로드 실패: GitHub 토큰이 없습니다(GitHub 동기화에서 토큰 입력).';
+  if (/GitHub (401|403|404)/.test(message)) return perm;
+  if (/브랜치 없음/.test(message)) return '이미지 업로드 실패: ' + GITHUB_IMAGE_REPO + ' 저장소에 `' + GITHUB_IMAGE_BRANCH + '` 브랜치가 없습니다. 브랜치를 한 번 만들어 주세요.';
+  if (/크기 초과/.test(message)) return '이미지 업로드 안 함: 이미지가 25MB를 넘습니다.';
+  if (/형식 미지원/.test(message)) return '이미지 업로드 안 함: PNG·JPEG·GIF·WebP만 올릴 수 있습니다.';
+  if (error instanceof TypeError || /Failed to fetch|NetworkError/i.test(message)) return '이미지 업로드 실패: 네트워크에 연결할 수 없습니다.';
+  return '이미지 업로드 실패: ' + message;
+}
+// CSS 매크로 입력칸(.css-macro-textarea, 인트로 .intro-macro-ta)에 이미지를 붙여넣기·끌어다 놓기·파일 선택으로 넣으면 공개 저장소에 올리고 커서 위치에 [](rawURL) 를 넣는다(#243).
+const MACRO_IMAGE_TARGET = '.css-macro-textarea, .intro-macro-ta';
+const MACRO_IMAGE_NOTICE_KEY = 'trpg-macro-image-public-notice';
+let macroImageSeq = 0;
+async function insertMacroImage(ta, blob) {
+  if (!ta?.isConnected || !blob) return;
+  if (!/^image\//i.test(blob.type || '')) { showToast('이미지 파일만 넣을 수 있습니다.'); return; }
+  if (!getGitHubSyncToken()) { showToast(describeImageUploadError(new Error('토큰이 없습니다'))); return; }
+  try {
+    if (localStorage.getItem(MACRO_IMAGE_NOTICE_KEY) !== '1') {
+      if (!confirm('이미지는 공개 저장소(' + GITHUB_IMAGE_REPO + ')에 올라가 주소를 아는 누구나 볼 수 있습니다. 계속할까요?')) return;
+      localStorage.setItem(MACRO_IMAGE_NOTICE_KEY, '1');
+    }
+  } catch (error) { /* 저장소를 못 쓰면 안내만 건너뛴다 */ }
+  const token = '[업로드 중…' + (++macroImageSeq) + ']';
+  const at = Math.min(ta.selectionStart ?? ta.value.length, ta.value.length);
+  ta.setRangeText(token, at, Math.min(ta.selectionEnd ?? at, ta.value.length), 'end');
+  const fire = () => ta.dispatchEvent(new Event('input', { bubbles: true }));
+  fire();
+  let replacement = '';
+  try {
+    replacement = '[](' + await uploadPublicImage(blob) + ')';
+  } catch (error) {
+    showToast(describeImageUploadError(error));
+  }
+  const pos = ta.value.indexOf(token);
+  if (pos < 0) return;
+  if (replacement) {
+    const before = ta.value[pos - 1], after = ta.value[pos + token.length];
+    replacement = (before && before !== '\n' ? '\n' : '') + replacement + (after && after !== '\n' ? '\n' : '');
+  }
+  ta.setRangeText(replacement, pos, pos + token.length, 'end');
+  fire();
+}
+function pickMacroImage(button) {
+  const ta = button.closest('.css-macro-editor-pane, .intro-editor-pane')?.querySelector('textarea');
+  if (!ta) return;
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = () => { const file = input.files?.[0]; if (file) insertMacroImage(ta, file); };
+  input.click();
+}
+document.addEventListener('paste', event => {
+  const ta = event.target?.closest?.(MACRO_IMAGE_TARGET);
+  const file = ta && [...(event.clipboardData?.items || [])].find(item => item.kind === 'file' && /^image\//i.test(item.type))?.getAsFile();
+  if (!file) return; // 텍스트 붙여넣기는 기존 동작 그대로
+  event.preventDefault(); event.stopPropagation();
+  insertMacroImage(ta, file);
+}, true);
+document.addEventListener('dragover', event => {
+  if (event.target?.closest?.(MACRO_IMAGE_TARGET) && [...(event.dataTransfer?.types || [])].includes('Files')) event.preventDefault();
+});
+document.addEventListener('drop', event => {
+  const ta = event.target?.closest?.(MACRO_IMAGE_TARGET);
+  const file = ta && [...(event.dataTransfer?.files || [])].find(item => /^image\//i.test(item.type));
+  if (!file) return;
+  event.preventDefault(); event.stopPropagation();
+  insertMacroImage(ta, file);
+}, true);
 async function fetchGitHubBlob(path) {
   const response = await githubSyncRequest(`${githubContentsUrl(path)}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}&raw=1`, { headers: { Accept: 'application/vnd.github.raw+json' } });
   return await response.blob();
@@ -35911,7 +36016,7 @@ function renderCssMacroPage() {
             </div>
           </div>
           <div class="css-macro-editor-pane">
-            <div class="css-macro-preview-head"><div class="css-macro-preview-label">CSS MACRO</div></div>
+            <div class="css-macro-preview-head"><div class="css-macro-preview-label">CSS MACRO</div><button type="button" class="macro-img-btn" onclick="pickMacroImage(this)" title="이미지를 공개 저장소에 올리고 [](주소)를 넣습니다">이미지</button></div>
             ${renderCssMacroFieldControls(item)}
             <textarea class="css-macro-textarea" data-css-macro-id="${item.id}" rows="1" placeholder="Roll20용 CSS 매크로를 입력하세요..."
               oninput="btcpAutoResize(this);updateCssMacroItemField('${item.id}','content',this.value)"

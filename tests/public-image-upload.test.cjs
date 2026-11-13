@@ -4,7 +4,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split('\r\n').join('\n');
 // 웹 업로드는 껐고(#233), 예전에 올린 raw URL 만 시작할 때 dataURL 로 되돌린다.
-assert.doesNotMatch(html, /GITHUB_IMAGE_BRANCH|uploadPublicImage|describeImageUploadError/);
+assert.doesNotMatch(html, /autoRegisterCharacterImages|registerCharacterSheetImageOnWeb/); // 시트 자동 업로드는 없다(#233)
+assert.match(html, /const GITHUB_IMAGE_BRANCH = 'images';/);
 const a = html.indexOf('let webImageRestoreRunning'), b = html.indexOf('function onCharacterSheetImageFile');
 assert.ok(a > 0 && b > a);
 const P = 'https://raw.githubusercontent.com/asp0902/TRPG-Management-Tool/images/';
