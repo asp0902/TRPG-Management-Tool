@@ -31835,18 +31835,11 @@ function describeImageUploadError(error) {
 }
 // CSS 매크로 입력칸(.css-macro-textarea, 인트로 .intro-macro-ta)에 이미지를 붙여넣기·끌어다 놓기·파일 선택으로 넣으면 공개 저장소에 올리고 커서 위치에 [](rawURL) 를 넣는다(#243).
 const MACRO_IMAGE_TARGET = '.css-macro-textarea, .intro-macro-ta';
-const MACRO_IMAGE_NOTICE_KEY = 'trpg-macro-image-public-notice';
 let macroImageSeq = 0;
 async function insertMacroImage(ta, blob) {
   if (!ta?.isConnected || !blob) return;
   if (!/^image\//i.test(blob.type || '')) { showToast('이미지 파일만 넣을 수 있습니다.'); return; }
   if (!getGitHubSyncToken()) { showToast(describeImageUploadError(new Error('토큰이 없습니다'))); return; }
-  try {
-    if (localStorage.getItem(MACRO_IMAGE_NOTICE_KEY) !== '1') {
-      if (!confirm('이미지는 공개 저장소(' + GITHUB_IMAGE_REPO + ')에 올라가 주소를 아는 누구나 볼 수 있습니다. 계속할까요?')) return;
-      localStorage.setItem(MACRO_IMAGE_NOTICE_KEY, '1');
-    }
-  } catch (error) { /* 저장소를 못 쓰면 안내만 건너뛴다 */ }
   const token = '[업로드 중…' + (++macroImageSeq) + ']';
   const at = Math.min(ta.selectionStart ?? ta.value.length, ta.value.length);
   ta.setRangeText(token, at, Math.min(ta.selectionEnd ?? at, ta.value.length), 'end');

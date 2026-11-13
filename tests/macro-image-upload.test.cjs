@@ -46,3 +46,7 @@ assert.equal(html.split('onclick="pickMacroImage(this)"').length - 1, 2, '버튼
 const sheetFn = html.slice(html.indexOf('function setCharacterSheetImage('), html.indexOf('function openCharacterSheetImageMenu'));
 assert.ok(!sheetFn.includes('uploadPublicImage'), '시트 이미지는 업로드하지 않는다(#233)');
 console.log('macro image input checks: OK');
+// #247: 공개 안내 confirm 없이 바로 업로드
+const ins = html.slice(html.indexOf('async function insertMacroImage'), html.indexOf('function pickMacroImage'));
+assert.ok(!ins.includes('confirm(') && !html.includes('MACRO_IMAGE_NOTICE_KEY'));
+console.log('macro image no confirm checks: OK');
