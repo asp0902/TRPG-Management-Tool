@@ -2232,6 +2232,7 @@ tr.ct-row-end .ct-select:focus {
   line-height: 1.8;
 }
 .bookmark-card {
+  position: relative;
   border: 1px solid #e8e8e8;
   border-radius: 18px;
   background: #fff;
@@ -2241,6 +2242,16 @@ tr.ct-row-end .ct-select:focus {
   min-height: 100%;
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.04);
 }
+/* 상단 고정(#244): 카드 우상단 압정 토글. 고정되지 않은 카드는 흐리게, 마우스를 올리면 진하게. 고정된 카드는 테두리·배경을 살짝 달리한다. */
+.bookmark-pin-btn {
+  position: absolute; top: 8px; right: 8px; z-index: 2; width: 28px; height: 28px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 999px;
+  background: rgba(255,255,255,0.85); color: #aaa; font-size: 12px; cursor: pointer; opacity: 0.55; transition: opacity 0.12s, color 0.12s;
+}
+.bookmark-card:hover .bookmark-pin-btn, .bookmark-pin-btn:focus-visible { opacity: 1; }
+.bookmark-pin-btn:hover { color: #333; }
+.bookmark-pin-btn[aria-pressed="true"] { opacity: 1; color: #111; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.18); }
+.bookmark-card.pinned { border-color: #cfcfcf; background: #fcfcf7; }
 .bookmark-thumb-wrap {
   position: relative;
   aspect-ratio: 16 / 9;
@@ -10157,6 +10168,7 @@ function mkBookmark(url = '') {
     tags: [],
     notes: '',
     attachments: [],
+    pinned: false, pinnedAt: 0, // 상단 고정(#244)
   };
 }
 // 기록 이미지(GM·PL): 여러 장. 단일 필드(gmImage / image)는 항상 images[0] 과 같게 두어 구버전·기존 화면과 호환한다(#203).
@@ -10542,6 +10554,8 @@ function normalizeBookmarkRecord(input = {}) {
     tags: normalizeCssMacroTags(input?.tags ?? input?.tagText ?? input?.tag),
     notes: typeof input?.notes === 'string' ? input.notes : '',
     attachments: normalizeCatalogAttachments(input?.attachments),
+    pinned: input?.pinned === true,
+    pinnedAt: input?.pinned === true ? (Number(input?.pinnedAt) || 0) : 0,
   };
 }
 // opts.promoteLegacyContent: 로드 경계(applyStatePayload)에서만 true.
@@ -34132,6 +34146,14 @@ function setBookmarkTagFilter(tag) {
   activeBookmarkTag = tag || 'all';
   renderBookmarkPage();
 }
+function toggleBookmarkPin(bookmarkId) {
+  const bookmark = getBookmarkById(bookmarkId);
+  if (!bookmark) return;
+  bookmark.pinned = !bookmark.pinned;
+  bookmark.pinnedAt = bookmark.pinned ? Date.now() : 0;
+  persist();
+  renderBookmarkPage();
+}
 function renderBookmarkPage() {
   const grid = document.getElementById('bookmark-grid');
   if (!grid) return;
@@ -34150,14 +34172,17 @@ function renderBookmarkPage() {
     ];
     return values.some(value => String(value || '').toLowerCase().includes(query));
   });
+  // 고정된 항목을 앞으로(표시할 때만): 최근에 고정한 것이 맨 앞, 나머지는 기존 순서 그대로. state.bookmarks 의 원래 순서는 바꾸지 않는다(#244).
+  const pinnedFirst = [...visible.filter(b => b.pinned).sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0)), ...visible.filter(b => !b.pinned)];
   if (!visible.length) {
     grid.innerHTML = `<div class="bookmark-empty">${state.bookmarks.length ? '검색 결과가 없습니다.<br>다른 제목이나 태그로 다시 찾아보세요.' : '등록된 북마크가 없습니다.<br>＋ 북마크 추가 버튼으로 첫 링크를 저장해보세요.'}</div>`;
     return;
   }
   closeBookmarkAttachPopover();
   closeBookmarkTagPopover();
-  grid.innerHTML = visible.map(bookmark => `
-    <article class="bookmark-card" data-bookmark-id="${bookmark.id}">
+  grid.innerHTML = pinnedFirst.map(bookmark => `
+    <article class="bookmark-card${bookmark.pinned ? ' pinned' : ''}" data-bookmark-id="${bookmark.id}">
+      <button type="button" class="bookmark-pin-btn" aria-pressed="${bookmark.pinned ? 'true' : 'false'}" title="${bookmark.pinned ? '고정 해제' : '상단에 고정'}" aria-label="${bookmark.pinned ? '고정 해제' : '상단에 고정'}" onclick="event.stopPropagation();toggleBookmarkPin('${bookmark.id}')"><i class="fa-solid fa-thumbtack" aria-hidden="true"></i></button>
       <div class="bookmark-thumb-wrap">
         ${bookmark.thumbnail
           ? `<img src="${esc(bookmark.thumbnail)}" alt="${esc(getBookmarkDisplayTitle(bookmark))}" onerror="this.parentNode.innerHTML='<div class=&quot;bookmark-thumb-placeholder&quot;>🔖</div>'">`
