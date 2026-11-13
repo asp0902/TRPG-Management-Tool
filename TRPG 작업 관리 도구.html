@@ -30950,6 +30950,8 @@ const CATALOG_LINK_TOBE_LABEL_VALUE = 'TOBE';
 const CATALOG_LINK_LABEL_TOBE_ICON_URL = 'https://image.aladin.co.kr/img/tobecontinued/tobecontinued.png';
 const CATALOG_LINK_NOTION_LABEL_VALUE = 'NOTION';
 const CATALOG_LINK_LABEL_NOTION_ICON_URL = 'https://www.notion.com/front-static/logo-ios.png';
+const CATALOG_LINK_BOOTH_LABEL_VALUE = 'BOOTH';
+const CATALOG_LINK_LABEL_BOOTH_ICON_URL = 'https://booth.pm/static-images/pwa/icon_size_180.png';
 const CATALOG_LINK_LABEL_OPTIONS = [
   { value: '', text: '-' },
   { value: CATALOG_LINK_ICON_LABEL_VALUE, text: 'X', image: CATALOG_LINK_LABEL_ICON_URL },
@@ -30957,7 +30959,8 @@ const CATALOG_LINK_LABEL_OPTIONS = [
   { value: CATALOG_LINK_TISTORY_LABEL_VALUE, text: 'Tistory', image: CATALOG_LINK_LABEL_TISTORY_ICON_URL },
   { value: CATALOG_LINK_GOOGLE_DOCS_LABEL_VALUE, text: 'Google Docs', image: CATALOG_LINK_LABEL_GOOGLE_DOCS_ICON_URL },
   { value: CATALOG_LINK_TOBE_LABEL_VALUE, text: '투비컨티뉴드', image: CATALOG_LINK_LABEL_TOBE_ICON_URL },
-  { value: CATALOG_LINK_NOTION_LABEL_VALUE, text: 'Notion', image: CATALOG_LINK_LABEL_NOTION_ICON_URL }
+  { value: CATALOG_LINK_NOTION_LABEL_VALUE, text: 'Notion', image: CATALOG_LINK_LABEL_NOTION_ICON_URL },
+  { value: CATALOG_LINK_BOOTH_LABEL_VALUE, text: 'BOOTH', image: CATALOG_LINK_LABEL_BOOTH_ICON_URL }
 ];
 
 // ── 헬퍼: 인라인 입력 HTML 생성 ──
@@ -32031,6 +32034,7 @@ function detectCatalogLinkLabelFromUrl(url) {
     if (is('postype.com')) return CATALOG_LINK_POSTYPE_LABEL_VALUE;
     if (is('tistory.com')) return CATALOG_LINK_TISTORY_LABEL_VALUE;
     if (host === 'docs.google.com') return CATALOG_LINK_GOOGLE_DOCS_LABEL_VALUE;
+    if (is('booth.pm')) return CATALOG_LINK_BOOTH_LABEL_VALUE;
     if (host === 'tobe.aladin.co.kr') return CATALOG_LINK_TOBE_LABEL_VALUE;
     if (['notion.so', 'notion.site', 'notion.com'].some(d => host === d || host.endsWith('.' + d))) return CATALOG_LINK_NOTION_LABEL_VALUE;
   } catch(e) {}
