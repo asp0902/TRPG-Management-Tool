@@ -66,7 +66,7 @@ body {
 .page-dropdown-item:hover { background: #262626; color: #ddd; }
 .page-dropdown-item.active { color: #fff; }
 /* ─── 앱 페이지 ─── */
-#page-scenario, #page-css-macro, #page-bookmark, #page-rulebook, #page-character, #page-datasheet, #page-record-timeline {
+#page-scenario, #page-css-macro, #page-bookmark, #page-music, #page-rulebook, #page-character, #page-datasheet, #page-record-timeline {
   display: none; flex: 1; flex-direction: column; overflow-y: auto;
 }
 /* 기록 타임라인 탭: 편집 칸을 넓게 */
@@ -2140,6 +2140,61 @@ tr.ct-row-end .ct-select:focus {
   color: #111;
   border-color: #cfcfcf;
 }
+/* ─── MUSIC (#255) ─── */
+.music-page { display: flex; height: 100%; overflow: hidden; background: #f5f5f5; }
+.music-side { width: 210px; flex-shrink: 0; background: #fff; border-right: 1px solid #e5e5e5; overflow-y: auto; padding: 10px 8px; box-sizing: border-box; }
+.music-side-head { display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 800; color: #777; padding: 2px 6px 8px; }
+.music-side-head button, .music-folder-edit { border: 0; background: none; cursor: pointer; font-size: 15px; color: #666; padding: 0 4px; }
+.music-folder { display: flex; align-items: center; gap: 6px; padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 12.5px; color: #333; }
+.music-folder:hover, .music-folder.drop { background: #f0f0f0; }
+.music-folder.active { background: #111; color: #fff; }
+.music-folder.active .music-folder-edit { color: #fff; }
+.music-folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.music-folder-count { font-size: 11px; opacity: 0.6; }
+.music-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.music-main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.music-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px 16px 6px; }
+.music-search { flex: 1; min-width: 160px; border: 1px solid #ddd; border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 12.5px; }
+.music-toolbar select { border: 1px solid #ddd; border-radius: 8px; padding: 6px; font: inherit; font-size: 12px; }
+.music-check { font-size: 12px; color: #444; white-space: nowrap; }
+.music-primary { background: #111; color: #fff; border: 1px solid #111; border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.music-storage { padding: 0 16px 6px; font-size: 11px; color: #999; }
+.music-grid { flex: 1; overflow-y: auto; padding: 8px 16px 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; align-content: start; }
+.music-empty { grid-column: 1 / -1; text-align: center; color: #999; padding: 60px 0; font-size: 13px; line-height: 1.7; }
+.music-album-head { grid-column: 1 / -1; font-weight: 800; font-size: 13px; color: #333; padding-top: 6px; border-bottom: 1px solid #ddd; }
+.music-card { background: #fff; border: 1px solid #e5e5e5; border-top: 4px solid #e5e5e5; border-radius: 10px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; }
+.music-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+.music-card-cover { position: relative; aspect-ratio: 16 / 10; background: #ececec; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #aaa; overflow: hidden; }
+.music-card-cover img { width: 100%; height: 100%; object-fit: cover; }
+.music-card-yt { position: absolute; right: 4px; bottom: 4px; background: rgba(0,0,0,0.7); color: #fff; font-size: 9px; font-style: normal; padding: 1px 5px; border-radius: 4px; }
+.music-card-body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.music-card-title { font-weight: 800; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.music-card-sub { font-size: 11.5px; color: #777; min-height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.music-card-meta { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #999; justify-content: space-between; }
+.music-card-meta .music-dot { margin-right: -2px; }
+.music-card-missing { font-size: 11px; color: #c0392b; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.music-card-missing button, .music-modal button { border: 1px solid #ddd; background: #fff; border-radius: 6px; padding: 3px 8px; font: inherit; font-size: 11.5px; cursor: pointer; }
+.music-modal-backdrop { position: fixed; inset: 0; z-index: 12500; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
+.music-modal { width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow-y: auto; background: #fff; border-radius: 14px; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; color: #333; }
+.music-modal-head { display: flex; align-items: center; gap: 8px; }
+.music-modal-title { flex: 1; font-weight: 800; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.music-modal-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.music-field { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: #666; font-weight: 700; }
+.music-field input, .music-field textarea, .music-field select { border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12.5px; font-weight: 400; color: #222; }
+.music-field textarea { min-height: 60px; resize: vertical; }
+.music-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.music-fields .music-field:last-child { grid-column: 1 / -1; }
+.music-player { background: #000; border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; min-height: 54px; }
+.music-player .music-yt { width: 100%; aspect-ratio: 16 / 9; border: 0; }
+.music-audio { width: 100%; }
+.music-nofile { color: #fff; padding: 16px; font-size: 12px; }
+.music-palette { display: flex; flex-wrap: wrap; gap: 6px; }
+.music-swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent !important; cursor: pointer; padding: 0 !important; }
+.music-swatch.none { background: #fff; border: 1px dashed #aaa !important; color: #888; }
+.music-swatch.on { border-color: #111 !important; }
+.music-danger { color: #c0392b !important; border-color: #e5b3ad !important; }
+.music-error { color: #c0392b; min-height: 14px; font-size: 12px; }
+.music-hint { font-size: 11px; color: #999; }
 .bookmark-page {
   display: flex;
   flex-direction: column;
@@ -8127,6 +8182,7 @@ select.sh-field-input,
           <div class="page-dropdown-item active" data-page="script">SCRIPT</div>
           <div class="page-dropdown-item" data-page="record">RECORD</div>
           <div class="page-dropdown-item" data-page="bookmark">BOOKMARK</div>
+          <div class="page-dropdown-item" data-page="music">MUSIC</div>
           <div class="page-dropdown-item" data-page="css-macro">CSS MACRO</div>
           <div class="page-dropdown-item" data-page="rulebook">RULEBOOK</div>
           <div class="page-dropdown-item" data-page="character">CHARACTER</div>
@@ -8946,6 +9002,27 @@ select.sh-field-input,
       </div>
       <div class="css-macro-picker-body">
         <div id="css-macro-picker-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MUSIC PAGE (#255) -->
+  <div id="page-music">
+    <div class="music-page">
+      <aside class="music-side">
+        <div class="music-side-head"><span>폴더</span><button type="button" title="새 폴더 만들기" onclick="openMusicFolderModal()">＋</button></div>
+        <div id="music-folders"></div>
+      </aside>
+      <div class="music-main">
+        <div class="music-toolbar">
+          <input id="music-search" class="music-search" placeholder="제목, 아티스트, 앨범, 태그, 메모 검색..." oninput="musicView.q=this.value;renderMusicPage()">
+          <select id="music-sort" onchange="musicView.sort=this.value;renderMusicPage()"><option value="added">추가 순</option><option value="name">이름 순</option></select>
+          <label class="music-check"><input id="music-by-album" type="checkbox" onchange="musicView.byAlbum=this.checked;renderMusicPage()"> 앨범별 보기</label>
+          <button type="button" class="music-primary" onclick="musicPickFiles()">＋ 파일</button>
+          <button type="button" class="music-primary" onclick="openMusicYoutubeModal()">＋ 유튜브</button>
+        </div>
+        <div class="music-storage" id="music-storage"></div>
+        <div class="music-grid" id="music-grid"></div>
       </div>
     </div>
   </div>
@@ -10104,7 +10181,7 @@ const SHEET_TEMPLATES = {
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-let state = { scenarios: [], folders: [], cssMacroFolders: [], records: [], catalog: [], cssMacros: [], cssPopupDictionary: [], bookmarks: [], rulebooks: [], dataSheets: [], characters: [], characterFolders: [], customFonts: [], manualFonts: [], recentFonts: [], customBulletSymbols: [], customBulletImages: [], findReplaceHistory: [], sharedMemoOwner: { memos: [] }, currentId: null };
+let state = { scenarios: [], folders: [], cssMacroFolders: [], records: [], catalog: [], cssMacros: [], cssPopupDictionary: [], bookmarks: [], musicFolders: [], musicTracks: [], rulebooks: [], dataSheets: [], characters: [], characterFolders: [], customFonts: [], manualFonts: [], recentFonts: [], customBulletSymbols: [], customBulletImages: [], findReplaceHistory: [], sharedMemoOwner: { memos: [] }, currentId: null };
 const characterSheetPopupParams = new URLSearchParams(location.search);
 const characterSheetPopupCharacterId = characterSheetPopupParams.get('characterPopup') || '';
 const characterSheetPopupSheetId = characterSheetPopupParams.get('sheet') || '';
@@ -10606,6 +10683,7 @@ function normalizeSidebarState(opts = {}) {
   });
   state.cssPopupDictionary = normalizeCssPopupDictionaryCollection(state.cssPopupDictionary);
   state.bookmarks = Array.isArray(state.bookmarks) ? state.bookmarks.map(normalizeBookmarkRecord) : [];
+  normalizeMusicCollections();
   state.rulebooks = Array.isArray(state.rulebooks) ? state.rulebooks.map(rb => normalizeRulebookEntry(rb, opts)) : [];
   state.dataSheets = Array.isArray(state.dataSheets) ? state.dataSheets.map(normalizeDataSheetEntry) : [];
   state.characters = Array.isArray(state.characters) ? state.characters.map(normalizeCharacterEntry) : [];
@@ -10658,6 +10736,8 @@ function makeStatePayload() {
     cssMacros: state.cssMacros,
     cssPopupDictionary: state.cssPopupDictionary,
     bookmarks: state.bookmarks,
+    musicFolders: state.musicFolders,
+    musicTracks: state.musicTracks,
     rulebooks: state.rulebooks,
     dataSheets: state.dataSheets,
     characters: state.characters,
@@ -10681,6 +10761,8 @@ function applyStatePayload(raw) {
     state.cssMacros = [];
     state.cssPopupDictionary = [];
     state.bookmarks = [];
+    state.musicFolders = [];
+    state.musicTracks = [];
     state.rulebooks = [];
     state.dataSheets = [];
     state.characters = [];
@@ -10701,6 +10783,8 @@ function applyStatePayload(raw) {
     state.cssMacros = Array.isArray(raw.cssMacros) ? raw.cssMacros : [];
     state.cssPopupDictionary = Array.isArray(raw.cssPopupDictionary) ? raw.cssPopupDictionary : [];
     state.bookmarks = Array.isArray(raw.bookmarks) ? raw.bookmarks : [];
+    state.musicFolders = Array.isArray(raw.musicFolders) ? raw.musicFolders : [];
+    state.musicTracks = Array.isArray(raw.musicTracks) ? raw.musicTracks : [];
     state.rulebooks = Array.isArray(raw.rulebooks) ? raw.rulebooks : [];
     state.dataSheets = Array.isArray(raw.dataSheets) ? raw.dataSheets : [];
     state.characters = Array.isArray(raw.characters) ? raw.characters : [];
@@ -24020,6 +24104,8 @@ function getFullBackupPayload() {
     cssMacros: state.cssMacros,
     cssPopupDictionary: state.cssPopupDictionary,
     bookmarks: state.bookmarks,
+    musicFolders: state.musicFolders,
+    musicTracks: state.musicTracks,
     rulebooks: state.rulebooks,
     dataSheets: state.dataSheets,
     characters: state.characters,
@@ -24513,7 +24599,7 @@ function getGitHubSyncDecision(input) {
   return 'idle';
 }
 function hasGitHubSyncData() {
-  return ['scenarios','folders','cssMacroFolders','records','catalog','cssMacros','cssPopupDictionary','bookmarks','rulebooks','dataSheets','characters','characterFolders','customFonts','manualFonts','recentFonts','customBulletSymbols','findReplaceHistory']
+  return ['scenarios','folders','cssMacroFolders','records','catalog','cssMacros','cssPopupDictionary','bookmarks','musicFolders','musicTracks','rulebooks','dataSheets','characters','characterFolders','customFonts','manualFonts','recentFonts','customBulletSymbols','findReplaceHistory']
     .some(key => Array.isArray(state[key]) && state[key].length > 0) || getSharedMemos().length > 0;
 }
 function setGitHubSyncStatus(message, type = '') {
@@ -24632,7 +24718,7 @@ async function getGitHubSyncRemote(meta) {
   makeImportPayload(data);
   return { ...meta, data };
 }
-const GITHUB_SYNC_DATA_KEYS = ['scenarios', 'records', 'catalog', 'cssMacros', 'folders', 'rulebooks', 'characters', 'bookmarks', 'dataSheets'];
+const GITHUB_SYNC_DATA_KEYS = ['scenarios', 'records', 'catalog', 'cssMacros', 'folders', 'rulebooks', 'characters', 'bookmarks', 'dataSheets', 'musicTracks'];
 // 받은 값이 앱 데이터가 아니면(메타데이터 JSON, 빈 객체 …) 적용하지 않는다.
 function validateGitHubSyncRemoteData(data, meta, byteLength) {
   if (Array.isArray(data)) return;
@@ -24869,6 +24955,8 @@ function makeImportPayload(data) {
       cssMacros: [],
       cssPopupDictionary: [],
       bookmarks: [],
+      musicFolders: [],
+      musicTracks: [],
       rulebooks: [],
       characters: [],
       characterFolders: [],
@@ -24895,6 +24983,8 @@ function makeImportPayload(data) {
     cssMacros: normalizeCssMacroCollection(data.cssMacros),
     cssPopupDictionary: normalizeCssPopupDictionaryCollection(data.cssPopupDictionary),
     bookmarks: Array.isArray(data.bookmarks) ? data.bookmarks.map(normalizeBookmarkRecord) : [],
+    musicFolders: Array.isArray(data.musicFolders) ? data.musicFolders.map(normalizeMusicFolder) : [],
+    musicTracks: Array.isArray(data.musicTracks) ? data.musicTracks.map(normalizeMusicTrack) : [],
     rulebooks: Array.isArray(data.rulebooks) ? data.rulebooks.map(normalizeRulebookEntry) : [],
     dataSheets: Array.isArray(data.dataSheets) ? data.dataSheets.map(normalizeDataSheetEntry) : [],
     characters: Array.isArray(data.characters) ? data.characters.map(normalizeCharacterEntry) : [],
@@ -24966,6 +25056,10 @@ function reassignImportedIdsForMerge(payload) {
   });
   reserveAll(payload.cssPopupDictionary, state.cssPopupDictionary, cssPopupDictionaryIdMap);
   reserveAll(payload.bookmarks, state.bookmarks, bookmarkIdMap);
+  const musicFolderIdMap = new Map();
+  reserveAll(payload.musicFolders, state.musicFolders, musicFolderIdMap);
+  reserveAll(payload.musicTracks, state.musicTracks, new Map());
+  payload.musicTracks.forEach(track => { if (track.folderId) track.folderId = mapImportedId(track.folderId, musicFolderIdMap); });
   reserveAll(payload.rulebooks, state.rulebooks, rulebookIdMap, (rulebook, result) => {
     if (result.oldId) rulebook.title = `${rulebook.title || '룰북'} (복사본)`;
   });
@@ -25019,6 +25113,8 @@ function replaceStateWithImportPayload(payload) {
   state.cssMacros = payload.cssMacros;
   state.cssPopupDictionary = payload.cssPopupDictionary;
   state.bookmarks = payload.bookmarks;
+  state.musicFolders = payload.musicFolders || [];
+  state.musicTracks = payload.musicTracks || [];
   state.rulebooks = payload.rulebooks;
   state.dataSheets = payload.dataSheets || [];
   state.characters = payload.characters;
@@ -25042,6 +25138,8 @@ function mergeImportPayload(payload) {
   state.cssMacros.push(...payload.cssMacros);
   state.cssPopupDictionary.push(...payload.cssPopupDictionary);
   state.bookmarks.push(...payload.bookmarks);
+  state.musicFolders.push(...(payload.musicFolders || []));
+  state.musicTracks.push(...(payload.musicTracks || []));
   state.rulebooks.push(...payload.rulebooks);
   if (Array.isArray(payload.dataSheets)) state.dataSheets.push(...payload.dataSheets);
   state.characters.push(...payload.characters);
@@ -25063,6 +25161,8 @@ function makeImportSnapshot() {
     cssMacros: state.cssMacros.slice(),
     cssPopupDictionary: state.cssPopupDictionary.slice(),
     bookmarks: state.bookmarks.slice(),
+    musicFolders: state.musicFolders.slice(),
+    musicTracks: state.musicTracks.slice(),
     rulebooks: state.rulebooks.slice(),
     dataSheets: state.dataSheets.slice(),
     characters: state.characters.slice(),
@@ -25081,7 +25181,7 @@ function makeImportSnapshot() {
   };
 }
 function restoreImportSnapshot(snapshot) {
-  ['scenarios','folders','cssMacroFolders','records','catalog','cssMacros','cssPopupDictionary','bookmarks','rulebooks','dataSheets','characters','characterFolders','customFonts','manualFonts','recentFonts','customBulletSymbols','customBulletImages','findReplaceHistory','sharedMemoOwner'].forEach(key => {
+  ['scenarios','folders','cssMacroFolders','records','catalog','cssMacros','cssPopupDictionary','bookmarks','musicFolders','musicTracks','rulebooks','dataSheets','characters','characterFolders','customFonts','manualFonts','recentFonts','customBulletSymbols','customBulletImages','findReplaceHistory','sharedMemoOwner'].forEach(key => {
     if (snapshot[key] !== undefined) state[key] = snapshot[key];
   });
   state.currentId = snapshot.currentId;
@@ -25156,6 +25256,7 @@ function refreshAfterImport(replaceMode = false) {
   if (currentPage === 'record') renderRecordPage();
   if (currentPage === 'css-macro') renderCssMacroPage();
   if (currentPage === 'bookmark') renderBookmarkPage();
+  if (currentPage === 'music') renderMusicPage();
   if (currentPage === 'rulebook') renderRulebookPage();
   if (currentPage === 'character') renderCharacterPage();
   if (openCharacterId) {
@@ -34924,6 +35025,393 @@ async function fetchBookmarkPageDocument(targetUrl, signal) {
 }
 // 직접 조회(CORS)가 막힐 때만 쓰는 외부 조회 서비스. 순서대로 시도하고, 앞이 실패·한도 초과·결과 없음일 때만 다음으로 간다(#191, #199).
 // 1순위 jina reader(키 없이 분당 한도, CORS 허용), 2순위 microlink(무료 한도가 IP당 하루 5회 수준이라 보조). 엔드포인트는 여기만 바꾸면 된다.
+// ── MUSIC 페이지(#255) ──
+// 메타데이터(state.musicFolders / state.musicTracks)는 다른 데이터와 같이 저장·백업·동기화된다.
+// 음원·표지 Blob 은 별도 IndexedDB(MUSIC_DB)에만 두고 동기화·백업·스냅샷에 넣지 않는다(이 기기 전용).
+// 유튜브는 임베드 재생만 한다(음원 다운로드·추출 기능 없음).
+const MUSIC_DB_NAME = 'trpg-music';
+const MUSIC_AUDIO_EXTS = ['mp3', 'wav', 'flac', 'ogg', 'm4a', 'aac', 'opus'];
+const MUSIC_COLORS = ['#FFB3BA', '#FFCBA4', '#FFDFBA', '#FFF3B0', '#E4F1AC', '#BAFFC9', '#A8E6CF', '#9BF6FF', '#BAE1FF', '#A0C4FF', '#BDB2FF', '#D7BDE2', '#FFC6FF', '#F8BBD0', '#D7CCC8', '#CFD8DC', '#FFE0AC'];
+function normalizeMusicFolder(input = {}) {
+  return { id: input?.id || mkId(), name: typeof input?.name === 'string' ? input.name : '', color: /^#[0-9a-f]{6}$/i.test(input?.color || '') ? input.color : '' };
+}
+function normalizeMusicTrack(input = {}) {
+  const str = key => (typeof input?.[key] === 'string' ? input[key] : '');
+  return {
+    id: input?.id || mkId(),
+    kind: input?.kind === 'youtube' ? 'youtube' : 'file',
+    title: str('title'), artist: str('artist'), album: str('album'), notes: str('notes'),
+    tags: normalizeCssMacroTags(input?.tags),
+    folderId: str('folderId'),
+    addedAt: Number(input?.addedAt) || 0,
+    duration: Number(input?.duration) > 0 ? Number(input.duration) : 0,
+    fileName: str('fileName'), size: Number(input?.size) || 0,
+    youtubeId: str('youtubeId'), url: str('url'), thumbnail: str('thumbnail'),
+  };
+}
+function normalizeMusicCollections() {
+  state.musicFolders = Array.isArray(state.musicFolders) ? state.musicFolders.map(normalizeMusicFolder) : [];
+  const ids = new Set(state.musicFolders.map(folder => folder.id));
+  state.musicTracks = Array.isArray(state.musicTracks) ? state.musicTracks.map(normalizeMusicTrack) : [];
+  state.musicTracks.forEach(track => { if (track.folderId && !ids.has(track.folderId)) track.folderId = ''; });
+}
+function musicParseYoutubeId(value) {
+  const text = String(value || '').trim();
+  const match = text.match(/^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/|live\/|v\/))([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/i);
+  return match ? match[1] : '';
+}
+function musicPlayerHtml(track, blobUrl) {
+  if (track.kind === 'youtube') {
+    return '<iframe class="music-yt" src="https://www.youtube.com/embed/' + encodeURIComponent(track.youtubeId) + '?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+  }
+  return blobUrl ? '<audio class="music-audio" controls autoplay src="' + esc(blobUrl) + '"></audio>' : '<div class="music-nofile">이 기기에 파일 없음</div>';
+}
+// ID3v2(mp3) 태그 읽기: 제목 TIT2, 아티스트 TPE1, 앨범 TALB, 표지 APIC. bytes = 파일 앞부분(헤더 포함). 다른 형식·태그 없음은 빈 값.
+function musicParseId3(bytes, TD) {
+  const out = { title: '', artist: '', album: '', cover: null };
+  if (!bytes || bytes.length < 10 || bytes[0] !== 0x49 || bytes[1] !== 0x44 || bytes[2] !== 0x33) return out;
+  const ver = bytes[3];
+  const safe = (b, i) => ((b[i] & 127) << 21) | ((b[i + 1] & 127) << 14) | ((b[i + 2] & 127) << 7) | (b[i + 3] & 127);
+  const end = Math.min(bytes.length, 10 + safe(bytes, 6));
+  const decode = (data, enc) => {
+    let label = 'windows-1252', body = data;
+    if (enc === 3) label = 'utf-8';
+    else if (enc === 1 || enc === 2) {
+      label = enc === 2 ? 'utf-16be' : 'utf-16le';
+      if (body[0] === 0xFE && body[1] === 0xFF) { label = 'utf-16be'; body = body.subarray(2); }
+      else if (body[0] === 0xFF && body[1] === 0xFE) { label = 'utf-16le'; body = body.subarray(2); }
+    }
+    return new TD(label).decode(body).split('\u0000')[0].trim();
+  };
+  let p = 10;
+  while (p + 10 <= end) {
+    const id = String.fromCharCode(bytes[p], bytes[p + 1], bytes[p + 2], bytes[p + 3]);
+    if (!/^[A-Z0-9]{4}$/.test(id)) break;
+    const size = ver === 4 ? safe(bytes, p + 4) : (bytes[p + 4] * 16777216 + (bytes[p + 5] << 16) + (bytes[p + 6] << 8) + bytes[p + 7]);
+    const data = bytes.subarray(p + 10, Math.min(end, p + 10 + size));
+    p += 10 + size;
+    if (!data.length) continue;
+    if (id === 'TIT2') out.title = decode(data.subarray(1), data[0]);
+    else if (id === 'TPE1') out.artist = decode(data.subarray(1), data[0]);
+    else if (id === 'TALB') out.album = decode(data.subarray(1), data[0]);
+    else if (id === 'APIC' && !out.cover) {
+      const enc = data[0];
+      let i = 1;
+      while (i < data.length && data[i] !== 0) i++;
+      const mime = new TD('windows-1252').decode(data.subarray(1, i));
+      i += 2; // 0 종료 + 그림 종류
+      if (enc === 1 || enc === 2) { while (i + 1 < data.length && !(data[i] === 0 && data[i + 1] === 0)) i += 2; i += 2; }
+      else { while (i < data.length && data[i] !== 0) i++; i++; }
+      if (i < data.length) out.cover = { mime: /^image\//.test(mime) ? mime : 'image/jpeg', bytes: data.subarray(i) };
+    }
+  }
+  return out;
+}
+async function musicReadTags(file) {
+  try {
+    const head = new Uint8Array(await file.slice(0, 10).arrayBuffer());
+    if (head[0] !== 0x49 || head[1] !== 0x44 || head[2] !== 0x33) return { title: '', artist: '', album: '', cover: null };
+    const size = 10 + (((head[6] & 127) << 21) | ((head[7] & 127) << 14) | ((head[8] & 127) << 7) | (head[9] & 127));
+    return musicParseId3(new Uint8Array(await file.slice(0, size).arrayBuffer()), TextDecoder);
+  } catch (e) { return { title: '', artist: '', album: '', cover: null }; }
+}
+// ── 기기 전용 Blob 저장소 ──
+let musicDbPromise = null;
+function musicDb() {
+  if (!musicDbPromise) musicDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(MUSIC_DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('blobs');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => { musicDbPromise = null; reject(req.error); };
+  });
+  return musicDbPromise;
+}
+async function musicTx(mode, fn) {
+  const db = await musicDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('blobs', mode), store = tx.objectStore('blobs');
+    const req = fn(store);
+    tx.oncomplete = () => resolve(req?.result);
+    tx.onerror = tx.onabort = () => reject(tx.error);
+  });
+}
+const musicBlobPut = (key, blob) => musicTx('readwrite', store => store.put(blob, key));
+const musicBlobGet = key => musicTx('readonly', store => store.get(key));
+const musicBlobDelete = ids => musicTx('readwrite', store => { ids.forEach(id => { store.delete(id); store.delete('cover:' + id); }); });
+const musicBlobKeys = () => musicTx('readonly', store => store.getAllKeys());
+// ── 화면 ──
+const musicView = { folder: 'all', q: '', sort: 'added', byAlbum: false };
+let musicLocalIds = new Set();       // 이 기기에 음원 Blob 이 있는 트랙 id
+let musicCoverUrls = {};             // 트랙 id → 표지 object URL
+let musicPlaying = null;             // { id, url } 재생 중 상세 보기
+async function musicLoadLocal() {
+  try {
+    const keys = await musicBlobKeys();
+    musicLocalIds = new Set(keys.filter(key => !String(key).startsWith('cover:')));
+    for (const key of keys) {
+      const id = String(key).startsWith('cover:') ? String(key).slice(6) : '';
+      if (id && !musicCoverUrls[id]) { const blob = await musicBlobGet(key); if (blob) musicCoverUrls[id] = URL.createObjectURL(blob); }
+    }
+  } catch (e) { console.warn('MUSIC_DB 읽기 실패', e); }
+}
+function musicFolderOf(track) { return state.musicFolders.find(folder => folder.id === track.folderId) || null; }
+function musicTrackTitle(track) { return track.title || track.fileName || track.url || '제목 없음'; }
+function musicVisibleTracks() {
+  const q = musicView.q.trim().toLowerCase();
+  let list = state.musicTracks.filter(track => {
+    if (musicView.folder === 'none' ? track.folderId : (musicView.folder !== 'all' && track.folderId !== musicView.folder)) return false;
+    return !q || [track.title, track.artist, track.album, track.notes, track.fileName, (track.tags || []).join(' ')].join('\n').toLowerCase().includes(q);
+  });
+  list = list.slice().sort(musicView.sort === 'name'
+    ? (a, b) => musicTrackTitle(a).localeCompare(musicTrackTitle(b), 'ko')
+    : (a, b) => b.addedAt - a.addedAt);
+  if (musicView.byAlbum) list = list.slice().sort((a, b) => (a.album || '￿').localeCompare(b.album || '￿', 'ko')); // 안정 정렬: 앨범 안에서는 위 정렬 유지
+  return list;
+}
+function musicFmtTime(sec) { sec = Math.round(sec || 0); return sec ? Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0') : ''; }
+function renderMusicCard(track) {
+  const folder = musicFolderOf(track);
+  const cover = track.kind === 'youtube' ? track.thumbnail : musicCoverUrls[track.id];
+  const missing = track.kind === 'file' && !musicLocalIds.has(track.id);
+  return '<div class="music-card" draggable="true" data-id="' + track.id + '" ondragstart="event.dataTransfer.setData(\'text/music-track\',\'' + track.id + '\')" onclick="openMusicDetail(\'' + track.id + '\')" style="border-top-color:' + (folder?.color || '#e5e5e5') + '">'
+    + '<div class="music-card-cover">' + (cover ? '<img src="' + esc(cover) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span>♪</span>') + (track.kind === 'youtube' ? '<i class="music-card-yt">YouTube</i>' : '') + '</div>'
+    + '<div class="music-card-body"><div class="music-card-title">' + esc(musicTrackTitle(track)) + '</div>'
+    + '<div class="music-card-sub">' + esc(track.artist || '') + '</div>'
+    + '<div class="music-card-meta">' + (folder ? '<span class="music-dot" style="background:' + folder.color + '"></span>' + esc(folder.name) : '') + '<span>' + musicFmtTime(track.duration) + '</span></div>'
+    + (missing ? '<div class="music-card-missing">이 기기에 파일 없음 <button type="button" onclick="event.stopPropagation();musicReupload(\'' + track.id + '\')">다시 올리기</button></div>' : '')
+    + '</div></div>';
+}
+function renderMusicPage() {
+  const side = document.getElementById('music-folders');
+  if (!side) return;
+  const count = id => state.musicTracks.filter(track => id === 'all' || (id === 'none' ? !track.folderId : track.folderId === id)).length;
+  const item = (id, name, color, extra = '') => '<div class="music-folder' + (musicView.folder === id ? ' active' : '') + '" data-folder="' + id + '" onclick="musicSelectFolder(\'' + id + '\')" ondragover="event.preventDefault();this.classList.add(\'drop\')" ondragleave="this.classList.remove(\'drop\')" ondrop="musicDropOnFolder(event,\'' + id + '\')">'
+    + '<span class="music-dot" style="background:' + (color || 'transparent') + ';border:1px solid ' + (color ? color : '#bbb') + '"></span><span class="music-folder-name">' + esc(name) + '</span><span class="music-folder-count">' + count(id) + '</span>' + extra + '</div>';
+  side.innerHTML = item('all', '전체 트랙', '') + item('none', '분류 없음', '')
+    + state.musicFolders.map(folder => item(folder.id, folder.name, folder.color, '<button type="button" class="music-folder-edit" title="이름·색 바꾸기 / 삭제" onclick="event.stopPropagation();openMusicFolderModal(\'' + folder.id + '\')">⋯</button>')).join('');
+  const list = musicVisibleTracks();
+  const grid = document.getElementById('music-grid');
+  if (!list.length) grid.innerHTML = '<div class="music-empty">' + (state.musicTracks.length ? '표시할 트랙이 없습니다.' : '등록된 트랙이 없습니다.<br>파일을 끌어다 놓거나 ＋ 파일 / ＋ 유튜브로 추가하세요.') + '</div>';
+  else if (musicView.byAlbum) {
+    let html = '', last = null;
+    list.forEach(track => { const album = track.album || '앨범 없음'; if (album !== last) { html += '<div class="music-album-head">' + esc(album) + '</div>'; last = album; } html += renderMusicCard(track); });
+    grid.innerHTML = html;
+  } else grid.innerHTML = list.map(renderMusicCard).join('');
+  document.getElementById('music-search').value = musicView.q;
+  document.getElementById('music-sort').value = musicView.sort;
+  document.getElementById('music-by-album').checked = musicView.byAlbum;
+  musicShowStorage();
+}
+async function musicShowStorage() {
+  const el = document.getElementById('music-storage');
+  if (!el || !navigator.storage?.estimate) return;
+  try { const e = await navigator.storage.estimate(); el.textContent = '이 기기 저장소 ' + (e.usage / 1048576).toFixed(1) + ' MB 사용' + (e.quota ? ' / ' + Math.round(e.quota / 1048576).toLocaleString() + ' MB' : '') + ' · 음원 파일은 이 기기에만 저장됩니다'; } catch (e) {}
+}
+function musicSelectFolder(id) { musicView.folder = id; renderMusicPage(); }
+function musicDropOnFolder(event, folderId) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drop');
+  const id = event.dataTransfer.getData('text/music-track');
+  const track = state.musicTracks.find(item => item.id === id);
+  if (!track || folderId === 'all') return;
+  event.stopPropagation();
+  track.folderId = folderId === 'none' ? '' : folderId;
+  persist(); renderMusicPage();
+}
+// ── 모달 ──
+function musicCloseModal() {
+  musicStop();
+  document.getElementById('music-modal-backdrop')?.remove();
+  document.removeEventListener('keydown', musicModalKey, true);
+}
+function musicOpenModal(html, keep) {
+  document.getElementById('music-modal-backdrop')?.remove();
+  const backdrop = document.createElement('div');
+  backdrop.id = 'music-modal-backdrop'; backdrop.className = 'music-modal-backdrop';
+  backdrop.innerHTML = '<div class="music-modal" onclick="event.stopPropagation()">' + html + '</div>';
+  backdrop.addEventListener('mousedown', event => { if (event.target === backdrop) musicCloseModal(); });
+  document.body.appendChild(backdrop);
+  if (!keep) document.addEventListener('keydown', musicModalKey, true);
+  return backdrop;
+}
+function musicStop() {
+  document.querySelectorAll('#music-modal-backdrop audio').forEach(audio => audio.pause());
+  document.querySelectorAll('#music-modal-backdrop iframe').forEach(frame => { frame.src = 'about:blank'; frame.remove(); });
+  if (musicPlaying?.url) URL.revokeObjectURL(musicPlaying.url);
+  musicPlaying = null;
+}
+function musicModalKey(event) {
+  if (event.key === 'Escape') { musicCloseModal(); return; }
+  if (!musicPlaying || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName) || event.target.isContentEditable) return;
+  event.preventDefault();
+  musicStep(event.key === 'ArrowLeft' ? -1 : 1);
+}
+function musicStep(dir) {
+  const list = musicVisibleTracks();
+  const at = list.findIndex(track => track.id === musicPlaying?.id);
+  if (at < 0 || !list.length) return;
+  openMusicDetail(list[(at + dir + list.length) % list.length].id);
+}
+async function openMusicDetail(id) {
+  const track = state.musicTracks.find(item => item.id === id);
+  if (!track) return;
+  musicStop();
+  let url = '';
+  if (track.kind === 'file') { try { const blob = await musicBlobGet(id); if (blob) url = URL.createObjectURL(blob); } catch (e) {} }
+  const folderOpts = '<option value="">분류 없음</option>' + state.musicFolders.map(folder => '<option value="' + folder.id + '"' + (folder.id === track.folderId ? ' selected' : '') + '>' + esc(folder.name) + '</option>').join('');
+  const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)" value="' + esc(key === 'tags' ? track.tags.map(tag => '#' + tag).join(' ') : track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
+  musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
+    + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>'
+    + (track.kind === 'file' && !url ? '<button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button>' : '')
+    + '<div class="music-fields">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + field('tags', '태그')
+    + '<label class="music-field">폴더 <select onchange="musicEditField(\'' + id + '\',this,\'folderId\')">' + folderOpts + '</select></label>' + field('notes', '메모', 'textarea') + '</div>'
+    + '<div class="music-modal-foot"><span class="music-hint">← → 이전·다음 곡</span><button type="button" class="music-danger" onclick="deleteMusicTrack(\'' + id + '\')">삭제</button></div>');
+  musicPlaying = { id, url };
+}
+function musicEditField(id, el, key) {
+  const track = state.musicTracks.find(item => item.id === id);
+  if (!track) return;
+  key = key || el.dataset.k;
+  track[key] = key === 'tags' ? normalizeCssMacroTags(el.value) : el.value;
+  if (key === 'title') document.querySelector('#music-modal-backdrop .music-modal-title').textContent = musicTrackTitle(track);
+  persist(); renderMusicPage();
+}
+async function deleteMusicTrack(id) {
+  const track = state.musicTracks.find(item => item.id === id);
+  if (!track || !confirm('"' + musicTrackTitle(track) + '" 트랙을 삭제할까요?' + (track.kind === 'file' ? '\n이 기기에 저장된 음원 파일도 함께 삭제됩니다.' : ''))) return;
+  musicCloseModal();
+  state.musicTracks = state.musicTracks.filter(item => item.id !== id);
+  persist();
+  try { await musicBlobDelete([id]); } catch (e) { console.warn(e); }
+  musicLocalIds.delete(id);
+  if (musicCoverUrls[id]) { URL.revokeObjectURL(musicCoverUrls[id]); delete musicCoverUrls[id]; }
+  renderMusicPage();
+}
+// ── 폴더 ──
+function openMusicFolderModal(folderId) {
+  const folder = state.musicFolders.find(item => item.id === folderId);
+  const color = folder?.color || '';
+  musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">' + (folder ? '폴더 편집' : '새 폴더 만들기') + '</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
+    + '<label class="music-field">이름<input id="music-folder-name" type="text" value="' + esc(folder?.name || '') + '" maxlength="40"></label>'
+    + '<div class="music-field">색상</div><div class="music-palette" data-color="' + color + '">'
+    + '<button type="button" class="music-swatch none' + (!color ? ' on' : '') + '" data-c="" title="무색" onclick="musicPickColor(this)">∅</button>'
+    + MUSIC_COLORS.map(c => '<button type="button" class="music-swatch' + (c.toLowerCase() === color.toLowerCase() ? ' on' : '') + '" data-c="' + c + '" style="background:' + c + '" onclick="musicPickColor(this)"></button>').join('') + '</div>'
+    + '<div class="music-error" id="music-folder-error"></div>'
+    + '<div class="music-modal-foot">' + (folder ? '<button type="button" class="music-danger" onclick="deleteMusicFolder(\'' + folder.id + '\')">삭제</button>' : '<span></span>') + '<button type="button" class="music-primary" onclick="saveMusicFolder(\'' + (folder?.id || '') + '\')">' + (folder ? '저장' : '만들기') + '</button></div>');
+  document.getElementById('music-folder-name').focus();
+}
+function musicPickColor(button) {
+  const palette = button.parentNode;
+  palette.dataset.color = button.dataset.c;
+  palette.querySelectorAll('.music-swatch').forEach(swatch => swatch.classList.toggle('on', swatch === button));
+}
+function saveMusicFolder(folderId) {
+  const name = document.getElementById('music-folder-name').value.trim();
+  const color = document.querySelector('#music-modal-backdrop .music-palette').dataset.color || '';
+  const error = document.getElementById('music-folder-error');
+  if (!name) { error.textContent = '이름을 입력해 주세요.'; return; }
+  if (state.musicFolders.some(folder => folder.id !== folderId && folder.name.toLowerCase() === name.toLowerCase())) { error.textContent = '같은 이름의 폴더가 이미 있습니다.'; return; }
+  if (folderId) { const folder = state.musicFolders.find(item => item.id === folderId); folder.name = name; folder.color = color; }
+  else state.musicFolders.push(normalizeMusicFolder({ name, color }));
+  persist(); musicCloseModal(); renderMusicPage();
+}
+function deleteMusicFolder(folderId) {
+  const folder = state.musicFolders.find(item => item.id === folderId);
+  if (!folder || !confirm("'" + folder.name + "' 폴더를 삭제할까요?\n트랙은 「분류 없음」으로 이동합니다.")) return;
+  state.musicTracks.forEach(track => { if (track.folderId === folderId) track.folderId = ''; });
+  state.musicFolders = state.musicFolders.filter(item => item.id !== folderId);
+  if (musicView.folder === folderId) musicView.folder = 'all';
+  persist(); musicCloseModal(); renderMusicPage();
+}
+// ── 트랙 추가 ──
+function musicAudioDuration(file) {
+  return new Promise(resolve => {
+    const audio = new Audio(), url = URL.createObjectURL(file);
+    const done = value => { URL.revokeObjectURL(url); resolve(value); };
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => done(Number.isFinite(audio.duration) ? audio.duration : 0);
+    audio.onerror = () => done(0);
+    setTimeout(() => done(0), 5000);
+    audio.src = url;
+  });
+}
+function musicIsAudioFile(file) { return MUSIC_AUDIO_EXTS.includes(String(file.name || '').split('.').pop().toLowerCase()); }
+async function musicAddFiles(fileList) {
+  const files = [...fileList].filter(musicIsAudioFile);
+  if (!files.length) { showToast('지원하는 음원 파일(' + MUSIC_AUDIO_EXTS.join(', ') + ')이 없습니다.'); return; }
+  const target = state.musicFolders.some(folder => folder.id === musicView.folder) ? musicView.folder : '';
+  for (const file of files) {
+    const tags = await musicReadTags(file);
+    const track = normalizeMusicTrack({ kind: 'file', title: tags.title || file.name.replace(/\.[^.]+$/, ''), artist: tags.artist, album: tags.album, fileName: file.name, size: file.size, folderId: target, addedAt: Date.now(), duration: await musicAudioDuration(file) });
+    try {
+      await musicBlobPut(track.id, file);
+      if (tags.cover) { const cover = new Blob([tags.cover.bytes], { type: tags.cover.mime }); await musicBlobPut('cover:' + track.id, cover); musicCoverUrls[track.id] = URL.createObjectURL(cover); }
+    } catch (e) { showToast('저장 실패: ' + file.name + ' (' + (e?.message || e) + ')'); continue; }
+    musicLocalIds.add(track.id);
+    state.musicTracks.push(track);
+  }
+  persist(); renderMusicPage();
+}
+function musicPickFiles() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.multiple = true; input.accept = MUSIC_AUDIO_EXTS.map(ext => '.' + ext).join(',');
+  input.onchange = () => musicAddFiles(input.files);
+  input.click();
+}
+function musicReupload(id) {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = MUSIC_AUDIO_EXTS.map(ext => '.' + ext).join(',');
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    await musicBlobPut(id, file);
+    musicLocalIds.add(id);
+    const track = state.musicTracks.find(item => item.id === id);
+    if (track && !track.duration) { track.duration = await musicAudioDuration(file); persist(); }
+    renderMusicPage();
+    if (document.getElementById('music-modal-backdrop')) openMusicDetail(id);
+  };
+  input.click();
+}
+function openMusicYoutubeModal() {
+  musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">유튜브 링크 추가</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
+    + '<label class="music-field">URL<input id="music-yt-url" type="text" placeholder="https://www.youtube.com/watch?v=..." spellcheck="false" onchange="musicFetchYoutube()"></label>'
+    + '<label class="music-field">제목<input id="music-yt-title" type="text" placeholder="자동으로 가져오거나 직접 입력"></label>'
+    + '<label class="music-field">아티스트(채널)<input id="music-yt-artist" type="text"></label>'
+    + '<div class="music-hint" id="music-yt-status">제목·썸네일은 유튜브 oEmbed 로 조회합니다(URL 이 유튜브로 전송됨). 재생은 임베드 플레이어이며 음원 다운로드는 지원하지 않습니다.</div>'
+    + '<div class="music-error" id="music-yt-error"></div>'
+    + '<div class="music-modal-foot"><button type="button" onclick="musicFetchYoutube()">제목 가져오기</button><button type="button" class="music-primary" onclick="musicAddYoutube()">추가</button></div>');
+  document.getElementById('music-yt-url').focus();
+}
+async function musicFetchYoutube() {
+  const url = document.getElementById('music-yt-url').value, id = musicParseYoutubeId(url), status = document.getElementById('music-yt-status');
+  if (!id) { document.getElementById('music-yt-error').textContent = '유튜브 링크를 알아볼 수 없습니다.'; return; }
+  document.getElementById('music-yt-error').textContent = '';
+  status.textContent = '조회 중...';
+  try {
+    const res = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!document.getElementById('music-yt-title').value) document.getElementById('music-yt-title').value = data.title || '';
+    if (!document.getElementById('music-yt-artist').value) document.getElementById('music-yt-artist').value = data.author_name || '';
+    status.textContent = '제목을 가져왔습니다.';
+  } catch (e) { status.textContent = '제목을 가져오지 못했습니다. 직접 입력해 주세요. (' + (e?.message || e) + ')'; }
+}
+function musicAddYoutube() {
+  const id = musicParseYoutubeId(document.getElementById('music-yt-url').value);
+  if (!id) { document.getElementById('music-yt-error').textContent = '유튜브 링크를 알아볼 수 없습니다.'; return; }
+  const target = state.musicFolders.some(folder => folder.id === musicView.folder) ? musicView.folder : '';
+  state.musicTracks.push(normalizeMusicTrack({ kind: 'youtube', youtubeId: id, url: 'https://www.youtube.com/watch?v=' + id, thumbnail: 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg', title: document.getElementById('music-yt-title').value.trim() || '유튜브 ' + id, artist: document.getElementById('music-yt-artist').value.trim(), folderId: target, addedAt: Date.now() }));
+  persist(); musicCloseModal(); renderMusicPage();
+}
+// 페이지에 파일 끌어 놓기
+document.addEventListener('dragover', event => { if (currentPage === 'music' && event.dataTransfer?.types?.includes('Files')) event.preventDefault(); });
+document.addEventListener('drop', event => {
+  if (currentPage !== 'music' || !event.dataTransfer?.files?.length) return;
+  event.preventDefault();
+  musicAddFiles(event.dataTransfer.files);
+});
 const BOOKMARK_META_JINA_URL = 'https://r.jina.ai/';
 const BOOKMARK_META_SERVICE_URL = 'https://api.microlink.io/';
 const BOOKMARK_META_SERVICE_NOTICE = '이 URL이 외부 조회 서비스(jina / microlink)로 전송됩니다.';
@@ -36908,6 +37396,7 @@ const CSS_MACRO_PAGE_LABELS = {
   script: 'SCRIPT',
   'css-macro': 'CSS MACRO',
   bookmark: 'BOOKMARK',
+  music: 'MUSIC',
   scenario: 'SCENARIO',
   record: 'RECORD',
   rulebook: 'RULEBOOK',
@@ -37028,6 +37517,7 @@ const CSS_MACRO_PAGE_TITLES = {
   record: '세션 기록',
   'css-macro': 'CSS 매크로',
   bookmark: '북마크',
+  music: '음악',
   rulebook: '룰북',
   character: 'CHARACTER',
   datasheet: '데이터 시트',
@@ -37079,6 +37569,7 @@ function switchPage(page) {
   document.getElementById('page-record-timeline').style.display = recordTimelineId ? 'flex' : 'none';
   document.getElementById('page-css-macro').style.display = page === 'css-macro' ? 'flex' : 'none';
   document.getElementById('page-bookmark').style.display = page === 'bookmark' ? 'flex' : 'none';
+  document.getElementById('page-music').style.display = page === 'music' ? 'flex' : 'none';
   document.getElementById('page-rulebook').style.display = page === 'rulebook' ? 'flex' : 'none';
   document.getElementById('page-character').style.display = page === 'character' ? 'flex' : 'none';
   document.getElementById('ch-sheet-backdrop').classList.toggle('open', !!characterSheetId);
@@ -37106,6 +37597,7 @@ function switchPage(page) {
     refreshCssMacroTextareaHeights(document.getElementById('page-css-macro') || document);
   }
   if (page === 'bookmark') renderBookmarkPage();
+  if (page === 'music') { renderMusicPage(); musicLoadLocal().then(() => { if (currentPage === 'music') renderMusicPage(); }); }
   if (page === 'rulebook') {
     try {
       renderRulebookPage();
