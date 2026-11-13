@@ -28689,7 +28689,8 @@ function tbDeleteBulletImage(id) {
   persist();
   tbRefreshBulletImageStyles();
 }
-const TB_PRESET_BULLETS = [TB_DEFAULT_BULLET, '-'];
+const TB_SMALL_BULLET = '∙'; // 작은 원형(#236): 글꼴 측정상 •의 약 45% 크기, 세로 중심은 •와 나눔명조 • 사이
+const TB_PRESET_BULLETS = [TB_DEFAULT_BULLET, TB_SMALL_BULLET, '-'];
 // 이미지 글머리는 '<img>id' 토큰(사용자가 칠 수 없는 <> 포함)으로 다룬다. CE 에서는 ul[data-tb-bullet="image"][data-tb-bullet-img=id], 입력칸(textarea)에서는 문자(⛤ / ●)로 들어간다.
 function tbBulletKind(symbol) {
   return symbol === TB_DEFAULT_BULLET ? 'default' : (String(symbol || '').startsWith(TB_IMG_BULLET_PREFIX) ? 'image' : 'custom');
@@ -28964,7 +28965,7 @@ function tbRemoveCEBullet(root, sourceRange) {
   return true;
 }
 function tbBulletPrefixes() {
-  return [TB_DEFAULT_BULLET, '-', '⛤', '●', ...tbGetCustomBulletSymbols()].filter(Boolean).sort((a, b) => b.length - a.length);
+  return [TB_DEFAULT_BULLET, TB_SMALL_BULLET, '-', '⛤', '●', ...tbGetCustomBulletSymbols()].filter(Boolean).sort((a, b) => b.length - a.length);
 }
 function tbTextBulletLines(root, start, end) {
   const lineStart = root.value.lastIndexOf('\n', start - 1) + 1;
@@ -29049,7 +29050,7 @@ function tbOpenBulletMenu(button) {
       const preset = document.createElement('button');
       preset.type = 'button';
       preset.className = 'tb-bullet-preset';
-      const label = (symbol === TB_DEFAULT_BULLET ? '기본 글머리 ' : '글머리 ') + symbol;
+      const label = symbol === TB_SMALL_BULLET ? '작은 원형 글머리' : (symbol === TB_DEFAULT_BULLET ? '기본 글머리 ' : '글머리 ') + symbol;
       preset.title = label;
       preset.setAttribute('aria-label', label);
       const symbolEl = document.createElement('span');

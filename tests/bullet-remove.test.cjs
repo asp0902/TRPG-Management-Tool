@@ -16,9 +16,9 @@ assert.match(html, /tbCEListSymbolMatches\(currentList, symbol\)\) return tbRemo
 const start = html.indexOf('function tbBulletPrefixes()');
 const end = html.indexOf('// 메뉴의 「글머리 해제」 활성 여부');
 assert.ok(start > 0 && end > start);
-const ctx = { TB_DEFAULT_BULLET: '•', tbGetCustomBulletSymbols: () => ['★', '→→'] };
+const ctx = { TB_DEFAULT_BULLET: '•', TB_SMALL_BULLET: '∙', tbGetCustomBulletSymbols: () => ['★', '→→'] };
 vm.runInNewContext(`${html.slice(start, end)}\nthis.strip = tbStripBulletPrefix;`, ctx);
-for (const [input, expected] of [['• 하나', '하나'], ['- 둘', '둘'], ['⛤ 셋', '셋'], ['● 넷', '넷'], ['★ 다섯', '다섯'], ['→→ 여섯', '여섯'], ['그냥', '그냥'], ['-없음', '-없음'], ['•붙음', '•붙음']]) {
+for (const [input, expected] of [['• 하나', '하나'], ['- 둘', '둘'], ['⛤ 셋', '셋'], ['● 넷', '넷'], ['∙ 작은', '작은'], ['★ 다섯', '다섯'], ['→→ 여섯', '여섯'], ['그냥', '그냥'], ['-없음', '-없음'], ['•붙음', '•붙음']]) {
   assert.equal(ctx.strip(input), expected, input);
 }
 console.log('bullet remove checks: OK');

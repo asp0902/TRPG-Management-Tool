@@ -21,3 +21,8 @@ assert.match(html, /#cp-native \{[\s\S]*?width: 28px; height: 28px;[\s\S]*?box-s
 assert.match(html, /\.cp-icon-btn \{[\s\S]*?width: 28px; height: 28px; box-sizing: border-box/);
 
 console.log('custom bullet and square color control checks: OK');
+// #236: 작은 원형 글머리(∙)는 • 바로 다음 프리셋, 입력칸 인식 목록에도 포함
+assert.ok(html.includes("const TB_PRESET_BULLETS = [TB_DEFAULT_BULLET, TB_SMALL_BULLET, '-'];"));
+assert.ok(html.includes("[TB_DEFAULT_BULLET, TB_SMALL_BULLET, '-', '"));
+assert.ok(html.includes("'작은 원형 글머리'"));
+console.log('small bullet checks: OK');
