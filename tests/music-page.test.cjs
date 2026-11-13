@@ -15,7 +15,7 @@ vm.runInNewContext(html.slice(a, b) + '\nthis.f = normalizeMusicFolder; this.t =
 
 // 정규화: 메타데이터에 Blob 류 값이 들어오지 않는다
 const t = ctx.t({ id: 'x', kind: 'file', title: 'T', blob: 'BIG', cover: 'data:image/png;base64,AAAA', duration: 61.2, tags: '#a #b' });
-assert.deepEqual(Object.keys(t).sort(), ['addedAt', 'album', 'artist', 'duration', 'fileName', 'folderId', 'id', 'kind', 'notes', 'size', 'tags', 'thumbnail', 'title', 'url', 'youtubeId'].sort());
+assert.deepEqual(Object.keys(t).sort(), ['addedAt', 'album', 'attached', 'artist', 'duration', 'fileName', 'folderId', 'id', 'kind', 'notes', 'size', 'tags', 'thumbnail', 'title', 'url', 'youtubeId'].sort());
 assert.ok(!JSON.stringify(t).includes('BIG') && !JSON.stringify(t).includes('data:image'));
 assert.equal(ctx.f({ name: 'F', color: 'red' }).color, '');
 assert.equal(ctx.f({ name: 'F', color: '#AABBCC' }).color, '#AABBCC');
@@ -37,6 +37,16 @@ const r = ctx.id3(tag, TextDecoder);
 assert.equal(r.title, '안녕'); assert.equal(r.artist, 'Artist'); assert.equal(r.album, '앨범');
 assert.equal(r.cover.mime, 'image/png'); assert.deepEqual([...r.cover.bytes], [1, 2, 3, 4]);
 assert.equal(JSON.stringify(ctx.id3(Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), TextDecoder)), JSON.stringify({ title: '', artist: '', album: '', cover: null }));
+
+// #257: 유튜브 트랙의 파일 첨부(메타데이터는 여부만). 파일 트랙에는 attached 가 없다.
+assert.equal(ctx.t({ kind: 'youtube', attached: true, fileName: 'a.mp3' }).attached, true);
+assert.equal(ctx.t({ kind: 'youtube' }).attached, false);
+assert.equal(ctx.t({ kind: 'file', attached: true }).attached, false);
+// 첨부 파일 URL 이 있으면 유튜브 트랙도 audio, 없으면(다른 기기·유튜브 전환) iframe
+assert.ok(ctx.html({ kind: 'youtube', youtubeId: 'dQw4w9WgXcQ', attached: true }, 'blob:x').includes('<audio'));
+assert.ok(ctx.html({ kind: 'youtube', youtubeId: 'dQw4w9WgXcQ', attached: true }, '').includes('<iframe'));
+['async function musicAttachFile', 'async function musicDetach', 'music-card-file', 'musicCardDrop(event,'].forEach(k => assert.ok(html.includes(k), k));
+assert.ok(!fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').includes(String.fromCharCode(13, 13, 10)), 'CR 중복 없음');
 
 // 연결: 내비·페이지·동기화 키(메타데이터만), Blob 저장소는 별도 DB
 assert.ok(html.includes('data-page="music"') && html.includes('<div id="page-music">'));
