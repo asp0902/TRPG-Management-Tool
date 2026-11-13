@@ -11,3 +11,8 @@ assert.ok(html.includes('grid.innerHTML = pinnedFirst.map('));
 assert.ok(html.includes("onclick=\"event.stopPropagation();toggleBookmarkPin('${bookmark.id}')\""));
 assert.ok(html.includes('aria-pressed="${bookmark.pinned'));
 console.log('bookmark pin checks: OK');
+// #245: 핀 색 — 고정·hover 는 #ef4444, 평소 회색(#aaa)은 그대로
+assert.ok(html.includes('.bookmark-pin-btn:hover { color: #ef4444; }'));
+assert.ok(html.includes('.bookmark-pin-btn[aria-pressed="true"] { opacity: 1; color: #ef4444;'));
+assert.ok(html.includes('background: rgba(255,255,255,0.85); color: #aaa;'));
+console.log('bookmark pin color checks: OK');
