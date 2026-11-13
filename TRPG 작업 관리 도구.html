@@ -1653,6 +1653,8 @@ tr.ct-row-end .ct-select:focus {
 .mcs-opts label { display: inline-flex; gap: 4px; align-items: center; white-space: nowrap; }
 .mcs-opts .mcs-bg-hex { width: 76px; }
 .mcs-error { color: #d33; min-height: 14px; }
+.mcs-note { font-size: 11px; color: #888; }
+.css-macro-preview-warn { display: block; margin-top: 6px; font-size: 10px; color: #999; font-family: sans-serif; white-space: normal; }
 .mcs-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .mcs-actions .mcs-insert { background: #111; color: #fff; border-color: #111; }
 .mcs-actions .mcs-insert:disabled { opacity: 0.4; cursor: default; }
@@ -32188,44 +32190,42 @@ document.addEventListener('drop', async event => {
   for (const file of images) await insertMacroImage(ta, file); // 여러 장은 차례로, 각각 한 줄씩
 }, true);
 // ── 「색 나눔 한 줄」 생성 도구(#249) ──
-// 코코포리아는 조각에 width:auto; margin:0 등을 강제하고 조각끼리 감쌀 수 없다. 그래서 글자를 조각 하나로 합치고 색을 하드 스톱 그라데이션 + background-clip:text 로 나눈다.
-// 경계는 글자 폭을 canvas 로 재서 calc(50% ± Npx) 로 만든다. 경계는 간격 문자의 한가운데(간격이 없으면 조각 끝)에 둔다.
-// opts: { pieces:[{text,color}], gap:'' | ' ' | '　', size, bold, italic, bg:'#000000'|'' , pad }, measure(text) → px. 반환: { macro } 또는 { error }.
+// 코코포리아는 조각에 width:auto; margin:0 등을 강제하고 조각끼리 감쌀 수 없으며 background-clip:text 도 적용하지 않는다(#252).
+// 그래서 색마다 display:inline 조각을 만들고, 글자 폭(canvas)으로 첫 조각 padding-left / 마지막 조각 padding-right 를 calc(50% - Npx) 로 잡아 한 줄을 가운데에 맞춘다.
+// opts: { pieces:[{text,color}], gap:'' | ' ' | '　', size, bold, italic, bg:'#000000'|'' }, measure(text) → px. 반환: { macro, total, half } 또는 { error }.
 function buildColorSplitMacro(opts, measure) {
   const pieces = (opts.pieces || []).filter(piece => String(piece.text || '') !== '');
   if (!pieces.length) return { error: '조각의 글자를 입력해 주세요.' };
   if (pieces.some(piece => /[\[\]\r\n]/.test(piece.text))) return { error: '글자에 [ ] 와 줄바꿈은 쓸 수 없습니다(매크로 문법이 깨집니다).' };
   const isHex = value => /^#[0-9a-f]{3,8}$/i.test(String(value || ''));
   if (pieces.some(piece => !isHex(piece.color)) || (opts.bg && !isHex(opts.bg))) return { error: '색은 #RRGGBB 형식으로 입력해 주세요.' };
+  // 코코포리아는 background-clip:text 를 적용하지 않으므로 색마다 display:inline 조각으로 나눈다(#252).
+  // 간격 문자는 다음 조각의 앞에 붙인다(조각 경계에서 줄바꿈이 생기지 않게).
   const gap = String(opts.gap || '');
-  const gapW = gap ? measure(gap) : 0;
-  const widths = pieces.map(piece => measure(piece.text));
-  const total = widths.reduce((sum, w) => sum + w, 0) + gapW * (pieces.length - 1);
-  const bounds = [];
-  let x = 0;
-  pieces.forEach((piece, index) => {
-    x += widths[index];
-    if (index < pieces.length - 1) { bounds.push(x + gapW / 2); x += gapW; }
-  });
-  const at = value => {
-    const offset = Math.round(value - total / 2);
-    return offset === 0 ? '50%' : 'calc(50% ' + (offset < 0 ? '- ' : '+ ') + Math.abs(offset) + 'px)';
-  };
-  const edge = bounds.map(at);
+  const texts = pieces.map((piece, index) => (index ? gap : '') + piece.text);
+  const total = texts.reduce((sum, text) => sum + measure(text), 0);
+  const half = Math.ceil(total / 2);
   const size = Math.max(6, Math.min(72, Number(opts.size) || 13));
-  const pad = Math.max(0, Math.min(200, Number(opts.pad) || 0));
-  let style = 'display:block; text-align:center; padding:0 ' + pad + 'px; text-decoration:none; font-style:' + (opts.italic ? 'italic' : 'normal')
-    + '; font-weight:' + (opts.bold ? 'bold' : 'normal') + '; font-size:' + size + 'px;';
-  if (pieces.length === 1) {
-    style += ' color:' + pieces[0].color + ';' + (opts.bg ? ' background:' + opts.bg + ';' : '');
-  } else {
-    const stops = pieces.map((piece, index) => piece.color + (index === 0 ? ' ' + edge[0] : index === pieces.length - 1 ? ' ' + edge[index - 1] : ' ' + edge[index - 1] + ' ' + edge[index]));
-    style += ' background:linear-gradient(90deg, ' + stops.join(', ') + ')' + (opts.bg ? ', linear-gradient(' + opts.bg + ', ' + opts.bg + ')' : '') + ';'
-      + ' -webkit-background-clip:text' + (opts.bg ? ', border-box' : '') + '; background-clip:text' + (opts.bg ? ', border-box' : '') + ';'
-      + ' color:transparent !important; -webkit-text-fill-color:transparent;';
-  }
-  const text = pieces.map(piece => piece.text).join(gap);
-  return { macro: '[' + text + '](#" style=" ' + style + ')', total, bounds };
+  const bg = opts.bg || '';
+  const last = pieces.length - 1;
+  const macro = pieces.map((piece, index) => {
+    const parts = [];
+    if (!last) { // 조각이 하나면 측정 없이 가운데 정렬
+      parts.push('display:block; text-align:center;');
+      if (bg) parts.push('background:' + bg + ';', 'padding:4px 0;');
+    } else {
+      parts.push('display:inline;');
+      if (bg) parts.push('background:' + bg + ';');
+      const padLeft = index === 0 ? 'calc(50% - ' + half + 'px)' : '0';
+      const padRight = index === last ? 'calc(50% - ' + (half + 8) + 'px)' : '0'; // 오른쪽을 8px 짧게 잡아 실제 글자가 더 넓어도 줄이 꺾이지 않게
+      if (bg) parts.push('padding:4px ' + padRight + ' 4px ' + padLeft + ';');
+      else if (index === 0 || index === last) parts.push('padding:0 ' + padRight + ' 0 ' + padLeft + ';');
+      if (bg && index === last) parts.push('box-shadow:8px 0 0 ' + bg + ';'); // 줄인 8px 은 그림자로 채운다
+    }
+    parts.push('text-decoration:none;', 'color:' + piece.color + ' !important;', 'font-style:' + (opts.italic ? 'italic' : 'normal') + ';', 'font-weight:' + (opts.bold ? 'bold' : 'normal') + ';', 'font-size:' + size + 'px;');
+    return '[' + texts[index] + '](#" style=" ' + parts.join(' ') + ')';
+  }).join('');
+  return { macro, total, half };
 }
 const colorSplitCanvas = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
 function colorSplitMeasurer(opts) {
@@ -32238,7 +32238,7 @@ function colorSplitReadOpts() {
   const rows = [...box.querySelectorAll('.mcs-row')].map(row => ({ text: row.querySelector('.mcs-text').value, color: row.querySelector('.mcs-hex').value.trim() }));
   const noBg = box.querySelector('.mcs-nobg').checked;
   return { pieces: rows, gap: box.querySelector('.mcs-gap').value, size: box.querySelector('.mcs-size').value, bold: box.querySelector('.mcs-weight').value === 'bold',
-    italic: box.querySelector('.mcs-italic').checked, bg: noBg ? '' : box.querySelector('.mcs-bg-hex').value.trim(), pad: box.querySelector('.mcs-pad').value };
+    italic: box.querySelector('.mcs-italic').checked, bg: noBg ? '' : box.querySelector('.mcs-bg-hex').value.trim() };
 }
 async function colorSplitRefresh() {
   const box = document.getElementById('color-split-dialog');
@@ -32292,8 +32292,8 @@ function openColorSplitDialog(button) {
     + '<label><input class="mcs-italic" type="checkbox" onchange="colorSplitRefresh()"> 기울임</label>'
     + '<label>배경 <input class="mcs-bg" type="color" value="#000000" oninput="this.nextElementSibling.value=this.value;colorSplitRefresh()"><input class="mcs-bg-hex" type="text" value="#000000" spellcheck="false" oninput="if(/^#[0-9a-f]{6}$/i.test(this.value))this.previousElementSibling.value=this.value;colorSplitRefresh()"></label>'
     + '<label><input class="mcs-nobg" type="checkbox" onchange="colorSplitRefresh()"> 배경 없음</label>'
-    + '<label>좌우 여백 <input class="mcs-pad" type="number" min="0" max="200" value="16" oninput="colorSplitRefresh()">px</label>'
     + '</div>'
+    + '<div class="mcs-note">치우치면 첫 조각의 padding-left 와 마지막 조각의 padding-right 숫자를 같은 만큼 조정하세요. 측정은 이 PC 글꼴 기준이라 코코포리아와 몇 px 다를 수 있습니다.</div>'
     + '<div class="mcs-error"></div>'
     + '<div class="css-macro-preview-chatbox"><div class="css-macro-preview-body mcs-preview"></div></div>'
     + '<div class="mcs-actions"><button type="button" onclick="closeColorSplitDialog()">취소</button><button type="button" class="mcs-insert" onclick="insertColorSplitMacro()">넣기</button></div>'
@@ -35305,6 +35305,7 @@ function tryParseCssMacroToken(source, startIdx) {
 }
 // 코코포리아 채팅(CCFOLIA 1.37.4, Win Chrome, 창 1278px) 실측값. PREVIEW 의 배경·폭·기본 글자·조각 span 보정이 모두 여기서 나온다.
 // 실측 범위: -webkit-text-stroke 는 무효, font-weight 800 은 400 으로 표시, bold/700 은 유지(그 밖의 값은 측정하지 않아 건드리지 않는다).
+// background-clip:text(-webkit- 포함)는 적용되지 않고(#252), 글자가 완전히 빈 [] 조각은 그려지지 않는다([ ] 는 그려진다).
 const CCFOLIA_PREVIEW = {
   bg: 'rgba(44,44,44,0.87)',
   contentWidth: 328,
@@ -35619,6 +35620,7 @@ function cssMacroPreviewSpanStyle(style, isDesc = false) {
     const prop = decl.slice(0, colon).trim().toLowerCase();
     const value = decl.slice(colon + 1).trim().toLowerCase();
     if (CCFOLIA_PREVIEW.blockedProps.some(blocked => prop.startsWith(blocked))) return false;
+    if (/^(?:-webkit-)?background-clip$/.test(prop) && /\btext\b/.test(value)) return false; // 실제 코코포리아에서 적용되지 않는다(#252)
     if (isDesc && CCFOLIA_PREVIEW.desc.blockedProps.some(blocked => prop.startsWith(blocked))) return false;
     return !(CCFOLIA_PREVIEW.blockedValues[prop] || []).includes(value);
   });
@@ -35664,6 +35666,12 @@ function replaceCssMacroPreviewTokens(source, options = {}) {
       continue;
     }
     parsedToken = true;
+    if (token.text === '') { // 글자가 완전히 빈 조각은 실제 코코포리아에서 그려지지 않는다(#252). 공백이 있는 [ ] 는 아래에서 그대로 그린다.
+      cursor = token.end;
+      const skipNote = input.slice(cursor).match(/^[ \t]*@[^\r\n]*/);
+      if (skipNote) { cursor += skipNote[0].length; flush(); }
+      continue;
+    }
     const styleAttr = ` style="${esc(cssMacroPreviewSpanStyle(token.style, isDesc))}"`;
     const text = esc(token.text.trim() ? token.text : '\u00a0');
     if (token.href) { // 링크 토큰은 합치지 않고 <a> 로 낸다
@@ -35725,7 +35733,17 @@ function sanitizeCssMacroPreviewHtml(value) {
   });
   return wrap.innerHTML;
 }
+// 코코포리아에서 적용되지 않는 서식(background-clip:text, 빈 [] 조각)이 있으면 미리보기 아래에 경고 한 줄을 붙인다(#252). 롤20 미리보기는 그대로.
 function renderCssMacroPreviewHtml(value) {
+  const html = renderCssMacroPreviewHtmlCore(value);
+  const raw = String(value || '');
+  if (!raw.trim() || isRoll20Macro(raw)) return html;
+  const found = [];
+  if (/(?:-webkit-)?background-clip\s*:[^;)]*\btext\b/i.test(raw)) found.push('background-clip:text');
+  if (/\[\]\(\s*<?#"/.test(raw)) found.push('빈 조각 []');
+  return found.length ? html + '<span class="css-macro-preview-warn">코코포리아에서 적용되지 않는 서식이 있습니다: ' + found.join(' / ') + '</span>' : html;
+}
+function renderCssMacroPreviewHtmlCore(value) {
   const raw = String(value || '').replace(/\r\n?/g, '\n');
   if (!raw.trim()) {
     return `<span class="css-macro-preview-placeholder">매크로를 입력하면 여기에 미리보기가 표시됩니다.</span>`;
