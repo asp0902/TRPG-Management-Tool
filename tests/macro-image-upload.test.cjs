@@ -50,3 +50,10 @@ console.log('macro image input checks: OK');
 const ins = html.slice(html.indexOf('async function insertMacroImage'), html.indexOf('function pickMacroImage'));
 assert.ok(!ins.includes('confirm(') && !html.includes('MACRO_IMAGE_NOTICE_KEY'));
 console.log('macro image no confirm checks: OK');
+// #248: 카드·인트로·페이지 단위 이미지 드롭, Files 일 때만 개입
+assert.ok(html.includes("const zone = el?.closest?.('.css-macro-card, .intro-split-wrap');"));
+assert.ok(html.includes("macroDropHasFiles = event => [...(event.dataTransfer?.types || [])].includes('Files')"));
+assert.ok(html.includes('이미지를 넣을 매크로 카드 위에 놓아 주세요'));
+assert.ok(html.includes('for (const file of images) await insertMacroImage(ta, file);'));
+assert.ok(html.includes('.css-macro-card.macro-drop-over, .intro-split-wrap.macro-drop-over {'));
+console.log('macro image drop zone checks: OK');

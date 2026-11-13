@@ -2352,6 +2352,7 @@ tr.ct-row-end .ct-select:focus {
 #bookmark-tag-popover button.bookmark-card-tag:hover { background: #e5e7eb; }
 .bookmark-attach-box { border: 1px solid #e4e4e4; border-radius: 10px; padding: 8px 10px; max-height: 32vh; overflow-y: auto; box-sizing: border-box; background: #fff; }
 .bookmark-modal.drop-over { outline: 2px dashed #4a9eff; outline-offset: -4px; }
+.css-macro-card.macro-drop-over, .intro-split-wrap.macro-drop-over { outline: 2px dashed #4a9eff; outline-offset: -4px; } /* 이미지 드롭 표시(#248) */
 .bookmark-card-btn.del:hover {
   background: #fff2f2;
   color: #ef4444;
@@ -31875,15 +31876,59 @@ document.addEventListener('paste', event => {
   event.preventDefault(); event.stopPropagation();
   insertMacroImage(ta, file);
 }, true);
-document.addEventListener('dragover', event => {
-  if (event.target?.closest?.(MACRO_IMAGE_TARGET) && [...(event.dataTransfer?.types || [])].includes('Files')) event.preventDefault();
-});
-document.addEventListener('drop', event => {
+// 끌어다 놓기(#248): 카드·인트로 블록 안 어디에 놓아도 그 입력칸에 넣는다. 페이지 빈 곳은 마지막으로 포커스한 입력칸에 넣거나 안내만 한다.
+// dataTransfer.types 에 Files 가 있을 때만 개입해서 블록·필드 끌어다 놓기 같은 기존 드래그는 건드리지 않는다.
+let lastMacroImageTA = null;
+let macroDropEl = null;
+document.addEventListener('focusin', event => {
   const ta = event.target?.closest?.(MACRO_IMAGE_TARGET);
-  const file = ta && [...(event.dataTransfer?.files || [])].find(item => /^image\//i.test(item.type));
-  if (!file) return;
-  event.preventDefault(); event.stopPropagation();
-  insertMacroImage(ta, file);
+  if (ta) lastMacroImageTA = ta;
+});
+function macroDropZone(target) {
+  const el = target?.closest ? target : target?.parentElement;
+  const zone = el?.closest?.('.css-macro-card, .intro-split-wrap');
+  if (zone) return { zone, page: false };
+  return el?.closest?.('#page-css-macro') ? { zone: null, page: true } : null;
+}
+function setMacroDropEl(el) {
+  if (macroDropEl === el) return;
+  macroDropEl?.classList.remove('macro-drop-over');
+  macroDropEl = el;
+  macroDropEl?.classList.add('macro-drop-over');
+}
+const macroDropHasFiles = event => [...(event.dataTransfer?.types || [])].includes('Files');
+document.addEventListener('dragover', event => {
+  if (!macroDropHasFiles(event)) return;
+  const hit = macroDropZone(event.target);
+  if (!hit) { setMacroDropEl(null); return; }
+  event.preventDefault();
+  setMacroDropEl(hit.zone);
+}, true);
+document.addEventListener('dragleave', event => {
+  if (macroDropEl && !macroDropEl.contains(event.relatedTarget)) setMacroDropEl(null);
+}, true);
+document.addEventListener('drop', async event => {
+  if (!macroDropHasFiles(event)) return;
+  const hit = macroDropZone(event.target);
+  setMacroDropEl(null);
+  if (!hit) return;
+  event.preventDefault(); event.stopPropagation(); // 브라우저가 파일을 여는 것을 막는다
+  const all = [...(event.dataTransfer?.files || [])];
+  const images = all.filter(file => /^image\//i.test(file.type));
+  if (!images.length) { if (all.length) showToast('이미지 파일만 넣을 수 있습니다.'); return; }
+  let ta = null;
+  if (hit.zone?.classList.contains('css-macro-card')) {
+    ta = hit.zone.querySelector('.css-macro-textarea');
+    const body = hit.zone.querySelector('.css-macro-card-body');
+    if (body && !body.classList.contains('open')) toggleCssMacroPreview(hit.zone.dataset.cssMacroId, hit.zone.querySelector('.css-macro-card-toggle')); // 접힌 카드는 펼친다
+  } else if (hit.zone) {
+    ta = hit.zone.querySelector('.intro-macro-ta');
+  } else if (lastMacroImageTA?.isConnected && lastMacroImageTA.closest('#page-css-macro')) {
+    ta = lastMacroImageTA;
+  }
+  if (!ta) { showToast('이미지를 넣을 매크로 카드 위에 놓아 주세요'); return; }
+  if (ta !== document.activeElement && ta !== lastMacroImageTA) { const end = ta.value.length; ta.setSelectionRange(end, end); } // 커서 위치가 없으면 본문 끝
+  for (const file of images) await insertMacroImage(ta, file); // 여러 장은 차례로, 각각 한 줄씩
 }, true);
 async function fetchGitHubBlob(path) {
   const response = await githubSyncRequest(`${githubContentsUrl(path)}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}&raw=1`, { headers: { Accept: 'application/vnd.github.raw+json' } });
