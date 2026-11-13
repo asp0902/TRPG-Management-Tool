@@ -1655,6 +1655,7 @@ tr.ct-row-end .ct-select:focus {
 .mcs-opts .mcs-bg-hex { width: 76px; }
 .mcs-error { color: #d33; min-height: 14px; }
 .mcs-note { font-size: 11px; color: #888; }
+.mcs-shift { min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
 .css-macro-preview-warn { display: block; margin-top: 6px; font-size: 10px; color: #999; font-family: sans-serif; white-space: normal; }
 .mcs-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .mcs-actions .mcs-insert { background: #111; color: #fff; border-color: #111; }
@@ -32192,8 +32193,9 @@ document.addEventListener('drop', async event => {
 }, true);
 // ── 「색 나눔 한 줄」 생성 도구(#249) ──
 // 코코포리아는 조각에 width:auto; margin:0 등을 강제하고 조각끼리 감쌀 수 없으며 background-clip:text 도 적용하지 않는다(#252).
-// 그래서 색마다 display:inline 조각을 만들고, 글자 폭(canvas)으로 첫 조각 padding-left / 마지막 조각 padding-right 를 calc(50% - Npx) 로 잡아 한 줄을 가운데에 맞춘다.
-// opts: { pieces:[{text,color}], gap:'' | ' ' | '　', size, bold, italic, bg:'#000000'|'' }, measure(text) → px. 반환: { macro, total, half } 또는 { error }.
+// 그래서 색마다 display:inline 조각을 만들고, 글자 폭(canvas)으로 첫 조각 padding-left / 마지막 조각 padding-right 를 % 로 잡아 한 줄을 가운데에 맞춘다(#254).
+// L = (W − 글자폭×k)/2 / W × 100 + 이동값, R = L − 2×이동값 − 0.4 (오른쪽을 0.4% 짧게 잡고 box-shadow 2px 로 메운다). 소수 1자리, 0 미만은 0.
+// opts: { pieces:[{text,color}], gap:'' | ' ' | '　', size, bold, italic, bg:'#000000'|'' , width:W(px, 기본 328), scale:k(%, 기본 100), shift:이동값(%, 기본 0) }, measure(text) → px. 반환: { macro, total, left, right } 또는 { error }.
 function buildColorSplitMacro(opts, measure) {
   const pieces = (opts.pieces || []).filter(piece => String(piece.text || '') !== '');
   if (!pieces.length) return { error: '조각의 글자를 입력해 주세요.' };
@@ -32205,7 +32207,12 @@ function buildColorSplitMacro(opts, measure) {
   const gap = String(opts.gap || '');
   const texts = pieces.map((piece, index) => (index ? gap : '') + piece.text);
   const total = texts.reduce((sum, text) => sum + measure(text), 0);
-  const half = Math.ceil(total / 2);
+  const width = Number(opts.width) > 0 ? Number(opts.width) : 328;
+  const scale = Number(opts.scale) > 0 ? Number(opts.scale) / 100 : 1;
+  const shift = Number(opts.shift) || 0;
+  const pct = value => Math.max(0, Math.round(value * 10) / 10);
+  const left = (width - total * scale) / 2 / width * 100 + shift;
+  const leftText = pct(left) + '%', rightText = pct(left - 2 * shift - 0.4) + '%';
   const size = Math.max(6, Math.min(72, Number(opts.size) || 13));
   const bg = opts.bg || '';
   const last = pieces.length - 1;
@@ -32217,16 +32224,16 @@ function buildColorSplitMacro(opts, measure) {
     } else {
       parts.push('display:inline;');
       if (bg) parts.push('background:' + bg + ';');
-      const padLeft = index === 0 ? 'calc(50% - ' + half + 'px)' : '0';
-      const padRight = index === last ? 'calc(50% - ' + (half + 8) + 'px)' : '0'; // 오른쪽을 8px 짧게 잡아 실제 글자가 더 넓어도 줄이 꺾이지 않게
+      const padLeft = index === 0 ? leftText : '0';
+      const padRight = index === last ? rightText : '0'; // 오른쪽을 0.4% 짧게 잡아 줄이 꺾이지 않게
       if (bg) parts.push('padding:4px ' + padRight + ' 4px ' + padLeft + ';');
       else if (index === 0 || index === last) parts.push('padding:0 ' + padRight + ' 0 ' + padLeft + ';');
-      if (bg && index === last) parts.push('box-shadow:8px 0 0 ' + bg + ';'); // 줄인 8px 은 그림자로 채운다
+      if (bg && index === last) parts.push('box-shadow:2px 0 0 ' + bg + ';'); // 줄인 만큼은 그림자로 채운다
     }
     parts.push('text-decoration:none;', 'color:' + piece.color + ' !important;', 'font-style:' + (opts.italic ? 'italic' : 'normal') + ';', 'font-weight:' + (opts.bold ? 'bold' : 'normal') + ';', 'font-size:' + size + 'px;');
     return '[' + texts[index] + '](#" style=" ' + parts.join(' ') + ')';
   }).join('');
-  return { macro, total, half };
+  return { macro, total, left: pct(left), right: pct(left - 2 * shift - 0.4) };
 }
 const colorSplitCanvas = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
 function colorSplitMeasurer(opts) {
@@ -32239,7 +32246,17 @@ function colorSplitReadOpts() {
   const rows = [...box.querySelectorAll('.mcs-row')].map(row => ({ text: row.querySelector('.mcs-text').value, color: row.querySelector('.mcs-hex').value.trim() }));
   const noBg = box.querySelector('.mcs-nobg').checked;
   return { pieces: rows, gap: box.querySelector('.mcs-gap').value, size: box.querySelector('.mcs-size').value, bold: box.querySelector('.mcs-weight').value === 'bold',
-    italic: box.querySelector('.mcs-italic').checked, bg: noBg ? '' : box.querySelector('.mcs-bg-hex').value.trim() };
+    italic: box.querySelector('.mcs-italic').checked, bg: noBg ? '' : box.querySelector('.mcs-bg-hex').value.trim(),
+    width: box.querySelector('.mcs-width').value, scale: box.querySelector('.mcs-scale').value, shift: Number(box.querySelector('.mcs-shift').dataset.v) || 0 };
+}
+const COLOR_SPLIT_STORE_KEY = 'trpg-color-split-opts';
+function colorSplitLoadStore() { try { return JSON.parse(localStorage.getItem(COLOR_SPLIT_STORE_KEY)) || {}; } catch (e) { return {}; } }
+function colorSplitSaveStore(opts) { try { localStorage.setItem(COLOR_SPLIT_STORE_KEY, JSON.stringify({ width: opts.width, scale: opts.scale, shift: opts.shift })); } catch (e) {} }
+function colorSplitNudge(delta) {
+  const el = document.querySelector('#color-split-dialog .mcs-shift');
+  const next = delta === 0 ? 0 : Math.round(((Number(el.dataset.v) || 0) + delta) * 10) / 10;
+  el.dataset.v = next; el.textContent = (next > 0 ? '+' : '') + next.toFixed(1) + '%';
+  colorSplitRefresh();
 }
 async function colorSplitRefresh() {
   const box = document.getElementById('color-split-dialog');
@@ -32249,6 +32266,9 @@ async function colorSplitRefresh() {
   const opts = colorSplitReadOpts();
   const result = buildColorSplitMacro(opts, colorSplitMeasurer(opts));
   colorSplitState.macro = result.macro || '';
+  colorSplitSaveStore(opts);
+  const preview = box.querySelector('.mcs-preview');
+  preview.style.setProperty('--ccf-width', (Number(opts.width) > 0 ? Number(opts.width) : 328) + 'px'); // 미리보기는 채팅 칸 폭으로(본문 PREVIEW 폭은 그대로)
   box.querySelector('.mcs-error').textContent = result.error || '';
   box.querySelector('.mcs-insert').disabled = !!result.error;
   box.querySelector('.mcs-preview').innerHTML = result.macro ? renderCssMacroPreviewHtml(result.macro) : '';
@@ -32278,6 +32298,8 @@ function openColorSplitDialog(button) {
   const ta = button.closest('.css-macro-editor-pane, .intro-editor-pane')?.querySelector('textarea');
   if (!ta || document.getElementById('color-split-dialog')) return;
   const hadCaret = ta === document.activeElement || ta === lastMacroImageTA;
+  const store = colorSplitLoadStore();
+  const shift0 = Math.round((Number(store.shift) || 0) * 10) / 10;
   colorSplitState = { ta, at: hadCaret ? ta.selectionStart : ta.value.length, end: hadCaret ? ta.selectionEnd : ta.value.length, macro: '' };
   const backdrop = document.createElement('div');
   backdrop.id = 'color-split-dialog-backdrop';
@@ -32294,7 +32316,12 @@ function openColorSplitDialog(button) {
     + '<label>배경 <input class="mcs-bg" type="color" value="#000000" oninput="this.nextElementSibling.value=this.value;colorSplitRefresh()"><input class="mcs-bg-hex" type="text" value="#000000" spellcheck="false" oninput="if(/^#[0-9a-f]{6}$/i.test(this.value))this.previousElementSibling.value=this.value;colorSplitRefresh()"></label>'
     + '<label><input class="mcs-nobg" type="checkbox" onchange="colorSplitRefresh()"> 배경 없음</label>'
     + '</div>'
-    + '<div class="mcs-note">치우치면 첫 조각의 padding-left 와 마지막 조각의 padding-right 숫자를 같은 만큼 조정하세요. 측정은 이 PC 글꼴 기준이라 코코포리아와 몇 px 다를 수 있습니다.</div>'
+    + '<div class="mcs-opts">'
+    + '<label>채팅 칸 폭 <input class="mcs-width" type="number" min="100" max="2000" value="' + (Number(store.width) > 0 ? Number(store.width) : 328) + '" oninput="colorSplitRefresh()">px</label>'
+    + '<label>글자 폭 배율 <input class="mcs-scale" type="number" min="50" max="200" value="' + (Number(store.scale) > 0 ? Number(store.scale) : 100) + '" oninput="colorSplitRefresh()">%</label>'
+    + '<label>위치 보정 <button type="button" title="왼쪽으로 0.1%" onclick="colorSplitNudge(-0.1)">◀</button><span class="mcs-shift" data-v="' + shift0 + '">' + (shift0 > 0 ? '+' : '') + shift0.toFixed(1) + '%</span><button type="button" title="오른쪽으로 0.1%" onclick="colorSplitNudge(0.1)">▶</button><button type="button" onclick="colorSplitNudge(0)">0</button></label>'
+    + '</div>'
+    + '<div class="mcs-note">코코포리아에서 줄이 치우치면 배율·위치 보정으로 맞추세요 (오른쪽으로 치우치면 ◀).</div>'
     + '<div class="mcs-error"></div>'
     + '<div class="css-macro-preview-chatbox"><div class="css-macro-preview-body mcs-preview"></div></div>'
     + '<div class="mcs-actions"><button type="button" onclick="closeColorSplitDialog()">취소</button><button type="button" class="mcs-insert" onclick="insertColorSplitMacro()">넣기</button></div>'
