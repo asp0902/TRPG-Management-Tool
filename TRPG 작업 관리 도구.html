@@ -6,6 +6,7 @@
 <title>TRPG 작업 관리 도구</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
 <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1417,6 +1418,9 @@ tr.ct-row-end .ct-select:focus {
   width: 100%;
   overflow-anchor: none;
 }
+.ccf-width-label { font-size: 11px; color: #888; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+.ccf-width-input { width: 52px; border: 1px solid #ddd; border-radius: 6px; padding: 2px 4px; font: inherit; font-size: 11px; }
+.css-macro-preview-wrap:has(.roll20-chat) .ccf-width-label { display: none; }
 .css-macro-preview-head {
   display: flex;
   align-items: center;
@@ -19141,6 +19145,7 @@ function mkBlockEl(b, cid, ctx = {}) {
           <div class="intro-preview-pane css-macro-preview-wrap">
             <div class="css-macro-preview-head">
               <div class="intro-pane-label">PREVIEW</div>
+              <label class="ccf-width-label" title="코코포리아 채팅 칸 본문 폭(색 나눔 한 줄과 같은 값)">채팅 폭 <input class="ccf-width-input" type="number" min="200" max="600" value="${ccfWidthNow()}" oninput="ccfSetWidth(this.value,true)" onchange="ccfSetWidth(this.value)">px</label>
               <button type="button" class="r20-copy-btn" onclick="copyRoll20HandoutFromPreview(this,event)" title="롤20 핸드아웃용 HTML로 변환해 복사">핸드아웃용 복사</button>
             </div>
             <div class="css-macro-preview-chatbox">
@@ -32362,6 +32367,7 @@ function colorSplitNudge(delta) {
 async function colorSplitRefresh() {
   const box = document.getElementById('color-split-dialog');
   if (!box) return;
+  await ccfLoadFonts(); // Roboto 가 로드된 뒤에 잰다(#256)
   await document.fonts.ready; // 웹폰트가 늦게 로드돼도 로드 뒤에 잰다
   if (!document.getElementById('color-split-dialog')) return;
   const opts = colorSplitReadOpts();
@@ -32369,7 +32375,12 @@ async function colorSplitRefresh() {
   colorSplitState.macro = result.macro || '';
   colorSplitSaveStore(opts);
   const preview = box.querySelector('.mcs-preview');
-  preview.style.setProperty('--ccf-width', (Number(opts.width) > 0 ? Number(opts.width) : 328) + 'px'); // 미리보기는 채팅 칸 폭으로(본문 PREVIEW 폭은 그대로)
+  preview.style.setProperty('--ccf-width', (Number(opts.width) > 0 ? Number(opts.width) : 328) + 'px'); // 미리보기는 채팅 칸 폭으로
+  const w = Math.round(Number(opts.width));
+  if (w >= 200 && w <= 600 && document.documentElement.style.getPropertyValue('--ccf-width') !== w + 'px') { // 대화상자에서 바꾼 폭을 PREVIEW 에도 반영
+    document.documentElement.style.setProperty('--ccf-width', w + 'px');
+    document.querySelectorAll('.ccf-width-input').forEach(el => { el.value = w; });
+  }
   box.querySelector('.mcs-error').textContent = result.error || '';
   box.querySelector('.mcs-insert').disabled = !!result.error;
   box.querySelector('.mcs-preview').innerHTML = result.macro ? renderCssMacroPreviewHtml(result.macro) : '';
@@ -32418,7 +32429,7 @@ function openColorSplitDialog(button) {
     + '<label><input class="mcs-nobg" type="checkbox" onchange="colorSplitRefresh()"> 배경 없음</label>'
     + '</div>'
     + '<div class="mcs-opts">'
-    + '<label>채팅 칸 폭 <input class="mcs-width" type="number" min="100" max="2000" value="' + (Number(store.width) > 0 ? Number(store.width) : 328) + '" oninput="colorSplitRefresh()">px</label>'
+    + '<label>채팅 칸 폭 <input class="mcs-width" type="number" min="200" max="600" value="' + ccfWidthNow() + '" oninput="colorSplitRefresh()">px</label>'
     + '<label>글자 폭 배율 <input class="mcs-scale" type="number" min="50" max="200" value="' + (Number(store.scale) > 0 ? Number(store.scale) : 100) + '" oninput="colorSplitRefresh()">%</label>'
     + '<label>위치 보정 <button type="button" title="왼쪽으로 0.1%" onclick="colorSplitNudge(-0.1)">◀</button><span class="mcs-shift" data-v="' + shift0 + '">' + (shift0 > 0 ? '+' : '') + shift0.toFixed(1) + '%</span><button type="button" title="오른쪽으로 0.1%" onclick="colorSplitNudge(0.1)">▶</button><button type="button" onclick="colorSplitNudge(0)">0</button></label>'
     + '</div>'
@@ -35839,7 +35850,7 @@ const CCFOLIA_PREVIEW = {
 if (typeof document !== 'undefined') {
   const rootStyle = document.documentElement.style;
   rootStyle.setProperty('--ccf-bg', CCFOLIA_PREVIEW.bg);
-  rootStyle.setProperty('--ccf-width', CCFOLIA_PREVIEW.contentWidth + 'px');
+  rootStyle.setProperty('--ccf-width', ccfWidthNow() + 'px');
   rootStyle.setProperty('--ccf-font', CCFOLIA_PREVIEW.fontFamily);
   rootStyle.setProperty('--ccf-size', CCFOLIA_PREVIEW.fontSize + 'px');
   rootStyle.setProperty('--ccf-line-height', CCFOLIA_PREVIEW.lineHeight);
@@ -35849,6 +35860,25 @@ if (typeof document !== 'undefined') {
   rootStyle.setProperty('--ccf-desc-font-style', CCFOLIA_PREVIEW.desc.fontStyle);
   rootStyle.setProperty('--ccf-desc-text-align', CCFOLIA_PREVIEW.desc.textAlign);
   rootStyle.setProperty('--ccf-desc-overflow', CCFOLIA_PREVIEW.desc.overflow);
+}
+// 채팅 칸 폭(#256): PREVIEW 본문 폭과 「색 나눔 한 줄」의 채팅 칸 폭이 같은 값(localStorage COLOR_SPLIT_STORE_KEY.width) 하나를 쓴다. 동기화 데이터에는 넣지 않는다.
+function ccfWidthNow() {
+  const n = Math.round(Number(colorSplitLoadStore().width));
+  return n >= 200 && n <= 600 ? n : CCFOLIA_PREVIEW.contentWidth;
+}
+function ccfSetWidth(value, live) {
+  const n = Math.round(Number(value));
+  if (!(n >= 200 && n <= 600)) { if (!live) document.querySelectorAll('.ccf-width-input, .mcs-width').forEach(el => { el.value = ccfWidthNow(); }); return; } // 입력 도중(범위 밖)에는 무시
+  document.documentElement.style.setProperty('--ccf-width', n + 'px');
+  const store = colorSplitLoadStore();
+  if (Number(store.width) !== n) colorSplitSaveStore({ ...store, width: n });
+  document.querySelectorAll('.ccf-width-input, .mcs-width').forEach(el => { if (el !== document.activeElement || !live) el.value = n; });
+  if (document.getElementById('color-split-dialog')) colorSplitRefresh();
+}
+// 코코포리아 글꼴(Roboto 400/700, 기울임 포함)이 불러와진 뒤에 PREVIEW 가 다시 그려지고 canvas 측정이 정확해진다.
+function ccfLoadFonts() {
+  if (typeof document === 'undefined' || !document.fonts?.load) return Promise.resolve();
+  return Promise.all(['12px Roboto', 'bold 12px Roboto', 'italic 12px Roboto', 'italic bold 12px Roboto'].map(font => document.fonts.load(font, 'Aa').catch(() => {})));
 }
 // 롤20 채팅(app.roll20.net, 한국어 UI, Windows Chrome, 창 1278px, 채팅창 폭 325px, 2026-10-13) 실측값.
 // 실측: /desc 한 줄 = 메시지 하나(바탕 #f1f1f1, 패딩 0 16 7 15, 위 spacer 높이 2px·아래 margin 7px, 13.65px/17.0625px, 기울임·굵게·가운데). 조각은 <a> 이고 style 은 걸러지지 않는다
@@ -37014,6 +37044,7 @@ function renderCssMacroPage() {
           <div class="css-macro-preview-wrap">
             <div class="css-macro-preview-head">
               <div class="css-macro-preview-label">PREVIEW</div>
+              <label class="ccf-width-label" title="코코포리아 채팅 칸 본문 폭(색 나눔 한 줄과 같은 값)">채팅 폭 <input class="ccf-width-input" type="number" min="200" max="600" value="${ccfWidthNow()}" oninput="ccfSetWidth(this.value,true)" onchange="ccfSetWidth(this.value)">px</label>
               <button type="button" class="r20-copy-btn" onclick="copyRoll20HandoutFromPreview(this,event)" title="롤20 핸드아웃용 HTML로 변환해 복사">핸드아웃용 복사</button>
             </div>
             <div class="css-macro-preview-chatbox">
