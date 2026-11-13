@@ -35833,6 +35833,7 @@ function tryParseCssMacroToken(source, startIdx) {
 // 코코포리아 채팅(CCFOLIA 1.37.4, Win Chrome, 창 1278px) 실측값. PREVIEW 의 배경·폭·기본 글자·조각 span 보정이 모두 여기서 나온다.
 // 실측 범위: -webkit-text-stroke 는 무효, font-weight 800 은 400 으로 표시, bold/700 은 유지(그 밖의 값은 측정하지 않아 건드리지 않는다).
 // background-clip:text(-webkit- 포함)는 적용되지 않고(#252), 글자가 완전히 빈 [] 조각은 그려지지 않는다([ ] 는 그려진다).
+const CCF_USER_DEFAULT_WIDTH = 271; // 사용자 기본 채팅 칸 폭(코코포리아 기본 본문 폭 CCFOLIA_PREVIEW.contentWidth 328 과 별개). 아래 초기화 블록보다 먼저 선언해야 한다.
 const CCFOLIA_PREVIEW = {
   bg: 'rgba(44,44,44,0.87)',
   contentWidth: 328,
@@ -35850,6 +35851,7 @@ const CCFOLIA_PREVIEW = {
 if (typeof document !== 'undefined') {
   const rootStyle = document.documentElement.style;
   rootStyle.setProperty('--ccf-bg', CCFOLIA_PREVIEW.bg);
+  ccfMigrateWidth();
   rootStyle.setProperty('--ccf-width', ccfWidthNow() + 'px');
   rootStyle.setProperty('--ccf-font', CCFOLIA_PREVIEW.fontFamily);
   rootStyle.setProperty('--ccf-size', CCFOLIA_PREVIEW.fontSize + 'px');
@@ -35864,7 +35866,16 @@ if (typeof document !== 'undefined') {
 // 채팅 칸 폭(#256): PREVIEW 본문 폭과 「색 나눔 한 줄」의 채팅 칸 폭이 같은 값(localStorage COLOR_SPLIT_STORE_KEY.width) 하나를 쓴다. 동기화 데이터에는 넣지 않는다.
 function ccfWidthNow() {
   const n = Math.round(Number(colorSplitLoadStore().width));
-  return n >= 200 && n <= 600 ? n : CCFOLIA_PREVIEW.contentWidth;
+  return n >= 200 && n <= 600 ? n : CCF_USER_DEFAULT_WIDTH;
+}
+// #254 기본값 328 이 그대로 저장돼 있으면 한 번만 CCF_USER_DEFAULT_WIDTH 로 옮기고, 다른 값은 유지한다.
+function ccfMigrateWidth() {
+  try {
+    if (localStorage.getItem('trpg-ccf-width-migrated')) return;
+    localStorage.setItem('trpg-ccf-width-migrated', '1');
+    const store = colorSplitLoadStore();
+    if (Number(store.width) === 328) colorSplitSaveStore({ ...store, width: CCF_USER_DEFAULT_WIDTH });
+  } catch (e) {}
 }
 function ccfSetWidth(value, live) {
   const n = Math.round(Number(value));
