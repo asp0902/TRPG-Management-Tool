@@ -5,7 +5,12 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도�
 // 인트로 블록은 예시·안내 문구가 없다(#238). 공통 미리보기 안내 문구는 다른 화면용이라 유지.
 assert.ok(!html.includes('인트로 매크로 코드를 입력하세요'));
 assert.ok(html.includes("return String(value || '').trim() ? renderCssMacroPreviewHtml(value) : '';"));
-assert.ok(html.includes('${renderIntroPreviewHtml(introContent)}'));
-assert.ok(html.includes("preview.innerHTML = renderIntroPreviewHtml(value);"));
+assert.ok(html.includes('${renderMacroPreviewNoHint(introContent)}'));
+assert.ok(html.includes("preview.innerHTML = renderMacroPreviewNoHint(value);"));
 assert.ok(html.includes('매크로를 입력하면 여기에 미리보기가 표시됩니다.'));
 console.log('intro no example text checks: OK');
+// #246: CSS MACRO 페이지도 같은 방식(입력칸 placeholder 없음, 미리보기 빈 상태 문구 없음). 공통 렌더러 문구는 다른 화면용이라 유지.
+assert.ok(!html.includes('Roll20용 CSS 매크로를 입력하세요'));
+assert.ok(html.includes('data-css-macro-id="${item.id}">${renderMacroPreviewNoHint(getCssMacroResolvedContent(item))}</div>'));
+assert.ok(html.includes('preview.innerHTML = renderMacroPreviewNoHint(value);\n  restoreCssMacroEditViewportAnchor'));
+console.log('css macro no example text checks: OK');

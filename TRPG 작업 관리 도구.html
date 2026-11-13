@@ -19011,7 +19011,7 @@ function mkBlockEl(b, cid, ctx = {}) {
             </div>
             <div class="css-macro-preview-chatbox">
               <div class="css-macro-preview-body intro-preview-body" data-intro-preview-id="${b.id}">
-                ${renderIntroPreviewHtml(introContent)}
+                ${renderMacroPreviewNoHint(introContent)}
               </div>
             </div>
           </div>
@@ -35530,7 +35530,7 @@ function syncCssMacroItemRenderedContent(itemId, options = {}) {
   const viewportAnchor = captureCssMacroEditViewportAnchor(itemId);
   item.content = resolved;
   const preview = document.querySelector(`.css-macro-preview-body[data-css-macro-id="${itemId}"]`);
-  if (preview) preview.innerHTML = renderCssMacroPreviewHtml(resolved);
+  if (preview) preview.innerHTML = renderMacroPreviewNoHint(resolved);
   if (options.updateTextarea !== false) {
     const textarea = document.querySelector(`.css-macro-textarea[data-css-macro-id="${itemId}"]`);
     if (textarea && textarea.value !== resolved) {
@@ -35591,7 +35591,7 @@ function updateCssMacroItemPreview(itemId, value) {
   const preview = document.querySelector(`.css-macro-preview-body[data-css-macro-id="${itemId}"]`);
   if (!preview) return;
   const viewportAnchor = captureCssMacroEditViewportAnchor(itemId);
-  preview.innerHTML = renderCssMacroPreviewHtml(value);
+  preview.innerHTML = renderMacroPreviewNoHint(value);
   restoreCssMacroEditViewportAnchor(viewportAnchor);
 }
 const introPreviewRafIds = new Map();
@@ -35648,8 +35648,8 @@ function syncAllIntroMacroTextareaSizes(root = document) {
     syncIntroMacroTextareaSize(preview.dataset.introPreviewId);
   });
 }
-// 인트로 블록은 비었을 때 예시·안내 문구 없이 빈 칸으로 둔다(#238). 공통 renderCssMacroPreviewHtml 의 안내 문구는 다른 화면용이라 그대로.
-function renderIntroPreviewHtml(value) {
+// 인트로 블록(#238)과 CSS MACRO 페이지(#246)는 비었을 때 예시·안내 문구 없이 빈 칸으로 둔다. 공통 renderCssMacroPreviewHtml 의 안내 문구는 다른 화면용이라 그대로.
+function renderMacroPreviewNoHint(value) {
   return String(value || '').trim() ? renderCssMacroPreviewHtml(value) : '';
 }
 function updateIntroPreview(blockId, value) {
@@ -35659,7 +35659,7 @@ function updateIntroPreview(blockId, value) {
     introPreviewRafIds.delete(key);
     const preview = document.querySelector(`.intro-preview-body[data-intro-preview-id="${blockId}"]`);
     if (!preview) return;
-    preview.innerHTML = renderIntroPreviewHtml(value);
+    preview.innerHTML = renderMacroPreviewNoHint(value);
     syncIntroMacroTextareaSize(blockId);
   }));
 }
@@ -36037,13 +36037,13 @@ function renderCssMacroPage() {
               <button type="button" class="r20-copy-btn" onclick="copyRoll20HandoutFromPreview(this,event)" title="롤20 핸드아웃용 HTML로 변환해 복사">핸드아웃용 복사</button>
             </div>
             <div class="css-macro-preview-chatbox">
-              <div class="css-macro-preview-body" data-css-macro-id="${item.id}">${renderCssMacroPreviewHtml(getCssMacroResolvedContent(item))}</div>
+              <div class="css-macro-preview-body" data-css-macro-id="${item.id}">${renderMacroPreviewNoHint(getCssMacroResolvedContent(item))}</div>
             </div>
           </div>
           <div class="css-macro-editor-pane">
             <div class="css-macro-preview-head"><div class="css-macro-preview-label">CSS MACRO</div><button type="button" class="macro-img-btn" onclick="pickMacroImage(this)" title="이미지를 공개 저장소에 올리고 [](주소)를 넣습니다">이미지</button></div>
             ${renderCssMacroFieldControls(item)}
-            <textarea class="css-macro-textarea" data-css-macro-id="${item.id}" rows="1" placeholder="Roll20용 CSS 매크로를 입력하세요..."
+            <textarea class="css-macro-textarea" data-css-macro-id="${item.id}" rows="1"
               oninput="btcpAutoResize(this);updateCssMacroItemField('${item.id}','content',this.value)"
               oncontextmenu="return openCssMacroTextareaCtxMenu(event,'${item.id}',this)"
               spellcheck="false">${esc(getCssMacroResolvedContent(item))}</textarea>
