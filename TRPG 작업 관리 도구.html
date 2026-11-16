@@ -35600,6 +35600,8 @@ function openMusicYoutubeModal() {
     + '<img id="music-yt-thumb" class="music-yt-thumb" alt="" hidden onerror="this.hidden=true">'
     + '<label class="music-field">제목<input id="music-yt-title" type="text" placeholder="자동으로 가져오거나 직접 입력"></label>'
     + '<label class="music-field">아티스트(채널)<input id="music-yt-artist" type="text"></label>'
+    + '<label class="music-field">앨범<input id="music-yt-album" type="text" placeholder="자동으로 가져오거나 직접 입력"></label>'
+    + '<div class="music-hint" id="music-yt-album-status"></div>'
     + '<div class="music-hint" id="music-yt-status">제목·썸네일은 유튜브 oEmbed 로 조회합니다(URL 이 유튜브로 전송됨). 재생은 임베드 플레이어이며 음원 다운로드는 지원하지 않습니다.</div>'
     + '<div class="music-error" id="music-yt-error"></div>'
     + '<div class="music-modal-foot"><button type="button" onclick="musicFetchYoutube()">제목 가져오기</button><button type="button" class="music-primary" onclick="musicAddYoutube()">추가</button></div>');
@@ -35619,16 +35621,51 @@ async function musicFetchYoutube(auto) {
     const data = await res.json();
     if (data.thumbnail_url && thumb.dataset.id === id) thumb.src = data.thumbnail_url;
     if (!document.getElementById('music-yt-title').value) document.getElementById('music-yt-title').value = data.title || '';
-    if (!document.getElementById('music-yt-artist').value) document.getElementById('music-yt-artist').value = data.author_name || '';
+    const artistEl = document.getElementById('music-yt-artist');
+    if (!artistEl.value) { artistEl.value = data.author_name || ''; artistEl.dataset.auto = artistEl.value; } // 자동값 기억: 사용자가 고치면 달라져 덮어쓰지 않는다(#283)
     status.textContent = '제목을 가져왔습니다.';
   } catch (e) { status.textContent = '제목을 가져오지 못했습니다. 직접 입력해 주세요. (' + (e?.message || e) + ')'; }
+  musicFetchAlbumInfo(id); // 백그라운드(기다리지 않음)
+}
+// jina 본문(markdown)의 「## Music」 구간: 첫 「# 」=노래, 다음 「#### 」=아티스트, 그다음 일반 텍스트 줄=앨범. 실패하면 빈 값(#283)
+function musicParseJinaMusic(content) {
+  const out = { song: '', artist: '', album: '' };
+  const lines = String(content || '').split(/\r?\n/);
+  let i = lines.findIndex(line => /^##\s+Music\b/.test(line));
+  if (i < 0) return out;
+  for (i++; i < lines.length; i++) { if (/^#\s+/.test(lines[i])) { out.song = lines[i].replace(/^#\s+/, '').trim(); break; } }
+  for (i++; i < lines.length; i++) { if (/^####\s+/.test(lines[i])) { out.artist = lines[i].replace(/^####\s+/, '').trim(); break; } }
+  for (i++; i < lines.length; i++) { const t = lines[i].trim(); if (t && !/^[#!\[]/.test(t)) { out.album = t; break; } }
+  return out;
+}
+async function musicFetchAlbumInfo(id) {
+  const st = document.getElementById('music-yt-album-status');
+  if (!st) return;
+  st.textContent = '앨범 정보 조회 중… (URL이 외부 조회 서비스 jina 로 전송됨)';
+  const timer = bookmarkTimeoutSignal(null, BOOKMARK_META_SERVICE_TIMEOUT_MS[0]);
+  let music = null;
+  try {
+    const res = await fetch(BOOKMARK_META_JINA_URL + 'https://www.youtube.com/watch?v=' + id, { method: 'GET', mode: 'cors', credentials: 'omit', headers: { Accept: 'application/json' }, signal: timer.signal });
+    const json = await res.json();
+    if (!res.ok || !json || !json.data) throw new Error('HTTP ' + res.status);
+    music = musicParseJinaMusic(json.data.content);
+  } catch (e) { music = null; } finally { timer.clear(); }
+  const urlEl = document.getElementById('music-yt-url');
+  if (!urlEl || musicParseYoutubeId(urlEl.value) !== id) return; // 모달이 닫혔거나 URL 이 바뀐 뒤 늦게 온 응답은 무시
+  const stNow = document.getElementById('music-yt-album-status');
+  if (!music) { stNow.textContent = '앨범 정보를 가져오지 못했습니다. 직접 입력해 주세요.'; return; }
+  if (!music.album && !music.artist) { stNow.textContent = '등록된 앨범 정보가 없습니다.'; return; }
+  const albumEl = document.getElementById('music-yt-album'), artistEl = document.getElementById('music-yt-artist');
+  if (music.album && !albumEl.value) albumEl.value = music.album;
+  if (music.artist && (!artistEl.value || artistEl.value === artistEl.dataset.auto)) { artistEl.value = music.artist; artistEl.dataset.auto = music.artist; }
+  stNow.textContent = '앨범 정보를 가져왔습니다.';
 }
 function musicYtThumbFor(id) { const t = document.getElementById('music-yt-thumb'); return t && !t.hidden && t.dataset.id === id && t.getAttribute('src') ? t.getAttribute('src') : 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg'; }
 function musicAddYoutube() {
   const id = musicParseYoutubeId(document.getElementById('music-yt-url').value);
   if (!id) { document.getElementById('music-yt-error').textContent = '유튜브 링크를 알아볼 수 없습니다.'; return; }
   const target = state.musicFolders.some(folder => folder.id === musicView.folder) ? musicView.folder : '';
-  state.musicTracks.push(normalizeMusicTrack({ kind: 'youtube', youtubeId: id, url: 'https://www.youtube.com/watch?v=' + id, thumbnail: musicYtThumbFor(id), title: document.getElementById('music-yt-title').value.trim() || '유튜브 ' + id, artist: document.getElementById('music-yt-artist').value.trim(), folderId: target, addedAt: Date.now() }));
+  state.musicTracks.push(normalizeMusicTrack({ kind: 'youtube', youtubeId: id, url: 'https://www.youtube.com/watch?v=' + id, thumbnail: musicYtThumbFor(id), title: document.getElementById('music-yt-title').value.trim() || '유튜브 ' + id, artist: document.getElementById('music-yt-artist').value.trim(), album: document.getElementById('music-yt-album').value.trim(), folderId: target, addedAt: Date.now() }));
   persist(); musicCloseModal(); renderMusicPage();
 }
 // 페이지에 파일 끌어 놓기
