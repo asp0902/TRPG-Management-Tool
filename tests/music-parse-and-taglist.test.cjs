@@ -1,0 +1,13 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+const code = html.slice(html.indexOf('function musicParseYoutubeId'), html.indexOf('function musicPlayerHtml'));
+const ctx = {}; vm.createContext(ctx); vm.runInContext(code + ';this.f=musicParseYoutubeId', ctx);
+const f = ctx.f, base = 'https://www.youtube.com/watch?v=e-3z40QzJT0', ID = 'e-3z40QzJT0';
+ok(f(base) === ID, '하이픈이 들어간 영상 id');
+ok(f('\u200b' + base) === ID && f(base + '\u200b') === ID && f('\ufeff' + base) === ID, '보이지 않는 문자(제로폭 공백·BOM)가 섞여도 인식');
+ok(f('"' + base + '"') === ID && f('<' + base + '>') === ID && f('링크 ' + base) === ID, '따옴표·꺾쇠·앞 설명 글이 있어도 주소를 찾음');
+ok(f(base + '&list=PL1&t=3s') === ID && f('https://youtu.be/' + ID + '?si=abc') === ID && f('https://m.youtube.com/watch?v=' + ID) === ID && f('youtube.com/shorts/' + ID) === ID, '기존 형식(목록·시간·짧은 주소·모바일·쇼츠) 유지');
+ok(f('https://notyoutube.com/watch?v=' + ID) === '' && f('abc') === '' && f('') === '', '다른 사이트·잘못된 글은 인식하지 않음');
+ok(html.includes('class="music-tag-label" onclick="musicToggleTagList()"') && html.includes('<div class="music-tag-list hidden">') && html.includes('.music-tag-list.hidden { display: none; }'), '「태그」 항목명을 누르면 이전에 만든 태그 목록 표시(기본 숨김)');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);

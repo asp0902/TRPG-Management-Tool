@@ -2213,6 +2213,8 @@ tr.ct-row-end .ct-select:focus {
 .music-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .music-fcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .music-fcol-tags { min-height: 0; }
+.music-tag-label { cursor: pointer; width: fit-content; text-decoration: underline dotted; text-underline-offset: 3px; }
+.music-tag-list.hidden { display: none; }
 .music-tag-list { flex: 1 1 0; min-height: 0; overflow-y: auto; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px; } /* 높이는 왼쪽 열(앨범 칸까지)에 맞추고 넘치면 스크롤 */ /* 왼쪽: 제목·아티스트·앨범 세로, 오른쪽: 태그(#298 후속) */
 .music-modal button.music-tag-chip { border-radius: 999px; padding: 2px 8px; font-size: 11px; }
 .music-modal button.music-tag-chip.on { background: #111; color: #fff; border-color: #111; }
@@ -35328,8 +35330,8 @@ function normalizeMusicCollections() {
   state.musicTracks.forEach(track => { if (track.folderId && !ids.has(track.folderId)) track.folderId = ''; });
 }
 function musicParseYoutubeId(value) {
-  const text = String(value || '').trim();
-  const match = text.match(/^(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/|live\/|v\/))([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/i);
+  const text = String(value || '').replace(/[\u200b-\u200d\u2060\ufeff]/g, '').trim(); // 보이지 않는 문자 제거
+  const match = text.match(/(?:^|[^A-Za-z0-9.-])(?:https?:\/\/)?(?:www\.|m\.|music\.)?(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|shorts\/|embed\/|live\/|v\/))([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/i); // 따옴표·꺾쇠·앞뒤 설명 글이 있어도 주소를 찾는다
   return match ? match[1] : '';
 }
 function musicPlayerHtml(track, blobUrl) {
@@ -35777,7 +35779,8 @@ function musicExistingTagsInner(track) { // 다른 곡에 이미 만들어져 �
   state.musicTracks.forEach(t => (t.tags || []).forEach(tag => { const key = musicTagKey(tag); if (key && !on.has(key) && !seen.has(key)) seen.set(key, tag); }));
   return [...seen.values()].sort((a, b) => a.localeCompare(b, 'ko')).map(tag => '<button type="button" class="music-tag-chip" data-t="' + esc(tag) + '" onclick="musicToggleTag(' + q + track.id + q + ',this.dataset.t)">' + esc(tag) + '</button>').join('');
 }
-function musicExistingTagsHtml(track) { return '<div class="music-tag-list">' + musicExistingTagsInner(track) + '</div>'; }
+function musicExistingTagsHtml(track) { return '<div class="music-tag-list hidden">' + musicExistingTagsInner(track) + '</div>'; } // 기본은 숨김, 「태그」 항목명을 누르면 보임(#321)
+function musicToggleTagList() { document.querySelector('#music-modal-backdrop .music-tag-list')?.classList.toggle('hidden'); }
 function musicRefreshExistingTags(track) { const box = document.querySelector('#music-modal-backdrop .music-tag-list'); if (box && track) box.innerHTML = musicExistingTagsInner(track); }
 async function openMusicDetail(id, source) {
   musicDebug('openMusicDetail', id + ' ' + (source || ''));
@@ -35805,7 +35808,7 @@ async function openMusicDetail(id, source) {
       + (track.attached && !blob ? missing : '') + (!track.attached ? btn('파일 첨부', 'musicAttachPick') + '<span class="music-hint">또는 이 창·카드 위로 음원 파일을 끌어 놓기</span>' : '') + '</div>';
   }
   const folderOpts = '<option value="">분류 없음</option>' + state.musicFolders.map(folder => '<option value="' + folder.id + '"' + (folder.id === track.folderId ? ' selected' : '') + '>' + esc(folder.name) + '</option>').join('');
-  const tagsField = '<div class="music-field">태그' + tagEditorHtml('data-k="tags" onchange="musicEditField(' + String.fromCharCode(39) + id + String.fromCharCode(39) + ',this)"', track.tags, '') + '</div>';
+  const tagsField = '<div class="music-field"><span class="music-tag-label" onclick="musicToggleTagList()" title="눌러서 이전에 만든 태그 보기">태그</span>' + tagEditorHtml('data-k="tags" onchange="musicEditField(' + String.fromCharCode(39) + id + String.fromCharCode(39) + ',this)"', track.tags, '') + '</div>';
   const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" oninput="musicAutoGrow(this)" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)"' + ' value="' + esc(track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
   musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + (track.kind === 'youtube' && !url ? '<div class="music-hint" id="music-yt-state">유튜브: 불러오는 중…</div>' : '') + attachRow
