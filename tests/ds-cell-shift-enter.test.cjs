@@ -1,0 +1,11 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+const cell = html.slice(html.indexOf('function ds_handleCellKeydown'), html.indexOf('function ds_handleRowHeaderMouseDown'));
+const memo = html.slice(html.indexOf('function ds_handleMemoRowKeydown'), html.indexOf('function ds_handleCellKeydown'));
+ok(cell.includes("e.key === 'Enter' && e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey"), '셀: Shift+Enter 줄바꿈');
+ok(cell.includes("e.key === 'Enter' && !e.shiftKey && !e.altKey"), '셀: Enter 이동은 Shift 제외');
+ok(!cell.includes('e.shiftKey ? -1 : 1, 0'), '셀: Shift+Enter 위 칸 이동 제거');
+ok(memo.includes('e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey'), '메모 행: Shift+Enter 줄바꿈');
+ok(!/e\.key === 'Enter' && e\.altKey/.test(cell) && !/if \(e\.altKey &&/.test(memo), 'Alt+Enter 줄바꿈 제거');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);
