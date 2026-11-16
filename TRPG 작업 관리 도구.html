@@ -35500,7 +35500,21 @@ function musicOpenModal(html, keep) {
   if (!keep) document.addEventListener('keydown', musicModalKey, true);
   return backdrop;
 }
+// MUSIC 재생 진단(#315): 재생이 멈추는 원인을 찾기 위해 최근 30건(호출·창 이벤트·플레이어 제거)을 localStorage 'trpg-music-debug' 에 남긴다. 콘솔에서 JSON.parse(localStorage.getItem('trpg-music-debug')) 로 본다.
+function musicDebug(what, extra) {
+  try {
+    const log = JSON.parse(localStorage.getItem('trpg-music-debug') || '[]');
+    log.push({ t: new Date().toISOString().slice(11, 23), what, extra: extra || '', stack: new Error().stack.split('\n').slice(2, 6).map(line => line.trim().slice(0, 100)).join(' | ') });
+    localStorage.setItem('trpg-music-debug', JSON.stringify(log.slice(-30)));
+  } catch (e) {}
+}
+if (typeof window !== 'undefined') {
+  ['blur', 'focus'].forEach(type => window.addEventListener(type, () => { if (document.getElementById('music-modal-backdrop')) musicDebug('window ' + type, document.hasFocus() ? 'hasFocus' : 'noFocus'); }));
+  document.addEventListener('visibilitychange', () => { if (document.getElementById('music-modal-backdrop')) musicDebug('visibility', document.visibilityState); });
+  new MutationObserver(records => records.forEach(rec => rec.removedNodes.forEach(node => { if (node.nodeType === 1 && (node.tagName === 'IFRAME' || (node.querySelector && node.querySelector('iframe.music-yt')))) musicDebug('player removed', node.tagName); }))).observe(document.documentElement, { childList: true, subtree: true });
+}
 function musicStop() {
+  musicDebug('musicStop', musicPlaying ? musicPlaying.id : '');
   document.querySelectorAll('#music-modal-backdrop audio').forEach(audio => audio.pause());
   document.querySelectorAll('#music-modal-backdrop iframe').forEach(frame => { frame.src = 'about:blank'; frame.remove(); });
   if (musicPlaying?.url) URL.revokeObjectURL(musicPlaying.url);
@@ -35705,6 +35719,7 @@ function musicExistingTagsHtml(track) {
   return '<div class="music-tag-list">' + [...seen.values()].sort((a, b) => a.localeCompare(b, 'ko')).map(tag => '<button type="button" class="music-tag-chip' + (on.has(musicTagKey(tag)) ? ' on' : '') + '" data-t="' + esc(tag) + '" onclick="musicToggleTag(' + q + track.id + q + ',this.dataset.t)">' + esc(tag) + '</button>').join('') + '</div>';
 }
 async function openMusicDetail(id, source) {
+  musicDebug('openMusicDetail', id + ' ' + (source || ''));
   const track = state.musicTracks.find(item => item.id === id);
   if (!track) return;
   musicStop();
