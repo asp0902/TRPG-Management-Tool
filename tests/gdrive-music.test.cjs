@@ -6,7 +6,13 @@ const sha = buf => crypto.createHash('sha256').update(buf).digest('hex');
 const sha256Hex = async blob => sha(Buffer.from(await blob.arrayBuffer()));
 
 // 정적 확인
-ok(html.includes('id="gdrive-client-id"') && html.includes('onclick="gdriveConnectClicked()">Drive 연결</button>') && html.includes('id="gdrive-disconnect"'), '동기화 모달에 Drive 클라이언트 ID·연결·해제');
+ok(html.includes('id="gdrive-client-id"') && html.includes('onclick="gdriveConnectClicked()" style="white-space:nowrap;flex:none">Drive 연결</button>') && html.includes('id="gdrive-disconnect"'), '동기화 모달에 Drive 클라이언트 ID·연결·해제');
+// UI 배치(#297 후속): 상태 줄은 입력칸 바로 아래·버튼 위, 버튼 글자는 한 줄
+{ const i = html.indexOf('id="gdrive-client-id"'), st = html.indexOf('id="gdrive-status"', i), btn = html.indexOf('>Drive 연결</button>', i);
+  ok(i > 0 && st > i && st < btn, '상태 줄이 입력칸 바로 아래(버튼보다 위)');
+  const seg = html.slice(btn - 200, btn + 400);
+  ok(/Drive 연결<\/button>/.test(seg) && (html.slice(btn - 160, btn).includes('white-space:nowrap')) && html.slice(html.indexOf('id="gdrive-disconnect"'), html.indexOf('id="gdrive-disconnect"') + 200).includes('white-space:nowrap'), 'Drive 연결·연결 해제 버튼은 줄바꿈 없이 한 줄(nowrap)'); }
+ok(html.includes("interactive ? 180000 : 20000"), '로그인 창 대기 시간 연장(대화형 3분)');
 ok(html.includes("GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'"), '범위는 drive.file(앱이 만든 파일만)');
 ok(html.includes('  gdriveFieldRefresh();\n  const lastAt'), '모달 열 때 Drive 칸 갱신');
 ok(html.includes('musicSyncUploads(); // 음원 업로드(#296·#297)') && html.includes("setTimeout(() => musicSyncUploads(), 4000)"), '곡 추가·첨부·시작 시 음원 업로드 호출');
@@ -106,5 +112,11 @@ const mk = (opts = {}) => {
   // 연결 해제: 클라이언트 ID·폴더 id 삭제(Drive 파일은 그대로)
   ({ c, ctx } = mk()); c.store['trpg-gdrive-client-id'] = 'X'; c.store['trpg-gdrive-folder-id'] = 'F'; ctx.f.gdriveDisconnect();
   ok(!('trpg-gdrive-client-id' in c.store) && !('trpg-gdrive-folder-id' in c.store) && !ctx.f.gdriveConfigured(), '연결 해제 → 클라이언트 ID·폴더 id 삭제');
+  // 연결 실패 사유가 상태 줄에 표시됨
+  ({ c, ctx } = mk()); c.store['trpg-gdrive-client-id'] = 'X'; c.tokenResp = null;
+  const els = { 'gdrive-client-id': { value: 'X' }, 'gdrive-status': { textContent: '' }, 'gdrive-disconnect': { style: {} } };
+  ctx.document.getElementById = id => els[id] || null;
+  await ctx.f.gdriveConnectClicked();
+  ok(/^연결하지 못했습니다 \((unknown|popup_closed)\)/.test(els['gdrive-status'].textContent), '연결 실패 시 사유가 상태 줄에 표시: ' + els['gdrive-status'].textContent);
   console.log('fails=' + fails); process.exit(fails ? 1 : 0);
 })();
