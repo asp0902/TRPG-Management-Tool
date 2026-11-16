@@ -10,4 +10,5 @@ ok(fn.indexOf('PC 파일 선택') < fn.indexOf('id="music-yt-url"') && fn.includ
 ok(!fn.includes('placeholder=') && !fn.includes('또는 유튜브 링크') && !fn.includes('oEmbed 로 조회합니다'), '곡 추가 모달 예시·안내 문구 없음(#288)');
 ok(fn.includes('id="music-yt-status" hidden') && !html.includes('music-yt-album-status') && fn.includes('id="music-yt-error"'), 'URL 아래 상태 줄(#303)·오류 요소 유지, 앨범 상태 요소는 없음');
 ok(!fn.includes('제목 가져오기'), '「제목 가져오기」 버튼 삭제(#303)');
+ok(fn.includes('<div class="music-modal-foot"><div class="music-yt-status" id="music-yt-status" hidden></div><button type="button" class="music-primary" onclick="musicAddYoutube()">추가</button></div>'), '상태 줄은 예전 「제목 가져오기」 자리(아래 왼쪽)에 있음');
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);

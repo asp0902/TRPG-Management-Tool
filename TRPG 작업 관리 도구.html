@@ -35872,13 +35872,12 @@ function openMusicYoutubeModal() {
   musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">곡 추가</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<button type="button" class="music-primary" onclick="musicCloseModal(); musicPickFiles();">PC 파일 선택</button><div class="music-or"></div>'
     + '<label class="music-field">URL<input id="music-yt-url" type="text" spellcheck="false" onchange="musicFetchYoutube(true)" onkeydown="musicYtKey(event)"></label>'
-    + '<div class="music-yt-status" id="music-yt-status" hidden></div>'
     + '<img id="music-yt-thumb" class="music-yt-thumb" alt="" hidden onerror="this.hidden=true">'
     + '<label class="music-field">제목<input id="music-yt-title" type="text"></label>'
     + '<label class="music-field">아티스트(채널)<input id="music-yt-artist" type="text"></label>'
     + '<label class="music-field">앨범<input id="music-yt-album" type="text"></label>'
     + '<div class="music-error" id="music-yt-error"></div>'
-    + '<div class="music-modal-foot"><span></span><button type="button" class="music-primary" onclick="musicAddYoutube()">추가</button></div>');
+    + '<div class="music-modal-foot"><div class="music-yt-status" id="music-yt-status" hidden></div><button type="button" class="music-primary" onclick="musicAddYoutube()">추가</button></div>');
   document.getElementById('music-yt-url').focus();
 }
 // URL 아래 상태 줄: 불러오는 중 / 완료 / 실패(#303). 모달이 닫혔거나 URL 이 바뀌었으면 건드리지 않는다.
