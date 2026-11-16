@@ -16636,7 +16636,7 @@ function rbAutoSaveInlineMemoEditor() {
   const state = rbInlineMemoEditorState;
   const editor = document.getElementById('rb-inline-note-editor');
   const body = editor?.querySelector('.rb-inline-note-editor-body');
-  const noteHtml = sanitizeCssMacroPreviewHtml(body?.innerHTML || '').trim();
+  const noteHtml = sanitizeCssMacroPreviewHtml(body?.innerHTML || '').trimEnd(); // 앞쪽 공백은 들여쓰기(전각 공백)라 지우지 않는다(#262)
   const noteText = String(body?.innerText || body?.textContent || '').trim();
   if (!state || !body) return false;
   if (state.noteEl) {
@@ -27987,7 +27987,7 @@ function handleFormatIndentShortcut(e) {
   const editable = e.target?.closest?.('textarea, [contenteditable="true"]');
   if (editable?.closest('.tb-variation-panel')) return;
   if (editable?.closest('.branch-choice-input')) return; // 선택지 칸은 들여쓰기 대신 기본 Tab 포커스 이동
-  if (!editable || !editable.closest('#panel-info.active, #panel-body.active, #rb-chapter-body, #page-record-timeline')) return;
+  if (!editable || !editable.closest('#panel-info.active, #panel-body.active, #rb-chapter-body, #page-record-timeline, #rb-inline-note-editor')) return;
   if (editable.closest('#info-basic-grid') && !editable.closest('.info-ce')) return;
   e.preventDefault();
   lastFocusedTA = editable;
