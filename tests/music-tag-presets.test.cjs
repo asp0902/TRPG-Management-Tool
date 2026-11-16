@@ -4,7 +4,7 @@ let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m);
 const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
 // 태그 예시·소리 분석 추천은 삭제됨(#298·#301): 상세 창은 왼쪽 제목·아티스트·앨범 / 오른쪽 태그 칸 + 기존 태그 나열
 ok(!html.includes('musicTagPresetsHtml') && !html.includes('태그 예시') && !html.includes('MUSIC_TAG_PRESETS') && !html.includes('musicRecRowHtml'), '태그 예시·추천 줄 코드 없음');
-ok(html.includes("'<div class=\"music-fcol\">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + '</div><div class=\"music-fcol music-fcol-tags\">' + field('tags', '태그') + musicExistingTagsHtml(track) + '</div>'"), '왼쪽: 제목·아티스트·앨범 세로 / 오른쪽: 태그 + 기존 태그 목록');
+ok(html.includes("'<div class=\"music-fcol\">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + '</div><div class=\"music-fcol music-fcol-tags\">' + tagsField + musicExistingTagsHtml(track) + '</div>'"), '왼쪽: 제목·아티스트·앨범 세로 / 오른쪽: 태그 + 기존 태그 목록');
 ok(html.includes('.music-fcol { display: flex; flex-direction: column;') && html.includes('.music-modal button.music-tag-chip.on {'), 'CSS(세로 열·태그 칩)');
 const code = cut('function normalizeCssMacroTags', 'function formatCssMacroTagsText') + cut('function musicTagKey', '// ── MUSIC 음원 동기화(#296)');
 const chips = [];
@@ -12,7 +12,7 @@ const mkChip = t => ({ dataset: { t }, on: false, classList: { toggle(c, v) { th
 const tagInput = { value: '' };
 let persisted = 0, rendered = 0;
 const ctx = { esc: x => String(x), state: { musicTracks: [{ id: 'm1', tags: ['내태그'] }] }, persist: () => persisted++, renderMusicPage: () => rendered++,
-  document: { querySelector: () => tagInput, querySelectorAll: () => chips }, console, String, localStorage: { removeItem() {} } };
+  document: { querySelector: () => tagInput, querySelectorAll: () => chips }, tagEditorRefresh() {}, console, String, localStorage: { removeItem() {} } };
 vm.createContext(ctx); vm.runInContext(code + ';this.f={musicTagKey,musicToggleTag,normalizeCssMacroTags}', ctx);
 const f = ctx.f, nt = f.normalizeCssMacroTags;
 const track = ctx.state.musicTracks[0];

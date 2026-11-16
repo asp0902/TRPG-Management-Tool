@@ -514,6 +514,7 @@ tr.ct-row-end .ct-select:focus {
   font-size: 12px; line-height: 1; padding: 0; font-family: inherit;
 }
 .record-session-tag-chip-remove:hover { color: #111; }
+.music-field .tag-editor-input { border: 0; border-radius: 0; padding: 2px 0; font-size: 13px; flex: 1 1 100px; min-width: 80px; }
 .record-session-tag-input {
   flex: 1 1 120px; min-width: 90px; border: none; outline: none; background: transparent;
   padding: 2px 0; font-size: 13px; font-family: inherit; color: #222;
@@ -9119,7 +9120,7 @@ select.sh-field-input,
         <div class="bookmark-modal-preview" id="bookmark-thumb-preview"></div>
         <div class="bookmark-form-row">
           <div class="bookmark-form-label">태그</div>
-          <input class="bookmark-form-input" id="bookmark-tags" placeholder="#자료 #세션 #영감" spellcheck="false" oninput="renderBookmarkTagSuggestions()" onkeydown="tagInputEnter(event,this)">
+          <div class="record-session-tag-editor tag-editor" onclick="this.querySelector('.tag-editor-input').focus()" data-placeholder="자료, 세션, 영감"><input type="hidden" class="tag-editor-value" id="bookmark-tags" oninput="renderBookmarkTagSuggestions()"><span class="record-session-tags tag-editor-chips"></span><input type="text" class="record-session-tag-input tag-editor-input" spellcheck="false" onkeydown="tagEditorKey(event,this)" onblur="tagEditorCommit(this)"></div>
           <div class="bookmark-tag-suggestions" id="bookmark-tag-suggestions"></div>
         </div>
         <div class="bookmark-form-row">
@@ -9291,7 +9292,7 @@ select.sh-field-input,
         <div class="rb-modal-label">태그</div>
         <div class="rb-modal-tags" id="rb-modal-tags"></div>
         <div class="rb-modal-new-tag-row" style="margin-top:6px;">
-          <input class="rb-modal-new-tag-input" id="rb-new-tag-input" placeholder="태그 입력 후 추가" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();addRbNewTag();}">
+          <input class="rb-modal-new-tag-input" id="rb-new-tag-input" placeholder="태그 입력 후 추가" spellcheck="false" onkeydown="if((event.key==='Enter'||event.key===',')&&!event.isComposing&&event.keyCode!==229){event.preventDefault();addRbNewTag();}" onblur="addRbNewTag()">
           <button class="rb-modal-new-tag-btn" type="button" onclick="addRbNewTag()">추가</button>
         </div>
       </div>
@@ -9411,7 +9412,7 @@ select.sh-field-input,
         <div class="ch-modal-label">태그</div>
         <div class="ch-modal-tags" id="ch-modal-tags"></div>
         <div class="ch-modal-new-tag-row" style="margin-top:6px;">
-          <input class="ch-modal-new-tag-input" id="ch-new-tag-input" placeholder="태그 입력 후 추가" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();addChNewTag();}">
+          <input class="ch-modal-new-tag-input" id="ch-new-tag-input" placeholder="태그 입력 후 추가" spellcheck="false" onkeydown="if((event.key==='Enter'||event.key===',')&&!event.isComposing&&event.keyCode!==229){event.preventDefault();addChNewTag();}" onblur="addChNewTag()">
           <button class="ch-modal-new-tag-btn" type="button" onclick="addChNewTag()">추가</button>
         </div>
       </div>
@@ -10534,23 +10535,58 @@ function normalizeCssMacroTags(input, fallbackTag = '') {
       return true;
     });
 }
-// 태그 입력칸에서 Enter: 확정된 부분(el.dataset.committed) 뒤에 새로 입력한 글을 태그 하나(띄어쓰기 허용)로 '#' 를 붙여 바꾸고 끝에 공백을 둔다(#293).
-// 앞부분이 바뀌었으면 칸 전체를 normalizeCssMacroTags 로 정리. 빈 입력·새 글 없음·한글 조합 중에는 아무 것도 하지 않는다(기존 Enter 동작 유지).
-function tagInputEnter(event, el) {
-  if (!event || event.key !== 'Enter' || event.isComposing || event.keyCode === 229 || !el) return;
-  const value = el.value, committed = el.dataset.committed; // undefined = 확정 기준 없음, '' = 처음부터 비어 있던 칸
-  if (!value.trim() || value.trim() === (committed || '').trim()) return;
-  let tags;
-  if (committed !== undefined && value.startsWith(committed)) {
-    const rest = value.slice(committed.length).trim(); // 새 글에 '#'·쉼표가 있으면 그 규칙으로 여러 태그, 없으면 통째로 태그 하나
-    tags = normalizeCssMacroTags(committed).concat(rest.includes('#') || rest.includes(',') ? normalizeCssMacroTags(rest.startsWith('#') ? rest : '#' + rest) : [rest]);
-  } else tags = normalizeCssMacroTags(value);
-  event.preventDefault();
-  tags = normalizeCssMacroTags(tags); // 중복(대소문자 무시)·공백 정리
-  el.value = tags.map(tag => '#' + tag).join(' ') + ' ';
-  el.dataset.committed = el.value;
-  el.dispatchEvent(new Event('input', { bubbles: true })); // 북마크 태그 추천 갱신
-  el.dispatchEvent(new Event('change', { bubbles: true })); // MUSIC 은 change 로 저장(musicEditField)
+// 칩 태그 입력기(#311): 세션 기록의 태그 입력과 같은 방식. Enter·쉼표·입력칸을 벗어날 때 태그로 확정(띄어쓰기 허용), 칩의 ×로 제거, 빈 칸에서 Backspace 로 마지막 태그 제거.
+// 값은 숨김 입력칸(.tag-editor-value)에 '#태그 #태그' 문자열로 두어, 북마크·MUSIC 의 기존 저장 코드(value 읽기, input/change 이벤트)를 그대로 쓴다.
+function tagEditorHtml(valueAttrs, tags, placeholder) {
+  const text = normalizeCssMacroTags(tags).map(tag => '#' + tag).join(' ');
+  return '<div class="record-session-tag-editor tag-editor" onclick="this.querySelector(' + String.fromCharCode(39) + '.tag-editor-input' + String.fromCharCode(39) + ').focus()" data-placeholder="' + esc(placeholder || '') + '">'
+    + '<input type="hidden" class="tag-editor-value" ' + valueAttrs + ' value="' + esc(text) + '">'
+    + '<span class="record-session-tags tag-editor-chips"></span>'
+    + '<input type="text" class="record-session-tag-input tag-editor-input" spellcheck="false" onkeydown="tagEditorKey(event,this)" onblur="tagEditorCommit(this)">'
+    + '</div>';
+}
+function tagEditorOf(el) { return el && el.closest ? el.closest('.tag-editor') : null; }
+function tagEditorTags(editor) { return normalizeCssMacroTags(editor.querySelector('.tag-editor-value').value); }
+function tagEditorRender(editor) { // 칩과 placeholder 를 값에 맞춰 다시 그린다
+  const tags = tagEditorTags(editor), input = editor.querySelector('.tag-editor-input');
+  editor.querySelector('.tag-editor-chips').innerHTML = tags.map(tag => '<span class="record-session-tag-chip"><span>' + esc(tag) + '</span><button type="button" class="record-session-tag-chip-remove" title="태그 제거" data-tag="' + esc(encodeURIComponent(tag)) + '" onmousedown="event.preventDefault()" onclick="tagEditorRemove(this)">×</button></span>').join('');
+  input.placeholder = tags.length ? '' : (editor.dataset.placeholder || '');
+}
+function tagEditorRefresh(valueEl) { const editor = tagEditorOf(valueEl); if (editor) tagEditorRender(editor); } // 코드가 값(value)을 바꾼 뒤 호출
+function tagEditorSet(editor, tags) {
+  const valueEl = editor.querySelector('.tag-editor-value');
+  valueEl.value = normalizeCssMacroTags(tags).map(tag => '#' + tag).join(' ');
+  tagEditorRender(editor);
+  valueEl.dispatchEvent(new Event('input', { bubbles: true })); // 북마크: 태그 추천 갱신
+  valueEl.dispatchEvent(new Event('change', { bubbles: true })); // MUSIC: 저장(musicEditField)
+}
+function tagEditorAdd(editor, text) { // 입력한 글을 태그 하나로(띄어쓰기 허용). '#'·쉼표가 있으면 여러 태그로 나눈다.
+  const raw = String(text || '').trim();
+  if (!raw) return false;
+  const added = raw.includes('#') || raw.includes(',') ? normalizeCssMacroTags(raw.startsWith('#') ? raw : '#' + raw) : [raw];
+  tagEditorSet(editor, tagEditorTags(editor).concat(added));
+  return true;
+}
+function tagEditorRemove(button) {
+  const editor = tagEditorOf(button), tag = decodeURIComponent(button.dataset.tag || '').toLowerCase();
+  if (editor) tagEditorSet(editor, tagEditorTags(editor).filter(item => item.toLowerCase() !== tag));
+}
+function tagEditorKey(event, input) {
+  const editor = tagEditorOf(input);
+  if (!editor || event.isComposing || event.keyCode === 229) return;
+  if (event.key === 'Enter' || event.key === ',') {
+    if (event.key === 'Enter' && !input.value.trim()) return; // 빈 칸 Enter 는 기존 동작(예: 창 저장) 유지
+    event.preventDefault();
+    if (tagEditorAdd(editor, input.value)) input.value = '';
+  } else if (event.key === 'Backspace' && !input.value) {
+    const tags = tagEditorTags(editor);
+    if (!tags.length) return;
+    event.preventDefault(); tags.pop(); tagEditorSet(editor, tags);
+  }
+}
+function tagEditorCommit(input) { // 입력칸을 벗어날 때 남은 글을 태그로 확정
+  const editor = tagEditorOf(input);
+  if (editor && tagEditorAdd(editor, input.value)) input.value = '';
 }
 function formatCssMacroTagsText(tags) {
   return normalizeCssMacroTags(tags).map(tag => `#${tag}`).join(' ');
@@ -34889,7 +34925,7 @@ function toggleBookmarkTagSuggestion(tag) {
   const tags = normalizeCssMacroTags(input.value || '');
   tags.push(tag);
   input.value = normalizeCssMacroTags(tags).map(item => `#${item}`).join(' ');
-  input.dataset.committed = input.value;
+  tagEditorRefresh(input);
   renderBookmarkTagSuggestions();
 }
 function renderBookmarkTagFilters() {
@@ -34977,7 +35013,7 @@ function openBookmarkModal(bookmarkId = '') {
   document.getElementById('bookmark-title').value = bookmark?.title || '';
   document.getElementById('bookmark-thumb').value = bookmark?.thumbnail || '';
   document.getElementById('bookmark-tags').value = normalizeCssMacroTags(bookmark?.tags).map(tag => `#${tag}`).join(' ');
-  document.getElementById('bookmark-tags').dataset.committed = document.getElementById('bookmark-tags').value;
+  tagEditorRefresh(document.getElementById('bookmark-tags'));
   document.getElementById('bookmark-notes').value = bookmark?.notes || '';
   document.getElementById('bookmark-delete-btn').style.display = bookmark ? '' : 'none';
   setBookmarkFetchStatus('');
@@ -35486,7 +35522,7 @@ function musicToggleTag(id, tag) {
   const key = musicTagKey(tag);
   track.tags = track.tags.some(t => musicTagKey(t) === key) ? track.tags.filter(t => musicTagKey(t) !== key) : normalizeCssMacroTags(track.tags.concat(tag)); // 해제는 공백 유무와 관계없이 둘 다 제거
   const input = document.querySelector('#music-modal-backdrop input[data-k="tags"]');
-  if (input) input.value = track.tags.map(t => '#' + t).join(' ');
+  if (input) { input.value = track.tags.map(t => '#' + t).join(' '); tagEditorRefresh(input); }
   const on = new Set(track.tags.map(musicTagKey));
   document.querySelectorAll('#music-modal-backdrop .music-tag-chip').forEach(chip => chip.classList.toggle('on', on.has(musicTagKey(chip.dataset.t))));
   persist(); renderMusicPage();
@@ -35679,14 +35715,16 @@ async function openMusicDetail(id, source) {
     + (track.attached && blob ? '<span class="music-hint">' + esc(track.fileName) + '</span><button type="button" onclick="musicAttachPick(\'' + id + '\')">교체</button><button type="button" class="music-danger" onclick="musicDetach(\'' + id + '\')">떼어내기</button><button type="button" onclick="musicUnlinkYoutube(\'' + id + '\')">유튜브 연결 해제</button>' : '')
     + (!track.attached ? '<button type="button" onclick="musicAttachPick(\'' + id + '\')">파일 첨부</button><span class="music-hint">또는 이 창·카드 위로 음원 파일을 끌어 놓기</span>' : '') + '</div>';
   const folderOpts = '<option value="">분류 없음</option>' + state.musicFolders.map(folder => '<option value="' + folder.id + '"' + (folder.id === track.folderId ? ' selected' : '') + '>' + esc(folder.name) + '</option>').join('');
-  const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)"' + (key === 'tags' ? ' onkeydown="tagInputEnter(event,this)" data-committed="' + esc(track.tags.map(tag => '#' + tag).join(' ')) + '"' : '') + ' value="' + esc(key === 'tags' ? track.tags.map(tag => '#' + tag).join(' ') : track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
+  const tagsField = '<div class="music-field">태그' + tagEditorHtml('data-k="tags" onchange="musicEditField(' + String.fromCharCode(39) + id + String.fromCharCode(39) + ',this)"', track.tags, '') + '</div>';
+  const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)"' + ' value="' + esc(track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
   musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + attachRow
     + (track.kind === 'file' && !url ? '<button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button>' : '')
-    + '<div class="music-fields">' + '<div class="music-fcol">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + '</div><div class="music-fcol music-fcol-tags">' + field('tags', '태그') + musicExistingTagsHtml(track) + '</div>'
+    + '<div class="music-fields">' + '<div class="music-fcol">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + '</div><div class="music-fcol music-fcol-tags">' + tagsField + musicExistingTagsHtml(track) + '</div>'
     + '<label class="music-field" style="grid-column:1/-1">폴더 <select onchange="musicEditField(\'' + id + '\',this,\'folderId\')">' + folderOpts + '</select></label>' + field('notes', '메모', 'textarea') + '</div>'
     + '<div class="music-modal-foot"><span class="music-hint">← → 이전·다음 곡</span><button type="button" class="music-danger" onclick="deleteMusicTrack(\'' + id + '\')">삭제</button></div>');
   musicPlaying = { id, url };
+  document.querySelectorAll('#music-modal-backdrop .tag-editor').forEach(tagEditorRender);
   const box = document.querySelector('#music-modal-backdrop .music-modal');
   if (box && track.kind === 'youtube') { // 이 창 어디에 놓아도 이 곡에 파일 첨부(#299)
     box.addEventListener('dragover', event => musicCardDragOver(event));
@@ -37052,13 +37090,8 @@ function toggleCssMacroPreview(itemId, button) {
   if (body) body.classList.toggle('open', open);
   if (open) refreshCssMacroTextareaHeights(card || document);
 }
-function renderCssMacroTagChips(tags, itemId) {
-  const normalized = normalizeCssMacroTags(tags);
-  if (!normalized.length) return '';
-  return normalized.map((tag, index) => `
-    <button type="button" class="css-macro-tag" title="클릭하여 수정"
-      onmousedown="event.preventDefault()" onclick="editCssMacroTag('${itemId}',${index})">#${esc(tag)}</button>
-  `).join('');
+function renderCssMacroTagChips(tags, itemId) { // 칩 태그 입력기(#311): 입력·확정·제거는 tagEditor*, 값은 updateCssMacroItemTags 로 저장
+  return tagEditorHtml('data-css-macro-id="' + itemId + '" onchange="updateCssMacroItemTags(' + String.fromCharCode(39) + itemId + String.fromCharCode(39) + ',this.value)"', tags, '태그 입력 후 Enter');
 }
 function getCssMacroResolvedContent(item) {
   if (!item) return '';
@@ -37285,6 +37318,7 @@ function updateCssMacroItemTagsPreview(itemId) {
   const wrap = document.querySelector(`.css-macro-tags[data-css-macro-id="${itemId}"]`);
   if (!wrap) return;
   wrap.innerHTML = renderCssMacroTagChips(item.tags, itemId);
+  wrap.querySelectorAll('.tag-editor').forEach(tagEditorRender);
 }
 function getCssPopupDictionaryItemById(itemId) {
   return state.cssPopupDictionary.find(item => item.id === itemId) || null;
@@ -37673,6 +37707,7 @@ function renderCssMacroPage() {
     `).join('')}
   </div>`;
   refreshCssMacroTextareaHeights(wrap);
+  wrap.querySelectorAll('.tag-editor').forEach(tagEditorRender);
 }
 function addCssMacroItem(folderId = '') {
   ensureCssMacroHistory();
@@ -37724,40 +37759,14 @@ function updateCssMacroItemTags(itemId, value) {
   const item = getCssMacroItemById(itemId);
   if (!item) return;
   ensureCssMacroHistory();
-  item.tags = normalizeCssMacroTags(value);
-  updateCssMacroItemTagsPreview(itemId);
+  item.tags = normalizeCssMacroTags(value); // 입력기는 이미 화면에 반영돼 있어 다시 그리지 않는다(입력 중 포커스 유지)
   commitCssMacroHistory(`css-macro:${itemId}:tags`);
   persist();
 }
-function addCssMacroTag(itemId) {
-  const item = getCssMacroItemById(itemId);
-  if (!item) return;
-  const input = prompt('추가할 태그를 입력하세요. (# 없이 입력해도 됩니다.)', '');
-  if (input === null) return;
-  ensureCssMacroHistory();
-  const nextTags = normalizeCssMacroTags([...(item.tags || []), ...normalizeCssMacroTags(input)]);
-  item.tags = nextTags;
-  updateCssMacroItemTagsPreview(itemId);
-  commitCssMacroHistory(`css-macro:${itemId}:tag-add`, { force: true });
-  persist();
-}
-function editCssMacroTag(itemId, tagIndex) {
-  const item = getCssMacroItemById(itemId);
-  if (!item) return;
-  const currentTags = Array.isArray(item.tags) ? item.tags.slice() : [];
-  const currentTag = currentTags[tagIndex];
-  if (!currentTag) return;
-  const input = prompt('태그를 수정하세요. 비워두면 삭제됩니다.', `#${currentTag}`);
-  if (input === null) return;
-  const trimmed = String(input || '').trim();
-  ensureCssMacroHistory();
-  currentTags.splice(tagIndex, 1);
-  const replacement = trimmed ? normalizeCssMacroTags(trimmed) : [];
-  currentTags.splice(tagIndex, 0, ...replacement);
-  item.tags = normalizeCssMacroTags(currentTags);
-  updateCssMacroItemTagsPreview(itemId);
-  commitCssMacroHistory(`css-macro:${itemId}:tag-edit`, { force: true });
-  persist();
+function addCssMacroTag(itemId) { // + 버튼: 카드를 펼치고 태그 입력칸으로 이동(#311)
+  const card = document.querySelector('.css-macro-card[data-css-macro-id="' + itemId + '"]');
+  if (card && !isCssMacroPreviewOpen(itemId)) toggleCssMacroPreview(itemId, card.querySelector('.css-macro-card-toggle') || card.querySelector('.css-macro-card-head'));
+  document.querySelector('.css-macro-tags[data-css-macro-id="' + itemId + '"] .tag-editor-input')?.focus();
 }
 function copyCssMacroItem(itemId, btn) {
   const item = getCssMacroItemById(itemId);
