@@ -35222,6 +35222,7 @@ function normalizeMusicTrack(input = {}) {
     fileName: str('fileName'), size: Number(input?.size) || 0,
     attached: input?.kind === 'youtube' && input?.attached === true, // 유튜브 트랙에 PC 음원 파일 첨부(Blob 은 이 기기 MUSIC_DB 에만, #257)
     youtubeId: str('youtubeId'), url: str('url'), thumbnail: str('thumbnail'),
+    aiTagSuggestions: Array.isArray(input?.aiTagSuggestions) ? input.aiTagSuggestions.filter(tag => typeof tag === 'string') : null, // AI 추천 태그(#285): null=아직 요청 안 함
   };
 }
 function normalizeMusicCollections() {
@@ -35467,9 +35468,8 @@ function musicToggleTag(id, tag) {
   document.querySelectorAll('#music-modal-backdrop .music-tag-chip').forEach(chip => chip.classList.toggle('on', on.has(chip.dataset.t.toLowerCase())));
   persist(); renderMusicPage();
 }
-// ── AI 태그 추천(#285): 추천만, 저장은 사용자가 칩을 눌러서. API 키는 이 기기 localStorage 에만 두고 동기화·내보내기 payload 에 넣지 않으며 로그·오류 문구에 출력하지 않는다 ──
-const MUSIC_AI_KEY_STORE = 'trpg-music-ai-key', MUSIC_AI_MODEL_STORE = 'trpg-music-ai-model', MUSIC_AI_DEFAULT_MODEL = 'claude-opus-5-5', MUSIC_AI_MAX_TAGS = 6;
-const MUSIC_AI_NOTICE = '곡 제목·아티스트·앨범이 Anthropic API 로 전송됩니다. API 키는 이 기기 브라우저에만 저장됩니다.';
+// ── AI 태그 추천(#285): 곡 추가 직후·상세 열 때 자동 1회, 결과는 track.aiTagSuggestions 에 저장하고 태그 반영은 사용자가 칩을 눌러서. API 키는 이 기기 localStorage 에만 두고 동기화·내보내기 payload 에 넣지 않으며 로그·오류 문구에 출력하지 않는다 ──
+const MUSIC_AI_KEY_STORE = 'trpg-music-ai-key', MUSIC_AI_MODEL_STORE = 'trpg-music-ai-model', MUSIC_AI_DEFAULT_MODEL = 'claude-haiku-5-5', MUSIC_AI_MAX_TAGS = 6;
 function musicAiGet(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
 function musicAiPresets() { // 저장 태그(공백 제거형) → { ko, en, cat }
   const map = {};
@@ -35511,29 +35511,32 @@ async function musicAiRequestTags(track, key, model) {
   return musicAiParse(await res.json());
 }
 const MUSIC_AI_ERRORS = { refusal: '모델이 이 요청에 답하지 않았습니다.', auth: 'API 키가 올바르지 않습니다. AI 태그 설정을 확인하세요.', rate: '요청 한도를 넘었습니다. 잠시 후 다시 시도하세요.', network: '네트워크 오류로 추천을 가져오지 못했습니다.', http: '추천을 가져오지 못했습니다.' };
-async function musicAiSuggest(id) {
-  const track = state.musicTracks.find(item => item.id === id);
-  const status = document.getElementById('music-ai-status'), box = document.getElementById('music-ai-rec');
-  if (!track || !status || !box) return;
-  const key = musicAiGet(MUSIC_AI_KEY_STORE, '');
-  if (!key) { status.textContent = 'AI 태그 설정에서 API 키를 먼저 입력하세요.'; return; } // 키가 없으면 호출하지 않는다
-  status.textContent = '추천 중… (' + MUSIC_AI_NOTICE + ')';
-  let tags;
-  try { tags = await musicAiRequestTags(track, key, musicAiGet(MUSIC_AI_MODEL_STORE, MUSIC_AI_DEFAULT_MODEL)); }
-  catch (e) { const st = document.getElementById('music-ai-status'); if (st) st.textContent = MUSIC_AI_ERRORS[e && e.message] || MUSIC_AI_ERRORS.http; return; }
-  const boxNow = document.getElementById('music-ai-rec');
-  if (!boxNow || boxNow.dataset.id !== id) return; // 모달이 닫히거나 다른 곡으로 바뀐 뒤 온 응답은 무시
+const musicAiTried = new Set(); // 이번 세션에 이미 요청한 곡(실패해도 재시도하지 않는다)
+function musicAiRecHtml(track) {
   const presets = musicAiPresets(), on = new Set(track.tags.map(tag => tag.toLowerCase()));
-  boxNow.innerHTML = tags.map(tag => '<button type="button" class="music-tag-chip rec' + (on.has(tag.toLowerCase()) ? ' on' : '') + '" data-t="' + esc(tag) + '" title="' + esc(presets[tag].en) + '" onclick="musicToggleTag(' + String.fromCharCode(39) + id + String.fromCharCode(39) + ',this.dataset.t)">' + esc(presets[tag].ko) + '</button>').join('');
-  document.getElementById('music-ai-status').textContent = tags.length ? '추천 ' + tags.length + '개 — 눌러서 붙이세요.' : '어울리는 태그를 찾지 못했습니다.';
+  const tags = (track.aiTagSuggestions || []).filter(tag => presets[tag]);
+  return tags.length ? '<span class="music-hint">추천</span>' + tags.map(tag => '<button type="button" class="music-tag-chip rec' + (on.has(tag.toLowerCase()) ? ' on' : '') + '" data-t="' + esc(tag) + '" title="' + esc(presets[tag].en) + '" onclick="musicToggleTag(' + String.fromCharCode(39) + track.id + String.fromCharCode(39) + ',this.dataset.t)">' + esc(presets[tag].ko) + '</button>').join('') : '';
+}
+// 키가 없거나 이미 추천이 있거나 이번 세션에 요청했으면 조용히 건너뛴다. 실패해도 조용히 끝(재시도 안 함).
+async function musicAiAuto(track) {
+  const key = musicAiGet(MUSIC_AI_KEY_STORE, '');
+  if (!key || !track || Array.isArray(track.aiTagSuggestions) || musicAiTried.has(track.id)) return;
+  musicAiTried.add(track.id);
+  let tags;
+  try { tags = await musicAiRequestTags(track, key, musicAiGet(MUSIC_AI_MODEL_STORE, MUSIC_AI_DEFAULT_MODEL)); } catch (e) { return; }
+  const now = state.musicTracks.find(item => item.id === track.id);
+  if (!now) return; // 그 사이 삭제됨
+  now.aiTagSuggestions = tags;
+  persist();
+  const box = document.getElementById('music-ai-rec');
+  if (box && box.dataset.id === now.id) box.innerHTML = musicAiRecHtml(now); // 상세가 열려 있으면 바로 표시
 }
 function openMusicAiSettings() {
   const hasKey = !!musicAiGet(MUSIC_AI_KEY_STORE, '');
   musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">AI 태그 설정</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<label class="music-field">Anthropic API 키<input id="music-ai-key" type="password" autocomplete="off" placeholder="' + (hasKey ? '저장됨 (●●●●) — 바꾸려면 새 키 입력' : 'sk-ant-...') + '"></label>'
     + '<label class="music-field">모델<input id="music-ai-model" type="text" value="' + esc(musicAiGet(MUSIC_AI_MODEL_STORE, MUSIC_AI_DEFAULT_MODEL)) + '" spellcheck="false"></label>'
-    + '<div class="music-hint">' + esc(MUSIC_AI_NOTICE) + ' 비용은 선택한 모델 기준으로 사용자 계정에 청구됩니다.</div>'
-    + '<div class="music-modal-foot">' + (hasKey ? '<button type="button" class="music-danger" onclick="musicAiClearKey()">키 삭제</button>' : '<span></span>') + '<button type="button" class="music-primary" onclick="musicAiSaveSettings()">저장</button></div>');
+       + '<div class="music-modal-foot">' + (hasKey ? '<button type="button" class="music-danger" onclick="musicAiClearKey()">키 삭제</button>' : '<span></span>') + '<button type="button" class="music-primary" onclick="musicAiSaveSettings()">저장</button></div>');
 }
 function musicAiSaveSettings() {
   const key = document.getElementById('music-ai-key').value.trim(), model = document.getElementById('music-ai-model').value.trim();
@@ -35542,7 +35545,7 @@ function musicAiSaveSettings() {
 }
 function musicAiClearKey() { try { localStorage.removeItem(MUSIC_AI_KEY_STORE); } catch (e) {} musicCloseModal(); showToast('API 키를 삭제했습니다.'); }
 function musicAiRowHtml(track) {
-  return '<div class="music-ai"><button type="button" onclick="musicAiSuggest(' + String.fromCharCode(39) + track.id + String.fromCharCode(39) + ')">AI 추천</button><span class="music-hint" id="music-ai-status"></span><div class="music-tag-sub" id="music-ai-rec" data-id="' + esc(track.id) + '"></div></div>';
+  return '<div class="music-ai" id="music-ai-rec" data-id="' + esc(track.id) + '">' + musicAiRecHtml(track) + '</div>';
 }
 async function openMusicDetail(id, source) {
   const track = state.musicTracks.find(item => item.id === id);
@@ -35566,6 +35569,7 @@ async function openMusicDetail(id, source) {
     + '<label class="music-field">폴더 <select onchange="musicEditField(\'' + id + '\',this,\'folderId\')">' + folderOpts + '</select></label>' + field('notes', '메모', 'textarea') + '</div>'
     + '<div class="music-modal-foot"><span class="music-hint">← → 이전·다음 곡</span><button type="button" class="music-danger" onclick="deleteMusicTrack(\'' + id + '\')">삭제</button></div>');
   musicPlaying = { id, url };
+  musicAiAuto(track); // 추천이 없으면 자동 1회(#285)
 }
 function musicEditField(id, el, key) {
   const track = state.musicTracks.find(item => item.id === id);
@@ -35638,7 +35642,7 @@ function musicIsAudioFile(file) { return MUSIC_AUDIO_EXTS.includes(String(file.n
 async function musicAddFiles(fileList) {
   const files = [...fileList].filter(musicIsAudioFile);
   if (!files.length) { showToast('지원하는 음원 파일(' + MUSIC_AUDIO_EXTS.join(', ') + ')이 없습니다.'); return; }
-  const target = state.musicFolders.some(folder => folder.id === musicView.folder) ? musicView.folder : '';
+  const target = state.musicFolders.some(folder => folder.id === musicView.folder) ? musicView.folder : '', addedTracks = [];
   for (const file of files) {
     const tags = await musicReadTags(file);
     const track = normalizeMusicTrack({ kind: 'file', title: tags.title || file.name.replace(/\.[^.]+$/, ''), artist: tags.artist, album: tags.album, fileName: file.name, size: file.size, folderId: target, addedAt: Date.now(), duration: await musicAudioDuration(file) });
@@ -35648,8 +35652,10 @@ async function musicAddFiles(fileList) {
     } catch (e) { showToast('저장 실패: ' + file.name + ' (' + (e?.message || e) + ')'); continue; }
     musicLocalIds.add(track.id);
     state.musicTracks.push(track);
+    addedTracks.push(track);
   }
   persist(); renderMusicPage();
+  addedTracks.forEach(musicAiAuto);
 }
 function musicPickFiles() {
   const input = document.createElement('input');
@@ -35789,8 +35795,9 @@ function musicAddYoutube() {
   const id = musicParseYoutubeId(document.getElementById('music-yt-url').value);
   if (!id) { document.getElementById('music-yt-error').textContent = '유튜브 링크를 알아볼 수 없습니다.'; return; }
   const target = state.musicFolders.some(folder => folder.id === musicView.folder) ? musicView.folder : '';
-  state.musicTracks.push(normalizeMusicTrack({ kind: 'youtube', youtubeId: id, url: 'https://www.youtube.com/watch?v=' + id, thumbnail: musicYtThumbFor(id), title: document.getElementById('music-yt-title').value.trim() || '유튜브 ' + id, artist: document.getElementById('music-yt-artist').value.trim(), album: document.getElementById('music-yt-album').value.trim(), folderId: target, addedAt: Date.now() }));
-  persist(); musicCloseModal(); renderMusicPage();
+  const added = normalizeMusicTrack({ kind: 'youtube', youtubeId: id, url: 'https://www.youtube.com/watch?v=' + id, thumbnail: musicYtThumbFor(id), title: document.getElementById('music-yt-title').value.trim() || '유튜브 ' + id, artist: document.getElementById('music-yt-artist').value.trim(), album: document.getElementById('music-yt-album').value.trim(), folderId: target, addedAt: Date.now() });
+  state.musicTracks.push(added);
+  persist(); musicCloseModal(); renderMusicPage(); musicAiAuto(added);
 }
 // 페이지에 파일 끌어 놓기
 document.addEventListener('dragover', event => { if (currentPage === 'music' && event.dataTransfer?.types?.includes('Files')) event.preventDefault(); });
