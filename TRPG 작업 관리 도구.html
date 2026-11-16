@@ -2193,6 +2193,13 @@ tr.ct-row-end .ct-select:focus {
 .music-field input, .music-field textarea, .music-field select { border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12.5px; font-weight: 400; color: #222; }
 .music-field textarea { min-height: 60px; resize: vertical; }
 .music-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.music-tag-presets { grid-column: 1 / -1; font-size: 11.5px; }
+.music-tag-presets summary { cursor: pointer; color: #666; font-weight: 700; }
+.music-tag-cat { font-weight: 800; color: #333; margin-top: 8px; }
+.music-tag-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; }
+.music-tag-sub > span { color: #999; min-width: 80px; }
+.music-modal button.music-tag-chip { border-radius: 999px; padding: 2px 8px; font-size: 11px; }
+.music-modal button.music-tag-chip.on { background: #111; color: #fff; border-color: #111; }
 .music-fields .music-field:last-child { grid-column: 1 / -1; }
 .music-player { background: #000; border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; min-height: 54px; }
 .music-player .music-yt { width: 100%; aspect-ratio: 16 / 9; border: 0; }
@@ -35420,6 +35427,43 @@ function musicStep(dir) {
   if (at < 0 || !list.length) return;
   openMusicDetail(list[(at + dir + list.length) % list.length].id);
 }
+// 분위기 태그 예시(#284): 대분류 → [소분류, '한글|영어, ...']. 저장은 한글(공백 제거), 영어는 칩 title 로만.
+const MUSIC_TAG_PRESETS = [
+  ['감정 및 정서', [
+    ['긍정·밝음', '경쾌한|Cheerful, 행복한|Happy, 희망찬|Hopeful, 설레는|Romantic, 따뜻한|Warm, 유쾌한|Playful'],
+    ['부정·어두움', '우울한|Melancholic, 슬픈|Sad, 비장한|Dramatic, 분노한|Angry, 긴장감 있는|Tense, 공포스러운|Eerie'],
+    ['평온·안정', '차분한|Calm, 평화로운|Peaceful, 릴랙스한|Relaxing, 몽환적인|Dreamy, 아련한|Nostalgic']]],
+  ['에너지 및 속도감', [
+    ['고에너지·빠름', '신나는|Energetic, 역동적인|Dynamic, 강렬한|Intense, 웅장한|Epic, 펑키한|Groovy, 공격적인|Aggressive'],
+    ['저에너지·느림', '잔잔한|Mellow, 나른한|Chill, 느긋한|Laid-back, 고요한|Serene, 무거운|Heavy']]],
+  ['공간감 및 질감', [
+    ['질감', '부드러운|Soft, 거친|Raw/Gritty, 맑고 투명한|Crisp/Clear, 묵직한|Deep, 몽글몽글한|Lush'],
+    ['공간·계절감', '시원한|Breezy, 청량한|Refreshing, 포근한|Cozy, 어둡고 습한|Dark/Moody, 우주적인|Atmospheric/Spacey']]],
+  ['상황 및 용도별 느낌', [
+    ['휴식 및 집중', '수면용|Sleep, 명상|Meditation, 공부 및 집중|Focus, 카페 분위기|Cafe/Lounge'],
+    ['활동 및 사교', '드라이브|Driving, 운동 및 러닝|Workout, 파티|Party, 페스티벌|Festival'],
+    ['시간 및 날씨', '새벽 감성|Late Night, 비 오는 날|Rainy Day, 맑은 아침|Morning']]],
+];
+// 태그 입력칸은 공백으로 태그를 나누므로(normalizeCssMacroTags) 공백 있는 예시는 공백을 뺀 형태로 저장한다(예: 긴장감있는)
+function musicPresetTag(ko) { return ko.replace(/\s+/g, ''); }
+function musicTagPresetsHtml(track) {
+  const on = new Set(track.tags.map(tag => tag.toLowerCase()));
+  return '<details class="music-tag-presets"><summary>태그 예시</summary>' + MUSIC_TAG_PRESETS.map(([cat, subs]) => '<div class="music-tag-cat">' + esc(cat) + '</div>' + subs.map(([sub, list]) => '<div class="music-tag-sub"><span>' + esc(sub) + '</span>' + list.split(', ').map(item => {
+    const [ko, en] = item.split('|'), tag = musicPresetTag(ko);
+    return '<button type="button" class="music-tag-chip' + (on.has(tag.toLowerCase()) ? ' on' : '') + '" data-t="' + esc(tag) + '" title="' + esc(en) + '" onclick="musicToggleTag(' + String.fromCharCode(39) + track.id + String.fromCharCode(39) + ',this.dataset.t)">' + esc(ko) + '</button>';
+  }).join('') + '</div>').join('')).join('') + '</details>';
+}
+function musicToggleTag(id, tag) {
+  const track = state.musicTracks.find(item => item.id === id);
+  if (!track) return;
+  const key = tag.toLowerCase();
+  track.tags = track.tags.some(t => t.toLowerCase() === key) ? track.tags.filter(t => t.toLowerCase() !== key) : normalizeCssMacroTags(track.tags.concat(tag));
+  const input = document.querySelector('#music-modal-backdrop input[data-k="tags"]');
+  if (input) input.value = track.tags.map(t => '#' + t).join(' ');
+  const on = new Set(track.tags.map(t => t.toLowerCase()));
+  document.querySelectorAll('#music-modal-backdrop .music-tag-chip').forEach(chip => chip.classList.toggle('on', on.has(chip.dataset.t.toLowerCase())));
+  persist(); renderMusicPage();
+}
 async function openMusicDetail(id, source) {
   const track = state.musicTracks.find(item => item.id === id);
   if (!track) return;
@@ -35438,7 +35482,7 @@ async function openMusicDetail(id, source) {
   musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + attachRow
     + (track.kind === 'file' && !url ? '<button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button>' : '')
-    + '<div class="music-fields">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + field('tags', '태그')
+    + '<div class="music-fields">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + field('tags', '태그') + musicTagPresetsHtml(track)
     + '<label class="music-field">폴더 <select onchange="musicEditField(\'' + id + '\',this,\'folderId\')">' + folderOpts + '</select></label>' + field('notes', '메모', 'textarea') + '</div>'
     + '<div class="music-modal-foot"><span class="music-hint">← → 이전·다음 곡</span><button type="button" class="music-danger" onclick="deleteMusicTrack(\'' + id + '\')">삭제</button></div>');
   musicPlaying = { id, url };
