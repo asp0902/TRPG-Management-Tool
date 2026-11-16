@@ -35390,7 +35390,7 @@ function renderMusicCard(track) {
   const hasFile = track.kind === 'file' || track.attached;
   const missing = hasFile && !musicLocalIds.has(track.id);
   const canDrop = track.kind === 'youtube';
-  return '<div class="music-card" draggable="true" data-id="' + track.id + '" ondragstart="event.dataTransfer.setData(\'text/music-track\',\'' + track.id + '\')" onclick="openMusicDetail(\'' + track.id + '\')"' + (canDrop ? ' ondragover="musicCardDragOver(event)" ondragleave="this.classList.remove(\'drop-target\')" ondrop="musicCardDrop(event,\'' + track.id + '\')"' : '') + ' style="border-top-color:' + (folder?.color || '#e5e5e5') + '">'
+  return '<div class="music-card" draggable="true" data-id="' + track.id + '" ondragstart="event.dataTransfer.setData(\'text/music-track\',\'' + track.id + '\')" onclick="openMusicDetail(\'' + track.id + '\')" oncontextmenu="musicCardContext(event,\'' + track.id + '\')"' + (canDrop ? ' ondragover="musicCardDragOver(event)" ondragleave="this.classList.remove(\'drop-target\')" ondrop="musicCardDrop(event,\'' + track.id + '\')"' : '') + ' style="border-top-color:' + (folder?.color || '#e5e5e5') + '">'
     + '<div class="music-card-cover">' + (cover ? '<img src="' + esc(cover) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span>♪</span>') + (track.kind === 'youtube' ? '<i class="music-card-yt">YouTube</i>' : '') + (track.kind === 'youtube' && track.attached ? '<i class="music-card-file">파일</i>' : '') + '</div>'
     + '<div class="music-card-body"><div class="music-card-title">' + esc(musicTrackTitle(track)) + '</div>'
     + '<div class="music-card-sub">' + esc(track.artist || '') + '</div>'
@@ -35697,6 +35697,22 @@ function musicEditField(id, el, key) {
   track[key] = key === 'tags' ? normalizeCssMacroTags(el.value) : el.value;
   if (key === 'title') document.querySelector('#music-modal-backdrop .music-modal-title').textContent = musicTrackTitle(track);
   persist(); renderMusicPage();
+}
+// 카드 우클릭 메뉴(#306): 수정하기(상세 창 열기) / 삭제하기(확인 후 삭제)
+function musicCloseCardMenu() { document.getElementById('music-card-menu')?.remove(); }
+function musicCardContext(event, id) {
+  event.preventDefault(); event.stopPropagation();
+  musicCloseCardMenu();
+  const menu = document.createElement('div');
+  menu.id = 'music-card-menu'; menu.className = 'ds-ctx-menu open';
+  menu.innerHTML = '<div class="ds-ctx-item" data-act="edit">수정하기</div><div class="ds-ctx-item danger" data-act="delete">삭제하기</div>';
+  menu.addEventListener('click', e => { const act = e.target.dataset && e.target.dataset.act; if (!act) return; musicCloseCardMenu(); if (act === 'edit') openMusicDetail(id); else deleteMusicTrack(id); });
+  menu.addEventListener('contextmenu', e => e.preventDefault());
+  document.body.appendChild(menu);
+  menu.style.left = Math.max(4, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 4)) + 'px';
+  menu.style.top = Math.max(4, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 4)) + 'px';
+  const close = e => { if (e.type === 'mousedown' && menu.contains(e.target)) return; musicCloseCardMenu(); ['mousedown', 'keydown', 'scroll', 'resize', 'blur'].forEach(t => window.removeEventListener(t, close, true)); };
+  setTimeout(() => ['mousedown', 'keydown', 'scroll', 'resize', 'blur'].forEach(t => window.addEventListener(t, close, true)), 0);
 }
 async function deleteMusicTrack(id) {
   const track = state.musicTracks.find(item => item.id === id);

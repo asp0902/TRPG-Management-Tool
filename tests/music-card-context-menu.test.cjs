@@ -1,0 +1,10 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+const BS = String.fromCharCode(92);
+ok(html.includes('oncontextmenu="musicCardContext(event,' + BS + "'" + "' + track.id + '" + BS + "'" + ")\"'"), '카드에 우클릭 핸들러');
+const fn = html.slice(html.indexOf('function musicCardContext'), html.indexOf('async function deleteMusicTrack'));
+ok(fn.includes('event.preventDefault()') && fn.includes('data-act="edit">수정하기') && fn.includes('data-act="delete">삭제하기'), '메뉴: 수정하기·삭제하기(기본 우클릭 메뉴 대체)');
+ok(fn.includes("openMusicDetail(id)") && fn.includes('deleteMusicTrack(id)'), '수정하기=상세 창 열기, 삭제하기=기존 삭제(확인창 포함)');
+ok(fn.includes("['mousedown', 'keydown', 'scroll', 'resize', 'blur']") && fn.includes('window.innerWidth - menu.offsetWidth'), '바깥 클릭·Esc·스크롤로 닫힘, 화면 가장자리 보정');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);
