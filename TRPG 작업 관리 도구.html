@@ -2193,14 +2193,10 @@ tr.ct-row-end .ct-select:focus {
 .music-field input, .music-field textarea, .music-field select { border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12.5px; font-weight: 400; color: #222; }
 .music-field textarea { min-height: 60px; resize: vertical; }
 .music-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.music-rec { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11.5px; }
+.music-fcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; } /* 왼쪽: 제목·아티스트·앨범 세로, 오른쪽: 태그(#298 후속) */
+.music-rec { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11.5px; }
 .music-rec:empty { display: none; }
 .music-modal button.music-tag-chip.rec { border-style: dashed; }
-.music-tag-presets { grid-column: 1 / -1; font-size: 11.5px; }
-.music-tag-presets summary { cursor: pointer; color: #666; font-weight: 700; }
-.music-tag-cat { font-weight: 800; color: #333; margin-top: 8px; }
-.music-tag-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; }
-.music-tag-sub > span { color: #999; min-width: 80px; }
 .music-modal button.music-tag-chip { border-radius: 999px; padding: 2px 8px; font-size: 11px; }
 .music-modal button.music-tag-chip.on { background: #111; color: #fff; border-color: #111; }
 .music-fields .music-field:last-child { grid-column: 1 / -1; }
@@ -35469,7 +35465,7 @@ function musicStep(dir) {
   if (at < 0 || !list.length) return;
   openMusicDetail(list[(at + dir + list.length) % list.length].id);
 }
-// 분위기 태그 예시(#284): 대분류 → [소분류, '한글|영어, ...']. 저장은 한글(공백 제거), 영어는 칩 title 로만.
+// 분위기 태그 프리셋(#284, 소리 분석 추천 #286 의 태그 이름·영어 표기에 사용): 대분류 → [소분류, '한글|영어, ...']. 저장은 한글 그대로, 영어는 칩 title 로만.
 const MUSIC_TAG_PRESETS = [
   ['감정 및 정서', [
     ['긍정·밝음', '경쾌한|Cheerful, 행복한|Happy, 희망찬|Hopeful, 설레는|Romantic, 따뜻한|Warm, 유쾌한|Playful'],
@@ -35489,13 +35485,6 @@ const MUSIC_TAG_PRESETS = [
 // 프리셋 태그는 공백 포함 한글 그대로 저장한다(예: 긴장감 있는). 켜짐 판정·해제는 공백을 무시하고 비교해 옛 저장값(긴장감있는)도 같은 태그로 본다(#292).
 function musicPresetTag(ko) { return ko.replace(/\s+/g, ' ').trim(); }
 function musicTagKey(tag) { return String(tag || '').replace(/\s+/g, '').toLowerCase(); }
-function musicTagPresetsHtml(track) {
-  const on = new Set(track.tags.map(musicTagKey));
-  return '<details class="music-tag-presets"><summary>태그 예시</summary>' + MUSIC_TAG_PRESETS.map(([cat, subs]) => '<div class="music-tag-cat">' + esc(cat) + '</div>' + subs.map(([sub, list]) => '<div class="music-tag-sub"><span>' + esc(sub) + '</span>' + list.split(', ').map(item => {
-    const [ko, en] = item.split('|'), tag = musicPresetTag(ko);
-    return '<button type="button" class="music-tag-chip' + (on.has(musicTagKey(tag)) ? ' on' : '') + '" data-t="' + esc(tag) + '" title="' + esc(en) + '" onclick="musicToggleTag(' + String.fromCharCode(39) + track.id + String.fromCharCode(39) + ',this.dataset.t)">' + esc(ko) + '</button>';
-  }).join('') + '</div>').join('')).join('') + '</details>';
-}
 function musicToggleTag(id, tag) {
   const track = state.musicTracks.find(item => item.id === id);
   if (!track) return;
@@ -35777,8 +35766,8 @@ async function openMusicDetail(id, source) {
   musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + attachRow
     + (track.kind === 'file' && !url ? '<button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button>' : '')
-    + '<div class="music-fields">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + field('tags', '태그') + musicRecRowHtml(track) + musicTagPresetsHtml(track)
-    + '<label class="music-field">폴더 <select onchange="musicEditField(\'' + id + '\',this,\'folderId\')">' + folderOpts + '</select></label>' + field('notes', '메모', 'textarea') + '</div>'
+    + '<div class="music-fields">' + '<div class="music-fcol">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + '</div><div class="music-fcol">' + field('tags', '태그') + musicRecRowHtml(track) + '</div>'
+    + '<label class="music-field" style="grid-column:1/-1">폴더 <select onchange="musicEditField(\'' + id + '\',this,\'folderId\')">' + folderOpts + '</select></label>' + field('notes', '메모', 'textarea') + '</div>'
     + '<div class="music-modal-foot"><span class="music-hint">← → 이전·다음 곡</span><button type="button" class="music-danger" onclick="deleteMusicTrack(\'' + id + '\')">삭제</button></div>');
   musicPlaying = { id, url };
 }

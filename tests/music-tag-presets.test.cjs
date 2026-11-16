@@ -2,8 +2,9 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
 let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
 const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
-ok(html.includes("+ field('tags', '태그') + musicRecRowHtml(track) + musicTagPresetsHtml(track)"), '태그 칸 아래에 예시 삽입');
-ok(html.includes('.music-tag-presets { grid-column: 1 / -1;') && html.includes('.music-modal button.music-tag-chip.on {'), 'CSS');
+ok(!html.includes('musicTagPresetsHtml') && !html.includes('music-tag-presets') && !html.includes('태그 예시'), '태그 예시(접이식 프리셋 칩) 삭제(#298)');
+ok(html.includes("'<div class=\"music-fcol\">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + '</div><div class=\"music-fcol\">' + field('tags', '태그') + musicRecRowHtml(track) + '</div>'"), '왼쪽: 제목·아티스트·앨범 세로 / 오른쪽: 태그');
+ok(html.includes('.music-fcol { display: flex; flex-direction: column;') && html.includes('.music-modal button.music-tag-chip.on {'), 'CSS(세로 열·추천 칩)');
 const code = cut('function normalizeCssMacroTags', 'function formatCssMacroTagsText') + cut('const MUSIC_TAG_PRESETS', 'async function openMusicDetail');
 const chips = [];
 const mkChip = t => ({ dataset: { t }, on: false, classList: { toggle(c, v) { this.owner.on = !!v; }, owner: null } });
@@ -11,7 +12,7 @@ const tagInput = { value: '' };
 let persisted = 0, rendered = 0;
 const ctx = { esc: x => String(x), state: { musicTracks: [{ id: 'm1', tags: ['내태그'] }] }, persist: () => persisted++, renderMusicPage: () => rendered++,
   document: { querySelector: () => tagInput, querySelectorAll: () => chips }, console };
-vm.createContext(ctx); vm.runInContext(code + ';this.f={MUSIC_TAG_PRESETS,musicPresetTag,musicTagKey,musicTagPresetsHtml,musicToggleTag,normalizeCssMacroTags}', ctx);
+vm.createContext(ctx); vm.runInContext(code + ';this.f={MUSIC_TAG_PRESETS,musicPresetTag,musicTagKey,musicToggleTag,normalizeCssMacroTags}', ctx);
 const f = ctx.f;
 // 프리셋 규모(이슈 본문 기준): 대분류 4, 소분류 10, 칩 49
 const all = f.MUSIC_TAG_PRESETS.flatMap(([c, subs]) => subs.flatMap(([s, list]) => list.split(', ').map(i => i.split('|'))));
@@ -28,10 +29,6 @@ ok(f.musicPresetTag('긴장감 있는') === '긴장감 있는' && f.musicPresetT
 ok(f.musicTagKey('긴장감 있는') === f.musicTagKey('긴장감있는'), '칩 판정은 공백 무시 비교');
 // HTML: title=영어, 표시=한글, 붙은 태그는 on
 const track = ctx.state.musicTracks[0]; track.tags = ['긴장감있는', '내태그']; // 옛 저장값(공백 없음)
-const h = f.musicTagPresetsHtml(track);
-ok(h.includes('<details class="music-tag-presets"><summary>태그 예시</summary>') && !h.includes('<details class="music-tag-presets" open'), '접이식 기본 접힘');
-ok(h.includes('title="Tense"') && h.includes('>긴장감 있는</button>') && h.includes('data-t="긴장감 있는"'), '영어는 title, 한글 표시·공백 포함 저장 태그');
-ok(/class="music-tag-chip on" data-t="긴장감 있는"/.test(h) && /class="music-tag-chip" data-t="경쾌한"/.test(h), '옛 저장값(긴장감있는)도 「긴장감 있는」 칩이 켜짐');
 // 토글: 추가 → 입력칸·칩·persist/render, 해제, 사용자 태그 공존
 chips.push(...['경쾌한', '긴장감 있는', '내태그'].map(t => { const c = mkChip(t); c.classList.owner = c; return c; }));
 track.tags = ['내태그'];
