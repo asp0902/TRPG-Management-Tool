@@ -35232,6 +35232,7 @@ function normalizeMusicTrack(input = {}) {
     attached: input?.kind === 'youtube' && input?.attached === true, // 유튜브 트랙에 PC 음원 파일 첨부(Blob 은 이 기기 MUSIC_DB 에만, #257)
     youtubeId: str('youtubeId'), url: str('url'), thumbnail: str('thumbnail'),
     aiTagSuggestions: Array.isArray(input?.aiTagSuggestions) ? input.aiTagSuggestions.filter(tag => typeof tag === 'string') : null, // AI 추천 태그(#285): null=아직 요청 안 함
+    soundTagSuggestions: Array.isArray(input?.soundTagSuggestions) ? input.soundTagSuggestions.filter(tag => typeof tag === 'string') : null, // 소리 분석 추천 태그(#286)
   };
 }
 function normalizeMusicCollections() {
@@ -35523,8 +35524,8 @@ const MUSIC_AI_ERRORS = { refusal: '모델이 이 요청에 답하지 않았습�
 const musicAiTried = new Set(); // 이번 세션에 이미 요청한 곡(실패해도 재시도하지 않는다)
 function musicAiRecHtml(track) {
   const presets = musicAiPresets(), on = new Set(track.tags.map(tag => tag.toLowerCase()));
-  const tags = (track.aiTagSuggestions || []).filter(tag => presets[tag]);
-  return tags.length ? '<span class="music-hint">추천</span>' + tags.map(tag => '<button type="button" class="music-tag-chip rec' + (on.has(tag.toLowerCase()) ? ' on' : '') + '" data-t="' + esc(tag) + '" title="' + esc(presets[tag].en) + '" onclick="musicToggleTag(' + String.fromCharCode(39) + track.id + String.fromCharCode(39) + ',this.dataset.t)">' + esc(presets[tag].ko) + '</button>').join('') : '';
+  const group = (label, list) => { const tags = (list || []).filter(tag => presets[tag]); return tags.length ? '<span class="music-hint">' + label + '</span>' + tags.map(tag => '<button type="button" class="music-tag-chip rec' + (on.has(tag.toLowerCase()) ? ' on' : '') + '" data-t="' + esc(tag) + '" title="' + esc(presets[tag].en) + '" onclick="musicToggleTag(' + String.fromCharCode(39) + track.id + String.fromCharCode(39) + ',this.dataset.t)">' + esc(presets[tag].ko) + '</button>').join('') : ''; };
+  return group('AI 추천', track.aiTagSuggestions) + group('소리 분석', track.soundTagSuggestions); // 출처 구분(#286)
 }
 // 키가 없거나 이미 추천이 있거나 이번 세션에 요청했으면 조용히 건너뛴다. 실패해도 조용히 끝(재시도 안 함).
 async function musicAiAuto(track) {
@@ -35557,8 +35558,87 @@ function musicAiSaveKeyFromInput() { // 값이 있을 때만 저장. 저장했�
 }
 function musicAiClearKey() { try { localStorage.removeItem(MUSIC_AI_KEY_STORE); } catch (e) {} musicAiKeyFieldRefresh(); showToast('API 키를 삭제했습니다.'); }
 function musicAiRowHtml(track) {
-  const hint = !musicAiGet(MUSIC_AI_KEY_STORE, '') && !(track.aiTagSuggestions && track.aiTagSuggestions.length) ? '<span class="music-hint">동기화 설정에서 API 키를 입력하세요</span>' : '';
+  const hint = !musicAiGet(MUSIC_AI_KEY_STORE, '') && !(track.aiTagSuggestions && track.aiTagSuggestions.length) && !(track.soundTagSuggestions && track.soundTagSuggestions.length) ? '<span class="music-hint">동기화 설정에서 API 키를 입력하세요</span>' : '';
   return '<div class="music-ai" id="music-ai-rec" data-id="' + esc(track.id) + '">' + (musicAiRecHtml(track) || hint) + '</div>';
+}
+// ── 소리 분석 태그 추천(#286): PC 파일 곡만. Web Audio 로 앞 최대 60초를 이 기기에서 분석(외부 전송 없음) → 상수 규칙표로 프리셋 태그 추천. 저장은 칩 클릭으로만 ──
+const MUSIC_SOUND_SECONDS = 60, MUSIC_SOUND_MAX_BYTES = 80 * 1024 * 1024;
+const MUSIC_SOUND_LIMITS = { energyHigh: 0.12, energyLow: 0.05, bright: 3000, dark: 1500, fast: 125, slow: 85 }; // 평균 RMS·스펙트럼 중심(Hz)·BPM 경계
+// 매핑표: [조건(f = {bpm, energy, energyVar, centroid}), 추천 태그(프리셋 저장 태그)]. bpm 0 = 박자를 못 찾음.
+const MUSIC_SOUND_RULES = [
+  [f => f.bpm >= MUSIC_SOUND_LIMITS.fast && f.energy >= MUSIC_SOUND_LIMITS.energyHigh, ['신나는', '역동적인']],
+  [f => f.bpm >= MUSIC_SOUND_LIMITS.fast && f.energy < MUSIC_SOUND_LIMITS.energyHigh, ['경쾌한']],
+  [f => f.energy >= MUSIC_SOUND_LIMITS.energyHigh && f.energyVar >= 0.5, ['강렬한']],
+  [f => f.energy <= MUSIC_SOUND_LIMITS.energyLow && (!f.bpm || f.bpm <= MUSIC_SOUND_LIMITS.slow), ['잔잔한', '느긋한', '고요한']],
+  [f => f.energy <= MUSIC_SOUND_LIMITS.energyLow && f.centroid <= MUSIC_SOUND_LIMITS.dark, ['어둡고습한', '몽환적인']],
+  [f => f.centroid >= MUSIC_SOUND_LIMITS.bright, ['맑고투명한', '청량한']],
+  [f => f.energy > MUSIC_SOUND_LIMITS.energyLow && f.energy < MUSIC_SOUND_LIMITS.energyHigh && f.bpm > 0 && f.bpm <= MUSIC_SOUND_LIMITS.slow, ['차분한']],
+];
+function musicSoundFft(re, im) { // 제자리 radix-2 FFT
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; } }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const a = i + k, b = a + len / 2, tr = re[b] * cr - im[b] * ci, ti = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+        const nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+      }
+    }
+  }
+}
+// 모노 샘플 → { bpm, energy(평균 RMS), energyVar(RMS 변동계수), centroid(스펙트럼 중심 Hz) }. 너무 짧으면 null.
+function musicSoundFeatures(x, sr) {
+  const win = 1024, hop = 512, n = Math.floor((x.length - win) / hop) + 1;
+  if (!(n >= 100)) return null;
+  const rms = new Float64Array(n);
+  for (let i = 0; i < n; i++) { let sum = 0; for (let k = i * hop, e = k + win; k < e; k++) sum += x[k] * x[k]; rms[i] = Math.sqrt(sum / win); }
+  const mean = rms.reduce((a, b) => a + b, 0) / n, sd = Math.sqrt(rms.reduce((a, b) => a + (b - mean) * (b - mean), 0) / n);
+  const onset = new Float64Array(n); for (let i = 1; i < n; i++) onset[i] = Math.max(0, rms[i] - rms[i - 1]);
+  const om = onset.reduce((a, b) => a + b, 0) / n; for (let i = 0; i < n; i++) onset[i] -= om;
+  const fps = sr / hop, lagMin = Math.floor(fps * 60 / 180), lagMax = Math.ceil(fps * 60 / 60);
+  let ac0 = 0; for (let i = 0; i < n; i++) ac0 += onset[i] * onset[i];
+  let best = 0, bestLag = 0;
+  for (let lag = lagMin; lag <= lagMax && lag < n / 2; lag++) { let a = 0; for (let i = 0; i + lag < n; i++) a += onset[i] * onset[i + lag]; a /= (n - lag) / n; if (a > best) { best = a; bestLag = lag; } }
+  const bpm = ac0 > 0 && bestLag && best / ac0 >= 0.1 ? Math.round(60 * fps / bestLag) : 0; // 주기성이 약하면 박자 없음
+  const size = 2048; let num = 0, den = 0;
+  if (x.length >= size) {
+    const frames = Math.min(24, Math.floor(x.length / size)), re = new Float64Array(size), im = new Float64Array(size);
+    for (let fi = 0; fi < frames; fi++) {
+      const start = Math.floor(fi * (x.length - size) / Math.max(1, frames - 1));
+      for (let k = 0; k < size; k++) { re[k] = x[start + k] * (0.5 - 0.5 * Math.cos(2 * Math.PI * k / (size - 1))); im[k] = 0; }
+      musicSoundFft(re, im);
+      for (let k = 1; k < size / 2; k++) { const mag = Math.hypot(re[k], im[k]); num += k * sr / size * mag; den += mag; }
+    }
+  }
+  return { bpm, energy: mean, energyVar: mean > 0 ? sd / mean : 0, centroid: den > 0 ? num / den : 0 };
+}
+function musicSoundTags(f) { // 규칙표 → 프리셋 안의 값만, 중복 제거, 최대 6개
+  if (!f) return [];
+  const presets = musicAiPresets(), out = [];
+  MUSIC_SOUND_RULES.forEach(([when, tags]) => { if (when(f)) tags.forEach(tag => { if (presets[tag] && !out.includes(tag)) out.push(tag); }); });
+  return out.slice(0, MUSIC_AI_MAX_TAGS);
+}
+async function musicSoundDecode(file) { // 앞 최대 60초의 첫 채널
+  const Ctx = typeof OfflineAudioContext !== 'undefined' ? OfflineAudioContext : null;
+  if (!Ctx || file.size > MUSIC_SOUND_MAX_BYTES) return null;
+  const audio = await new Ctx(1, 1, 44100).decodeAudioData(await file.arrayBuffer());
+  return { samples: audio.getChannelData(0).slice(0, Math.floor(audio.sampleRate * MUSIC_SOUND_SECONDS)), sr: audio.sampleRate };
+}
+const musicSoundTried = new Set();
+async function musicSoundAuto(track, file) { // 파일 추가 직후 자동 1회. 실패해도 조용히 끝(재시도 안 함)
+  if (!track || track.kind !== 'file' || Array.isArray(track.soundTagSuggestions) || musicSoundTried.has(track.id)) return;
+  musicSoundTried.add(track.id);
+  let tags;
+  try { const d = await musicSoundDecode(file); if (!d) return; tags = musicSoundTags(musicSoundFeatures(d.samples, d.sr)); } catch (e) { return; }
+  const now = state.musicTracks.find(item => item.id === track.id);
+  if (!now) return;
+  now.soundTagSuggestions = tags;
+  persist();
+  const box = document.getElementById('music-ai-rec');
+  if (box && box.dataset.id === now.id) box.innerHTML = musicAiRecHtml(now);
 }
 async function openMusicDetail(id, source) {
   const track = state.musicTracks.find(item => item.id === id);
@@ -35665,10 +35745,11 @@ async function musicAddFiles(fileList) {
     } catch (e) { showToast('저장 실패: ' + file.name + ' (' + (e?.message || e) + ')'); continue; }
     musicLocalIds.add(track.id);
     state.musicTracks.push(track);
-    addedTracks.push(track);
+    addedTracks.push({ track, file });
   }
   persist(); renderMusicPage();
-  addedTracks.forEach(musicAiAuto);
+  addedTracks.forEach(item => musicAiAuto(item.track));
+  for (const item of addedTracks) await musicSoundAuto(item.track, item.file); // 무거운 디코딩은 한 곡씩(#286)
 }
 function musicPickFiles() {
   const input = document.createElement('input');

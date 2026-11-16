@@ -10,7 +10,7 @@ ok(html.includes("+ field('tags', '태그') + musicAiRowHtml(track) + musicTagPr
 ok(!html.includes('Anthropic API 로 전송') && !html.includes('MUSIC_AI_NOTICE'), '전송 안내 문구 없음(사용자 결정)');
 ok(!html.includes('musicAiSuggest') && !html.includes('>AI 추천</button>'), '추천 버튼 없음(자동)');
 ok(html.includes("aiTagSuggestions: Array.isArray(input?.aiTagSuggestions)"), 'track.aiTagSuggestions 필드');
-ok(html.includes('musicAiAuto(added)') && html.includes('addedTracks.forEach(musicAiAuto)') && html.includes('musicAiAuto(track); // 추천이 없으면 자동 1회'), '추가 직후(유튜브·PC 파일)·상세 열 때 자동 호출');
+ok(html.includes('musicAiAuto(added)') && html.includes('addedTracks.forEach(item => musicAiAuto(item.track))') && html.includes('musicAiAuto(track); // 추천이 없으면 자동 1회'), '추가 직후(유튜브·PC 파일)·상세 열 때 자동 호출');
 // 키 보호
 ok(!/console\./.test(block), '키·응답 로그 출력 없음');
 const outside = html.replace(block, '');
