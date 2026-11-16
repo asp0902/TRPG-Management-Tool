@@ -5,7 +5,8 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
 
-assert.match(html, /\.rb-inline-note-editor \{[\s\S]*?overflow: auto;[\s\S]*?scrollbar-gutter: stable both-edges;[\s\S]*?padding: 10px;/, '스크롤은 동일한 좌우 여백을 가진 외곽 모달에 있어야 합니다.');
+assert.match(html, /\.rb-inline-note-editor \{[\s\S]*?overflow: auto;[\s\S]*?padding: 10px;/, '스크롤은 외곽 모달에 있어야 합니다.');
+assert.doesNotMatch(html, /\.rb-inline-note-editor \{[^}]*scrollbar-gutter/, '스크롤바가 없을 때 좌우 여백이 늘지 않아야 합니다(#260).');
 assert.match(html, /\.rb-inline-note-editor-body \{[\s\S]*?max-height: none;[\s\S]*?overflow: visible;/, '입력칸 내부 스크롤은 없어야 합니다.');
 assert.match(html, /options\.range\?\.getBoundingClientRect\?\.\(\) \|\| options\.noteEl\?\.getBoundingClientRect\?\.\(\)/, '선택 영역이나 기존 메모 위치를 배치 기준으로 사용해야 합니다.');
 
