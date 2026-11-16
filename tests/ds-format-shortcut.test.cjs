@@ -4,6 +4,6 @@ let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m);
 const i = html.indexOf("e.target.closest('#ds-editor-body') && ['b', 'i', '`', 'u']");
 ok(i > 0, '데이터 시트 서식 단축키 분기');
 ok(i < html.indexOf('if (!lastFocusedTA) return;', i - 400), 'lastFocusedTA 검사보다 앞');
-ok(html.slice(i, i + 400).includes("ds_toggleCellStyle(key === 'b' ? 'b' : key === 'i' ? 'i' : 's')"), 'b/i/` → ds_toggleCellStyle');
+ok(html.slice(i, i + 400).includes("ds_toggleCellStyle(key === 'b' ? 'b' : key === 'i' ? 'i' : key === 'u' ? 'u' : 's')"), 'b/i/`/u → ds_toggleCellStyle');
 ok(html.slice(i - 80, i).includes('!e.shiftKey && !e.altKey'), 'Shift·Alt 없을 때만');
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);

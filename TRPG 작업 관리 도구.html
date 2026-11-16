@@ -7087,6 +7087,8 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .ds-cell-i { font-style: italic; }
 .ds-cell-s { text-decoration: line-through; }
 .ds-cell-i.ds-cell-s { text-decoration: line-through; }
+.ds-cell-u { text-decoration: underline; }
+.ds-cell-s.ds-cell-u, .ds-cell-i.ds-cell-s.ds-cell-u { text-decoration: underline line-through; }
 .ds-color-swatch { width: 12px; height: 4px; border-radius: 2px; background: transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18); }
 .ds-color-menu { min-width: 168px; padding: 8px; }
 .ds-color-swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 6px; }
@@ -28075,7 +28077,7 @@ document.addEventListener('keydown', e => {
   }
   if (!e.shiftKey && !e.altKey && e.target.closest && e.target.closest('#ds-editor-body') && ['b', 'i', '`', 'u'].includes(key)) { // 데이터 시트는 셀 단위 서식(#271): 문자 감싸기 금지
     e.preventDefault();
-    if (key !== 'u') ds_toggleCellStyle(key === 'b' ? 'b' : key === 'i' ? 'i' : 's');
+    ds_toggleCellStyle(key === 'b' ? 'b' : key === 'i' ? 'i' : key === 'u' ? 'u' : 's');
     return;
   }
   if (!lastFocusedTA) return;
@@ -38311,6 +38313,7 @@ function ds_normalizeCellStyle(st) {
   if (st.b) out.b = true;
   if (st.i) out.i = true;
   if (st.s) out.s = true;
+  if (st.u) out.u = true;
   if (color) out.color = color;
   return out;
 }
@@ -38318,7 +38321,7 @@ function ds_getCellStyle(row, colId) {
   if (!row || row.isCategory || row.isMemo || !colId) return {};
   return ds_normalizeCellStyle(row.cellStyles && row.cellStyles[colId]);
 }
-function ds_hasCellStyle(st) { return !!(st && (st.b || st.i || st.s || st.color)); }
+function ds_hasCellStyle(st) { return !!(st && (st.b || st.i || st.s || st.u || st.color)); }
 function normalizeDataSheetRow(r, columns) {
   r = (r && typeof r === 'object' && !Array.isArray(r)) ? r : {};
   var isCategory = !!r.isCategory;
@@ -39316,6 +39319,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) {
     + '<button type="button" id="ds-bold-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_toggleCellStyle(\'b\')" title="굵게" aria-label="굵게"><i class="fa-solid fa-bold"></i></button>'
     + '<button type="button" id="ds-italic-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_toggleCellStyle(\'i\')" title="기울임" aria-label="기울임"><i class="fa-solid fa-italic"></i></button>'
     + '<button type="button" id="ds-strike-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_toggleCellStyle(\'s\')" title="취소선" aria-label="취소선"><i class="fa-solid fa-strikethrough"></i></button>'
+    + '<button type="button" id="ds-underline-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_toggleCellStyle(\'u\')" title="밑줄" aria-label="밑줄"><i class="fa-solid fa-underline"></i></button>'
     + '<div class="ds-format-dropdown-wrap">'
     + '<button type="button" id="ds-color-btn" class="ds-format-btn ds-format-picker-btn" onmousedown="event.preventDefault()" onclick="ds_toggleFormatMenu(event,\'color\')" title="텍스트 색상" aria-label="텍스트 색상"><i class="fa-solid fa-palette"></i><span id="ds-color-swatch" class="ds-color-swatch"></span><i class="fa-solid fa-caret-down ds-format-caret"></i></button>'
     + '<div class="ds-format-menu ds-color-menu" id="ds-color-menu" role="menu" aria-label="텍스트 색상">'
@@ -39908,7 +39912,7 @@ function ds_updateFormatToolbarState(ds) {
   var styleTargets = (textTargets || []).filter(function(c) { return ds_isDataRow(c.row) && c.colId; });
   var hasStyleTargets = styleTargets.length > 0;
   var refStyle = hasStyleTargets ? ds_getCellStyle(styleTargets[0].row, styleTargets[0].colId) : {};
-  [['ds-bold-btn', 'b'], ['ds-italic-btn', 'i'], ['ds-strike-btn', 's']].forEach(function(pair) {
+  [['ds-bold-btn', 'b'], ['ds-italic-btn', 'i'], ['ds-strike-btn', 's'], ['ds-underline-btn', 'u']].forEach(function(pair) {
     var b = document.getElementById(pair[0]);
     if (!b) return;
     b.disabled = !hasStyleTargets;
@@ -40709,6 +40713,7 @@ function _dsApplyCellStyleToDom(rowIdx, colId, st) {
   ta.classList.toggle('ds-cell-b', !!st.b);
   ta.classList.toggle('ds-cell-i', !!st.i);
   ta.classList.toggle('ds-cell-s', !!st.s);
+  ta.classList.toggle('ds-cell-u', !!st.u);
   ta.style.color = st.color || '';
 }
 function _dsMutateCellStyles(mutator) {
@@ -40730,7 +40735,7 @@ function _dsMutateCellStyles(mutator) {
   ds_updateFormatToolbarState(ds);
 }
 function ds_toggleCellStyle(prop) {
-  if (prop !== 'b' && prop !== 'i' && prop !== 's') return;
+  if (prop !== 'b' && prop !== 'i' && prop !== 's' && prop !== 'u') return;
   var ds = findDataSheet(_dsEditId);
   if (!ds) return;
   var targetCells = (ds_getTextAlignTargetCells(ds) || []).filter(function(c) { return ds_isDataRow(c.row) && c.colId; });
@@ -40839,7 +40844,7 @@ function _dsRenderFlatTable(ds) {
       var isEditingCell = ds_isCellInEditMode(rowIdx, c.id);
       var editClass = isEditingCell ? ' ds-cell-editing' : '';
       var cst = ds_getCellStyle(row, c.id);
-      var styleClass = (cst.b ? ' ds-cell-b' : '') + (cst.i ? ' ds-cell-i' : '') + (cst.s ? ' ds-cell-s' : '');
+      var styleClass = (cst.b ? ' ds-cell-b' : '') + (cst.i ? ' ds-cell-i' : '') + (cst.s ? ' ds-cell-s' : '') + (cst.u ? ' ds-cell-u' : '');
       var styleAttr = cst.color ? ' style="color:' + esc(cst.color) + ';"' : '';
       return '<td' + cellClassAttr + ' data-col-id="' + esc(c.id) + '" oncontextmenu="ds_openRowMenu(event,' + rowIdx + ',\'' + esc(c.id) + '\')">'
         + '<textarea class="ds-cell-input ds-cell-align-' + textAlign + editClass + styleClass + '"' + styleAttr + ' rows="1" data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '" onmousedown="ds_handleCellMouseDown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" ondblclick="ds_enterCellEditMode(' + rowIdx + ',\'' + esc(c.id) + '\')" onkeydown="ds_handleCellKeydown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" onbeforeinput="ds_handleCellBeforeInput(event,this)" oncompositionstart="ds_handleCellCompositionStart(this)" onpaste="ds_handleCellPaste(event,this)" oninput="ds_handleCellInput(this)" onfocus="ds_handleCellFocus(this)" onblur="ds_autosizeCell(this)">' + esc(val) + '</textarea>'
