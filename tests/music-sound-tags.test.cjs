@@ -34,11 +34,11 @@ ok(ft.includes('신나는') && ft.includes('역동적인') && !ft.includes('잔�
 const slow = sine(110, 0.05);
 const sf = f.musicSoundFeatures(slow, sr), st = f.musicSoundTags(sf);
 ok(sf.energy <= 0.05 && sf.centroid < 1500, '에너지 낮음·어두움 (RMS ' + sf.energy.toFixed(3) + ', 중심 ' + Math.round(sf.centroid) + 'Hz)');
-ok(st.includes('잔잔한') && st.includes('어둡고습한') && !st.includes('신나는'), '느림+저에너지+어두움 → 잔잔한/어둡고습한 (' + st + ')');
+ok(st.includes('잔잔한') && st.includes('어둡고 습한') && !st.includes('신나는'), '느림+저에너지+어두움 → 잔잔한/어둡고 습한 (' + st + ')');
 // 밝은 고음
 const bright = sine(6000, 0.1);
 const bf = f.musicSoundFeatures(bright, sr), bt = f.musicSoundTags(bf);
-ok(bf.centroid >= 3000 && bt.includes('맑고투명한') && bt.includes('청량한'), '스펙트럼 밝음 → 맑고투명한/청량한 (중심 ' + Math.round(bf.centroid) + 'Hz)');
+ok(bf.centroid >= 3000 && bt.includes('맑고 투명한') && bt.includes('청량한'), '스펙트럼 밝음 → 맑고 투명한/청량한 (중심 ' + Math.round(bf.centroid) + 'Hz)');
 // 모든 추천은 프리셋 안의 값, 최대 6개, 중복 없음
 const outs = [ft, st, bt, f.musicSoundTags({ bpm: 140, energy: 0.3, energyVar: 0.9, centroid: 4000 })];
 ok(outs.every(t => t.every(x => presets[x]) && t.length <= 6 && new Set(t).size === t.length), '매핑 결과는 프리셋 값만·최대 6·중복 없음');
@@ -55,6 +55,8 @@ ok(f.MUSIC_SOUND_RULES.every(([, tags]) => tags.every(t => presets[t])), '규칙
   // 추천 줄: 출처 구분
   const html2 = f.musicRecHtml({ id: 'z', tags: ['신나는'], soundTagSuggestions: ['신나는', '없는태그'] });
   ok(html2.includes('>소리 분석</span>') && /class="music-tag-chip rec on" data-t="신나는"/.test(html2) && !html2.includes('없는태그'), '추천 줄: 소리 분석 그룹·붙은 태그 on·프리셋 밖 제외');
+  { const h = f.musicRecHtml({ id: 'z', tags: ['어둡고습한'], soundTagSuggestions: ['어둡고습한', '어둡고 습한', '몽환적인'] });
+    ok(h.includes('data-t="어둡고 습한"') && (h.match(/data-t=/g) || []).length === 2 && /rec on" data-t="어둡고 습한"/.test(h), '옛 저장값(공백 없음) 추천도 프리셋 형태로 표시·중복 제거·옛 태그와 같은 칩 켜짐'); }
   ok(f.musicRecHtml({ id: 'z', tags: [], soundTagSuggestions: null }) === '' && f.musicRecRowHtml({ id: 'z', tags: [] }).includes('id="music-rec" data-id="z"></div>') && html.includes('.music-rec:empty { display: none; }'), '추천이 없으면 줄이 비어 숨겨짐');
   console.log('fails=' + fails); process.exit(fails ? 1 : 0);
 })();
