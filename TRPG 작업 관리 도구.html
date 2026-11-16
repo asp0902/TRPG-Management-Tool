@@ -517,8 +517,7 @@ tr.ct-row-end .ct-select:focus {
 /* 태그 삭제 버튼: 외곽선·배경 없이 글자만, 해당 태그에 마우스를 올렸을 때만 보인다(#313). 호버가 없는 기기(터치)에서는 항상 보인다. */
 .record-session-tag-chip .record-session-tag-chip-remove { border: 0; border-radius: 0; background: none; box-shadow: none; padding: 0; min-width: 0; width: auto; height: auto; color: #888; }
 @media (hover: hover) {
-  .record-session-tag-chip .record-session-tag-chip-remove { opacity: 0; }
-  .record-session-tag-chip:hover .record-session-tag-chip-remove, .record-session-tag-chip .record-session-tag-chip-remove:focus-visible { opacity: 1; }
+  .record-session-tag-chip:not(:hover) .record-session-tag-chip-remove { display: none; } /* 호버 전에는 자리를 차지하지 않아 칩 폭이 글자 수에 맞는다 */
 }
 .music-field .tag-editor-input { border: 0; border-radius: 0; padding: 2px 0; font-size: 13px; flex: 1 1 100px; min-width: 80px; }
 .record-session-tag-input {
@@ -2217,7 +2216,7 @@ tr.ct-row-end .ct-select:focus {
 .music-fields .music-field:last-child { grid-column: 1 / -1; }
 .music-player { background: #000; border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; min-height: 54px; }
 .music-player .music-yt { width: 100%; aspect-ratio: 16 / 9; border: 0; }
-.music-audio { width: 100%; }
+.music-audio { width: 100%; color-scheme: dark; background: #000; } /* 파일 재생 플레이어를 검게(#314) */
 body.file-dragging iframe { pointer-events: none; } /* 파일을 끄는 동안 iframe 이 드롭을 가로채지 않게(#299) */
 .music-modal.drop-target { outline: 2px dashed #111; outline-offset: -4px; }
 .music-card-file { position: absolute; left: 4px; bottom: 4px; background: rgba(255,255,255,0.9); color: #111; font-size: 9px; font-style: normal; font-weight: 800; padding: 1px 5px; border-radius: 4px; }
@@ -35540,7 +35539,7 @@ try { ['trpg-music-ai-openai-key', 'trpg-music-ai-key', 'trpg-music-ai-model'].f
 // ── Google Drive 음원 저장(#297): OAuth 클라이언트 ID(이 기기 localStorage)가 있으면 음원을 사용자 Drive 의 「TRPG-Music」 폴더에 올리고 받는다(범위 drive.file: 이 앱이 만든 파일만).
 // 접근 토큰은 메모리에만 두고(약 1시간) 만료되면 조용히 갱신을 시도하며, 안 되면 「Drive 연결 필요」로 두고 동기화 설정에서 다시 연결한다. 파일 이름은 음원 sha256. 곡을 지워도 Drive 파일은 지우지 않는다.
 const GDRIVE_CLIENT_KEY = 'trpg-gdrive-client-id', GDRIVE_FOLDER_KEY = 'trpg-gdrive-folder-id', GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file', GDRIVE_CHUNK = 8 * 1024 * 1024;
-let gdriveToken = '', gdriveExpires = 0, gdriveStatus = '', gdriveReason = '', gdriveSilentFailedAt = 0;
+let gdriveToken = '', gdriveExpires = 0, gdriveStatus = '', gdriveReason = '';
 function gdriveClientId() { try { return localStorage.getItem(GDRIVE_CLIENT_KEY) || ''; } catch (e) { return ''; } }
 function gdriveConfigured() { return !!gdriveClientId(); }
 function gdriveLoadGis() {
@@ -35557,13 +35556,13 @@ function gdriveLoadGis() {
 async function gdriveEnsureToken(interactive) {
   if (gdriveToken && Date.now() < gdriveExpires) return gdriveToken;
   if (!gdriveConfigured()) return '';
-  if (!interactive && Date.now() - gdriveSilentFailedAt < 10 * 60 * 1000) return ''; // 조용한 갱신이 실패했으면 10분간 다시 시도하지 않는다(로그인 창이 깜빡이는 것을 줄임)
+  if (!interactive) return ''; // 자동 동작(시작·동기화)은 로그인 창을 열지 않는다. 토큰이 없으면 보류하고, 곡 추가·파일 첨부·「Drive 연결」·파일 받기 같은 사용자 동작에서만 요청한다(#314)
   if (!await gdriveLoadGis()) return '';
   const prompt = interactive ? '' : 'none';
   return await new Promise(resolve => {
     gdriveReason = '';
     const timer = setTimeout(() => { gdriveReason = 'timeout'; resolve(''); }, interactive ? 180000 : 20000); // 로그인 창에서 계정을 고르는 시간을 기다린다
-    const done = value => { clearTimeout(timer); if (!value && !interactive) gdriveSilentFailedAt = Date.now(); resolve(value); };
+    const done = value => { clearTimeout(timer); resolve(value); };
     const client = window.google.accounts.oauth2.initTokenClient({
       client_id: gdriveClientId(), scope: GDRIVE_SCOPE, prompt,
       callback: response => { if (response && response.access_token) { gdriveToken = response.access_token; gdriveExpires = Date.now() + Math.max(60, Number(response.expires_in) || 3600) * 1000 - 60000; done(gdriveToken); } else { gdriveReason = (response && response.error) || 'no_token'; done(''); } },
@@ -35647,14 +35646,14 @@ async function musicHasPendingUploads(mode) { // 이 기기에 음원이 있고 
   const local = new Set(await musicBlobKeys() || []), done = sha => attachDoneSet.has((mode === 'drive' ? 'gdrive:' : '') + sha);
   return state.musicTracks.some(t => (t.kind === 'file' || t.attached) && local.has(t.id) && !(t.sha256 && done(t.sha256)));
 }
-async function musicSyncUploads() {
+async function musicSyncUploads(interactive) { // interactive: 사용자 동작(곡 추가·파일 첨부)에서 불린 경우에만 로그인 창을 열 수 있다
   const mode = gdriveConfigured() ? 'drive' : (getGitHubSyncToken() && isGitHubSyncEnabled() ? 'github' : '');
   if (!mode || musicSyncRunning) return;
   musicSyncRunning = true;
   try {
     await refreshAttachmentIndex(); // 올라간 해시 목록(status 저장소)을 먼저 읽는다
     if (mode === 'drive' && !(await musicHasPendingUploads(mode)) ) return; // 올릴 것이 없으면 토큰 요청(로그인 창)도 하지 않는다
-    if (mode === 'drive' && !await gdriveEnsureToken(false)) { gdriveStatus = 'Drive 연결 필요 — 동기화 설정에서 「Drive 연결」을 누르세요'; return; }
+    if (mode === 'drive' && !await gdriveEnsureToken(!!interactive)) { gdriveStatus = 'Drive 연결 필요 — 동기화 설정에서 「Drive 연결」을 누르세요'; return; }
     const key = sha => (mode === 'drive' ? 'gdrive:' : '') + sha; // 상태 저장소 키: Drive 와 GitHub 업로드를 따로 기록
     for (const track of state.musicTracks) {
       if (!(track.kind === 'file' || track.attached)) continue;
@@ -35710,14 +35709,15 @@ async function openMusicDetail(id, source) {
   if (!track) return;
   musicStop();
   let url = '', blob = null;
-  if (track.kind === 'file' || track.attached) { try { blob = await musicBlobGet(id); } catch (e) {} }
-  if (!blob && (track.kind === 'file' || track.attached) && track.sha256 && musicCanDownload()) { showToast('음원을 받는 중…'); blob = await musicDownloadTrack(track); renderMusicPage(); }
   const src = track.kind === 'file' ? 'file' : (source || 'youtube'); // 유튜브 카드는 첨부 파일이 있어도 열면 유튜브가 기본(#310), 상세의 유튜브/파일 전환 버튼으로 파일 재생
+  if (track.kind === 'file' || track.attached) { try { blob = await musicBlobGet(id); } catch (e) {} }
+  if (!blob && (track.kind === 'file' || track.attached) && track.sha256 && src === 'file' && musicCanDownload()) { showToast('음원을 받는 중…'); // 파일 재생을 고른 때만 받는다(유튜브 재생 중에는 로그인 창·지연이 생기지 않게)
+    blob = await musicDownloadTrack(track); renderMusicPage(); }
   if (blob && src === 'file') url = URL.createObjectURL(blob);
   const attachRow = track.kind === 'file' ? '<div class="music-attach"><input id="music-link-url" type="text" spellcheck="false" onkeydown="musicLinkKey(event,\'' + id + '\',this)"><button type="button" onclick="musicLinkYoutube(\'' + id + '\',document.getElementById(\'music-link-url\').value)">유튜브 주소 연결</button><span class="music-error" id="music-link-error"></span></div>'
     : track.kind !== 'youtube' ? '' : '<div class="music-attach">'
     + (track.attached && blob ? '<span class="music-src"><button type="button" class="' + (src === 'youtube' ? 'on' : '') + '" onclick="openMusicDetail(\'' + id + '\',\'youtube\')">유튜브</button><button type="button" class="' + (src === 'file' ? 'on' : '') + '" onclick="openMusicDetail(\'' + id + '\',\'file\')">파일</button></span>' : '')
-    + (track.attached && !blob ? '<span class="music-card-missing">이 기기에 파일 없음 (' + esc(track.fileName) + ') <button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button></span>' : '')
+    + (track.attached && !blob ? '<span class="music-card-missing">이 기기에 파일 없음 (' + esc(track.fileName) + ') <button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button>' + (track.sha256 && musicCanDownload() ? '<button type="button" onclick="openMusicDetail(\'' + id + '\',\'file\')">파일 받기</button>' : '') + '</span>' : '')
     + (track.attached && blob ? '<span class="music-hint">' + esc(track.fileName) + '</span><button type="button" onclick="musicAttachPick(\'' + id + '\')">교체</button><button type="button" class="music-danger" onclick="musicDetach(\'' + id + '\')">떼어내기</button><button type="button" onclick="musicUnlinkYoutube(\'' + id + '\')">유튜브 연결 해제</button>' : '')
     + (!track.attached ? '<button type="button" onclick="musicAttachPick(\'' + id + '\')">파일 첨부</button><span class="music-hint">또는 이 창·카드 위로 음원 파일을 끌어 놓기</span>' : '') + '</div>';
   const folderOpts = '<option value="">분류 없음</option>' + state.musicFolders.map(folder => '<option value="' + folder.id + '"' + (folder.id === track.folderId ? ' selected' : '') + '>' + esc(folder.name) + '</option>').join('');
@@ -35841,7 +35841,7 @@ async function musicAddFiles(fileList, link) { // link: 곡 추가 창에 입력
     state.musicTracks.push(track);
   }
   persist(); renderMusicPage();
-  musicSyncUploads(); // 음원 업로드(#296·#297)
+  musicSyncUploads(true); // 음원 업로드(#296·#297): 사용자 동작이므로 필요하면 로그인 창 허용
 }
 function musicPickFiles() {
   const input = document.createElement('input');
@@ -35888,7 +35888,7 @@ async function musicAttachFile(id, file) {
   try { track.sha256 = await sha256Hex(file); track.mime = file.type || ''; } catch (e) { track.sha256 = ''; }
   if (!track.duration) track.duration = await musicAudioDuration(file);
   persist(); renderMusicPage();
-  musicSyncUploads(); // 음원 업로드(#296·#297)
+  musicSyncUploads(true); // 음원 업로드(#296·#297): 사용자 동작이므로 필요하면 로그인 창 허용
   if (document.getElementById('music-modal-backdrop')) openMusicDetail(id, 'file');
 }
 function musicAttachPick(id) {

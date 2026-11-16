@@ -5,7 +5,7 @@ const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
 // 정적: 연결 지점
 ok(html.includes('await musicSyncUploads(); // MUSIC 음원(#296)'), '기존 백그라운드 업로드(syncAttachmentsToGitHub)에 MUSIC 음원 포함');
 ok(html.includes("sha256: str('sha256'), mime: str('mime')"), '트랙 메타에 sha256·mime');
-ok(html.includes("try { track.sha256 = await sha256Hex(file); track.mime = file.type || ''; }") && html.includes('musicSyncUploads(); // 음원 업로드(#296·#297)'), '곡 추가·파일 첨부 시 해시 계산·업로드 요청');
+ok(html.includes("try { track.sha256 = await sha256Hex(file); track.mime = file.type || ''; }") && html.includes('musicSyncUploads(true); // 음원 업로드(#296·#297)'), '곡 추가·파일 첨부 시 해시 계산·업로드 요청');
 ok(html.includes('blob = await musicDownloadTrack(track); renderMusicPage();') && html.includes("showToast('음원을 받는 중…')"), '상세 열 때 Blob 없고 sha256 있으면 받는 중… 표시 후 다운로드');
 ok(!/attachments\//.test(cut('async function deleteMusicTrack', '// ── 폴더 ──')), '곡 삭제 시 저장소 파일은 지우지 않음');
 ok(html.includes('async function fetchAttachmentFromGitHub') && html.includes('const blob = await fetchAttachmentFromGitHub(att);'), '첨부 다운로드 로직을 공용 함수로 분리(해시 검증 포함)');

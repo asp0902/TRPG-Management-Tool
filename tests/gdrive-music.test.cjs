@@ -15,7 +15,7 @@ ok(html.includes('id="gdrive-client-id"') && html.includes('onclick="gdriveConne
 ok(html.includes("interactive ? 180000 : 20000"), '로그인 창 대기 시간 연장(대화형 3분)');
 ok(html.includes("GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'"), '범위는 drive.file(앱이 만든 파일만)');
 ok(html.includes('  gdriveFieldRefresh();\n  const lastAt'), '모달 열 때 Drive 칸 갱신');
-ok(html.includes('musicSyncUploads(); // 음원 업로드(#296·#297)') && html.includes("setTimeout(() => musicSyncUploads(), 4000)"), '곡 추가·첨부·시작 시 음원 업로드 호출');
+ok(html.includes('musicSyncUploads(true); // 음원 업로드(#296·#297)') && html.includes("setTimeout(() => musicSyncUploads(), 4000)"), '곡 추가·첨부·시작 시 음원 업로드 호출');
 const block = cut('// ── Google Drive 음원 저장(#297)', 'async function openMusicDetail');
 ok(!/console\.(log|info|warn)/.test(block) && !/localStorage\.setItem\(['"]?[^)]*gdriveToken/.test(block), '접근 토큰은 로그·저장소에 쓰지 않음(메모리만)');
 ok(!/deleteMusicTrack[\s\S]{0,700}gdrive/.test(cut('async function deleteMusicTrack', '// ── 폴더 ──')), '곡 삭제 시 Drive 파일은 지우지 않음');
@@ -58,8 +58,9 @@ const mk = (opts = {}) => {
   let { c, ctx } = mk();
   ok(await ctx.f.gdriveEnsureToken(true) === '' && c.prompts.length === 0, '클라이언트 ID 없으면 로그인 시도 안 함');
   c.store['trpg-gdrive-client-id'] = 'CLIENT.apps.googleusercontent.com';
-  ok(await ctx.f.gdriveEnsureToken(false) === 'FAKE-DRIVE-TOKEN' && c.prompts[0] === 'none', '백그라운드: 창 없이(prompt none) 조용히 토큰 요청');
-  await ctx.f.gdriveEnsureToken(true); ok(c.prompts.length === 1, '유효한 토큰은 재사용(재요청 없음)');
+  ok(await ctx.f.gdriveEnsureToken(false) === '' && c.prompts.length === 0, '백그라운드(자동) 호출은 로그인 창을 열지 않음(#314)');
+  ok(await ctx.f.gdriveEnsureToken(true) === 'FAKE-DRIVE-TOKEN' && c.prompts[0] === '', '사용자 동작: 필요할 때만 창을 띄워 토큰 요청');
+  await ctx.f.gdriveEnsureToken(true); ok(c.prompts.length === 1, '유효한 토큰은 재사용(재요청 없음)'); ok(await ctx.f.gdriveEnsureToken(false) === 'FAKE-DRIVE-TOKEN', '캐시된 토큰은 자동 호출에서도 사용');
   ({ c, ctx } = mk()); c.store['trpg-gdrive-client-id'] = 'X'; await ctx.f.gdriveEnsureToken(true); ok(c.prompts[0] === '', '사용자 클릭: 필요할 때만 창(prompt 빈 값)');
   ({ c, ctx } = mk()); c.store['trpg-gdrive-client-id'] = 'X'; c.tokenResp = null; ok(await ctx.f.gdriveEnsureToken(false) === '', '조용한 갱신 실패 → 빈 토큰(연결 필요로 처리)');
 
@@ -100,11 +101,11 @@ const mk = (opts = {}) => {
   c.blobs.a = new Blob([Buffer.from('aaa')], { type: 'audio/mpeg' }); c.blobs.b = new Blob([Buffer.from('bbb')]);
   ctx.attachDoneSet.add('gdrive:' + sha(Buffer.from('bbb'))); ctx.attachDoneSet.add(sha(Buffer.from('aaa'))); // GitHub 업로드 기록은 Drive 완료가 아님
   ctx.state.musicTracks.push({ id: 'a', kind: 'file', sha256: '', mime: '' }, { id: 'b', kind: 'youtube', attached: true, sha256: sha(Buffer.from('bbb')) }, { id: 'y', kind: 'youtube', attached: false });
-  await ctx.f.musicSyncUploads();
+  await ctx.f.musicSyncUploads(true);
   ok(ctx.state.musicTracks[0].sha256 === sha(Buffer.from('aaa')), '옛 곡 해시 등록');
   ok(c.calls.filter(x => x[1].includes('uploadType=resumable')).length === 1 && ctx.attachDoneSet.has('gdrive:' + sha(Buffer.from('aaa'))) && c.statusPuts.length === 1, 'Drive 로 새 곡만 업로드·gdrive: 키로 기록(이미 올라간 곡 건너뜀)');
   ({ c, ctx } = mk()); c.store['trpg-gdrive-client-id'] = 'X'; c.tokenResp = null; c.blobs.a = new Blob(['aaa']); ctx.state.musicTracks.push({ id: 'a', kind: 'file', sha256: '' });
-  await ctx.f.musicSyncUploads(); ok(c.calls.length === 0 && ctx.state.musicTracks[0].sha256 === '', '토큰을 못 받으면(연결 필요) 업로드·해시 등록 안 함');
+  await ctx.f.musicSyncUploads(true); ok(c.calls.length === 0 && ctx.state.musicTracks[0].sha256 === '', '토큰을 못 받으면(연결 필요) 업로드·해시 등록 안 함');
   ({ c, ctx } = mk({ githubToken: true })); c.blobs.a = new Blob(['aaa']); ctx.state.musicTracks.push({ id: 'a', kind: 'file', sha256: '' });
   await ctx.f.musicSyncUploads(); ok(c.uploads.length === 1 && c.uploads[0][0] === 'github' && c.calls.length === 0, 'Drive 설정이 없으면 기존 GitHub 업로드(#296)');
   ({ c, ctx } = mk()); c.blobs.a = new Blob(['aaa']); ctx.state.musicTracks.push({ id: 'a', kind: 'file', sha256: '' });
@@ -119,8 +120,8 @@ const mk = (opts = {}) => {
   ctx.attachDoneSet.add('gdrive:abc'); c.blobs.n = new Blob(['x']); await ctx.f.musicSyncUploads(); ok(c.prompts.length === 0, '이미 Drive 에 올린 곡만 있으면 토큰 요청 안 함');
   ({ c, ctx } = mk()); c.store['trpg-gdrive-client-id'] = 'X'; c.tokenResp = null; c.blobs.a = new Blob(['aaa']); ctx.state.musicTracks.push({ id: 'a', kind: 'file', sha256: '' });
   await ctx.f.musicSyncUploads(); await ctx.f.musicSyncUploads(); await ctx.f.musicSyncUploads();
-  ok(c.prompts.length === 1, '조용한 갱신이 실패하면 10분간 다시 시도하지 않음(로그인 창 깜빡임 방지)');
-  await ctx.f.gdriveEnsureToken(true); ok(c.prompts.length === 2, '사용자가 직접 연결을 누르면 쿨다운과 관계없이 시도');
+  ok(c.prompts.length === 0 && c.calls.length === 0, '자동 호출(시작·동기화)은 올릴 음원이 있어도 로그인 창을 열지 않고 보류(재생 중 창 깜빡임 방지, #314)');
+  await ctx.f.musicSyncUploads(true); ok(c.prompts.length === 1, '곡 추가·파일 첨부 같은 사용자 동작에서만 로그인 창 요청');
   // 연결 실패 사유가 상태 줄에 표시됨
   ({ c, ctx } = mk()); c.store['trpg-gdrive-client-id'] = 'X'; c.tokenResp = null;
   const els = { 'gdrive-client-id': { value: 'X' }, 'gdrive-status': { textContent: '' }, 'gdrive-disconnect': { style: {} } };
