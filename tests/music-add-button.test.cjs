@@ -5,6 +5,6 @@ ok(html.includes('<button type="button" class="music-primary" onclick="openMusic
 ok(!html.includes('>＋ 파일</button>') && !html.includes('>＋ 유튜브</button>'), '기존 두 버튼 제거');
 const fn = html.slice(html.indexOf('function openMusicYoutubeModal'), html.indexOf('async function musicFetchYoutube'));
 ok(fn.includes('<div class="music-modal-title">곡 추가</div>'), '모달 제목 곡 추가');
-ok(fn.includes('onclick="musicCloseModal(); musicPickFiles();">PC 파일 선택</button><div class="music-or">또는 유튜브 링크</div>'), 'PC 파일 선택 + 구분선');
+ok(fn.includes('onclick="musicCloseModal(); musicPickFiles();">PC 파일 선택</button><div class="music-or"></div>'), 'PC 파일 선택 + 구분선');
 ok(fn.indexOf('PC 파일 선택') < fn.indexOf('id="music-yt-url"') && fn.includes('musicAddYoutube()'), '유튜브 입력부 유지');
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);

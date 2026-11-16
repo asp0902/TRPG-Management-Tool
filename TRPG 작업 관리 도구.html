@@ -2186,7 +2186,7 @@ tr.ct-row-end .ct-select:focus {
 .music-modal { width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow-y: auto; background: #fff; border-radius: 14px; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; color: #333; }
 .music-modal-head { display: flex; align-items: center; gap: 8px; }
 .music-yt-thumb { width: 100%; max-height: 180px; object-fit: cover; border-radius: 8px; }
-.music-or { text-align: center; font-size: 11px; color: #888; border-top: 1px solid #e4e4e4; padding-top: 8px; }
+.music-or { border-top: 1px solid #e4e4e4; margin: 2px 0; } /* 문구 없이 구분선만(#288) */
 .music-modal-title { flex: 1; font-weight: 800; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .music-modal-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .music-field { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: #666; font-weight: 700; }
@@ -35819,7 +35819,7 @@ function musicYtKey(event) {
 function openMusicYoutubeModal() {
   musicYtLastId = '';
   musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">곡 추가</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
-    + '<button type="button" class="music-primary" onclick="musicCloseModal(); musicPickFiles();">PC 파일 선택</button><div class="music-or">또는 유튜브 링크</div>'
+    + '<button type="button" class="music-primary" onclick="musicCloseModal(); musicPickFiles();">PC 파일 선택</button><div class="music-or"></div>'
     + '<label class="music-field">URL<input id="music-yt-url" type="text" placeholder="https://www.youtube.com/watch?v=..." spellcheck="false" onchange="musicFetchYoutube(true)" onkeydown="musicYtKey(event)"></label>'
     + '<img id="music-yt-thumb" class="music-yt-thumb" alt="" hidden onerror="this.hidden=true">'
     + '<label class="music-field">제목<input id="music-yt-title" type="text" placeholder="자동으로 가져오거나 직접 입력"></label>'
