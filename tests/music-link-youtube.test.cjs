@@ -13,7 +13,7 @@ let persisted = 0, rendered = 0, detail = [];
 const ctx = { state: { musicTracks: [] }, persist() { persisted++; }, renderMusicPage() { rendered++; }, openMusicDetail: (id, src) => detail.push([id, src]), document: { getElementById: id => els[id] || null }, encodeURIComponent };
 vm.createContext(ctx); vm.runInContext(code + ';this.f={musicLinkYoutube,musicUnlinkYoutube,musicLinkKey}', ctx);
 const f = ctx.f;
-const track = { id: 't1', kind: 'file', title: '제목', artist: 'A', album: 'B', tags: ['태그'], notes: 'N', folderId: 'f1', duration: 123, fileName: 'a.mp3', size: 10, attached: false, youtubeId: '', url: '', thumbnail: '', soundTagSuggestions: ['잔잔한'] };
+const track = { id: 't1', kind: 'file', title: '제목', artist: 'A', album: 'B', tags: ['태그'], notes: 'N', folderId: 'f1', duration: 123, fileName: 'a.mp3', size: 10, attached: false, youtubeId: '', url: '', thumbnail: '', memo2: 'M' };
 ctx.state.musicTracks.push(track);
 // 잘못된 주소: 오류 문구, 변환 없음
 f.musicLinkYoutube('t1', 'not a url');
@@ -21,7 +21,7 @@ ok(track.kind === 'file' && els['music-link-error'].textContent.includes('알아
 // 연결
 f.musicLinkYoutube('t1', 'https://youtu.be/dQw4w9WgXcQ');
 ok(track.kind === 'youtube' && track.youtubeId === 'dQw4w9WgXcQ' && track.url === 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' && track.attached === true, '#257 「유튜브 + 첨부 파일」 형태로 변환');
-ok(track.fileName === 'a.mp3' && track.size === 10 && track.duration === 123 && track.title === '제목' && track.artist === 'A' && track.album === 'B' && track.notes === 'N' && track.folderId === 'f1' && JSON.stringify(track.tags) === '["태그"]' && JSON.stringify(track.soundTagSuggestions) === '["잔잔한"]', '파일명·길이·제목·아티스트·앨범·메모·폴더·태그·소리 분석 추천 유지');
+ok(track.fileName === 'a.mp3' && track.size === 10 && track.duration === 123 && track.title === '제목' && track.artist === 'A' && track.album === 'B' && track.notes === 'N' && track.folderId === 'f1' && JSON.stringify(track.tags) === '["태그"]' && track.memo2 === 'M', '파일명·길이·제목·아티스트·앨범·메모·폴더·태그·기타 메타 유지');
 ok(track.thumbnail === 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg', '유튜브 썸네일 설정(파일 표지는 카드에서 우선)');
 ok(persisted === 1 && rendered === 1 && detail.length === 1 && detail[0][0] === 't1' && detail[0][1] === 'file', '저장·카드 갱신·상세 다시 열기(재생 기본 파일)');
 // Enter 키
