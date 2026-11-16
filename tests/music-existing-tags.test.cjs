@@ -6,7 +6,7 @@ ok(html.includes('.music-tag-list { flex: 1 1 0; min-height: 0; overflow-y: auto
 ok(html.includes('.music-card-title { font-weight: 800; font-size: 12.5px; white-space: normal; overflow-wrap: anywhere; }') && !/\.music-card-title \{[^}]*ellipsis/.test(html), '카드 제목은 줄바꿈해서 끝까지 표시(말줄임 없음)');
 ok(!/\.music-modal-title \{[^}]*ellipsis/.test(html), '상세 창 제목도 말줄임 없음');
 const code = cut('function musicTagKey', 'function musicToggleTag').replace(/^[\s\S]*?(function musicTagKey)/, '$1') + cut('function musicExistingTagsInner', 'async function openMusicDetail');
-const ctx = { esc: x => String(x), String, state: { musicTracks: [{ id: 'a', tags: ['연주', '피아노 솔로'] }, { id: 'b', tags: ['밤', '연주', '피아노솔로', 'Jazz'] }, { id: 'c', tags: ['jazz'] }] }, document: { querySelector: () => ctx.box } };
+const ctx = { esc: x => String(x), String, musicTagChipStyle: () => '', state: { musicTracks: [{ id: 'a', tags: ['연주', '피아노 솔로'] }, { id: 'b', tags: ['밤', '연주', '피아노솔로', 'Jazz'] }, { id: 'c', tags: ['jazz'] }] }, document: { querySelector: () => ctx.box } };
 vm.createContext(ctx); vm.runInContext(code + ';this.f={musicExistingTagsHtml,musicRefreshExistingTags}', ctx);
 const h = ctx.f.musicExistingTagsHtml(ctx.state.musicTracks[0]);
 const chips = [...h.matchAll(/data-t="([^"]+)"/g)].map(m => m[1]);

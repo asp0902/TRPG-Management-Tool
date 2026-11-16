@@ -2213,6 +2213,13 @@ tr.ct-row-end .ct-select:focus {
 .music-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .music-fcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .music-fcol-tags { min-height: 0; }
+.music-cat-btn { border: 1px solid #ddd; background: #fff; border-radius: 6px; padding: 1px 7px; font: inherit; font-size: 10.5px; color: #666; cursor: pointer; }
+.music-cat-row { display: flex; align-items: center; gap: 8px; }
+.music-cat-row input[type="color"] { width: 32px; height: 28px; padding: 0; border: 1px solid #ddd; border-radius: 6px; background: none; cursor: pointer; }
+.music-cat-name { flex: 1; min-width: 0; border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12px; }
+.music-cat-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; border: 1px solid rgba(0,0,0,0.15); }
+.music-tag-menu-head { padding: 5px 14px; font-size: 11px; color: #888; }
+.music-tag-menu-sep { height: 1px; background: #eee; margin: 4px 0; }
 .music-tag-label { cursor: pointer; width: fit-content; text-decoration: underline dotted; text-underline-offset: 3px; }
 .music-tag-list.hidden { display: none; }
 .music-tag-list { flex: 1 1 0; min-height: 0; overflow-y: auto; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px; } /* 높이는 왼쪽 열(앨범 칸까지)에 맞추고 넘치면 스크롤 */ /* 왼쪽: 제목·아티스트·앨범 세로, 오른쪽: 태그(#298 후속) */
@@ -10255,7 +10262,7 @@ const SHEET_TEMPLATES = {
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-let state = { scenarios: [], folders: [], cssMacroFolders: [], records: [], catalog: [], cssMacros: [], cssPopupDictionary: [], bookmarks: [], musicFolders: [], musicTracks: [], rulebooks: [], dataSheets: [], characters: [], characterFolders: [], customFonts: [], manualFonts: [], recentFonts: [], customBulletSymbols: [], customBulletImages: [], findReplaceHistory: [], sharedMemoOwner: { memos: [] }, currentId: null };
+let state = { scenarios: [], folders: [], cssMacroFolders: [], records: [], catalog: [], cssMacros: [], cssPopupDictionary: [], bookmarks: [], musicFolders: [], musicTagCats: null, musicTracks: [], rulebooks: [], dataSheets: [], characters: [], characterFolders: [], customFonts: [], manualFonts: [], recentFonts: [], customBulletSymbols: [], customBulletImages: [], findReplaceHistory: [], sharedMemoOwner: { memos: [] }, currentId: null };
 const characterSheetPopupParams = new URLSearchParams(location.search);
 const characterSheetPopupCharacterId = characterSheetPopupParams.get('characterPopup') || '';
 const characterSheetPopupSheetId = characterSheetPopupParams.get('sheet') || '';
@@ -10556,9 +10563,9 @@ function normalizeCssMacroTags(input, fallbackTag = '') {
 }
 // 칩 태그 입력기(#311): 세션 기록의 태그 입력과 같은 방식. Enter·쉼표·입력칸을 벗어날 때 태그로 확정(띄어쓰기 허용), 칩의 ×로 제거, 빈 칸에서 Backspace 로 마지막 태그 제거.
 // 값은 숨김 입력칸(.tag-editor-value)에 '#태그 #태그' 문자열로 두어, 북마크·MUSIC 의 기존 저장 코드(value 읽기, input/change 이벤트)를 그대로 쓴다.
-function tagEditorHtml(valueAttrs, tags, placeholder) { // 입력칸 + 그 바깥 아래에 만들어진 태그 칩(#319)
+function tagEditorHtml(valueAttrs, tags, placeholder, music) { // 입력칸 + 그 바깥 아래에 만들어진 태그 칩(#319)
   const text = normalizeCssMacroTags(tags).map(tag => '#' + tag).join(' ');
-  return '<div class="tag-editor" data-placeholder="' + esc(placeholder || '') + '">'
+  return '<div class="tag-editor" data-placeholder="' + esc(placeholder || '') + '"' + (music ? ' data-music-tags="1"' : '') + '>'
     + '<input type="hidden" class="tag-editor-value" ' + valueAttrs + ' value="' + esc(text) + '">'
     + '<input type="text" class="tag-editor-input" spellcheck="false" placeholder="' + esc(placeholder || '') + '" onkeydown="tagEditorKey(event,this)" onblur="tagEditorCommit(this)">'
     + '<span class="record-session-tags tag-editor-chips"></span>'
@@ -10568,7 +10575,8 @@ function tagEditorOf(el) { return el && el.closest ? el.closest('.tag-editor') :
 function tagEditorTags(editor) { return normalizeCssMacroTags(editor.querySelector('.tag-editor-value').value); }
 function tagEditorRender(editor) { // 칩과 placeholder 를 값에 맞춰 다시 그린다
   const tags = tagEditorTags(editor), input = editor.querySelector('.tag-editor-input');
-  editor.querySelector('.tag-editor-chips').innerHTML = tags.map(tag => '<span class="record-session-tag-chip"><span>' + esc(tag) + '</span><button type="button" class="record-session-tag-chip-remove" title="태그 제거" data-tag="' + esc(encodeURIComponent(tag)) + '" onmousedown="event.preventDefault()" onclick="tagEditorRemove(this)">×</button></span>').join('');
+  const music = !!editor.dataset.musicTags; // MUSIC 태그만 분류 색과 우클릭 메뉴를 쓴다(#323)
+  editor.querySelector('.tag-editor-chips').innerHTML = tags.map(tag => '<span class="record-session-tag-chip"' + (music ? ' data-tag="' + esc(encodeURIComponent(tag)) + '" style="' + esc(musicTagChipStyle(tag)) + '" oncontextmenu="musicTagContext(event,this)"' : '') + '><span>' + esc(tag) + '</span><button type="button" class="record-session-tag-chip-remove" title="태그 제거" data-tag="' + esc(encodeURIComponent(tag)) + '" onmousedown="event.preventDefault()" onclick="tagEditorRemove(this)">×</button></span>').join('');
   input.placeholder = editor.dataset.placeholder || '';
 }
 function tagEditorRefresh(valueEl) { const editor = tagEditorOf(valueEl); if (editor) tagEditorRender(editor); } // 코드가 값(value)을 바꾼 뒤 호출
@@ -10865,6 +10873,7 @@ function makeStatePayload() {
     cssPopupDictionary: state.cssPopupDictionary,
     bookmarks: state.bookmarks,
     musicFolders: state.musicFolders,
+    musicTagCats: state.musicTagCats,
     musicTracks: state.musicTracks,
     rulebooks: state.rulebooks,
     dataSheets: state.dataSheets,
@@ -10890,6 +10899,7 @@ function applyStatePayload(raw) {
     state.cssPopupDictionary = [];
     state.bookmarks = [];
     state.musicFolders = [];
+    state.musicTagCats = null;
     state.musicTracks = [];
     state.rulebooks = [];
     state.dataSheets = [];
@@ -10912,6 +10922,7 @@ function applyStatePayload(raw) {
     state.cssPopupDictionary = Array.isArray(raw.cssPopupDictionary) ? raw.cssPopupDictionary : [];
     state.bookmarks = Array.isArray(raw.bookmarks) ? raw.bookmarks : [];
     state.musicFolders = Array.isArray(raw.musicFolders) ? raw.musicFolders : [];
+    state.musicTagCats = Array.isArray(raw.musicTagCats) ? raw.musicTagCats : null; // null = 아직 만든 적 없음 → 기본 분류로 채움(#323)
     state.musicTracks = Array.isArray(raw.musicTracks) ? raw.musicTracks : [];
     state.rulebooks = Array.isArray(raw.rulebooks) ? raw.rulebooks : [];
     state.dataSheets = Array.isArray(raw.dataSheets) ? raw.dataSheets : [];
@@ -24237,6 +24248,7 @@ function getFullBackupPayload() {
     cssPopupDictionary: state.cssPopupDictionary,
     bookmarks: state.bookmarks,
     musicFolders: state.musicFolders,
+    musicTagCats: state.musicTagCats,
     musicTracks: state.musicTracks,
     rulebooks: state.rulebooks,
     dataSheets: state.dataSheets,
@@ -25209,6 +25221,7 @@ function makeImportPayload(data) {
       cssPopupDictionary: [],
       bookmarks: [],
       musicFolders: [],
+      musicTagCats: null,
       musicTracks: [],
       rulebooks: [],
       characters: [],
@@ -25237,6 +25250,7 @@ function makeImportPayload(data) {
     cssPopupDictionary: normalizeCssPopupDictionaryCollection(data.cssPopupDictionary),
     bookmarks: Array.isArray(data.bookmarks) ? data.bookmarks.map(normalizeBookmarkRecord) : [],
     musicFolders: Array.isArray(data.musicFolders) ? data.musicFolders.map(normalizeMusicFolder) : [],
+    musicTagCats: Array.isArray(data.musicTagCats) ? data.musicTagCats.map(normalizeMusicTagCat) : null,
     musicTracks: Array.isArray(data.musicTracks) ? data.musicTracks.map(normalizeMusicTrack) : [],
     rulebooks: Array.isArray(data.rulebooks) ? data.rulebooks.map(normalizeRulebookEntry) : [],
     dataSheets: Array.isArray(data.dataSheets) ? data.dataSheets.map(normalizeDataSheetEntry) : [],
@@ -25367,6 +25381,7 @@ function replaceStateWithImportPayload(payload) {
   state.cssPopupDictionary = payload.cssPopupDictionary;
   state.bookmarks = payload.bookmarks;
   state.musicFolders = payload.musicFolders || [];
+  state.musicTagCats = payload.musicTagCats || null;
   state.musicTracks = payload.musicTracks || [];
   state.rulebooks = payload.rulebooks;
   state.dataSheets = payload.dataSheets || [];
@@ -25392,6 +25407,10 @@ function mergeImportPayload(payload) {
   state.cssPopupDictionary.push(...payload.cssPopupDictionary);
   state.bookmarks.push(...payload.bookmarks);
   state.musicFolders.push(...(payload.musicFolders || []));
+  if (payload.musicTagCats) { // 합치기: 같은 id 의 분류는 태그만 합치고, 없는 분류는 추가(#323)
+    musicTagCatsEnsure();
+    payload.musicTagCats.forEach(cat => { const same = state.musicTagCats.find(item => item.id === cat.id); if (!same) state.musicTagCats.push(cat); else cat.tags.forEach(key => { if (!same.tags.includes(key)) same.tags.push(key); }); });
+  }
   state.musicTracks.push(...(payload.musicTracks || []));
   state.rulebooks.push(...payload.rulebooks);
   if (Array.isArray(payload.dataSheets)) state.dataSheets.push(...payload.dataSheets);
@@ -25415,6 +25434,7 @@ function makeImportSnapshot() {
     cssPopupDictionary: state.cssPopupDictionary.slice(),
     bookmarks: state.bookmarks.slice(),
     musicFolders: state.musicFolders.slice(),
+    musicTagCats: state.musicTagCats ? state.musicTagCats.slice() : null,
     musicTracks: state.musicTracks.slice(),
     rulebooks: state.rulebooks.slice(),
     dataSheets: state.dataSheets.slice(),
@@ -25434,7 +25454,7 @@ function makeImportSnapshot() {
   };
 }
 function restoreImportSnapshot(snapshot) {
-  ['scenarios','folders','cssMacroFolders','records','catalog','cssMacros','cssPopupDictionary','bookmarks','musicFolders','musicTracks','rulebooks','dataSheets','characters','characterFolders','customFonts','manualFonts','recentFonts','customBulletSymbols','customBulletImages','findReplaceHistory','sharedMemoOwner'].forEach(key => {
+  ['scenarios','folders','cssMacroFolders','records','catalog','cssMacros','cssPopupDictionary','bookmarks','musicFolders','musicTagCats','musicTracks','rulebooks','dataSheets','characters','characterFolders','customFonts','manualFonts','recentFonts','customBulletSymbols','customBulletImages','findReplaceHistory','sharedMemoOwner'].forEach(key => {
     if (snapshot[key] !== undefined) state[key] = snapshot[key];
   });
   state.currentId = snapshot.currentId;
@@ -35324,6 +35344,7 @@ function normalizeMusicTrack(input = {}) {
   };
 }
 function normalizeMusicCollections() {
+  musicTagCatsEnsure();
   state.musicFolders = Array.isArray(state.musicFolders) ? state.musicFolders.map(normalizeMusicFolder) : [];
   const ids = new Set(state.musicFolders.map(folder => folder.id));
   state.musicTracks = Array.isArray(state.musicTracks) ? state.musicTracks.map(normalizeMusicTrack) : [];
@@ -35585,6 +35606,7 @@ function musicStop() {
   musicPlaying = null;
 }
 function musicModalKey(event) {
+  if (document.getElementById('music-cat-backdrop')) { if (event.key === 'Escape') { event.stopPropagation(); musicCloseTagCatManager(); } return; }
   if (event.key === 'Escape') { musicCloseModal(); return; }
   if (!musicPlaying || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
   if (/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName) || event.target.isContentEditable) return;
@@ -35774,10 +35796,86 @@ async function musicDownloadTrack(track) {
   } catch (err) { showToast('음원을 받지 못했습니다: ' + (err?.message || err)); return null; }
 }
 // 이미 만들어진 태그(모든 곡의 태그 합집합)를 태그 칸 아래에 나열한다. 칩을 누르면 이 곡에 태그 추가/해제(#299 후속)
+// ── 태그 분류와 색(#323): 분류마다 이름·파스텔 색을 갖고, 태그를 우클릭해 한 번 분류하면 모든 곡에서 같은 색으로 보인다. 이름은 수정·추가·삭제 가능. 상태(state.musicTagCats)로 저장·동기화된다 ──
+function musicTagCatDefaults() { return [['cat-situation', '상황', '#dcecfb'], ['cat-mood', '분위기', '#e8e0f7'], ['cat-emotion', '감정', '#fbe0e8'], ['cat-time', '시간대', '#fdf3d0'], ['cat-season', '계절', '#dff3dc'], ['cat-tempo', '템포', '#fde5d3']].map(([id, name, color]) => ({ id, name, color, tags: [] })); }
+const MUSIC_TAG_CAT_EXTRA_COLORS = ['#d9f1f1', '#ece4d9', '#f0ddf0', '#e3ecd0', '#fbe3d9', '#dde3f5'];
+function normalizeMusicTagCat(input) {
+  const raw = input && typeof input === 'object' ? input : {};
+  return { id: typeof raw.id === 'string' && raw.id ? raw.id : mkId(), name: typeof raw.name === 'string' ? raw.name.slice(0, 20) : '', color: /^#[0-9a-f]{6}$/i.test(raw.color || '') ? raw.color.toLowerCase() : '#e8e8e8', tags: [...new Set((Array.isArray(raw.tags) ? raw.tags : []).filter(key => typeof key === 'string' && key))] };
+}
+function musicTagCatsEnsure() { state.musicTagCats = Array.isArray(state.musicTagCats) ? state.musicTagCats.map(normalizeMusicTagCat) : musicTagCatDefaults(); return state.musicTagCats; }
+function musicTagCatOf(tag) { const key = musicTagKey(tag); return (state.musicTagCats || []).find(cat => cat.tags.includes(key)) || null; }
+function musicShade(hex, factor) { const n = parseInt(String(hex).slice(1), 16); return '#' + [16, 8, 0].map(sh => Math.round(((n >> sh) & 255) * factor).toString(16).padStart(2, '0')).join(''); }
+function musicTagChipStyle(tag) { const cat = musicTagCatOf(tag); return cat ? 'background:' + cat.color + ';border-color:' + musicShade(cat.color, 0.9) + ';color:#3a3a3a' : ''; }
+function musicTagCatSet(tag, catId) { // 한 태그는 한 분류에만 속한다
+  const key = musicTagKey(tag);
+  musicTagCatsEnsure().forEach(cat => { cat.tags = cat.tags.filter(k => k !== key); });
+  const cat = state.musicTagCats.find(item => item.id === catId);
+  if (cat) cat.tags.push(key);
+  persist(); musicRefreshTagColors();
+}
+function musicRefreshTagColors() { // 열려 있는 상세 창의 칩 색을 다시 입힌다
+  document.querySelectorAll('#music-modal-backdrop .tag-editor').forEach(tagEditorRender);
+  const track = state.musicTracks.find(item => item.id === (musicPlaying && musicPlaying.id));
+  if (track) musicRefreshExistingTags(track);
+}
+function musicCloseTagMenu() { document.getElementById('music-tag-menu')?.remove(); }
+function musicTagContext(event, el) { // 태그 칩 우클릭: 분류 지정 메뉴
+  event.preventDefault(); event.stopPropagation();
+  musicCloseTagMenu();
+  const tag = el.dataset.tag ? decodeURIComponent(el.dataset.tag) : (el.dataset.t || ''), cur = musicTagCatOf(tag);
+  const menu = document.createElement('div');
+  menu.id = 'music-tag-menu'; menu.className = 'ds-ctx-menu open'; menu.style.zIndex = 10600;
+  menu.innerHTML = '<div class="music-tag-menu-head">' + esc(tag) + ' · 분류</div>' + musicTagCatsEnsure().map(cat => '<div class="ds-ctx-item" data-cat="' + esc(cat.id) + '"><span class="music-cat-dot" style="background:' + cat.color + '"></span>' + esc(cat.name || '(이름 없음)') + (cur && cur.id === cat.id ? ' ✓' : '') + '</div>').join('')
+    + '<div class="ds-ctx-item" data-cat="">분류 없음' + (!cur ? ' ✓' : '') + '</div><div class="music-tag-menu-sep"></div><div class="ds-ctx-item" data-act="manage">분류 관리…</div>';
+  menu.addEventListener('click', e => { const t = e.target.closest('.ds-ctx-item'); if (!t) return; musicCloseTagMenu(); if (t.dataset.act === 'manage') openMusicTagCatManager(); else musicTagCatSet(tag, t.dataset.cat); });
+  menu.addEventListener('contextmenu', e => e.preventDefault());
+  document.body.appendChild(menu);
+  menu.style.left = Math.max(4, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 4)) + 'px';
+  menu.style.top = Math.max(4, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 4)) + 'px';
+  const close = e => { if (e.type === 'mousedown' && menu.contains(e.target)) return; musicCloseTagMenu(); ['mousedown', 'keydown', 'scroll', 'resize', 'blur'].forEach(t => window.removeEventListener(t, close, true)); };
+  setTimeout(() => ['mousedown', 'keydown', 'scroll', 'resize', 'blur'].forEach(t => window.addEventListener(t, close, true)), 0);
+}
+function musicTagCatManagerRows() {
+  const q = String.fromCharCode(39);
+  return musicTagCatsEnsure().map(cat => '<div class="music-cat-row"><input type="color" value="' + esc(cat.color) + '" title="색" oninput="musicTagCatEdit(' + q + esc(cat.id) + q + ',' + q + 'color' + q + ',this.value)">'
+    + '<input type="text" class="music-cat-name" value="' + esc(cat.name) + '" maxlength="20" placeholder="분류 이름" spellcheck="false" oninput="musicTagCatEdit(' + q + esc(cat.id) + q + ',' + q + 'name' + q + ',this.value)">'
+    + '<span class="music-hint">태그 ' + cat.tags.length + '개</span><button type="button" class="music-danger" onclick="musicTagCatDelete(' + q + esc(cat.id) + q + ')">삭제</button></div>').join('');
+}
+function openMusicTagCatManager() { // 분류 이름 수정·추가·삭제 창(상세 창 위에 겹쳐 열린다)
+  document.getElementById('music-cat-backdrop')?.remove();
+  const backdrop = document.createElement('div');
+  backdrop.id = 'music-cat-backdrop'; backdrop.className = 'music-modal-backdrop'; backdrop.style.zIndex = 10500;
+  backdrop.innerHTML = '<div class="music-modal" onclick="event.stopPropagation()"><div class="music-modal-head"><div class="music-modal-title">태그 분류 관리</div><button type="button" onclick="musicCloseTagCatManager()">✕</button></div>'
+    + '<div class="music-hint">태그를 우클릭하면 분류를 지정합니다. 분류 이름과 색은 여기서 바꿉니다.</div><div id="music-cat-rows">' + musicTagCatManagerRows() + '</div>'
+    + '<div class="music-modal-foot"><button type="button" onclick="musicTagCatAdd()">＋ 분류 추가</button><button type="button" class="music-primary" onclick="musicCloseTagCatManager()">닫기</button></div></div>';
+  backdrop.addEventListener('mousedown', e => { if (e.target === backdrop) musicCloseTagCatManager(); });
+  document.body.appendChild(backdrop);
+}
+function musicCloseTagCatManager() { document.getElementById('music-cat-backdrop')?.remove(); }
+function musicTagCatEdit(id, field, value) {
+  const cat = musicTagCatsEnsure().find(item => item.id === id);
+  if (!cat) return;
+  if (field === 'color' && /^#[0-9a-f]{6}$/i.test(value)) cat.color = value.toLowerCase(); else if (field === 'name') cat.name = String(value).slice(0, 20);
+  persist(); musicRefreshTagColors();
+}
+function musicTagCatAdd() {
+  const cats = musicTagCatsEnsure();
+  cats.push(normalizeMusicTagCat({ name: '새 분류', color: MUSIC_TAG_CAT_EXTRA_COLORS[cats.length % MUSIC_TAG_CAT_EXTRA_COLORS.length] }));
+  persist();
+  const rows = document.getElementById('music-cat-rows'); if (rows) { rows.innerHTML = musicTagCatManagerRows(); const inputs = rows.querySelectorAll('.music-cat-name'); const last = inputs[inputs.length - 1]; if (last) { last.focus(); last.select(); } }
+}
+function musicTagCatDelete(id) {
+  const cat = musicTagCatsEnsure().find(item => item.id === id);
+  if (!cat || !confirm('"' + (cat.name || '이 분류') + '" 분류를 삭제할까요?\n이 분류의 태그는 분류 없음(회색)으로 돌아갑니다. 태그 자체는 지워지지 않습니다.')) return;
+  state.musicTagCats = state.musicTagCats.filter(item => item.id !== id);
+  persist(); musicRefreshTagColors();
+  const rows = document.getElementById('music-cat-rows'); if (rows) rows.innerHTML = musicTagCatManagerRows();
+}
 function musicExistingTagsInner(track) { // 다른 곡에 이미 만들어져 있고 이 곡에는 아직 없는 태그(이 곡에 붙은 태그는 입력칸의 칩으로 이미 보인다)
   const seen = new Map(), on = new Set(track.tags.map(musicTagKey)), q = String.fromCharCode(39);
   state.musicTracks.forEach(t => (t.tags || []).forEach(tag => { const key = musicTagKey(tag); if (key && !on.has(key) && !seen.has(key)) seen.set(key, tag); }));
-  return [...seen.values()].sort((a, b) => a.localeCompare(b, 'ko')).map(tag => '<button type="button" class="music-tag-chip" data-t="' + esc(tag) + '" onclick="musicToggleTag(' + q + track.id + q + ',this.dataset.t)">' + esc(tag) + '</button>').join('');
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, 'ko')).map(tag => '<button type="button" class="music-tag-chip" data-t="' + esc(tag) + '" style="' + esc(musicTagChipStyle(tag)) + '" oncontextmenu="musicTagContext(event,this)" onclick="musicToggleTag(' + q + track.id + q + ',this.dataset.t)">' + esc(tag) + '</button>').join('');
 }
 function musicExistingTagsHtml(track) { return '<div class="music-tag-list hidden">' + musicExistingTagsInner(track) + '</div>'; } // 기본은 숨김, 「태그」 항목명을 누르면 보임(#321)
 function musicToggleTagList() { document.querySelector('#music-modal-backdrop .music-tag-list')?.classList.toggle('hidden'); }
@@ -35808,7 +35906,7 @@ async function openMusicDetail(id, source) {
       + (track.attached && !blob ? missing : '') + (!track.attached ? btn('파일 첨부', 'musicAttachPick') + '<span class="music-hint">또는 이 창·카드 위로 음원 파일을 끌어 놓기</span>' : '') + '</div>';
   }
   const folderOpts = '<option value="">분류 없음</option>' + state.musicFolders.map(folder => '<option value="' + folder.id + '"' + (folder.id === track.folderId ? ' selected' : '') + '>' + esc(folder.name) + '</option>').join('');
-  const tagsField = '<div class="music-field"><span class="music-tag-label" onclick="musicToggleTagList()" title="눌러서 이전에 만든 태그 보기">태그</span>' + tagEditorHtml('data-k="tags" onchange="musicEditField(' + String.fromCharCode(39) + id + String.fromCharCode(39) + ',this)"', track.tags, '') + '</div>';
+  const tagsField = '<div class="music-field"><span><span class="music-tag-label" onclick="musicToggleTagList()" title="눌러서 이전에 만든 태그 보기">태그</span> <button type="button" class="music-cat-btn" onclick="openMusicTagCatManager()" title="태그 분류 이름·색 관리">분류</button></span>' + tagEditorHtml('data-k="tags" onchange="musicEditField(' + String.fromCharCode(39) + id + String.fromCharCode(39) + ',this)"', track.tags, '', true) + '</div>';
   const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" oninput="musicAutoGrow(this)" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)"' + ' value="' + esc(track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
   musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + (track.kind === 'youtube' && !url ? '<div class="music-hint" id="music-yt-state">유튜브: 불러오는 중…</div>' : '') + attachRow
