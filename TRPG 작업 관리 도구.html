@@ -28073,6 +28073,11 @@ document.addEventListener('keydown', e => {
     if (shouldUseNativeHistoryShortcut(e)) return;
     e.preventDefault(); tbRedo(); return;
   }
+  if (!e.shiftKey && !e.altKey && e.target.closest && e.target.closest('#ds-editor-body') && ['b', 'i', '`', 'u'].includes(key)) { // 데이터 시트는 셀 단위 서식(#271): 문자 감싸기 금지
+    e.preventDefault();
+    if (key !== 'u') ds_toggleCellStyle(key === 'b' ? 'b' : key === 'i' ? 'i' : 's');
+    return;
+  }
   if (!lastFocusedTA) return;
   // Ctrl+L: 선택 구간을 개변으로 (우클릭 메뉴의 '개변 추가'와 같은 동작)
   if (key === 'l') {
