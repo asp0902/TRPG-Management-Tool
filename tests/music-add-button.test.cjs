@@ -7,4 +7,6 @@ const fn = html.slice(html.indexOf('function openMusicYoutubeModal'), html.index
 ok(fn.includes('<div class="music-modal-title">곡 추가</div>'), '모달 제목 곡 추가');
 ok(fn.includes('onclick="musicCloseModal(); musicPickFiles();">PC 파일 선택</button><div class="music-or"></div>'), 'PC 파일 선택 + 구분선');
 ok(fn.indexOf('PC 파일 선택') < fn.indexOf('id="music-yt-url"') && fn.includes('musicAddYoutube()'), '유튜브 입력부 유지');
+ok(!fn.includes('placeholder=') && !fn.includes('또는 유튜브 링크') && !fn.includes('oEmbed 로 조회합니다'), '곡 추가 모달 예시·안내 문구 없음(#288)');
+ok(fn.includes('id="music-yt-status"></div>') && fn.includes('id="music-yt-error"') && fn.includes('id="music-yt-album-status"'), '상태·오류 요소는 유지');
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);

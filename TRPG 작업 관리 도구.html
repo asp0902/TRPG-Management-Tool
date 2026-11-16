@@ -35820,13 +35820,13 @@ function openMusicYoutubeModal() {
   musicYtLastId = '';
   musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">곡 추가</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<button type="button" class="music-primary" onclick="musicCloseModal(); musicPickFiles();">PC 파일 선택</button><div class="music-or"></div>'
-    + '<label class="music-field">URL<input id="music-yt-url" type="text" placeholder="https://www.youtube.com/watch?v=..." spellcheck="false" onchange="musicFetchYoutube(true)" onkeydown="musicYtKey(event)"></label>'
+    + '<label class="music-field">URL<input id="music-yt-url" type="text" spellcheck="false" onchange="musicFetchYoutube(true)" onkeydown="musicYtKey(event)"></label>'
     + '<img id="music-yt-thumb" class="music-yt-thumb" alt="" hidden onerror="this.hidden=true">'
-    + '<label class="music-field">제목<input id="music-yt-title" type="text" placeholder="자동으로 가져오거나 직접 입력"></label>'
+    + '<label class="music-field">제목<input id="music-yt-title" type="text"></label>'
     + '<label class="music-field">아티스트(채널)<input id="music-yt-artist" type="text"></label>'
-    + '<label class="music-field">앨범<input id="music-yt-album" type="text" placeholder="자동으로 가져오거나 직접 입력"></label>'
+    + '<label class="music-field">앨범<input id="music-yt-album" type="text"></label>'
     + '<div class="music-hint" id="music-yt-album-status"></div>'
-    + '<div class="music-hint" id="music-yt-status">제목·썸네일은 유튜브 oEmbed 로 조회합니다(URL 이 유튜브로 전송됨). 재생은 임베드 플레이어이며 음원 다운로드는 지원하지 않습니다.</div>'
+    + '<div class="music-hint" id="music-yt-status"></div>'
     + '<div class="music-error" id="music-yt-error"></div>'
     + '<div class="music-modal-foot"><button type="button" onclick="musicFetchYoutube()">제목 가져오기</button><button type="button" class="music-primary" onclick="musicAddYoutube()">추가</button></div>');
   document.getElementById('music-yt-url').focus();
