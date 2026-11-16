@@ -2175,7 +2175,7 @@ tr.ct-row-end .ct-select:focus {
 .music-card-cover img { width: 100%; height: 100%; object-fit: cover; }
 .music-card-yt { position: absolute; right: 4px; bottom: 4px; background: rgba(0,0,0,0.7); color: #fff; font-size: 9px; font-style: normal; padding: 1px 5px; border-radius: 4px; }
 .music-card-body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.music-card-title { font-weight: 800; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.music-card-title { font-weight: 800; font-size: 12.5px; white-space: normal; overflow-wrap: anywhere; } /* 제목을 끝까지 보여 준다 */
 .music-card-sub { font-size: 11.5px; color: #777; min-height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .music-card-meta { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #999; justify-content: space-between; }
 .music-card-meta .music-dot { margin-right: -2px; }
@@ -2187,13 +2187,15 @@ tr.ct-row-end .ct-select:focus {
 .music-modal-head { display: flex; align-items: center; gap: 8px; }
 .music-yt-thumb { width: 100%; max-height: 180px; object-fit: cover; border-radius: 8px; }
 .music-or { border-top: 1px solid #e4e4e4; margin: 2px 0; } /* 문구 없이 구분선만(#288) */
-.music-modal-title { flex: 1; font-weight: 800; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.music-modal-title { flex: 1; font-weight: 800; font-size: 14px; white-space: normal; overflow-wrap: anywhere; }
 .music-modal-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .music-field { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: #666; font-weight: 700; }
 .music-field input, .music-field textarea, .music-field select { border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12.5px; font-weight: 400; color: #222; }
 .music-field textarea { min-height: 60px; resize: vertical; }
 .music-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.music-fcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; } /* 왼쪽: 제목·아티스트·앨범 세로, 오른쪽: 태그(#298 후속) */
+.music-fcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.music-fcol-tags { min-height: 0; }
+.music-tag-list { flex: 1 1 0; min-height: 0; overflow-y: auto; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px; } /* 높이는 왼쪽 열(앨범 칸까지)에 맞추고 넘치면 스크롤 */ /* 왼쪽: 제목·아티스트·앨범 세로, 오른쪽: 태그(#298 후속) */
 .music-rec { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11.5px; }
 .music-rec:empty { display: none; }
 .music-modal button.music-tag-chip.rec { border-style: dashed; }
@@ -35756,6 +35758,14 @@ async function musicDownloadTrack(track) {
     return blob;
   } catch (err) { showToast('음원을 받지 못했습니다: ' + (err?.message || err)); return null; }
 }
+// 이미 만들어진 태그(모든 곡의 태그 합집합)를 태그 칸 아래에 나열한다. 칩을 누르면 이 곡에 태그 추가/해제(#299 후속)
+function musicExistingTagsHtml(track) {
+  const seen = new Map();
+  state.musicTracks.forEach(t => (t.tags || []).forEach(tag => { const key = musicTagKey(tag); if (key && !seen.has(key)) seen.set(key, tag); }));
+  const on = new Set(track.tags.map(musicTagKey));
+  const q = String.fromCharCode(39);
+  return '<div class="music-tag-list">' + [...seen.values()].sort((a, b) => a.localeCompare(b, 'ko')).map(tag => '<button type="button" class="music-tag-chip' + (on.has(musicTagKey(tag)) ? ' on' : '') + '" data-t="' + esc(tag) + '" onclick="musicToggleTag(' + q + track.id + q + ',this.dataset.t)">' + esc(tag) + '</button>').join('') + '</div>';
+}
 async function openMusicDetail(id, source) {
   const track = state.musicTracks.find(item => item.id === id);
   if (!track) return;
@@ -35776,7 +35786,7 @@ async function openMusicDetail(id, source) {
   musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + attachRow
     + (track.kind === 'file' && !url ? '<button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button>' : '')
-    + '<div class="music-fields">' + '<div class="music-fcol">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + '</div><div class="music-fcol">' + field('tags', '태그') + musicRecRowHtml(track) + '</div>'
+    + '<div class="music-fields">' + '<div class="music-fcol">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + '</div><div class="music-fcol music-fcol-tags">' + field('tags', '태그') + musicRecRowHtml(track) + musicExistingTagsHtml(track) + '</div>'
     + '<label class="music-field" style="grid-column:1/-1">폴더 <select onchange="musicEditField(\'' + id + '\',this,\'folderId\')">' + folderOpts + '</select></label>' + field('notes', '메모', 'textarea') + '</div>'
     + '<div class="music-modal-foot"><span class="music-hint">← → 이전·다음 곡</span><button type="button" class="music-danger" onclick="deleteMusicTrack(\'' + id + '\')">삭제</button></div>');
   musicPlaying = { id, url };

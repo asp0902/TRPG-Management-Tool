@@ -3,7 +3,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도�
 let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
 const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
 ok(!html.includes('musicTagPresetsHtml') && !html.includes('music-tag-presets') && !html.includes('태그 예시'), '태그 예시(접이식 프리셋 칩) 삭제(#298)');
-ok(html.includes("'<div class=\"music-fcol\">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + '</div><div class=\"music-fcol\">' + field('tags', '태그') + musicRecRowHtml(track) + '</div>'"), '왼쪽: 제목·아티스트·앨범 세로 / 오른쪽: 태그');
+ok(html.includes("'<div class=\"music-fcol\">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + '</div><div class=\"music-fcol music-fcol-tags\">' + field('tags', '태그') + musicRecRowHtml(track) + musicExistingTagsHtml(track) + '</div>'"), '왼쪽: 제목·아티스트·앨범 세로 / 오른쪽: 태그');
 ok(html.includes('.music-fcol { display: flex; flex-direction: column;') && html.includes('.music-modal button.music-tag-chip.on {'), 'CSS(세로 열·추천 칩)');
 const code = cut('function normalizeCssMacroTags', 'function formatCssMacroTagsText') + cut('const MUSIC_TAG_PRESETS', 'async function openMusicDetail');
 const chips = [];

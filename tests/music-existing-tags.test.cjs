@@ -1,0 +1,16 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
+ok(html.includes('.music-tag-list { flex: 1 1 0; min-height: 0; overflow-y: auto;'), '태그 목록 높이는 왼쪽 열(앨범 칸까지)에 맞추고 넘치면 스크롤');
+ok(html.includes('.music-card-title { font-weight: 800; font-size: 12.5px; white-space: normal; overflow-wrap: anywhere; }') && !/\.music-card-title \{[^}]*ellipsis/.test(html), '카드 제목은 줄바꿈해서 끝까지 표시(말줄임 없음)');
+ok(!/\.music-modal-title \{[^}]*ellipsis/.test(html), '상세 창 제목도 말줄임 없음');
+const code = cut('function musicTagKey', 'function musicToggleTag').replace(/^[\s\S]*?(function musicTagKey)/, '$1') + cut('// 이미 만들어진 태그', 'async function openMusicDetail');
+const ctx = { esc: x => String(x), String, state: { musicTracks: [{ id: 'a', tags: ['연주', '피아노 솔로'] }, { id: 'b', tags: ['밤', '연주', '피아노솔로', 'Jazz'] }, { id: 'c', tags: ['jazz'] }] } };
+vm.createContext(ctx); vm.runInContext(code + ';this.f={musicExistingTagsHtml}', ctx);
+const h = ctx.f.musicExistingTagsHtml(ctx.state.musicTracks[0]);
+const chips = [...h.matchAll(/data-t="([^"]+)"/g)].map(m => m[1]);
+ok(chips.length === 4 && chips.includes('연주') && chips.includes('밤') && chips.includes('피아노 솔로') && chips.filter(t => /jazz/i.test(t)).length === 1, '모든 곡의 태그 합집합(공백 무시·대소문자 무시 중복 제거) 나열');
+ok(/music-tag-chip on" data-t="연주"/.test(h) && /music-tag-chip on" data-t="피아노 솔로"/.test(h) && /music-tag-chip" data-t="밤"/.test(h), '이 곡에 붙은 태그는 켜짐 표시');
+ok(h.includes("onclick=\"musicToggleTag('a',this.dataset.t)\""), '칩 클릭은 기존 musicToggleTag(추가/해제)');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);
