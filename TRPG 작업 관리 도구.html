@@ -36134,12 +36134,21 @@ async function musicFetchYoutube(auto) {
 // jina 본문(markdown)의 「## Music」 구간: 첫 「# 」=노래, 다음 「#### 」=아티스트, 그다음 일반 텍스트 줄=앨범. 실패하면 빈 값(#283)
 function musicParseJinaMusic(content) {
   const out = { song: '', artist: '', album: '' };
-  const lines = String(content || '').split(/\r?\n/);
-  let i = lines.findIndex(line => /^##\s+Music\b/.test(line));
-  if (i < 0) return out;
-  for (i++; i < lines.length; i++) { if (/^#\s+/.test(lines[i])) { out.song = lines[i].replace(/^#\s+/, '').trim(); break; } }
+  const all = String(content || '').split(/\r?\n/);
+  const start = all.findIndex(line => /^##\s+Music\b/.test(line));
+  if (start < 0) return out;
+  const stop = all.findIndex((line, k) => k > start && /^##\s/.test(line)); // 「## Music」 구간만(뒤의 영상 정보 제목을 노래로 잘못 읽지 않게)
+  const lines = all.slice(start + 1, stop < 0 ? undefined : stop);
+  let i = 0;
+  // 줄이 나뉜 형식: 「# 노래」 → 「#### 아티스트」 → 일반 글 한 줄(앨범)
+  for (; i < lines.length; i++) { if (/^#\s+/.test(lines[i])) { out.song = lines[i].replace(/^#\s+/, '').trim(); break; } }
   for (i++; i < lines.length; i++) { if (/^####\s+/.test(lines[i])) { out.artist = lines[i].replace(/^####\s+/, '').trim(); break; } }
   for (i++; i < lines.length; i++) { const t = lines[i].trim(); if (t && !/^[#!\[]/.test(t)) { out.album = t; break; } }
+  if (!out.artist) { // 한 줄로 이어진 형식(#322): [![Image](...) # 노래 #### 아티스트 [앨범](...)](...)
+    const flat = lines.join(' ').replace(/\s+/g, ' ');
+    const m = flat.match(/#\s+(.+?)\s+#{4}\s+(.+?)(?:\s+\[([^\]]+)\]\(|\s*$)/);
+    if (m) { out.song = m[1].trim(); out.artist = m[2].replace(/\]\(.*$/, '').trim(); out.album = m[3] && m[3].trim() !== 'Music' ? m[3].trim() : ''; }
+  }
   return out;
 }
 async function musicFetchAlbumInfo(id) {

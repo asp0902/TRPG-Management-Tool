@@ -25,6 +25,13 @@ const md = '# Title\n\n## Music 1 song\n![Image 1](https://i.ytimg.com/x.jpg)\n#
   ok(f.musicParseJinaMusic('## Music\r\n# S\r\n#### A\r\nAlb\r\n').album === 'Alb', 'CRLF 처리');
   ok(f.musicParseJinaMusic('## Music 1 song\n# S\n#### A\n[Music](x)\n').album === '', '앨범 줄 없으면 빈 앨범(링크 줄은 제외)');
 
+  // 실제 jina 응답 구조(#322): 노래·아티스트·앨범이 한 줄로 이어진 형식, 뒤의 영상 정보 제목(# 제목)은 무시
+  { const NL = String.fromCharCode(10);
+    const real = ['## Music 1 song', '', '[![Image 8](https://i.ytimg.com/a.jpg) # The French Library #### Franz Gordon [The French Library](https://music.youtube.com/x)](https://www.youtube.com/y)', '', '[Music](https://www.youtube.com/channel/z)', '', '### People mentioned', '', '## Video details', '', '# The French Library', ''].join(NL);
+    const r2 = f.musicParseJinaMusic(real);
+    ok(r2.song === 'The French Library' && r2.artist === 'Franz Gordon' && r2.album === 'The French Library', '한 줄로 이어진 형식 → 노래·아티스트·앨범');
+    const r3 = f.musicParseJinaMusic(['## Music 1 song', '[![I](u) # Song A #### Artist B](u)', '', '[Music](u)', '## Video details', '# 영상 제목'].join(NL));
+    ok(r3.song === 'Song A' && r3.artist === 'Artist B' && r3.album === '', '앨범 링크가 없으면 앨범은 비움(아티스트 뒤 잔여 문자 제거)'); }
   // 채움: 앨범 비어 있음, 아티스트는 자동값(채널명)이므로 교체
   reset(); els['music-yt-artist'].value = '채널명'; els['music-yt-artist'].dataset.auto = '채널명';
   body = { data: { content: md } }; fetched = [];
