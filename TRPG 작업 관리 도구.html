@@ -38119,7 +38119,7 @@ function normalizeRulebookEntry(rb, opts = {}) {
 //   - 카테고리 헤더 행: { id, isCategory:true, categoryName, cells: { ... 보존됨 } }
 function ds_normalizeRowHeaderWidth(width) {
   var w = parseInt(width, 10);
-  if (isNaN(w)) w = 132;
+  if (isNaN(w)) w = 32;
   if (w < 24) w = 24;
   return w;
 }
@@ -40649,6 +40649,7 @@ function ds_toggleHeaderEditMode() {
   persist();
   renderDataSheetEditor();
   ds_restoreEditorViewport(viewport);
+  if (sheet.headerEditMode === 'rows') ds_autoFitRowHeader(true); // 행 이름이 잘리면 폭만 키운다(#265)
 }
 
 function _dsRenderFlatTable(ds) {
@@ -40981,7 +40982,7 @@ function ds_autoFitColumn(colId) {
   renderDataSheetEditor();
   ds_restoreEditorViewport(viewport);
 }
-function ds_autoFitRowHeader() {
+function ds_autoFitRowHeader(onlyGrow) {
   var ds = findDataSheet(_dsEditId);
   var sheet = _dsActiveSheet(ds);
   if (!sheet) return;
@@ -41003,6 +41004,7 @@ function ds_autoFitRowHeader() {
     var numFont = numEl ? getComputedStyle(numEl).font : '11px sans-serif';
     maxW = _dsMeasureTextWidth(String((ds.rows || []).length || 1), numFont) + 28;
   }
+  if (onlyGrow && Math.ceil(maxW) <= ds_getRowHeaderWidth(ds)) return;
   sheet.rowHeaderWidth = ds_normalizeRowHeaderWidth(Math.ceil(maxW));
   persist();
   var viewport = ds_captureEditorViewport();
