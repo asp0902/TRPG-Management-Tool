@@ -2,7 +2,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
 let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
 const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
-ok(html.includes("+ field('tags', '태그') + musicTagPresetsHtml(track)"), '태그 칸 아래에 예시 삽입');
+ok(html.includes("+ field('tags', '태그') + musicAiRowHtml(track) + musicTagPresetsHtml(track)"), '태그 칸 아래에 예시 삽입');
 ok(html.includes('.music-tag-presets { grid-column: 1 / -1;') && html.includes('.music-modal button.music-tag-chip.on {'), 'CSS');
 const code = cut('function normalizeCssMacroTags', 'function formatCssMacroTagsText') + cut('const MUSIC_TAG_PRESETS', 'async function openMusicDetail');
 const chips = [];

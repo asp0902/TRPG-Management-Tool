@@ -2193,6 +2193,8 @@ tr.ct-row-end .ct-select:focus {
 .music-field input, .music-field textarea, .music-field select { border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12.5px; font-weight: 400; color: #222; }
 .music-field textarea { min-height: 60px; resize: vertical; }
 .music-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.music-ai { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11.5px; }
+.music-modal button.music-tag-chip.rec { border-style: dashed; }
 .music-tag-presets { grid-column: 1 / -1; font-size: 11.5px; }
 .music-tag-presets summary { cursor: pointer; color: #666; font-weight: 700; }
 .music-tag-cat { font-weight: 800; color: #333; margin-top: 8px; }
@@ -9055,6 +9057,7 @@ select.sh-field-input,
           <select id="music-sort" onchange="musicView.sort=this.value;renderMusicPage()"><option value="added">추가 순</option><option value="name">이름 순</option></select>
           <label class="music-check"><input id="music-by-album" type="checkbox" onchange="musicView.byAlbum=this.checked;renderMusicPage()"> 앨범별 보기</label>
           <button type="button" class="music-primary" onclick="openMusicYoutubeModal()" title="곡 추가" aria-label="곡 추가">＋</button>
+          <button type="button" onclick="openMusicAiSettings()" title="AI 태그 설정" aria-label="AI 태그 설정">⚙</button>
         </div>
         <div class="music-storage" id="music-storage"></div>
         <div class="music-grid" id="music-grid"></div>
@@ -35464,6 +35467,83 @@ function musicToggleTag(id, tag) {
   document.querySelectorAll('#music-modal-backdrop .music-tag-chip').forEach(chip => chip.classList.toggle('on', on.has(chip.dataset.t.toLowerCase())));
   persist(); renderMusicPage();
 }
+// ── AI 태그 추천(#285): 추천만, 저장은 사용자가 칩을 눌러서. API 키는 이 기기 localStorage 에만 두고 동기화·내보내기 payload 에 넣지 않으며 로그·오류 문구에 출력하지 않는다 ──
+const MUSIC_AI_KEY_STORE = 'trpg-music-ai-key', MUSIC_AI_MODEL_STORE = 'trpg-music-ai-model', MUSIC_AI_DEFAULT_MODEL = 'claude-opus-5-5', MUSIC_AI_MAX_TAGS = 6;
+const MUSIC_AI_NOTICE = '곡 제목·아티스트·앨범이 Anthropic API 로 전송됩니다. API 키는 이 기기 브라우저에만 저장됩니다.';
+function musicAiGet(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
+function musicAiPresets() { // 저장 태그(공백 제거형) → { ko, en, cat }
+  const map = {};
+  MUSIC_TAG_PRESETS.forEach(([cat, subs]) => subs.forEach(([sub, list]) => list.split(', ').forEach(item => { const [ko, en] = item.split('|'); map[musicPresetTag(ko)] = { ko, en, cat: cat + ' / ' + sub }; })));
+  return map;
+}
+function musicAiBuildRequest(track, key, model) {
+  const presets = musicAiPresets(), tags = Object.keys(presets);
+  const list = tags.map(tag => tag + ' (' + presets[tag].ko + ' | ' + presets[tag].en + ', ' + presets[tag].cat + ')').join('\n');
+  return {
+    url: 'https://api.anthropic.com/v1/messages',
+    init: {
+      method: 'POST',
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: model || MUSIC_AI_DEFAULT_MODEL, max_tokens: 1024,
+        system: '음악 곡의 분위기 태그를 고른다. 아래 목록의 저장 태그(맨 앞 단어)만 사용하고 목록에 없는 태그는 쓰지 않는다. 곡을 아는 경우에만 그 지식을 근거로 하고, 모르면 제목·앨범의 분위기로 추정한다. 어울리는 것을 최대 ' + MUSIC_AI_MAX_TAGS + '개 고른다.\n' + list,
+        messages: [{ role: 'user', content: '제목: ' + (track.title || '') + '\n아티스트: ' + (track.artist || '') + '\n앨범: ' + (track.album || '') + '\n메모: ' + (track.notes || '') }],
+        output_config: { effort: 'low', format: { type: 'json_schema', schema: { type: 'object', properties: { tags: { type: 'array', items: { type: 'string', enum: tags } } }, required: ['tags'], additionalProperties: false } } },
+      }),
+    },
+  };
+}
+function musicAiParse(data) { // 프리셋 밖 값은 버리고 중복 제거, 최대 6개
+  if (data && data.stop_reason === 'refusal') throw new Error('refusal');
+  const text = ((data && data.content) || []).filter(part => part && part.type === 'text').map(part => part.text).join('');
+  const presets = musicAiPresets();
+  let tags = [];
+  try { tags = JSON.parse(text).tags; } catch (e) { tags = []; }
+  return [...new Set((Array.isArray(tags) ? tags : []).filter(tag => typeof tag === 'string' && presets[tag]))].slice(0, MUSIC_AI_MAX_TAGS);
+}
+async function musicAiRequestTags(track, key, model) {
+  const req = musicAiBuildRequest(track, key, model);
+  let res;
+  try { res = await fetch(req.url, req.init); } catch (e) { throw new Error('network'); }
+  if (res.status === 401) throw new Error('auth');
+  if (res.status === 429) throw new Error('rate');
+  if (!res.ok) throw new Error('http');
+  return musicAiParse(await res.json());
+}
+const MUSIC_AI_ERRORS = { refusal: '모델이 이 요청에 답하지 않았습니다.', auth: 'API 키가 올바르지 않습니다. AI 태그 설정을 확인하세요.', rate: '요청 한도를 넘었습니다. 잠시 후 다시 시도하세요.', network: '네트워크 오류로 추천을 가져오지 못했습니다.', http: '추천을 가져오지 못했습니다.' };
+async function musicAiSuggest(id) {
+  const track = state.musicTracks.find(item => item.id === id);
+  const status = document.getElementById('music-ai-status'), box = document.getElementById('music-ai-rec');
+  if (!track || !status || !box) return;
+  const key = musicAiGet(MUSIC_AI_KEY_STORE, '');
+  if (!key) { status.textContent = 'AI 태그 설정에서 API 키를 먼저 입력하세요.'; return; } // 키가 없으면 호출하지 않는다
+  status.textContent = '추천 중… (' + MUSIC_AI_NOTICE + ')';
+  let tags;
+  try { tags = await musicAiRequestTags(track, key, musicAiGet(MUSIC_AI_MODEL_STORE, MUSIC_AI_DEFAULT_MODEL)); }
+  catch (e) { const st = document.getElementById('music-ai-status'); if (st) st.textContent = MUSIC_AI_ERRORS[e && e.message] || MUSIC_AI_ERRORS.http; return; }
+  const boxNow = document.getElementById('music-ai-rec');
+  if (!boxNow || boxNow.dataset.id !== id) return; // 모달이 닫히거나 다른 곡으로 바뀐 뒤 온 응답은 무시
+  const presets = musicAiPresets(), on = new Set(track.tags.map(tag => tag.toLowerCase()));
+  boxNow.innerHTML = tags.map(tag => '<button type="button" class="music-tag-chip rec' + (on.has(tag.toLowerCase()) ? ' on' : '') + '" data-t="' + esc(tag) + '" title="' + esc(presets[tag].en) + '" onclick="musicToggleTag(' + String.fromCharCode(39) + id + String.fromCharCode(39) + ',this.dataset.t)">' + esc(presets[tag].ko) + '</button>').join('');
+  document.getElementById('music-ai-status').textContent = tags.length ? '추천 ' + tags.length + '개 — 눌러서 붙이세요.' : '어울리는 태그를 찾지 못했습니다.';
+}
+function openMusicAiSettings() {
+  const hasKey = !!musicAiGet(MUSIC_AI_KEY_STORE, '');
+  musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">AI 태그 설정</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
+    + '<label class="music-field">Anthropic API 키<input id="music-ai-key" type="password" autocomplete="off" placeholder="' + (hasKey ? '저장됨 (●●●●) — 바꾸려면 새 키 입력' : 'sk-ant-...') + '"></label>'
+    + '<label class="music-field">모델<input id="music-ai-model" type="text" value="' + esc(musicAiGet(MUSIC_AI_MODEL_STORE, MUSIC_AI_DEFAULT_MODEL)) + '" spellcheck="false"></label>'
+    + '<div class="music-hint">' + esc(MUSIC_AI_NOTICE) + ' 비용은 선택한 모델 기준으로 사용자 계정에 청구됩니다.</div>'
+    + '<div class="music-modal-foot">' + (hasKey ? '<button type="button" class="music-danger" onclick="musicAiClearKey()">키 삭제</button>' : '<span></span>') + '<button type="button" class="music-primary" onclick="musicAiSaveSettings()">저장</button></div>');
+}
+function musicAiSaveSettings() {
+  const key = document.getElementById('music-ai-key').value.trim(), model = document.getElementById('music-ai-model').value.trim();
+  try { if (key) localStorage.setItem(MUSIC_AI_KEY_STORE, key); localStorage.setItem(MUSIC_AI_MODEL_STORE, model || MUSIC_AI_DEFAULT_MODEL); } catch (e) { showToast('설정을 저장하지 못했습니다.'); return; }
+  musicCloseModal(); showToast('AI 태그 설정을 저장했습니다.');
+}
+function musicAiClearKey() { try { localStorage.removeItem(MUSIC_AI_KEY_STORE); } catch (e) {} musicCloseModal(); showToast('API 키를 삭제했습니다.'); }
+function musicAiRowHtml(track) {
+  return '<div class="music-ai"><button type="button" onclick="musicAiSuggest(' + String.fromCharCode(39) + track.id + String.fromCharCode(39) + ')">AI 추천</button><span class="music-hint" id="music-ai-status"></span><div class="music-tag-sub" id="music-ai-rec" data-id="' + esc(track.id) + '"></div></div>';
+}
 async function openMusicDetail(id, source) {
   const track = state.musicTracks.find(item => item.id === id);
   if (!track) return;
@@ -35482,7 +35562,7 @@ async function openMusicDetail(id, source) {
   musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + attachRow
     + (track.kind === 'file' && !url ? '<button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button>' : '')
-    + '<div class="music-fields">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + field('tags', '태그') + musicTagPresetsHtml(track)
+    + '<div class="music-fields">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + field('tags', '태그') + musicAiRowHtml(track) + musicTagPresetsHtml(track)
     + '<label class="music-field">폴더 <select onchange="musicEditField(\'' + id + '\',this,\'folderId\')">' + folderOpts + '</select></label>' + field('notes', '메모', 'textarea') + '</div>'
     + '<div class="music-modal-foot"><span class="music-hint">← → 이전·다음 곡</span><button type="button" class="music-danger" onclick="deleteMusicTrack(\'' + id + '\')">삭제</button></div>');
   musicPlaying = { id, url };
