@@ -25,6 +25,7 @@ const mk = () => {
     attachTx: async (store) => { c.statusPuts.push(store); },
     fetchAttachmentFromGitHub: async att => { c.fetched = att.sha256; if (c.fetchFail) throw new Error('해시가 맞지 않습니다'); return new Blob([c.remoteBytes]); },
     musicReadTags: async () => c.tagsReturn,
+    musicBlobKeys: async () => Object.keys(c.blobs), refreshAttachmentIndex: async () => {},
     localStorage: { getItem: () => null, setItem() {}, removeItem() {} }, window: {}, document: {}, setTimeout, clearTimeout, Date, Math, Number, String, Promise, encodeURIComponent, fetch: async () => { throw new Error('외부 호출 금지'); },
   };
   vm.createContext(ctx); vm.runInContext(code + ';this.f={musicSyncUploads,musicDownloadTrack}', ctx); return { c, ctx };
