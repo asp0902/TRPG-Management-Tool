@@ -8237,7 +8237,7 @@ select.sh-field-input,
   <div class="sidebar-footer">
     <button onclick="exportDatedBackup()">내보내기</button>
     <button onclick="document.getElementById('import-input').click()">가져오기</button>
-    <button id="github-sync-btn" onclick="openGitHubSyncModal()">GitHub 동기화</button>
+    <button id="github-sync-btn" onclick="openGitHubSyncModal()">동기화</button>
     <button id="snapshot-btn" onclick="openSnapshotModal()" title="자동 백업 설정과 앱 내부 스냅샷 목록">백업</button>
     <input type="file" id="import-input" accept=".json,.zip" style="display:none" onchange="importAll(event)">
   </div>
@@ -9057,7 +9057,6 @@ select.sh-field-input,
           <select id="music-sort" onchange="musicView.sort=this.value;renderMusicPage()"><option value="added">추가 순</option><option value="name">이름 순</option></select>
           <label class="music-check"><input id="music-by-album" type="checkbox" onchange="musicView.byAlbum=this.checked;renderMusicPage()"> 앨범별 보기</label>
           <button type="button" class="music-primary" onclick="openMusicYoutubeModal()" title="곡 추가" aria-label="곡 추가">＋</button>
-          <button type="button" onclick="openMusicAiSettings()" title="AI 태그 설정" aria-label="AI 태그 설정">⚙</button>
         </div>
         <div class="music-storage" id="music-storage"></div>
         <div class="music-grid" id="music-grid"></div>
@@ -9544,7 +9543,7 @@ select.sh-field-input,
     onclick="if(event.target===this)closeGitHubSyncModal()"
     onkeydown="if(event.key==='Escape')closeGitHubSyncModal()">
     <div class="rb-modal github-sync-modal" onclick="event.stopPropagation()">
-      <div class="rb-modal-heading" id="github-sync-heading">GitHub 동기화</div>
+      <div class="rb-modal-heading" id="github-sync-heading">동기화</div>
       <div class="github-sync-repo">asp0902/TRPG-Management-Tool-data · sync</div>
       <div class="rb-modal-field">
         <label class="rb-modal-label req" for="github-sync-token">저장소 전용 토큰</label>
@@ -9560,6 +9559,13 @@ select.sh-field-input,
         <strong>Contents 읽기/쓰기</strong> 권한만 부여하세요.
         <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">토큰 만들기</a>
       </p>
+      <div class="rb-modal-field">
+        <label class="rb-modal-label" for="music-ai-key-input">AI 태그 추천 · Anthropic API 키</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="password" id="music-ai-key-input" class="rb-modal-input" autocomplete="new-password" spellcheck="false">
+          <button type="button" class="rb-modal-cancel" id="music-ai-key-clear" onclick="musicAiClearKey()" style="display:none">키 삭제</button>
+        </div>
+      </div>
       <div id="github-sync-status" class="github-sync-status" aria-live="polite">연결되지 않음</div>
       <div class="github-sync-modal-actions">
         <button type="button" class="rb-modal-cancel" onclick="pullGitHubSyncNow()">최신본 불러오기</button>
@@ -24663,7 +24669,7 @@ function updateGitHubSyncButton() {
   btn.classList.toggle('error', githubSyncStatusType === 'error');
   const noToken = !getGitHubSyncToken();
   btn.classList.toggle('needs-token', noToken);
-  btn.textContent = noToken ? '토큰 필요' : (githubSyncInFlight ? '동기화 중' : (githubSyncStatusType === 'error' ? 'GitHub 확인' : (active ? 'GitHub 연결중' : 'GitHub 동기화')));
+  btn.textContent = noToken ? '토큰 필요' : (githubSyncInFlight ? '동기화 중' : (githubSyncStatusType === 'error' ? '동기화 확인' : (active ? '동기화 연결중' : '동기화')));
   const lastAt = localStorage.getItem(GITHUB_SYNC_LAST_AT_KEY);
   btn.title = noToken ? 'GitHub 자동 백업을 쓰려면 토큰을 입력하세요.' : (githubSyncStatus || (lastAt ? `마지막 동기화: ${new Date(lastAt).toLocaleString()}` : 'GitHub 자동 동기화 설정'));
 }
@@ -24676,6 +24682,7 @@ function openGitHubSyncModal() {
     input.placeholder = token ? '저장된 토큰 사용 중' : 'Fine-grained token';
   }
   if (enabled) enabled.checked = localStorage.getItem(GITHUB_SYNC_ENABLED_KEY) !== '0';
+  musicAiKeyFieldRefresh();
   const lastAt = localStorage.getItem(GITHUB_SYNC_LAST_AT_KEY);
   setGitHubSyncStatus(githubSyncStatus || (lastAt ? `마지막 동기화: ${new Date(lastAt).toLocaleString()}` : '연결되지 않음'), githubSyncStatusType);
   document.getElementById('github-sync-backdrop')?.classList.add('open');
@@ -25013,7 +25020,7 @@ function syncGitHubState(options = {}) {
   if (options.automatic) githubSyncTrace = { stage: 'meta', at: performance.now(), steps: {}, recs: [], info: {} };
   githubSyncInFlight = runGitHubSync(options).catch(err => {
     console.error('GitHub sync failed:', err);
-    setGitHubSyncStatus(err?.message || 'GitHub 동기화에 실패했습니다.', 'error');
+    setGitHubSyncStatus(err?.message || '동기화에 실패했습니다.', 'error');
     return false;
   }).finally(() => {
     githubSyncInFlight = null;
@@ -25036,7 +25043,9 @@ function syncGitHubState(options = {}) {
 async function saveGitHubSyncSettings() {
   const input = document.getElementById('github-sync-token');
   const token = input?.value.trim() || getGitHubSyncToken();
+  const aiKeySaved = musicAiSaveKeyFromInput(); // 동기화 토큰과 독립: 토큰이 없어도 AI 키는 저장된다(#287)
   if (!token) {
+    if (aiKeySaved) { setGitHubSyncStatus('AI 태그 API 키를 저장했습니다.', 'success'); return; }
     setGitHubSyncStatus('저장소 전용 토큰을 입력하세요.', 'error');
     input?.focus();
     return;
@@ -25066,7 +25075,7 @@ async function pushGitHubSyncNow() {
 }
 function disconnectGitHubSync() {
   if (!getGitHubSyncToken()) return closeGitHubSyncModal();
-  if (!confirm('이 기기에서 GitHub 동기화 연결을 해제하시겠습니까?\nGitHub에 저장된 데이터는 삭제되지 않습니다.')) return;
+  if (!confirm('이 기기에서 동기화 연결을 해제하시겠습니까?\nGitHub에 저장된 데이터는 삭제되지 않습니다.')) return;
   stopGitHubSyncTimers();
   [GITHUB_SYNC_TOKEN_KEY, GITHUB_SYNC_ENABLED_KEY, GITHUB_SYNC_LAST_SHA_KEY, GITHUB_SYNC_LAST_AT_KEY].forEach(key => localStorage.removeItem(key));
   githubSyncDirty = false;
@@ -25075,7 +25084,7 @@ function disconnectGitHubSync() {
   githubSyncStatusType = '';
   updateGitHubSyncButton();
   closeGitHubSyncModal();
-  showToast('GitHub 동기화 연결을 해제했습니다.');
+  showToast('동기화 연결을 해제했습니다.');
 }
 async function initGitHubSync() {
   updateGitHubSyncButton();
@@ -32356,7 +32365,7 @@ async function uploadPublicImage(blob) {
 function describeImageUploadError(error) {
   const message = String(error?.message || '');
   const perm = '이미지 업로드 실패: 토큰에 앱 저장소(' + GITHUB_IMAGE_REPO + ') Contents 쓰기 권한이 필요합니다.';
-  if (/토큰이 없/.test(message)) return '이미지 업로드 실패: GitHub 토큰이 없습니다(GitHub 동기화에서 토큰 입력).';
+  if (/토큰이 없/.test(message)) return '이미지 업로드 실패: GitHub 토큰이 없습니다(동기화에서 토큰 입력).';
   if (/GitHub (401|403|404)/.test(message)) return perm;
   if (/브랜치 없음/.test(message)) return '이미지 업로드 실패: ' + GITHUB_IMAGE_REPO + ' 저장소에 `' + GITHUB_IMAGE_BRANCH + '` 브랜치가 없습니다. 브랜치를 한 번 만들어 주세요.';
   if (/크기 초과/.test(message)) return '이미지 업로드 안 함: 이미지가 25MB를 넘습니다.';
@@ -32708,7 +32717,7 @@ function attachmentBackupBadge(att) {
   if (state === 'uploading') return ['⏳', 'GitHub에 올리는 중'];
   if (state === 'error') return ['⚠', '올리기에 실패했습니다. 다음 동기화 때 다시 시도합니다.'];
   if (attachDoneSet.has(att.sha256)) return ['☁', 'GitHub에 백업됨'];
-  return ['·', isGitHubSyncEnabled() ? 'GitHub 업로드 대기 중' : 'GitHub 동기화가 꺼져 있어 올리지 않았습니다.'];
+  return ['·', isGitHubSyncEnabled() ? '동기화 업로드 대기 중' : '동기화가 꺼져 있어 올리지 않았습니다.'];
 }
 // 파일 끌어다 놓기(시나리오 링크 팝오버 위, 북마크 수정 모달 위)
 function initAttachmentDrop() {
@@ -35510,7 +35519,7 @@ async function musicAiRequestTags(track, key, model) {
   if (!res.ok) throw new Error('http');
   return musicAiParse(await res.json());
 }
-const MUSIC_AI_ERRORS = { refusal: '모델이 이 요청에 답하지 않았습니다.', auth: 'API 키가 올바르지 않습니다. AI 태그 설정을 확인하세요.', rate: '요청 한도를 넘었습니다. 잠시 후 다시 시도하세요.', network: '네트워크 오류로 추천을 가져오지 못했습니다.', http: '추천을 가져오지 못했습니다.' };
+const MUSIC_AI_ERRORS = { refusal: '모델이 이 요청에 답하지 않았습니다.', auth: 'API 키가 올바르지 않습니다. 동기화 설정을 확인하세요.', rate: '요청 한도를 넘었습니다. 잠시 후 다시 시도하세요.', network: '네트워크 오류로 추천을 가져오지 못했습니다.', http: '추천을 가져오지 못했습니다.' };
 const musicAiTried = new Set(); // 이번 세션에 이미 요청한 곡(실패해도 재시도하지 않는다)
 function musicAiRecHtml(track) {
   const presets = musicAiPresets(), on = new Set(track.tags.map(tag => tag.toLowerCase()));
@@ -35531,21 +35540,25 @@ async function musicAiAuto(track) {
   const box = document.getElementById('music-ai-rec');
   if (box && box.dataset.id === now.id) box.innerHTML = musicAiRecHtml(now); // 상세가 열려 있으면 바로 표시
 }
-function openMusicAiSettings() {
+// AI 태그 API 키 입력칸은 동기화 설정 모달에 있다(#287). 키는 동기화 토큰과 독립으로 저장한다.
+function musicAiKeyFieldRefresh() {
+  const input = document.getElementById('music-ai-key-input'), clear = document.getElementById('music-ai-key-clear');
   const hasKey = !!musicAiGet(MUSIC_AI_KEY_STORE, '');
-  musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">AI 태그 설정</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
-    + '<label class="music-field">Anthropic API 키<input id="music-ai-key" type="password" autocomplete="off" placeholder="' + (hasKey ? '저장됨 (●●●●) — 바꾸려면 새 키 입력' : 'sk-ant-...') + '"></label>'
-    + '<label class="music-field">모델<input id="music-ai-model" type="text" value="' + esc(musicAiGet(MUSIC_AI_MODEL_STORE, MUSIC_AI_DEFAULT_MODEL)) + '" spellcheck="false"></label>'
-       + '<div class="music-modal-foot">' + (hasKey ? '<button type="button" class="music-danger" onclick="musicAiClearKey()">키 삭제</button>' : '<span></span>') + '<button type="button" class="music-primary" onclick="musicAiSaveSettings()">저장</button></div>');
+  if (input) { input.value = ''; input.placeholder = hasKey ? '저장됨 (●●●●)' : 'sk-ant-...'; }
+  if (clear) clear.style.display = hasKey ? '' : 'none';
 }
-function musicAiSaveSettings() {
-  const key = document.getElementById('music-ai-key').value.trim(), model = document.getElementById('music-ai-model').value.trim();
-  try { if (key) localStorage.setItem(MUSIC_AI_KEY_STORE, key); localStorage.setItem(MUSIC_AI_MODEL_STORE, model || MUSIC_AI_DEFAULT_MODEL); } catch (e) { showToast('설정을 저장하지 못했습니다.'); return; }
-  musicCloseModal(); showToast('AI 태그 설정을 저장했습니다.');
+function musicAiSaveKeyFromInput() { // 값이 있을 때만 저장. 저장했으면 true
+  const input = document.getElementById('music-ai-key-input');
+  const key = input ? input.value.trim() : '';
+  if (!key) return false;
+  try { localStorage.setItem(MUSIC_AI_KEY_STORE, key); } catch (e) { showToast('API 키를 저장하지 못했습니다.'); return false; }
+  musicAiKeyFieldRefresh();
+  return true;
 }
-function musicAiClearKey() { try { localStorage.removeItem(MUSIC_AI_KEY_STORE); } catch (e) {} musicCloseModal(); showToast('API 키를 삭제했습니다.'); }
+function musicAiClearKey() { try { localStorage.removeItem(MUSIC_AI_KEY_STORE); } catch (e) {} musicAiKeyFieldRefresh(); showToast('API 키를 삭제했습니다.'); }
 function musicAiRowHtml(track) {
-  return '<div class="music-ai" id="music-ai-rec" data-id="' + esc(track.id) + '">' + musicAiRecHtml(track) + '</div>';
+  const hint = !musicAiGet(MUSIC_AI_KEY_STORE, '') && !(track.aiTagSuggestions && track.aiTagSuggestions.length) ? '<span class="music-hint">동기화 설정에서 API 키를 입력하세요</span>' : '';
+  return '<div class="music-ai" id="music-ai-rec" data-id="' + esc(track.id) + '">' + (musicAiRecHtml(track) || hint) + '</div>';
 }
 async function openMusicDetail(id, source) {
   const track = state.musicTracks.find(item => item.id === id);

@@ -4,7 +4,8 @@ let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m);
 const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
 const block = cut('// ── AI 태그 추천(#285)', 'async function openMusicDetail');
 const code = cut('const MUSIC_TAG_PRESETS', 'async function openMusicDetail'); // 프리셋 + 태그 토글 + AI 블록
-ok(html.includes('openMusicAiSettings()" title="AI 태그 설정"'), '도구 모음 ⚙ 설정 버튼');
+ok(!html.includes('openMusicAiSettings') && !html.includes('AI 태그 설정'), 'MUSIC ⚙ 버튼·AI 설정 모달 제거(#287)');
+ok(html.includes('id="music-ai-key-input" class="rb-modal-input"') && html.includes('autocomplete="new-password"'), '동기화 모달에 키 입력칸(password)');
 ok(html.includes("+ field('tags', '태그') + musicAiRowHtml(track) + musicTagPresetsHtml(track)"), '상세 모달에 추천 줄');
 ok(!html.includes('Anthropic API 로 전송') && !html.includes('MUSIC_AI_NOTICE'), '전송 안내 문구 없음(사용자 결정)');
 ok(!html.includes('musicAiSuggest') && !html.includes('>AI 추천</button>'), '추천 버튼 없음(자동)');
