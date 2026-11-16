@@ -514,6 +514,12 @@ tr.ct-row-end .ct-select:focus {
   font-size: 12px; line-height: 1; padding: 0; font-family: inherit;
 }
 .record-session-tag-chip-remove:hover { color: #111; }
+/* 태그 삭제 버튼: 외곽선·배경 없이 글자만, 해당 태그에 마우스를 올렸을 때만 보인다(#313). 호버가 없는 기기(터치)에서는 항상 보인다. */
+.record-session-tag-chip .record-session-tag-chip-remove { border: 0; border-radius: 0; background: none; box-shadow: none; padding: 0; min-width: 0; width: auto; height: auto; color: #888; }
+@media (hover: hover) {
+  .record-session-tag-chip .record-session-tag-chip-remove { opacity: 0; }
+  .record-session-tag-chip:hover .record-session-tag-chip-remove, .record-session-tag-chip .record-session-tag-chip-remove:focus-visible { opacity: 1; }
+}
 .music-field .tag-editor-input { border: 0; border-radius: 0; padding: 2px 0; font-size: 13px; flex: 1 1 100px; min-width: 80px; }
 .record-session-tag-input {
   flex: 1 1 120px; min-width: 90px; border: none; outline: none; background: transparent;
