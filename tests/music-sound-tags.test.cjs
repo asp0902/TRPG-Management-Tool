@@ -2,7 +2,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
 let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
 const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
-const soundBlock = cut('// ── 소리 분석 태그 추천(#286)', 'async function openMusicDetail');
+const soundBlock = cut('// ── 소리 분석 태그 추천(#286)', '// ── MUSIC 음원 동기화(#296)');
 ok(!/fetch\(|XMLHttpRequest|sendBeacon/.test(soundBlock) && !/console\./.test(soundBlock), '소리 분석은 외부 전송·로그 없음');
 ok(html.includes('addedTracks.push({ track, file })') && html.includes('await musicSoundAuto(item.track, item.file)'), '파일 추가 직후 자동 1회(PC 파일만)');
 ok(html.includes("soundTagSuggestions: Array.isArray(input?.soundTagSuggestions)"), 'track.soundTagSuggestions 필드');

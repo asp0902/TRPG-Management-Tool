@@ -15,7 +15,7 @@ vm.runInNewContext(html.slice(a, b) + '\nthis.f = normalizeMusicFolder; this.t =
 
 // 정규화: 메타데이터에 Blob 류 값이 들어오지 않는다
 const t = ctx.t({ id: 'x', kind: 'file', title: 'T', blob: 'BIG', cover: 'data:image/png;base64,AAAA', duration: 61.2, tags: '#a #b' });
-assert.deepEqual(Object.keys(t).sort(), ['addedAt', 'soundTagSuggestions', 'album', 'attached', 'artist', 'duration', 'fileName', 'folderId', 'id', 'kind', 'notes', 'size', 'tags', 'thumbnail', 'title', 'url', 'youtubeId'].sort());
+assert.deepEqual(Object.keys(t).sort(), ['addedAt', 'soundTagSuggestions', 'album', 'attached', 'artist', 'duration', 'fileName', 'folderId', 'id', 'kind', 'mime', 'sha256', 'notes', 'size', 'tags', 'thumbnail', 'title', 'url', 'youtubeId'].sort());
 assert.ok(!JSON.stringify(t).includes('BIG') && !JSON.stringify(t).includes('data:image'));
 assert.equal(ctx.f({ name: 'F', color: 'red' }).color, '');
 assert.equal(ctx.f({ name: 'F', color: '#AABBCC' }).color, '#AABBCC');

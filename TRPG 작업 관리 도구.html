@@ -32657,7 +32657,7 @@ async function uploadAttachmentToGitHub(sha, blob) {
   }
   await putGitHubFile(`${base}.json`, new Blob([JSON.stringify({ sha256: sha, size: blob.size, chunkBytes: ATTACH_SPLIT_BYTES, parts })]), `${message} 목록`);
 }
-async function downloadAttachmentFromGitHub(att) {
+async function fetchAttachmentFromGitHub(att) { // GitHub attachments/<sha256>(조각이면 목록 기준)을 받아 해시를 검증한 Blob 을 돌려준다(저장은 호출자)
   const base = `attachments/${att.sha256}`;
   let blob;
   const manifestRes = await githubSyncRequest(`${githubContentsUrl(`${base}.json`)}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}&raw=1`, { headers: { Accept: 'application/vnd.github.raw+json' }, allow404: true });
@@ -32670,6 +32670,10 @@ async function downloadAttachmentFromGitHub(att) {
     blob = await fetchGitHubBlob(base);
   }
   if (await sha256Hex(blob) !== att.sha256) throw new Error('GitHub에서 받은 파일의 해시가 맞지 않습니다. 저장하지 않았습니다.');
+  return blob;
+}
+async function downloadAttachmentFromGitHub(att) {
+  const blob = await fetchAttachmentFromGitHub(att);
   await putAttachmentBlob(att.sha256, blob);
   attachLocalSet.add(att.sha256);
   await attachTx('status', 'readwrite', store => store.put({ sha256: att.sha256, uploadedAt: new Date().toISOString() }));
@@ -32716,6 +32720,7 @@ async function syncAttachmentsToGitHub() {
       }
       renderAttachmentListIfOpen();
     }
+    await musicSyncUploads(); // MUSIC 음원(#296)
   } finally { attachSyncRunning = false; }
 }
 function renderAttachmentListIfOpen() {
@@ -35244,6 +35249,7 @@ function normalizeMusicTrack(input = {}) {
     fileName: str('fileName'), size: Number(input?.size) || 0,
     attached: input?.kind === 'youtube' && input?.attached === true, // 유튜브 트랙에 PC 음원 파일 첨부(Blob 은 이 기기 MUSIC_DB 에만, #257)
     youtubeId: str('youtubeId'), url: str('url'), thumbnail: str('thumbnail'),
+    sha256: str('sha256'), mime: str('mime'), // 음원 해시·형식(#296): 다른 기기가 GitHub attachments/<sha256> 에서 받는다
     soundTagSuggestions: Array.isArray(input?.soundTagSuggestions) ? input.soundTagSuggestions.filter(tag => typeof tag === 'string') : null, // 소리 분석 추천 태그(#286)
   };
 }
@@ -35587,12 +35593,46 @@ async function musicSoundAuto(track, file) { // 파일 추가 직후 자동 1회
   const box = document.getElementById('music-rec');
   if (box && box.dataset.id === now.id) box.innerHTML = musicRecHtml(now);
 }
+// ── MUSIC 음원 동기화(#296): 첨부 파일과 같은 GitHub 백업(attachments/<sha256>, 큰 파일은 조각·목록)을 쓴다. 음원 Blob 은 이 기기 MUSIC_DB(트랙 id 키)에 두고, 해시·형식만 트랙 메타로 동기화한다.
+// 표지('cover:<id>')는 올리지 않고 받은 음원의 ID3 에서 다시 뽑는다. 곡을 지워도 저장소 파일은 지우지 않는다(첨부와 같은 정책). 데이터 저장소는 비공개이며 다른 곳에는 올리지 않는다.
+async function musicSyncUploads() {
+  if (!getGitHubSyncToken() || !isGitHubSyncEnabled()) return;
+  for (const track of state.musicTracks) {
+    if (!(track.kind === 'file' || track.attached)) continue;
+    try {
+      if (track.sha256 && attachDoneSet.has(track.sha256)) continue;
+      const blob = await musicBlobGet(track.id);
+      if (!blob) continue;
+      if (!track.sha256) { track.sha256 = await sha256Hex(blob); track.mime = track.mime || blob.type || ''; persist(); } // 옛 곡: 해시 계산·등록(한 번)
+      if (attachDoneSet.has(track.sha256)) continue;
+      await uploadAttachmentToGitHub(track.sha256, blob);
+      await attachTx('status', 'readwrite', store => store.put({ sha256: track.sha256, uploadedAt: new Date().toISOString() }));
+      attachDoneSet.add(track.sha256);
+    } catch (err) { console.error('music upload failed:', err); }
+  }
+}
+// 이 기기에 음원이 없고 sha256 이 있으면 GitHub 에서 받아 MUSIC_DB 에 저장한다. 실패·꺼짐이면 null(기존 「이 기기에 파일 없음」 표시).
+async function musicDownloadTrack(track) {
+  if (!track.sha256 || !getGitHubSyncToken() || !isGitHubSyncEnabled()) return null;
+  try {
+    const blob = new Blob([await fetchAttachmentFromGitHub({ sha256: track.sha256 })], { type: track.mime || '' });
+    await musicBlobPut(track.id, blob);
+    musicLocalIds.add(track.id);
+    attachDoneSet.add(track.sha256);
+    try { // 표지는 받은 음원의 ID3 에서 다시 만든다
+      const tags = await musicReadTags(blob);
+      if (tags.cover) { const cover = new Blob([tags.cover.bytes], { type: tags.cover.mime }); await musicBlobPut('cover:' + track.id, cover); musicCoverUrls[track.id] = URL.createObjectURL(cover); }
+    } catch (e) { /* 표지 없음 */ }
+    return blob;
+  } catch (err) { showToast('음원을 받지 못했습니다: ' + (err?.message || err)); return null; }
+}
 async function openMusicDetail(id, source) {
   const track = state.musicTracks.find(item => item.id === id);
   if (!track) return;
   musicStop();
   let url = '', blob = null;
   if (track.kind === 'file' || track.attached) { try { blob = await musicBlobGet(id); } catch (e) {} }
+  if (!blob && (track.kind === 'file' || track.attached) && track.sha256 && getGitHubSyncToken() && isGitHubSyncEnabled()) { showToast('음원을 받는 중…'); blob = await musicDownloadTrack(track); renderMusicPage(); }
   const src = track.kind === 'file' ? 'file' : (source || (blob ? 'file' : 'youtube')); // 첨부 파일이 있으면 기본은 파일
   if (blob && src === 'file') url = URL.createObjectURL(blob);
   const attachRow = track.kind === 'file' ? '<div class="music-attach"><input id="music-link-url" type="text" spellcheck="false" onkeydown="musicLinkKey(event,\'' + id + '\',this)"><button type="button" onclick="musicLinkYoutube(\'' + id + '\',document.getElementById(\'music-link-url\').value)">유튜브 주소 연결</button><span class="music-error" id="music-link-error"></span></div>'
@@ -35691,10 +35731,12 @@ async function musicAddFiles(fileList) {
       if (tags.cover) { const cover = new Blob([tags.cover.bytes], { type: tags.cover.mime }); await musicBlobPut('cover:' + track.id, cover); musicCoverUrls[track.id] = URL.createObjectURL(cover); }
     } catch (e) { showToast('저장 실패: ' + file.name + ' (' + (e?.message || e) + ')'); continue; }
     musicLocalIds.add(track.id);
+    try { track.sha256 = await sha256Hex(file); track.mime = file.type || ''; } catch (e) { /* 해시 실패는 나중에 백그라운드에서 다시 계산 */ }
     state.musicTracks.push(track);
     addedTracks.push({ track, file });
   }
   persist(); renderMusicPage();
+  syncAttachmentsToGitHub(); // 음원 업로드(#296)
   for (const item of addedTracks) await musicSoundAuto(item.track, item.file); // 무거운 디코딩은 한 곡씩(#286)
 }
 function musicPickFiles() {
@@ -35711,8 +35753,10 @@ async function musicAttachFile(id, file) {
   try { await musicBlobPut(id, file); } catch (e) { showToast('저장 실패: ' + file.name + ' (' + (e?.message || e) + ')'); return; }
   musicLocalIds.add(id);
   track.attached = true; track.fileName = file.name; track.size = file.size;
+  try { track.sha256 = await sha256Hex(file); track.mime = file.type || ''; } catch (e) { track.sha256 = ''; }
   if (!track.duration) track.duration = await musicAudioDuration(file);
   persist(); renderMusicPage();
+  syncAttachmentsToGitHub(); // 음원 업로드(#296)
   if (document.getElementById('music-modal-backdrop')) openMusicDetail(id, 'file');
 }
 function musicAttachPick(id) {
@@ -35727,7 +35771,7 @@ async function musicDetach(id) {
   try { await musicBlobDelete([id, 'cover:' + id]); } catch (e) { console.warn(e); }
   if (musicCoverUrls[id]) { URL.revokeObjectURL(musicCoverUrls[id]); delete musicCoverUrls[id]; }
   musicLocalIds.delete(id);
-  track.attached = false; track.fileName = ''; track.size = 0;
+  track.attached = false; track.fileName = ''; track.size = 0; track.sha256 = ''; track.mime = '';
   persist(); renderMusicPage();
   if (document.getElementById('music-modal-backdrop')) openMusicDetail(id, 'youtube');
 }
