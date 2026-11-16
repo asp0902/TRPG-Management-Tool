@@ -35259,9 +35259,9 @@ function musicParseYoutubeId(value) {
 }
 function musicPlayerHtml(track, blobUrl) {
   if (track.kind === 'youtube' && !blobUrl) {
-    return '<iframe class="music-yt" src="https://www.youtube.com/embed/' + encodeURIComponent(track.youtubeId) + '?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+    return '<iframe class="music-yt" src="https://www.youtube.com/embed/' + encodeURIComponent(track.youtubeId) + '?autoplay=1&rel=0&loop=1&playlist=' + encodeURIComponent(track.youtubeId) + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
   }
-  return blobUrl ? '<audio class="music-audio" controls autoplay src="' + esc(blobUrl) + '"></audio>' : '<div class="music-nofile">이 기기에 파일 없음</div>';
+  return blobUrl ? '<audio class="music-audio" controls autoplay loop src="' + esc(blobUrl) + '"></audio>' : '<div class="music-nofile">이 기기에 파일 없음</div>';
 }
 // ID3v2(mp3) 태그 읽기: 제목 TIT2, 아티스트 TPE1, 앨범 TALB, 표지 APIC. bytes = 파일 앞부분(헤더 포함). 다른 형식·태그 없음은 빈 값.
 function musicParseId3(bytes, TD) {
