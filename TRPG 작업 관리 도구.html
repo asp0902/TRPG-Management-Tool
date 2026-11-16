@@ -2185,6 +2185,11 @@ tr.ct-row-end .ct-select:focus {
 .music-modal-backdrop { position: fixed; inset: 0; z-index: 12500; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
 .music-modal { width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow-y: auto; background: #fff; border-radius: 14px; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; color: #333; }
 .music-modal-head { display: flex; align-items: center; gap: 8px; }
+.music-yt-status { font-size: 11.5px; color: #666; display: flex; align-items: center; gap: 6px; }
+.music-yt-status[data-state="loading"]::before { content: ''; width: 10px; height: 10px; border: 2px solid #ccc; border-top-color: #111; border-radius: 50%; animation: music-spin 0.8s linear infinite; }
+.music-yt-status[data-state="done"] { color: #1a7f37; }
+.music-yt-status[data-state="error"] { color: #c0392b; }
+@keyframes music-spin { to { transform: rotate(360deg); } }
 .music-yt-thumb { width: 100%; max-height: 180px; object-fit: cover; border-radius: 8px; }
 .music-or { border-top: 1px solid #e4e4e4; margin: 2px 0; } /* 문구 없이 구분선만(#288) */
 .music-modal-title { flex: 1; font-weight: 800; font-size: 14px; white-space: normal; overflow-wrap: anywhere; }
@@ -35867,21 +35872,30 @@ function openMusicYoutubeModal() {
   musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">곡 추가</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<button type="button" class="music-primary" onclick="musicCloseModal(); musicPickFiles();">PC 파일 선택</button><div class="music-or"></div>'
     + '<label class="music-field">URL<input id="music-yt-url" type="text" spellcheck="false" onchange="musicFetchYoutube(true)" onkeydown="musicYtKey(event)"></label>'
+    + '<div class="music-yt-status" id="music-yt-status" hidden></div>'
     + '<img id="music-yt-thumb" class="music-yt-thumb" alt="" hidden onerror="this.hidden=true">'
     + '<label class="music-field">제목<input id="music-yt-title" type="text"></label>'
     + '<label class="music-field">아티스트(채널)<input id="music-yt-artist" type="text"></label>'
     + '<label class="music-field">앨범<input id="music-yt-album" type="text"></label>'
     + '<div class="music-error" id="music-yt-error"></div>'
-    + '<div class="music-modal-foot"><button type="button" onclick="musicFetchYoutube()">제목 가져오기</button><button type="button" class="music-primary" onclick="musicAddYoutube()">추가</button></div>');
+    + '<div class="music-modal-foot"><span></span><button type="button" class="music-primary" onclick="musicAddYoutube()">추가</button></div>');
   document.getElementById('music-yt-url').focus();
+}
+// URL 아래 상태 줄: 불러오는 중 / 완료 / 실패(#303). 모달이 닫혔거나 URL 이 바뀌었으면 건드리지 않는다.
+function musicYtSetStatus(id, state, text) {
+  const el = document.getElementById('music-yt-status'), urlEl = document.getElementById('music-yt-url');
+  if (!el || (id && (!urlEl || musicParseYoutubeId(urlEl.value) !== id))) return;
+  el.hidden = !state; el.dataset.state = state || ''; el.textContent = text || '';
 }
 async function musicFetchYoutube(auto) {
   const url = document.getElementById('music-yt-url').value, id = musicParseYoutubeId(url), thumb = document.getElementById('music-yt-thumb');
-  if (!id) { thumb.hidden = true; document.getElementById('music-yt-error').textContent = '유튜브 링크를 알아볼 수 없습니다.'; return; }
+  if (!id) { thumb.hidden = true; musicYtSetStatus('', '', ''); document.getElementById('music-yt-error').textContent = '유튜브 링크를 알아볼 수 없습니다.'; return; }
   if (auto && id === musicYtLastId) return;
   musicYtLastId = id;
   thumb.dataset.id = id; thumb.src = 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg'; thumb.hidden = false; // oEmbed 가 실패해도 id 기반 썸네일은 보여 준다
   document.getElementById('music-yt-error').textContent = '';
+  musicYtSetStatus(id, 'loading', '불러오는 중…');
+  let loaded = false;
   try {
     const res = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id));
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -35890,8 +35904,11 @@ async function musicFetchYoutube(auto) {
     if (!document.getElementById('music-yt-title').value) document.getElementById('music-yt-title').value = data.title || '';
     const artistEl = document.getElementById('music-yt-artist');
     if (!artistEl.value) { artistEl.value = data.author_name || ''; artistEl.dataset.auto = artistEl.value; } // 자동값 기억: 사용자가 고치면 달라져 덮어쓰지 않는다(#283)
-  } catch (e) { /* 제목을 못 가져오면 직접 입력(상태 문구 없음, #291) */ }
-  musicFetchAlbumInfo(id); // 백그라운드(기다리지 않음)
+    loaded = true;
+  } catch (e) { /* 제목을 못 가져오면 직접 입력 */ }
+  await musicFetchAlbumInfo(id); // 앨범 조회까지 끝나야 「불러오는 중」이 사라진다
+  if (!loaded && musicYtLastId === id) musicYtLastId = ''; // 실패하면 같은 주소로 Enter 를 다시 눌러 재시도할 수 있게
+  musicYtSetStatus(id, loaded ? 'done' : 'error', loaded ? '불러오기 완료' : '제목을 불러오지 못했습니다. 직접 입력해 주세요.');
 }
 // jina 본문(markdown)의 「## Music」 구간: 첫 「# 」=노래, 다음 「#### 」=아티스트, 그다음 일반 텍스트 줄=앨범. 실패하면 빈 값(#283)
 function musicParseJinaMusic(content) {

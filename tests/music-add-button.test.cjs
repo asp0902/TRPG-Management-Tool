@@ -8,5 +8,6 @@ ok(fn.includes('<div class="music-modal-title">곡 추가</div>'), '모달 제�
 ok(fn.includes('onclick="musicCloseModal(); musicPickFiles();">PC 파일 선택</button><div class="music-or"></div>'), 'PC 파일 선택 + 구분선');
 ok(fn.indexOf('PC 파일 선택') < fn.indexOf('id="music-yt-url"') && fn.includes('musicAddYoutube()'), '유튜브 입력부 유지');
 ok(!fn.includes('placeholder=') && !fn.includes('또는 유튜브 링크') && !fn.includes('oEmbed 로 조회합니다'), '곡 추가 모달 예시·안내 문구 없음(#288)');
-ok(!html.includes('music-yt-status') && !html.includes('music-yt-album-status') && fn.includes('id="music-yt-error"'), '상태 요소 삭제·오류 요소(잘못된 URL)는 유지(#291)');
+ok(fn.includes('id="music-yt-status" hidden') && !html.includes('music-yt-album-status') && fn.includes('id="music-yt-error"'), 'URL 아래 상태 줄(#303)·오류 요소 유지, 앨범 상태 요소는 없음');
+ok(!fn.includes('제목 가져오기'), '「제목 가져오기」 버튼 삭제(#303)');
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);
