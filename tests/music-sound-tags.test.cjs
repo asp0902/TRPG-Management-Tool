@@ -6,17 +6,17 @@ const soundBlock = cut('// ── 소리 분석 태그 추천(#286)', 'async fun
 ok(!/fetch\(|XMLHttpRequest|sendBeacon/.test(soundBlock) && !/console\./.test(soundBlock), '소리 분석은 외부 전송·로그 없음');
 ok(html.includes('addedTracks.push({ track, file })') && html.includes('await musicSoundAuto(item.track, item.file)'), '파일 추가 직후 자동 1회(PC 파일만)');
 ok(html.includes("soundTagSuggestions: Array.isArray(input?.soundTagSuggestions)"), 'track.soundTagSuggestions 필드');
-ok(html.includes("group('소리 분석', track.soundTagSuggestions)") && html.includes("group('AI 추천', track.aiTagSuggestions)"), '추천 줄 출처 구분');
+ok(html.includes("<span class=\"music-hint\">소리 분석</span>") && html.includes('track.soundTagSuggestions'), '추천 줄은 소리 분석 그룹');
 
 const code = cut('const MUSIC_TAG_PRESETS', 'async function openMusicDetail');
 const store = {};
 const ctx = { esc: x => String(x), state: { musicTracks: [] }, localStorage: { getItem: () => null }, persist() {}, document: { getElementById: () => null }, normalizeCssMacroTags: x => x, Math, Float64Array, Float32Array, OfflineAudioContext: undefined, console };
 vm.createContext(ctx);
-vm.runInContext(code + ';this.f={musicSoundFeatures,musicSoundTags,musicSoundAuto,musicSoundFft,musicAiPresets,musicAiRecHtml,MUSIC_SOUND_RULES}', ctx);
+vm.runInContext(code + ';this.f={musicSoundFeatures,musicSoundTags,musicSoundAuto,musicSoundFft,musicTagPresetMap,musicRecHtml,musicRecRowHtml,MUSIC_SOUND_RULES}', ctx);
 const f = ctx.f, sr = 44100, N = sr * 30;
 const sine = (freq, amp, len = N) => { const x = new Float32Array(len); for (let i = 0; i < len; i++) x[i] = amp * Math.sin(2 * Math.PI * freq * i / sr); return x; };
 const addClicks = (x, bpm, amp, ms = 40) => { const step = sr * 60 / bpm, dur = sr * ms / 1000; for (let t = 0; t < x.length; t += step) for (let k = 0; k < dur && t + k < x.length; k++) { const i = Math.floor(t) + k; if (i < x.length) x[i] += amp * Math.sin(2 * Math.PI * 800 * k / sr) * (1 - k / dur); } return x; };
-const presets = f.musicAiPresets();
+const presets = f.musicTagPresetMap();
 
 // FFT: 단일 사인파 피크가 맞는 bin
 { const n = 1024, re = new Float64Array(n), im = new Float64Array(n); for (let i = 0; i < n; i++) re[i] = Math.sin(2 * Math.PI * 64 * i / n); f.musicSoundFft(re, im);
@@ -53,7 +53,8 @@ ok(f.MUSIC_SOUND_RULES.every(([, tags]) => tags.every(t => presets[t])), '규칙
   await f.musicSoundAuto(fl, { size: 10, arrayBuffer: async () => new ArrayBuffer(8) });
   ok(fl.soundTagSuggestions === null, '디코딩 불가 환경은 조용히 건너뜀(저장 없음)');
   // 추천 줄: 출처 구분
-  const html2 = f.musicAiRecHtml({ id: 'z', tags: ['신나는'], aiTagSuggestions: ['경쾌한'], soundTagSuggestions: ['신나는', '없는태그'] });
-  ok(html2.includes('>AI 추천</span>') && html2.includes('>소리 분석</span>') && /class="music-tag-chip rec on" data-t="신나는"/.test(html2) && !html2.includes('없는태그'), '추천 줄: AI/소리 분석 구분·붙은 태그 on·프리셋 밖 제외');
+  const html2 = f.musicRecHtml({ id: 'z', tags: ['신나는'], soundTagSuggestions: ['신나는', '없는태그'] });
+  ok(html2.includes('>소리 분석</span>') && /class="music-tag-chip rec on" data-t="신나는"/.test(html2) && !html2.includes('없는태그'), '추천 줄: 소리 분석 그룹·붙은 태그 on·프리셋 밖 제외');
+  ok(f.musicRecHtml({ id: 'z', tags: [], soundTagSuggestions: null }) === '' && f.musicRecRowHtml({ id: 'z', tags: [] }).includes('id="music-rec" data-id="z"></div>') && html.includes('.music-rec:empty { display: none; }'), '추천이 없으면 줄이 비어 숨겨짐');
   console.log('fails=' + fails); process.exit(fails ? 1 : 0);
 })();
