@@ -24973,6 +24973,17 @@ function githubSyncRestoreFocus(snap) { // 결과 사유 반환: el-removed / im
   } catch (e) {}
   return 'restored';
 }
+// 다른 창이 포커스를 잠깐 가져갔다 돌아오면 마지막 입력칸·커서로 복귀(#274): blur 때 기억, focus 150ms 뒤 사이에 클릭이 없으면 #267 복구 함수 재사용
+if (typeof window !== 'undefined') {
+  let winFocusSnap = null, lastPointerAt = 0;
+  ['mousedown', 'touchstart'].forEach(type => document.addEventListener(type, () => { lastPointerAt = Date.now(); }, true));
+  window.addEventListener('blur', e => { if (e.target === window) winFocusSnap = githubSyncCaptureFocus(); });
+  window.addEventListener('focus', e => {
+    if (e.target !== window || !winFocusSnap) return;
+    const snap = winFocusSnap, since = Date.now(); winFocusSnap = null;
+    setTimeout(() => { if (lastPointerAt < since) githubSyncRestoreFocus(snap); }, 150);
+  });
+}
 function syncGitHubState(options = {}) {
   if (githubSyncInFlight) return githubSyncInFlight;
   if (githubSyncTimer) clearTimeout(githubSyncTimer);
