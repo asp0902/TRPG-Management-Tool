@@ -24786,6 +24786,7 @@ async function putGitHubSyncPayload(payload, sha = '') {
   return result?.content?.sha || '';
 }
 function rememberGitHubSync(sha, syncedAt) {
+  if (githubSyncTrace) githubSyncTrace.info.rememberedSha = sha || '';
   localStorage.setItem(GITHUB_SYNC_LAST_SHA_KEY, sha || '');
   localStorage.setItem(GITHUB_SYNC_LAST_AT_KEY, syncedAt || new Date().toISOString());
   githubSyncDirty = false;
@@ -24864,6 +24865,7 @@ async function runGitHubSync(options = {}) {
     localSavedAt,
     remoteSavedAt,
   });
+  if (githubSyncTrace) Object.assign(githubSyncTrace.info, { decision, lastShaBefore: lastSha, metaSha: meta.sha, remoteChanged, localChanged: localChangedNow });
   if (decision === 'conflict') {
     throw new Error('동기화 충돌: 이 기기와 GitHub가 모두 변경되었습니다. 최신본 불러오기 또는 현재 데이터 업로드를 선택하세요.');
   }
@@ -24919,22 +24921,27 @@ function githubSyncCaptureFocus() {
   if (el.isContentEditable) { const sel = window.getSelection(); return { el, range: sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null }; }
   return null;
 }
-function githubSyncRestoreFocus(snap) {
-  if (!snap || !snap.el.isConnected || imeComposing) return;
+function githubSyncDescribeEl(el) { return el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(' ').join('.') : ''); }
+function githubSyncRestoreFocus(snap) { // 결과 사유 반환: el-removed / ime / moved:<요소> / restored (#269)
+  if (!snap) return '';
+  if (!snap.el.isConnected) return 'el-removed';
+  if (imeComposing) return 'ime';
   const cur = document.activeElement;
-  if (cur && cur !== document.body) return; // 사용자가 다른 곳으로 옮겼으면 그대로 둔다
+  if (cur === snap.el) return 'kept'; // 포커스가 풀리지 않음
+  if (cur && cur !== document.body) return 'moved:' + githubSyncDescribeEl(cur); // 사용자가 다른 곳으로 옮겼으면 그대로 둔다
   snap.el.focus({ preventScroll: true });
   try {
     if (snap.range && snap.range.startContainer.isConnected) { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(snap.range); }
     else if (snap.start != null) snap.el.setSelectionRange(snap.start, snap.end, snap.dir || 'none');
   } catch (e) {}
+  return 'restored';
 }
 function syncGitHubState(options = {}) {
   if (githubSyncInFlight) return githubSyncInFlight;
   if (githubSyncTimer) clearTimeout(githubSyncTimer);
   githubSyncTimer = null;
   const focusSnap = options.automatic ? githubSyncCaptureFocus() : null;
-  if (options.automatic) githubSyncTrace = { stage: 'meta', at: performance.now(), steps: {}, recs: [] };
+  if (options.automatic) githubSyncTrace = { stage: 'meta', at: performance.now(), steps: {}, recs: [], info: {} };
   githubSyncInFlight = runGitHubSync(options).catch(err => {
     console.error('GitHub sync failed:', err);
     setGitHubSyncStatus(err?.message || 'GitHub 동기화에 실패했습니다.', 'error');
@@ -24942,8 +24949,12 @@ function syncGitHubState(options = {}) {
   }).finally(() => {
     githubSyncInFlight = null;
     updateGitHubSyncButton();
-    githubSyncRestoreFocus(focusSnap);
+    const reason = githubSyncRestoreFocus(focusSnap);
     const trace = githubSyncTrace; githubSyncTrace = null;
+    if (trace && focusSnap) { // 복구 결과·판정·sha 를 같은 로그에 1건 남긴다(#269)
+      trace.steps[trace.stage] = (trace.steps[trace.stage] || 0) + Math.round(performance.now() - trace.at); trace.at = performance.now();
+      githubSyncSaveLog([{ id: 'end-' + Date.now(), kind: 'sync-end', at: new Date().toISOString(), page: typeof currentPage === 'string' ? currentPage : '', el: githubSyncDescribeEl(focusSnap.el), reason, ...trace.info, lastShaAfter: localStorage.getItem(GITHUB_SYNC_LAST_SHA_KEY) || '', steps: trace.steps }]);
+    }
     if (trace && trace.recs.length) { // 기록이 있으면 끝난 뒤 최종 단계별 시간을 덧붙인다
       trace.steps[trace.stage] = (trace.steps[trace.stage] || 0) + Math.round(performance.now() - trace.at);
       githubSyncSaveLog(trace.recs.map(r => Object.assign(r, { finalSteps: trace.steps })));
@@ -25291,6 +25302,7 @@ async function safePersistImport() {
   }
 }
 function refreshAfterImport(replaceMode = false) {
+  githubSyncSaveLog([{ id: 'refresh-' + Date.now(), kind: 'refreshAfterImport', at: new Date().toISOString(), inSync: !!githubSyncTrace, stack: String(new Error().stack).split('\n').slice(1, 6).join('\n') }]);
   normalizeSidebarState();
   if (replaceMode) {
     scenarioHistory.clear();

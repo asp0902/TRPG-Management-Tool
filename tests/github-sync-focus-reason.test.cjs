@@ -1,0 +1,10 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+const fn = html.slice(html.indexOf('function githubSyncRestoreFocus'), html.indexOf('function syncGitHubState'));
+['el-removed', "'ime'", "'moved:'", "'kept'", "'restored'"].forEach(r => ok(fn.includes(r), '사유 ' + r));
+ok(html.includes("kind: 'sync-end'") && html.includes('lastShaAfter'), '동기화 종료 기록');
+ok(html.includes('Object.assign(githubSyncTrace.info, { decision, lastShaBefore: lastSha, metaSha: meta.sha'), '판정·sha 기록');
+ok(html.includes('info.rememberedSha') || html.includes('githubSyncTrace.info.rememberedSha'), 'PUT 응답 sha 기록');
+ok(html.includes("kind: 'refreshAfterImport'") && html.includes('.slice(1, 6)'), 'refreshAfterImport 호출 경로 5줄');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);
