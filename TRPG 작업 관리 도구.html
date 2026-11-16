@@ -10529,10 +10529,10 @@ function normalizeCssMacroTags(input, fallbackTag = '') {
 // 앞부분이 바뀌었으면 칸 전체를 normalizeCssMacroTags 로 정리. 빈 입력·새 글 없음·한글 조합 중에는 아무 것도 하지 않는다(기존 Enter 동작 유지).
 function tagInputEnter(event, el) {
   if (!event || event.key !== 'Enter' || event.isComposing || event.keyCode === 229 || !el) return;
-  const value = el.value, committed = el.dataset.committed || '';
-  if (!value.trim() || value.trim() === committed.trim()) return;
+  const value = el.value, committed = el.dataset.committed; // undefined = 확정 기준 없음, '' = 처음부터 비어 있던 칸
+  if (!value.trim() || value.trim() === (committed || '').trim()) return;
   let tags;
-  if (committed && value.startsWith(committed)) {
+  if (committed !== undefined && value.startsWith(committed)) {
     const rest = value.slice(committed.length).trim(); // 새 글에 '#'·쉼표가 있으면 그 규칙으로 여러 태그, 없으면 통째로 태그 하나
     tags = normalizeCssMacroTags(committed).concat(rest.includes('#') || rest.includes(',') ? normalizeCssMacroTags(rest.startsWith('#') ? rest : '#' + rest) : [rest]);
   } else tags = normalizeCssMacroTags(value);
@@ -35417,7 +35417,11 @@ function renderMusicPage() {
 async function musicShowStorage() {
   const el = document.getElementById('music-storage');
   if (!el || !navigator.storage?.estimate) return;
-  try { const e = await navigator.storage.estimate(); el.textContent = '이 기기 저장소 ' + (e.usage / 1048576).toFixed(1) + ' MB 사용' + (e.quota ? ' / ' + Math.round(e.quota / 1048576).toLocaleString() + ' MB' : '') + ' · 음원 파일은 이 기기에만 저장됩니다'; } catch (e) {}
+  try {
+    const e = await navigator.storage.estimate();
+    const where = gdriveConfigured() ? '음원은 이 기기와 Google Drive 에 저장됩니다' : (getGitHubSyncToken() && isGitHubSyncEnabled() ? '음원은 이 기기와 GitHub 백업에 저장됩니다' : '음원은 이 기기에만 저장됩니다 (동기화 설정에서 Drive 를 연결하면 다른 기기에서도 받을 수 있습니다)');
+    el.textContent = '이 기기 브라우저 저장소 ' + (e.usage / 1048576).toFixed(1) + ' MB 사용' + (e.quota ? ' / 사용 가능 한도 약 ' + Math.round(e.quota / 1048576).toLocaleString() + ' MB (이 기기 디스크 여유 기준)' : '') + ' · ' + where;
+  } catch (e) {}
 }
 function musicSelectFolder(id) { musicView.folder = id; renderMusicPage(); }
 function musicDropOnFolder(event, folderId) {

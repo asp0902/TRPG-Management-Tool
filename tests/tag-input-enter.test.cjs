@@ -29,6 +29,8 @@ r = run('#자료 #세션 ', '#자료 #세션 '); ok(!r.e.prevented && r.el.value
 r = run('#자료 긴장', '#자료 ', key({ isComposing: true })); ok(!r.e.prevented && r.el.value === '#자료 긴장', '한글 조합 중 Enter 무시(isComposing)');
 r = run('#자료 긴장', '#자료 ', key({ keyCode: 229 })); ok(!r.e.prevented && r.el.value === '#자료 긴장', '한글 조합 중 Enter 무시(keyCode 229)');
 r = run('#자료 긴장', '#자료 ', key({ key: 'a' })); ok(!r.e.prevented && r.el.value === '#자료 긴장', '다른 키는 무시');
+// 처음부터 비어 있던 칸(committed '') 에 띄어쓰기 있는 태그 하나를 입력하고 Enter → 태그 하나
+r = run('긴장감 있는', ''); ok(r.el.value === '#긴장감 있는 ' && r.e.prevented, "빈 칸에서 '긴장감 있는' + Enter → 태그 하나(띄어쓰기 허용)");
 // committed 가 없으면 전체 정리
 r = run('a b #c d', undefined); ok(r.el.value === '#a b #c d ', 'committed 없으면 전체 정리');
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);
