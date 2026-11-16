@@ -44,8 +44,8 @@ t = mk('#a'); f.tagEditorCommit(t.input); ok(t.events.length === 0, '빈 칸은 
 // × 제거
 t = mk('#a #b c #d'); f.tagEditorRemove({ dataset: { tag: encodeURIComponent('b c') }, closest: () => t.editor }); ok(t.valueEl.value === '#a #d', '칩 ×로 제거(공백 포함 태그)');
 // placeholder: 태그가 없을 때만
-t = mk(''); f.tagEditorRender(t.editor); ok(t.input.placeholder === '자료, 세션', '태그 없으면 placeholder'); t.valueEl.value = '#a'; f.tagEditorRender(t.editor); ok(t.input.placeholder === '', '태그가 있으면 placeholder 숨김');
+t = mk(''); f.tagEditorRender(t.editor); ok(t.input.placeholder === '자료, 세션', '태그 없으면 placeholder'); t.valueEl.value = '#a'; f.tagEditorRender(t.editor); ok(t.input.placeholder === '자료, 세션', '입력칸이 따로 있으므로 태그가 있어도 placeholder 유지(#319)');
 // 마크업: 값 속성(저장 코드용)과 칩 입력기 클래스
 const h = f.tagEditorHtml('data-k="tags"', ['긴장감 있는', 'a'], '자료');
-ok(h.includes('type="hidden" class="tag-editor-value" data-k="tags" value="#긴장감 있는 #a"') && h.includes('record-session-tag-editor'), '숨김 값 입력칸(#태그 문자열)과 세션 기록 입력기 스타일 재사용');
+ok(h.includes('type="hidden" class="tag-editor-value" data-k="tags" value="#긴장감 있는 #a"') && h.indexOf('class="tag-editor-input"') < h.indexOf('tag-editor-chips'), '숨김 값 입력칸(#태그 문자열), 입력칸이 먼저·만들어진 태그 칩은 입력칸 바깥 아래(#319)');
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);

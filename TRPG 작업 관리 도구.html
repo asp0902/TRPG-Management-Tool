@@ -519,7 +519,10 @@ tr.ct-row-end .ct-select:focus {
 @media (hover: hover) {
   .record-session-tag-chip:not(:hover) .record-session-tag-chip-remove { display: none; } /* 호버 전에는 자리를 차지하지 않아 칩 폭이 글자 수에 맞는다 */
 }
-.music-field .tag-editor-input { border: 0; border-radius: 0; padding: 2px 0; font-size: 13px; flex: 1 1 100px; min-width: 80px; }
+.tag-editor { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tag-editor-input { width: 100%; box-sizing: border-box; border: 1px solid #e4e4e4; border-radius: 5px; outline: none; padding: 6px 8px; font-size: 13px; font-family: inherit; color: #222; background: #fff; }
+.tag-editor-input:focus { border-color: #000; }
+.tag-editor-chips:empty { display: none; }
 .record-session-tag-input {
   flex: 1 1 120px; min-width: 90px; border: none; outline: none; background: transparent;
   padding: 2px 0; font-size: 13px; font-family: inherit; color: #222;
@@ -9132,7 +9135,7 @@ select.sh-field-input,
         <div class="bookmark-modal-preview" id="bookmark-thumb-preview"></div>
         <div class="bookmark-form-row">
           <div class="bookmark-form-label">태그</div>
-          <div class="record-session-tag-editor tag-editor" onclick="this.querySelector('.tag-editor-input').focus()" data-placeholder="자료, 세션, 영감"><input type="hidden" class="tag-editor-value" id="bookmark-tags" oninput="renderBookmarkTagSuggestions()"><span class="record-session-tags tag-editor-chips"></span><input type="text" class="record-session-tag-input tag-editor-input" spellcheck="false" onkeydown="tagEditorKey(event,this)" onblur="tagEditorCommit(this)"></div>
+          <div class="tag-editor" data-placeholder="자료, 세션, 영감"><input type="hidden" class="tag-editor-value" id="bookmark-tags" oninput="renderBookmarkTagSuggestions()"><input type="text" class="bookmark-form-input tag-editor-input" spellcheck="false" placeholder="자료, 세션, 영감" onkeydown="tagEditorKey(event,this)" onblur="tagEditorCommit(this)"><span class="record-session-tags tag-editor-chips"></span></div>
           <div class="bookmark-tag-suggestions" id="bookmark-tag-suggestions"></div>
         </div>
         <div class="bookmark-form-row">
@@ -10549,12 +10552,12 @@ function normalizeCssMacroTags(input, fallbackTag = '') {
 }
 // 칩 태그 입력기(#311): 세션 기록의 태그 입력과 같은 방식. Enter·쉼표·입력칸을 벗어날 때 태그로 확정(띄어쓰기 허용), 칩의 ×로 제거, 빈 칸에서 Backspace 로 마지막 태그 제거.
 // 값은 숨김 입력칸(.tag-editor-value)에 '#태그 #태그' 문자열로 두어, 북마크·MUSIC 의 기존 저장 코드(value 읽기, input/change 이벤트)를 그대로 쓴다.
-function tagEditorHtml(valueAttrs, tags, placeholder) {
+function tagEditorHtml(valueAttrs, tags, placeholder) { // 입력칸 + 그 바깥 아래에 만들어진 태그 칩(#319)
   const text = normalizeCssMacroTags(tags).map(tag => '#' + tag).join(' ');
-  return '<div class="record-session-tag-editor tag-editor" onclick="this.querySelector(' + String.fromCharCode(39) + '.tag-editor-input' + String.fromCharCode(39) + ').focus()" data-placeholder="' + esc(placeholder || '') + '">'
+  return '<div class="tag-editor" data-placeholder="' + esc(placeholder || '') + '">'
     + '<input type="hidden" class="tag-editor-value" ' + valueAttrs + ' value="' + esc(text) + '">'
+    + '<input type="text" class="tag-editor-input" spellcheck="false" placeholder="' + esc(placeholder || '') + '" onkeydown="tagEditorKey(event,this)" onblur="tagEditorCommit(this)">'
     + '<span class="record-session-tags tag-editor-chips"></span>'
-    + '<input type="text" class="record-session-tag-input tag-editor-input" spellcheck="false" onkeydown="tagEditorKey(event,this)" onblur="tagEditorCommit(this)">'
     + '</div>';
 }
 function tagEditorOf(el) { return el && el.closest ? el.closest('.tag-editor') : null; }
@@ -10562,7 +10565,7 @@ function tagEditorTags(editor) { return normalizeCssMacroTags(editor.querySelect
 function tagEditorRender(editor) { // 칩과 placeholder 를 값에 맞춰 다시 그린다
   const tags = tagEditorTags(editor), input = editor.querySelector('.tag-editor-input');
   editor.querySelector('.tag-editor-chips').innerHTML = tags.map(tag => '<span class="record-session-tag-chip"><span>' + esc(tag) + '</span><button type="button" class="record-session-tag-chip-remove" title="태그 제거" data-tag="' + esc(encodeURIComponent(tag)) + '" onmousedown="event.preventDefault()" onclick="tagEditorRemove(this)">×</button></span>').join('');
-  input.placeholder = tags.length ? '' : (editor.dataset.placeholder || '');
+  input.placeholder = editor.dataset.placeholder || '';
 }
 function tagEditorRefresh(valueEl) { const editor = tagEditorOf(valueEl); if (editor) tagEditorRender(editor); } // 코드가 값(value)을 바꾼 뒤 호출
 function tagEditorSet(editor, tags) {
