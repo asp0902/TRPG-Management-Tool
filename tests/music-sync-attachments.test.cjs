@@ -5,7 +5,7 @@ const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
 // 정적: 연결 지점
 ok(html.includes('await musicSyncUploads(); // MUSIC 음원(#296)'), '기존 백그라운드 업로드(syncAttachmentsToGitHub)에 MUSIC 음원 포함');
 ok(html.includes("sha256: str('sha256'), mime: str('mime')"), '트랙 메타에 sha256·mime');
-ok(html.includes("try { track.sha256 = await sha256Hex(file); track.mime = file.type || ''; }") && html.includes('syncAttachmentsToGitHub(); // 음원 업로드(#296)'), '곡 추가·파일 첨부 시 해시 계산·업로드 요청');
+ok(html.includes("try { track.sha256 = await sha256Hex(file); track.mime = file.type || ''; }") && html.includes('musicSyncUploads(); // 음원 업로드(#296·#297)'), '곡 추가·파일 첨부 시 해시 계산·업로드 요청');
 ok(html.includes('blob = await musicDownloadTrack(track); renderMusicPage();') && html.includes("showToast('음원을 받는 중…')"), '상세 열 때 Blob 없고 sha256 있으면 받는 중… 표시 후 다운로드');
 ok(!/attachments\//.test(cut('async function deleteMusicTrack', '// ── 폴더 ──')), '곡 삭제 시 저장소 파일은 지우지 않음');
 ok(html.includes('async function fetchAttachmentFromGitHub') && html.includes('const blob = await fetchAttachmentFromGitHub(att);'), '첨부 다운로드 로직을 공용 함수로 분리(해시 검증 포함)');
@@ -13,7 +13,8 @@ ok(html.includes('async function fetchAttachmentFromGitHub') && html.includes('c
 // ── 단위: 업로드·다운로드 (fetch/저장소는 전부 mock, 실제 저장소·토큰 없음) ──
 const sha = buf => crypto.createHash('sha256').update(buf).digest('hex');
 const sha256Hex = async blob => sha(Buffer.from(await blob.arrayBuffer()));
-const code = cut('async function musicSyncUploads', 'async function openMusicDetail');
+// #297 로 Drive 블록이 앞에 붙었으므로 GitHub 모드(Drive 설정 없음)만 검증한다
+const code = cut('// ── Google Drive 음원 저장(#297)', 'async function openMusicDetail');
 const mk = () => {
   const c = { token: 'FAKE-TEST-TOKEN', enabled: true, blobs: {}, uploads: [], statusPuts: [], toasts: [], puts: [], persisted: 0, readKeys: [], tagsReturn: { cover: null } };
   const ctx = {
@@ -24,6 +25,7 @@ const mk = () => {
     attachTx: async (store) => { c.statusPuts.push(store); },
     fetchAttachmentFromGitHub: async att => { c.fetched = att.sha256; if (c.fetchFail) throw new Error('해시가 맞지 않습니다'); return new Blob([c.remoteBytes]); },
     musicReadTags: async () => c.tagsReturn,
+    localStorage: { getItem: () => null, setItem() {}, removeItem() {} }, window: {}, document: {}, setTimeout, clearTimeout, Date, Math, Number, String, Promise, encodeURIComponent, fetch: async () => { throw new Error('외부 호출 금지'); },
   };
   vm.createContext(ctx); vm.runInContext(code + ';this.f={musicSyncUploads,musicDownloadTrack}', ctx); return { c, ctx };
 };

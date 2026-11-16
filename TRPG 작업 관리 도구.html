@@ -9561,6 +9561,15 @@ select.sh-field-input,
         <strong>Contents 읽기/쓰기</strong> 권한만 부여하세요.
         <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">토큰 만들기</a>
       </p>
+      <div class="rb-modal-field">
+        <label class="rb-modal-label" for="gdrive-client-id">Google Drive 음원 저장 · OAuth 클라이언트 ID</label>
+        <input type="text" id="gdrive-client-id" class="rb-modal-input" autocomplete="off" spellcheck="false">
+        <div style="display:flex;gap:6px;align-items:center;margin-top:6px">
+          <button type="button" class="rb-modal-cancel" onclick="gdriveConnectClicked()">Drive 연결</button>
+          <button type="button" class="rb-modal-cancel" id="gdrive-disconnect" onclick="gdriveDisconnect()" style="display:none">연결 해제</button>
+          <span class="github-sync-help" id="gdrive-status"></span>
+        </div>
+      </div>
       <div id="github-sync-status" class="github-sync-status" aria-live="polite">연결되지 않음</div>
       <div class="github-sync-modal-actions">
         <button type="button" class="rb-modal-cancel" onclick="pullGitHubSyncNow()">최신본 불러오기</button>
@@ -24696,6 +24705,7 @@ function openGitHubSyncModal() {
     input.placeholder = token ? '저장된 토큰 사용 중' : 'Fine-grained token';
   }
   if (enabled) enabled.checked = localStorage.getItem(GITHUB_SYNC_ENABLED_KEY) !== '0';
+  gdriveFieldRefresh();
   const lastAt = localStorage.getItem(GITHUB_SYNC_LAST_AT_KEY);
   setGitHubSyncStatus(githubSyncStatus || (lastAt ? `마지막 동기화: ${new Date(lastAt).toLocaleString()}` : '연결되지 않음'), githubSyncStatusType);
   document.getElementById('github-sync-backdrop')?.classList.add('open');
@@ -35595,30 +35605,150 @@ async function musicSoundAuto(track, file) { // 파일 추가 직후 자동 1회
 }
 // ── MUSIC 음원 동기화(#296): 첨부 파일과 같은 GitHub 백업(attachments/<sha256>, 큰 파일은 조각·목록)을 쓴다. 음원 Blob 은 이 기기 MUSIC_DB(트랙 id 키)에 두고, 해시·형식만 트랙 메타로 동기화한다.
 // 표지('cover:<id>')는 올리지 않고 받은 음원의 ID3 에서 다시 뽑는다. 곡을 지워도 저장소 파일은 지우지 않는다(첨부와 같은 정책). 데이터 저장소는 비공개이며 다른 곳에는 올리지 않는다.
-async function musicSyncUploads() {
-  if (!getGitHubSyncToken() || !isGitHubSyncEnabled()) return;
-  for (const track of state.musicTracks) {
-    if (!(track.kind === 'file' || track.attached)) continue;
-    try {
-      if (track.sha256 && attachDoneSet.has(track.sha256)) continue;
-      const blob = await musicBlobGet(track.id);
-      if (!blob) continue;
-      if (!track.sha256) { track.sha256 = await sha256Hex(blob); track.mime = track.mime || blob.type || ''; persist(); } // 옛 곡: 해시 계산·등록(한 번)
-      if (attachDoneSet.has(track.sha256)) continue;
-      await uploadAttachmentToGitHub(track.sha256, blob);
-      await attachTx('status', 'readwrite', store => store.put({ sha256: track.sha256, uploadedAt: new Date().toISOString() }));
-      attachDoneSet.add(track.sha256);
-    } catch (err) { console.error('music upload failed:', err); }
+// ── Google Drive 음원 저장(#297): OAuth 클라이언트 ID(이 기기 localStorage)가 있으면 음원을 사용자 Drive 의 「TRPG-Music」 폴더에 올리고 받는다(범위 drive.file: 이 앱이 만든 파일만).
+// 접근 토큰은 메모리에만 두고(약 1시간) 만료되면 조용히 갱신을 시도하며, 안 되면 「Drive 연결 필요」로 두고 동기화 설정에서 다시 연결한다. 파일 이름은 음원 sha256. 곡을 지워도 Drive 파일은 지우지 않는다.
+const GDRIVE_CLIENT_KEY = 'trpg-gdrive-client-id', GDRIVE_FOLDER_KEY = 'trpg-gdrive-folder-id', GDRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file', GDRIVE_CHUNK = 8 * 1024 * 1024;
+let gdriveToken = '', gdriveExpires = 0, gdriveStatus = '';
+function gdriveClientId() { try { return localStorage.getItem(GDRIVE_CLIENT_KEY) || ''; } catch (e) { return ''; } }
+function gdriveConfigured() { return !!gdriveClientId(); }
+function gdriveLoadGis() {
+  if (typeof window !== 'undefined' && window.google?.accounts?.oauth2) return Promise.resolve(true);
+  return new Promise(resolve => {
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client'; script.async = true;
+    script.onload = () => resolve(!!window.google?.accounts?.oauth2); script.onerror = () => resolve(false);
+    setTimeout(() => resolve(false), 10000);
+    document.head.appendChild(script);
+  });
+}
+// prompt: '' = 필요할 때만 창을 띄움(사용자 클릭 직후), 'none' = 창 없이 조용히만(백그라운드)
+async function gdriveEnsureToken(interactive) {
+  if (gdriveToken && Date.now() < gdriveExpires) return gdriveToken;
+  if (!gdriveConfigured() || !await gdriveLoadGis()) return '';
+  const prompt = interactive ? '' : 'none';
+  return await new Promise(resolve => {
+    const timer = setTimeout(() => resolve(''), 20000);
+    const done = value => { clearTimeout(timer); resolve(value); };
+    const client = window.google.accounts.oauth2.initTokenClient({
+      client_id: gdriveClientId(), scope: GDRIVE_SCOPE, prompt,
+      callback: response => { if (response && response.access_token) { gdriveToken = response.access_token; gdriveExpires = Date.now() + Math.max(60, Number(response.expires_in) || 3600) * 1000 - 60000; done(gdriveToken); } else done(''); },
+      error_callback: () => done(''),
+    });
+    client.requestAccessToken({ prompt });
+  });
+}
+async function gdriveApi(url, init = {}) {
+  const res = await fetch(url, { ...init, headers: { ...(init.headers || {}), Authorization: 'Bearer ' + gdriveToken } });
+  if (res.status === 401) { gdriveToken = ''; throw new Error('Drive 인증이 만료되었습니다.'); }
+  return res;
+}
+async function gdriveFolderId() {
+  let id = ''; try { id = localStorage.getItem(GDRIVE_FOLDER_KEY) || ''; } catch (e) {}
+  if (id) return id;
+  const q = "name='TRPG-Music' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+  const found = await (await gdriveApi('https://www.googleapis.com/drive/v3/files?fields=files(id)&q=' + encodeURIComponent(q))).json();
+  id = found.files && found.files[0] && found.files[0].id;
+  if (!id) {
+    const made = await gdriveApi('https://www.googleapis.com/drive/v3/files?fields=id', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'TRPG-Music', mimeType: 'application/vnd.google-apps.folder' }) });
+    if (!made.ok) throw new Error('Drive 폴더를 만들지 못했습니다. (HTTP ' + made.status + ')');
+    id = (await made.json()).id;
+  }
+  try { localStorage.setItem(GDRIVE_FOLDER_KEY, id); } catch (e) {}
+  return id;
+}
+async function gdriveFindFile(sha) {
+  const q = "name='" + sha + "' and '" + await gdriveFolderId() + "' in parents and trashed=false";
+  const res = await gdriveApi('https://www.googleapis.com/drive/v3/files?fields=files(id)&q=' + encodeURIComponent(q));
+  if (!res.ok) throw new Error('Drive 조회 실패 (HTTP ' + res.status + ')');
+  const data = await res.json();
+  return data.files && data.files[0] ? data.files[0].id : '';
+}
+async function gdriveUpload(sha, blob) { // 이미 있으면 건너뜀. 이어 올리기(resumable)로 8MB 씩
+  if (await gdriveFindFile(sha)) return;
+  const init = await gdriveApi('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable', {
+    method: 'POST', headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': blob.type || 'application/octet-stream', 'X-Upload-Content-Length': String(blob.size) },
+    body: JSON.stringify({ name: sha, parents: [await gdriveFolderId()] }) });
+  const session = init.headers.get('Location');
+  if (!init.ok || !session) throw new Error('Drive 업로드를 시작하지 못했습니다. (HTTP ' + init.status + ')');
+  for (let start = 0; start < blob.size || start === 0; start += GDRIVE_CHUNK) {
+    const end = Math.min(start + GDRIVE_CHUNK, blob.size);
+    const res = await fetch(session, { method: 'PUT', headers: { 'Content-Range': blob.size ? 'bytes ' + start + '-' + (end - 1) + '/' + blob.size : 'bytes */0' }, body: blob.slice(start, end) });
+    if (res.status === 308) continue; // 다음 조각
+    if (!res.ok) throw new Error('Drive 업로드 실패 (HTTP ' + res.status + ')');
+    return;
   }
 }
-// 이 기기에 음원이 없고 sha256 이 있으면 GitHub 에서 받아 MUSIC_DB 에 저장한다. 실패·꺼짐이면 null(기존 「이 기기에 파일 없음」 표시).
-async function musicDownloadTrack(track) {
-  if (!track.sha256 || !getGitHubSyncToken() || !isGitHubSyncEnabled()) return null;
+async function gdriveDownload(sha) { // 없으면 null
+  const id = await gdriveFindFile(sha);
+  if (!id) return null;
+  const res = await gdriveApi('https://www.googleapis.com/drive/v3/files/' + id + '?alt=media');
+  if (!res.ok) throw new Error('Drive 다운로드 실패 (HTTP ' + res.status + ')');
+  return await res.blob();
+}
+function gdriveFieldRefresh() { // 동기화 모달의 Drive 칸 표시
+  const input = document.getElementById('gdrive-client-id'), status = document.getElementById('gdrive-status'), off = document.getElementById('gdrive-disconnect');
+  if (input) input.value = gdriveClientId();
+  if (status) status.textContent = !gdriveConfigured() ? '연결 안 됨 (음원은 GitHub 백업을 사용)' : (gdriveToken && Date.now() < gdriveExpires ? '연결됨' : (gdriveStatus || 'Drive 연결 필요 — 「Drive 연결」을 누르세요'));
+  if (off) off.style.display = gdriveConfigured() ? '' : 'none';
+}
+async function gdriveConnectClicked() {
+  const id = (document.getElementById('gdrive-client-id')?.value || '').trim();
+  if (!id) { gdriveStatus = 'OAuth 클라이언트 ID 를 입력하세요.'; gdriveFieldRefresh(); return; }
+  try { localStorage.setItem(GDRIVE_CLIENT_KEY, id); } catch (e) {}
+  gdriveToken = ''; gdriveStatus = '';
+  const token = await gdriveEnsureToken(true);
+  if (!token) gdriveStatus = '연결하지 못했습니다. 클라이언트 ID·팝업 허용을 확인하세요.';
+  gdriveFieldRefresh();
+  if (token) musicSyncUploads();
+}
+function gdriveDisconnect() {
+  try { window.google?.accounts?.oauth2?.revoke?.(gdriveToken, () => {}); } catch (e) {}
+  gdriveToken = ''; gdriveExpires = 0; gdriveStatus = '';
+  try { localStorage.removeItem(GDRIVE_CLIENT_KEY); localStorage.removeItem(GDRIVE_FOLDER_KEY); } catch (e) {}
+  gdriveFieldRefresh(); showToast('Drive 연결을 해제했습니다. Drive 의 파일은 그대로 남습니다.');
+}
+let musicSyncRunning = false;
+async function musicSyncUploads() {
+  const mode = gdriveConfigured() ? 'drive' : (getGitHubSyncToken() && isGitHubSyncEnabled() ? 'github' : '');
+  if (!mode || musicSyncRunning) return;
+  musicSyncRunning = true;
   try {
-    const blob = new Blob([await fetchAttachmentFromGitHub({ sha256: track.sha256 })], { type: track.mime || '' });
+    if (mode === 'drive' && !await gdriveEnsureToken(false)) { gdriveStatus = 'Drive 연결 필요 — 동기화 설정에서 「Drive 연결」을 누르세요'; return; }
+    const key = sha => (mode === 'drive' ? 'gdrive:' : '') + sha; // 상태 저장소 키: Drive 와 GitHub 업로드를 따로 기록
+    for (const track of state.musicTracks) {
+      if (!(track.kind === 'file' || track.attached)) continue;
+      try {
+        if (track.sha256 && attachDoneSet.has(key(track.sha256))) continue;
+        const blob = await musicBlobGet(track.id);
+        if (!blob) continue;
+        if (!track.sha256) { track.sha256 = await sha256Hex(blob); track.mime = track.mime || blob.type || ''; persist(); } // 옛 곡: 해시 계산·등록(한 번)
+        if (attachDoneSet.has(key(track.sha256))) continue;
+        if (mode === 'drive') await gdriveUpload(track.sha256, blob); else await uploadAttachmentToGitHub(track.sha256, blob);
+        await attachTx('status', 'readwrite', store => store.put({ sha256: key(track.sha256), uploadedAt: new Date().toISOString() }));
+        attachDoneSet.add(key(track.sha256));
+      } catch (err) { console.error('music upload failed:', err); }
+    }
+  } finally { musicSyncRunning = false; }
+}
+function musicCanDownload() { return gdriveConfigured() || (!!getGitHubSyncToken() && isGitHubSyncEnabled()); }
+// 이 기기에 음원이 없고 sha256 이 있으면 Drive(설정돼 있으면) 또는 GitHub 에서 받아 MUSIC_DB 에 저장한다. 실패·꺼짐이면 null(기존 「이 기기에 파일 없음」 표시).
+async function musicDownloadTrack(track) {
+  if (!track.sha256 || !musicCanDownload()) return null;
+  try {
+    let raw = null, fromDrive = false;
+    if (gdriveConfigured()) {
+      if (await gdriveEnsureToken(true)) {
+        raw = await gdriveDownload(track.sha256);
+        if (raw && await sha256Hex(raw) !== track.sha256) throw new Error('Drive 에서 받은 파일의 해시가 맞지 않습니다. 저장하지 않았습니다.');
+        fromDrive = !!raw;
+      } else if (!(getGitHubSyncToken() && isGitHubSyncEnabled())) { showToast('Drive 연결이 필요합니다. 동기화 설정에서 연결하세요.'); return null; }
+    }
+    if (!raw && getGitHubSyncToken() && isGitHubSyncEnabled()) raw = await fetchAttachmentFromGitHub({ sha256: track.sha256 });
+    if (!raw) { showToast('저장소에서 음원을 찾지 못했습니다.'); return null; }
+    const blob = new Blob([raw], { type: track.mime || '' });
     await musicBlobPut(track.id, blob);
     musicLocalIds.add(track.id);
-    attachDoneSet.add(track.sha256);
+    attachDoneSet.add((fromDrive ? 'gdrive:' : '') + track.sha256);
     try { // 표지는 받은 음원의 ID3 에서 다시 만든다
       const tags = await musicReadTags(blob);
       if (tags.cover) { const cover = new Blob([tags.cover.bytes], { type: tags.cover.mime }); await musicBlobPut('cover:' + track.id, cover); musicCoverUrls[track.id] = URL.createObjectURL(cover); }
@@ -35632,7 +35762,7 @@ async function openMusicDetail(id, source) {
   musicStop();
   let url = '', blob = null;
   if (track.kind === 'file' || track.attached) { try { blob = await musicBlobGet(id); } catch (e) {} }
-  if (!blob && (track.kind === 'file' || track.attached) && track.sha256 && getGitHubSyncToken() && isGitHubSyncEnabled()) { showToast('음원을 받는 중…'); blob = await musicDownloadTrack(track); renderMusicPage(); }
+  if (!blob && (track.kind === 'file' || track.attached) && track.sha256 && musicCanDownload()) { showToast('음원을 받는 중…'); blob = await musicDownloadTrack(track); renderMusicPage(); }
   const src = track.kind === 'file' ? 'file' : (source || (blob ? 'file' : 'youtube')); // 첨부 파일이 있으면 기본은 파일
   if (blob && src === 'file') url = URL.createObjectURL(blob);
   const attachRow = track.kind === 'file' ? '<div class="music-attach"><input id="music-link-url" type="text" spellcheck="false" onkeydown="musicLinkKey(event,\'' + id + '\',this)"><button type="button" onclick="musicLinkYoutube(\'' + id + '\',document.getElementById(\'music-link-url\').value)">유튜브 주소 연결</button><span class="music-error" id="music-link-error"></span></div>'
@@ -35736,7 +35866,7 @@ async function musicAddFiles(fileList) {
     addedTracks.push({ track, file });
   }
   persist(); renderMusicPage();
-  syncAttachmentsToGitHub(); // 음원 업로드(#296)
+  musicSyncUploads(); // 음원 업로드(#296·#297)
   for (const item of addedTracks) await musicSoundAuto(item.track, item.file); // 무거운 디코딩은 한 곡씩(#286)
 }
 function musicPickFiles() {
@@ -35756,7 +35886,7 @@ async function musicAttachFile(id, file) {
   try { track.sha256 = await sha256Hex(file); track.mime = file.type || ''; } catch (e) { track.sha256 = ''; }
   if (!track.duration) track.duration = await musicAudioDuration(file);
   persist(); renderMusicPage();
-  syncAttachmentsToGitHub(); // 음원 업로드(#296)
+  musicSyncUploads(); // 음원 업로드(#296·#297)
   if (document.getElementById('music-modal-backdrop')) openMusicDetail(id, 'file');
 }
 function musicAttachPick(id) {
@@ -38324,6 +38454,7 @@ async function bootstrapApp() {
   bootMark('first-render-done');
   // GitHub 동기화는 첫 렌더 뒤 백그라운드로(원격이 바뀌었으면 34MB 받기·적용이 끝나야 화면이 뜨던 지연 제거). 버튼은 「동기화 중」으로 보인다.
   // 동기화 pull 뒤에 웹 이미지를 dataURL 로 되돌린다(#233).
+  if (!isCharacterSheetPopupMode() && gdriveConfigured()) setTimeout(() => musicSyncUploads(), 4000); // Drive 음원 업로드(#297): 조용히 토큰 갱신 시도, 안 되면 연결 필요 표시
   if (!isCharacterSheetPopupMode()) { const syncDone = initGitHubSync(); syncDone.catch(() => {}).then(restoreWebCharacterImages); }
   if (!isCharacterSheetPopupMode()) await initAutoBackup();
   bootMark('autobackup-init-done');
