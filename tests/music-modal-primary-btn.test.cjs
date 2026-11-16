@@ -9,5 +9,5 @@ const spec = sel => { const c = (sel.match(/\.[\w-]+/g) || []).length, t = (sel.
 const a = spec('.music-modal button'), b = spec('.music-modal button.music-primary');
 ok(b[1] > a[1], '구체성 (0,2,1) > (0,1,1): ' + a + ' < ' + b);
 // 모달 안 .music-primary 버튼이 실제로 있음
-ok(html.includes('class="music-primary" onclick="musicCloseModal(); musicPickFiles();">PC 파일 선택') && html.includes('class="music-primary" onclick="musicAddYoutube()">추가'), '모달 안 primary 버튼');
+ok(html.includes('class="music-primary" onclick="musicPickFileFromModal()">파일 선택') && html.includes('class="music-primary" onclick="musicAddYoutube()">추가'), '모달 안 primary 버튼');
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);
