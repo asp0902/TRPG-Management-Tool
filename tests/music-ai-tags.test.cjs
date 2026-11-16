@@ -14,7 +14,8 @@ ok(html.includes('musicAiAuto(added)') && html.includes('addedTracks.forEach(ite
 // 키 보호
 ok(!/console\./.test(block), '키·응답 로그 출력 없음');
 const outside = html.replace(block, '');
-ok(!outside.includes('trpg-music-ai-key') && !outside.includes('MUSIC_AI_KEY_STORE'), 'AI 키 저장소는 이 블록에서만 사용(동기화·내보내기 payload 에 없음)');
+ok(!outside.includes('trpg-music-ai-openai-key') && !outside.includes('MUSIC_AI_KEY_STORE'), 'AI 키 저장소는 이 블록에서만 사용(동기화·내보내기 payload 에 없음)');
+ok(!/anthropic/i.test(html.replace(/^.*#289.*$/gm, '')) , 'Anthropic 전용 코드·문구 없음(#289)');
 
 const store = {}; const calls = [];
 let mode = 'ok', persisted = 0, replyText = '{"tags":["경쾌한","긴장감있는","없는태그","경쾌한","행복한","희망찬","설레는","따뜻한","유쾌한"]}';
@@ -29,8 +30,8 @@ const ctx = {
     if (mode === '401') return { ok: false, status: 401, json: async () => ({}) };
     if (mode === '429') return { ok: false, status: 429, json: async () => ({}) };
     if (mode === 'net') throw new TypeError('Failed to fetch');
-    if (mode === 'refusal') return { ok: true, status: 200, json: async () => ({ stop_reason: 'refusal', content: [] }) };
-    return { ok: true, status: 200, json: async () => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: replyText }] }) };
+    if (mode === 'refusal') return { ok: true, status: 200, json: async () => ({ choices: [{ message: { refusal: 'no', content: null } }] }) };
+    return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: replyText } }] }) };
   },
 };
 vm.createContext(ctx);
@@ -38,23 +39,25 @@ vm.runInContext(code + ';this.f={musicAiBuildRequest,musicAiParse,musicAiRequest
 const f = ctx.f;
 (async () => {
   const track = ctx.state.musicTracks[0];
-  const req = f.musicAiBuildRequest(track, 'TEST-KEY', f.musicAiGet('trpg-music-ai-model', 'claude-haiku-5-5'));
+  const req = f.musicAiBuildRequest(track, 'TEST-KEY');
   const body = JSON.parse(req.init.body);
-  ok(req.url === 'https://api.anthropic.com/v1/messages' && req.init.method === 'POST', 'URL·POST');
-  ok(req.init.headers['x-api-key'] === 'TEST-KEY' && req.init.headers['anthropic-version'] === '2023-06-01' && req.init.headers['content-type'] === 'application/json' && req.init.headers['anthropic-dangerous-direct-browser-access'] === 'true', '헤더');
-  ok(body.model === 'claude-haiku-5-5' && body.max_tokens === 1024, '기본 모델 claude-haiku-5-5·max_tokens');
-  ok(f.musicAiBuildRequest(track, 'k').init.body.includes('"model":"claude-haiku-5-5"'), '모델 미지정 시 haiku 기본값');
-  ok(body.output_config.effort === 'low' && body.output_config.format.type === 'json_schema', 'effort low + json_schema');
-  ok(!('thinking' in body), 'thinking 미전송');
-  const sch = body.output_config.format.schema;
-  ok(sch.properties.tags.type === 'array' && sch.required[0] === 'tags' && sch.properties.tags.items.enum.length === 49 && sch.properties.tags.items.enum.includes('긴장감있는'), '스키마 {tags: 프리셋 enum 49}');
-  ok(body.system.includes('목록에 없는 태그는 쓰지 않는다') && body.system.includes('경쾌한 (경쾌한 | Cheerful'), '시스템 프롬프트에 프리셋 목록');
-  ok(body.messages[0].content.includes('제목: 곡') && body.messages[0].content.includes('앨범: B'), '사용자 메시지에 곡 정보');
+  ok(req.url === 'https://api.openai.com/v1/chat/completions' && req.init.method === 'POST', 'URL·POST');
+  const h = req.init.headers;
+  ok(h.Authorization === 'Bearer TEST-KEY' && h['Content-Type'] === 'application/json', '헤더 Authorization Bearer');
+  ok(!Object.keys(h).some(k => /anthropic|x-api-key/i.test(k)), 'Anthropic 헤더 미전송');
+  ok(body.model === 'gpt-5-nano' && body.max_completion_tokens === 1024 && body.reasoning_effort === 'minimal', '모델 gpt-5-nano·max_completion_tokens·reasoning_effort');
+  ok(!('temperature' in body) && !('max_tokens' in body) && !('output_config' in body) && !('thinking' in body), 'temperature 등 미전송, Anthropic 필드 없음');
+  const rf = body.response_format;
+  ok(rf.type === 'json_schema' && rf.json_schema.name === 'music_tags' && rf.json_schema.strict === true, 'response_format json_schema strict');
+  const sch = rf.json_schema.schema;
+  ok(sch.properties.tags.type === 'array' && sch.required[0] === 'tags' && sch.additionalProperties === false && sch.properties.tags.items.enum.length === 49 && sch.properties.tags.items.enum.includes('긴장감있는'), '스키마 {tags: 프리셋 enum 49}');
+  ok(body.messages[0].role === 'system' && body.messages[0].content.includes('목록에 없는 태그는 쓰지 않는다') && body.messages[0].content.includes('경쾌한 (경쾌한 | Cheerful'), '시스템 메시지에 프리셋 목록');
+  ok(body.messages[1].role === 'user' && body.messages[1].content.includes('제목: 곡') && body.messages[1].content.includes('앨범: B'), '사용자 메시지에 곡 정보');
   ok(!req.init.body.includes('TEST-KEY'), '키가 본문에 들어가지 않음');
   const tags = await f.musicAiRequestTags ? 0 : 0; // (함수는 아래 자동 경로로 검증)
-  ok(JSON.stringify(f.musicAiParse({ stop_reason: 'end_turn', content: [{ type: 'text', text: replyText }] })) === JSON.stringify(['경쾌한', '긴장감있는', '행복한', '희망찬', '설레는', '따뜻한']), '프리셋 밖 값 버림, 중복 제거, 최대 6개');
-  ok(f.musicAiParse({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'not json' }] }).length === 0, '깨진 JSON → 빈 추천');
-  let err = ''; try { f.musicAiParse({ stop_reason: 'refusal', content: [] }); } catch (e) { err = e.message; }
+  ok(JSON.stringify(f.musicAiParse({ choices: [{ message: { content: replyText } }] })) === JSON.stringify(['경쾌한', '긴장감있는', '행복한', '희망찬', '설레는', '따뜻한']), '프리셋 밖 값 버림, 중복 제거, 최대 6개');
+  ok(f.musicAiParse({ choices: [{ message: { content: 'not json' } }] }).length === 0, '깨진 JSON → 빈 추천');
+  let err = ''; try { f.musicAiParse({ choices: [{ message: { refusal: 'no', content: null } }] }); } catch (e) { err = e.message; }
   ok(err === 'refusal', 'refusal 처리');
   for (const [m, msg] of [['401', 'auth'], ['429', 'rate'], ['net', 'network']]) {
     mode = m; err = ''; try { await f.musicAiRequestTags(track, 'K', 'm'); } catch (e) { err = e.message; }
@@ -67,11 +70,11 @@ const f = ctx.f;
   calls.length = 0; await f.musicAiAuto(ctx.state.musicTracks[0]);
   ok(calls.length === 0 && ctx.state.musicTracks[0].aiTagSuggestions === null, '키 없으면 조용히 건너뜀');
   // 키 있음: 요청 1회 → track.aiTagSuggestions 저장·persist, 상세가 열려 있으면 추천 줄 갱신
-  store['trpg-music-ai-key'] = 'SECRET-KEY-123';
+  store['trpg-music-ai-openai-key'] = 'SECRET-KEY-123';
   els['music-ai-rec'] = { dataset: { id: 'm1' }, innerHTML: '' };
   await f.musicAiAuto(ctx.state.musicTracks[0]);
   ok(calls.length === 1 && JSON.stringify(ctx.state.musicTracks[0].aiTagSuggestions) === JSON.stringify(['경쾌한', '긴장감있는', '행복한', '희망찬', '설레는', '따뜻한']) && persisted === 1, '자동 요청 → aiTagSuggestions 저장');
-  ok(calls[0].init.headers['x-api-key'] === 'SECRET-KEY-123' && JSON.parse(calls[0].init.body).model === 'claude-haiku-5-5', '저장된 키·haiku 모델로 요청');
+  ok(calls[0].init.headers.Authorization === 'Bearer SECRET-KEY-123' && JSON.parse(calls[0].init.body).model === 'gpt-5-nano', '저장된 키·gpt-5-nano 로 요청');
   ok(els['music-ai-rec'].innerHTML.includes('music-tag-chip rec') && els['music-ai-rec'].innerHTML.includes('title="Cheerful"') && !els['music-ai-rec'].innerHTML.includes('SECRET'), '추천 줄 칩(점선 rec, 영어 title, 키 미노출)');
   // 이미 추천이 있으면 재요청 없음(중복 방지)
   await f.musicAiAuto(ctx.state.musicTracks[0]);

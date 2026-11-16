@@ -9560,7 +9560,7 @@ select.sh-field-input,
         <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">토큰 만들기</a>
       </p>
       <div class="rb-modal-field">
-        <label class="rb-modal-label" for="music-ai-key-input">AI 태그 추천 · Anthropic API 키</label>
+        <label class="rb-modal-label" for="music-ai-key-input">AI 태그 추천 · OpenAI API 키</label>
         <div style="display:flex;gap:6px;align-items:center">
           <input type="password" id="music-ai-key-input" class="rb-modal-input" autocomplete="new-password" spellcheck="false">
           <button type="button" class="rb-modal-cancel" id="music-ai-key-clear" onclick="musicAiClearKey()" style="display:none">키 삭제</button>
@@ -35479,40 +35479,40 @@ function musicToggleTag(id, tag) {
   persist(); renderMusicPage();
 }
 // ── AI 태그 추천(#285): 곡 추가 직후·상세 열 때 자동 1회, 결과는 track.aiTagSuggestions 에 저장하고 태그 반영은 사용자가 칩을 눌러서. API 키는 이 기기 localStorage 에만 두고 동기화·내보내기 payload 에 넣지 않으며 로그·오류 문구에 출력하지 않는다 ──
-const MUSIC_AI_KEY_STORE = 'trpg-music-ai-key', MUSIC_AI_MODEL_STORE = 'trpg-music-ai-model', MUSIC_AI_DEFAULT_MODEL = 'claude-haiku-5-5', MUSIC_AI_MAX_TAGS = 6;
+const MUSIC_AI_KEY_STORE = 'trpg-music-ai-openai-key', MUSIC_AI_LEGACY_KEY_STORE = 'trpg-music-ai-key', MUSIC_AI_MODEL = 'gpt-5-nano', MUSIC_AI_MAX_TAGS = 6; // 공급사: OpenAI(#289). 예전 Anthropic 키 이름은 읽지 않고 키 삭제 때 함께 지우기만 한다
 function musicAiGet(key, fallback) { try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; } }
 function musicAiPresets() { // 저장 태그(공백 제거형) → { ko, en, cat }
   const map = {};
   MUSIC_TAG_PRESETS.forEach(([cat, subs]) => subs.forEach(([sub, list]) => list.split(', ').forEach(item => { const [ko, en] = item.split('|'); map[musicPresetTag(ko)] = { ko, en, cat: cat + ' / ' + sub }; })));
   return map;
 }
-function musicAiBuildRequest(track, key, model) {
+function musicAiBuildRequest(track, key) {
   const presets = musicAiPresets(), tags = Object.keys(presets);
   const list = tags.map(tag => tag + ' (' + presets[tag].ko + ' | ' + presets[tag].en + ', ' + presets[tag].cat + ')').join('\n');
   return {
-    url: 'https://api.anthropic.com/v1/messages',
+    url: 'https://api.openai.com/v1/chat/completions',
     init: {
       method: 'POST',
-      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: model || MUSIC_AI_DEFAULT_MODEL, max_tokens: 1024,
-        system: '음악 곡의 분위기 태그를 고른다. 아래 목록의 저장 태그(맨 앞 단어)만 사용하고 목록에 없는 태그는 쓰지 않는다. 곡을 아는 경우에만 그 지식을 근거로 하고, 모르면 제목·앨범의 분위기로 추정한다. 어울리는 것을 최대 ' + MUSIC_AI_MAX_TAGS + '개 고른다.\n' + list,
-        messages: [{ role: 'user', content: '제목: ' + (track.title || '') + '\n아티스트: ' + (track.artist || '') + '\n앨범: ' + (track.album || '') + '\n메모: ' + (track.notes || '') }],
-        output_config: { effort: 'low', format: { type: 'json_schema', schema: { type: 'object', properties: { tags: { type: 'array', items: { type: 'string', enum: tags } } }, required: ['tags'], additionalProperties: false } } },
+        model: MUSIC_AI_MODEL, reasoning_effort: 'minimal', max_completion_tokens: 1024,
+        messages: [{ role: 'system', content: '음악 곡의 분위기 태그를 고른다. 아래 목록의 저장 태그(맨 앞 단어)만 사용하고 목록에 없는 태그는 쓰지 않는다. 곡을 아는 경우에만 그 지식을 근거로 하고, 모르면 제목·앨범의 분위기로 추정한다. 어울리는 것을 최대 ' + MUSIC_AI_MAX_TAGS + '개 고른다.\n' + list }, { role: 'user', content: '제목: ' + (track.title || '') + '\n아티스트: ' + (track.artist || '') + '\n앨범: ' + (track.album || '') + '\n메모: ' + (track.notes || '') }],
+        response_format: { type: 'json_schema', json_schema: { name: 'music_tags', strict: true, schema: { type: 'object', properties: { tags: { type: 'array', items: { type: 'string', enum: tags } } }, required: ['tags'], additionalProperties: false } } },
       }),
     },
   };
 }
 function musicAiParse(data) { // 프리셋 밖 값은 버리고 중복 제거, 최대 6개
-  if (data && data.stop_reason === 'refusal') throw new Error('refusal');
-  const text = ((data && data.content) || []).filter(part => part && part.type === 'text').map(part => part.text).join('');
+  const message = data && data.choices && data.choices[0] && data.choices[0].message;
+  if (message && message.refusal) throw new Error('refusal');
+  const text = message && typeof message.content === 'string' ? message.content : '';
   const presets = musicAiPresets();
   let tags = [];
   try { tags = JSON.parse(text).tags; } catch (e) { tags = []; }
   return [...new Set((Array.isArray(tags) ? tags : []).filter(tag => typeof tag === 'string' && presets[tag]))].slice(0, MUSIC_AI_MAX_TAGS);
 }
-async function musicAiRequestTags(track, key, model) {
-  const req = musicAiBuildRequest(track, key, model);
+async function musicAiRequestTags(track, key) {
+  const req = musicAiBuildRequest(track, key);
   let res;
   try { res = await fetch(req.url, req.init); } catch (e) { throw new Error('network'); }
   if (res.status === 401) throw new Error('auth');
@@ -35533,7 +35533,7 @@ async function musicAiAuto(track) {
   if (!key || !track || Array.isArray(track.aiTagSuggestions) || musicAiTried.has(track.id)) return;
   musicAiTried.add(track.id);
   let tags;
-  try { tags = await musicAiRequestTags(track, key, musicAiGet(MUSIC_AI_MODEL_STORE, MUSIC_AI_DEFAULT_MODEL)); } catch (e) { return; }
+  try { tags = await musicAiRequestTags(track, key); } catch (e) { return; }
   const now = state.musicTracks.find(item => item.id === track.id);
   if (!now) return; // 그 사이 삭제됨
   now.aiTagSuggestions = tags;
@@ -35545,7 +35545,7 @@ async function musicAiAuto(track) {
 function musicAiKeyFieldRefresh() {
   const input = document.getElementById('music-ai-key-input'), clear = document.getElementById('music-ai-key-clear');
   const hasKey = !!musicAiGet(MUSIC_AI_KEY_STORE, '');
-  if (input) { input.value = ''; input.placeholder = hasKey ? '저장됨 (●●●●)' : 'sk-ant-...'; }
+  if (input) { input.value = ''; input.placeholder = hasKey ? '저장됨 (●●●●)' : 'sk-...'; }
   if (clear) clear.style.display = hasKey ? '' : 'none';
 }
 function musicAiSaveKeyFromInput() { // 값이 있을 때만 저장. 저장했으면 true
@@ -35556,7 +35556,7 @@ function musicAiSaveKeyFromInput() { // 값이 있을 때만 저장. 저장했�
   musicAiKeyFieldRefresh();
   return true;
 }
-function musicAiClearKey() { try { localStorage.removeItem(MUSIC_AI_KEY_STORE); } catch (e) {} musicAiKeyFieldRefresh(); showToast('API 키를 삭제했습니다.'); }
+function musicAiClearKey() { try { localStorage.removeItem(MUSIC_AI_KEY_STORE); localStorage.removeItem(MUSIC_AI_LEGACY_KEY_STORE); } catch (e) {} musicAiKeyFieldRefresh(); showToast('API 키를 삭제했습니다.'); }
 function musicAiRowHtml(track) {
   const hint = !musicAiGet(MUSIC_AI_KEY_STORE, '') && !(track.aiTagSuggestions && track.aiTagSuggestions.length) && !(track.soundTagSuggestions && track.soundTagSuggestions.length) ? '<span class="music-hint">동기화 설정에서 API 키를 입력하세요</span>' : '';
   return '<div class="music-ai" id="music-ai-rec" data-id="' + esc(track.id) + '">' + (musicAiRecHtml(track) || hint) + '</div>';

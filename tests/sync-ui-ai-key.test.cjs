@@ -17,13 +17,18 @@ const ctx = { localStorage: { getItem: k => (k in store ? store[k] : null), setI
 vm.createContext(ctx); vm.runInContext(fnCode + ';this.f={musicAiKeyFieldRefresh,musicAiSaveKeyFromInput,musicAiClearKey}', ctx);
 const f = ctx.f;
 f.musicAiKeyFieldRefresh();
-ok(input.placeholder === 'sk-ant-...' && clear.style.display === 'none', '키 없음: 기본 placeholder, 삭제 버튼 숨김');
-input.value = '   '; ok(f.musicAiSaveKeyFromInput() === false && !('trpg-music-ai-key' in store), '빈 값은 저장 안 함');
-input.value = ' FAKE-TEST-KEY '; ok(f.musicAiSaveKeyFromInput() === true && store['trpg-music-ai-key'] === 'FAKE-TEST-KEY', '값이 있으면 trpg-music-ai-key 에 저장(트림)');
+ok(input.placeholder === 'sk-...' && clear.style.display === 'none', '키 없음: 기본 placeholder, 삭제 버튼 숨김');
+input.value = '   '; ok(f.musicAiSaveKeyFromInput() === false && !('trpg-music-ai-openai-key' in store), '빈 값은 저장 안 함');
+input.value = ' FAKE-TEST-KEY '; ok(f.musicAiSaveKeyFromInput() === true && store['trpg-music-ai-openai-key'] === 'FAKE-TEST-KEY', '값이 있으면 trpg-music-ai-key 에 저장(트림)');
 ok(input.value === '' && input.placeholder === '저장됨 (●●●●)' && clear.style.display === '', '저장 후 칸 비움·마스킹 placeholder·삭제 버튼 표시(값 재표시 안 함)');
 ok(!JSON.stringify([input, toasts]).includes('FAKE-TEST-KEY'), '키 값이 화면·토스트에 노출되지 않음');
 f.musicAiClearKey();
-ok(!('trpg-music-ai-key' in store) && input.placeholder === 'sk-ant-...' && clear.style.display === 'none', '키 삭제');
+ok(!('trpg-music-ai-openai-key' in store) && input.placeholder === 'sk-...' && clear.style.display === 'none', '키 삭제');
+store['trpg-music-ai-key'] = 'LEGACY-ANTHROPIC'; store['trpg-music-ai-openai-key'] = 'FAKE-TEST-KEY'; f.musicAiKeyFieldRefresh();
+ok(input.placeholder === '저장됨 (●●●●)', '예전 Anthropic 키는 읽지 않음(OpenAI 키만 기준)');
+f.musicAiClearKey();
+ok(!('trpg-music-ai-key' in store) && !('trpg-music-ai-openai-key' in store), '키 삭제 시 예전 Anthropic 키도 함께 삭제');
+
 // 저장 함수가 토큰 없이도 AI 키를 저장(독립)
 const sv = html.slice(html.indexOf('async function saveGitHubSyncSettings'), html.indexOf('async function pullGitHubSyncNow'));
 ok(sv.indexOf('musicAiSaveKeyFromInput()') > 0 && sv.indexOf('musicAiSaveKeyFromInput()') < sv.indexOf('if (!token)') && sv.includes('if (aiKeySaved)'), '토큰 확인보다 먼저 AI 키 저장(독립)');
