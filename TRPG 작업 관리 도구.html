@@ -35329,7 +35329,7 @@ function musicParseYoutubeId(value) {
 }
 function musicPlayerHtml(track, blobUrl) {
   if (track.kind === 'youtube' && !blobUrl) {
-    return '<iframe class="music-yt" src="https://www.youtube.com/embed/' + encodeURIComponent(track.youtubeId) + '?autoplay=1&rel=0&loop=1&playlist=' + encodeURIComponent(track.youtubeId) + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+    return '<iframe class="music-yt" src="https://www.youtube.com/embed/' + encodeURIComponent(track.youtubeId) + '?autoplay=1&rel=0&loop=1&playlist=' + encodeURIComponent(track.youtubeId) + '&enablejsapi=1&origin=' + encodeURIComponent(typeof location !== 'undefined' ? location.origin : '') + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
   }
   return blobUrl ? '<div class="music-audio-player"><audio class="music-audio" autoplay loop src="' + esc(blobUrl) + '"></audio>'
     + '<button type="button" class="music-ap-play" title="재생/일시정지" aria-label="재생/일시정지">❚❚</button><span class="music-ap-time">0:00 / 0:00</span>'
@@ -35543,6 +35543,28 @@ if (typeof window !== 'undefined') {
   document.addEventListener('visibilitychange', () => { if (document.getElementById('music-modal-backdrop')) musicDebug('visibility', document.visibilityState); });
   new MutationObserver(records => records.forEach(rec => rec.removedNodes.forEach(node => { if (node.nodeType === 1 && (node.tagName === 'IFRAME' || (node.querySelector && node.querySelector('iframe.music-yt')))) musicDebug('player removed', node.tagName); }))).observe(document.documentElement, { childList: true, subtree: true });
 }
+// 유튜브 플레이어 상태 표시(#317): 재생이 멈추는 원인을 화면에서 바로 볼 수 있게 플레이어 아래에 상태·오류 코드를 보여 주고, 시작 직후 저절로 멈추면 한 번 다시 재생을 시도한다.
+const MUSIC_YT_STATES = { '-1': '시작 전', 0: '종료', 1: '재생 중', 2: '일시정지', 3: '버퍼링 중', 5: '대기' };
+const MUSIC_YT_ERRORS = { 2: '잘못된 요청', 5: '플레이어 오류', 100: '영상을 찾을 수 없음/비공개', 101: '퍼가기 불허', 150: '퍼가기 불허', 153: '퍼가기 설정 오류(리퍼러 없음)' };
+let musicYtWatch = { openedAt: 0, retried: false, userPaused: false };
+function musicYtShow(text) { const el = document.getElementById('music-yt-state'); if (el) el.textContent = text; }
+function musicYtCommand(func) { const f = document.querySelector('#music-modal-backdrop iframe.music-yt'); if (f && f.contentWindow) f.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args: [] }), 'https://www.youtube.com'); }
+function musicYtAttach() { // 상세 창을 연 직후 호출: iframe 이 있으면 상태 수신을 시작
+  musicYtWatch = { openedAt: Date.now(), retried: false };
+  const f = document.querySelector('#music-modal-backdrop iframe.music-yt');
+  if (!f) return;
+  f.addEventListener('load', () => { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), 'https://www.youtube.com'); } catch (e) {} });
+}
+if (typeof window !== 'undefined') window.addEventListener('message', event => {
+  if (event.origin !== 'https://www.youtube.com' || !document.getElementById('music-yt-state')) return;
+  let data; try { data = JSON.parse(event.data); } catch (e) { return; }
+  const state = data.event === 'onStateChange' ? data.info : (data.event === 'infoDelivery' && data.info ? data.info.playerState : undefined);
+  if (data.event === 'onError') { musicDebug('yt error', data.info); musicYtShow('유튜브 오류 ' + data.info + (MUSIC_YT_ERRORS[data.info] ? ' — ' + MUSIC_YT_ERRORS[data.info] : '')); return; }
+  if (state === undefined || state === null) return;
+  musicDebug('yt state', state);
+  musicYtShow('유튜브: ' + (MUSIC_YT_STATES[state] || state));
+  if (state === 2 && !musicYtWatch.retried && Date.now() - musicYtWatch.openedAt < 8000) { musicYtWatch.retried = true; setTimeout(() => musicYtCommand('playVideo'), 300); } // 시작 직후 저절로 멈추면 한 번만 다시 재생
+});
 function musicStop() {
   musicDebug('musicStop', musicPlaying ? musicPlaying.id : '');
   document.querySelectorAll('#music-modal-backdrop audio').forEach(audio => audio.pause());
@@ -35768,12 +35790,13 @@ async function openMusicDetail(id, source) {
   const tagsField = '<div class="music-field">태그' + tagEditorHtml('data-k="tags" onchange="musicEditField(' + String.fromCharCode(39) + id + String.fromCharCode(39) + ',this)"', track.tags, '') + '</div>';
   const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" oninput="musicAutoGrow(this)" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)"' + ' value="' + esc(track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
   musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
-    + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + attachRow
+    + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + (track.kind === 'youtube' && !url ? '<div class="music-hint" id="music-yt-state">유튜브: 불러오는 중…</div>' : '') + attachRow
     + (track.kind === 'file' && !url ? '<button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button>' : '')
     + '<div class="music-fields">' + '<div class="music-fcol">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + '</div><div class="music-fcol music-fcol-tags">' + tagsField + musicExistingTagsHtml(track) + '</div>'
     + '<label class="music-field" style="grid-column:1/-1">폴더 <select onchange="musicEditField(\'' + id + '\',this,\'folderId\')">' + folderOpts + '</select></label>' + field('notes', '메모', 'textarea') + '</div>'
     + '<div class="music-modal-foot"><span class="music-hint">← → 이전·다음 곡</span><button type="button" class="music-danger" onclick="deleteMusicTrack(\'' + id + '\')">삭제</button></div>');
   musicPlaying = { id, url };
+  musicYtAttach();
   musicAudioInit(document.querySelector('#music-modal-backdrop .music-audio-player'));
   document.querySelectorAll('#music-modal-backdrop textarea[data-k]').forEach(musicAutoGrow); // 메모 칸 높이를 글 길이에 맞춘다(#312)
   document.querySelectorAll('#music-modal-backdrop .tag-editor').forEach(tagEditorRender);
