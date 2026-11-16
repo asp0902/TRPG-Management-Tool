@@ -2184,6 +2184,7 @@ tr.ct-row-end .ct-select:focus {
 .music-modal-backdrop { position: fixed; inset: 0; z-index: 12500; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
 .music-modal { width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow-y: auto; background: #fff; border-radius: 14px; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; color: #333; }
 .music-modal-head { display: flex; align-items: center; gap: 8px; }
+.music-or { text-align: center; font-size: 11px; color: #888; border-top: 1px solid #e4e4e4; padding-top: 8px; }
 .music-modal-title { flex: 1; font-weight: 800; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .music-modal-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .music-field { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: #666; font-weight: 700; }
@@ -9044,8 +9045,7 @@ select.sh-field-input,
           <input id="music-search" class="music-search" placeholder="제목, 아티스트, 앨범, 태그, 메모 검색..." oninput="musicView.q=this.value;renderMusicPage()">
           <select id="music-sort" onchange="musicView.sort=this.value;renderMusicPage()"><option value="added">추가 순</option><option value="name">이름 순</option></select>
           <label class="music-check"><input id="music-by-album" type="checkbox" onchange="musicView.byAlbum=this.checked;renderMusicPage()"> 앨범별 보기</label>
-          <button type="button" class="music-primary" onclick="musicPickFiles()">＋ 파일</button>
-          <button type="button" class="music-primary" onclick="openMusicYoutubeModal()">＋ 유튜브</button>
+          <button type="button" class="music-primary" onclick="openMusicYoutubeModal()" title="곡 추가" aria-label="곡 추가">＋</button>
         </div>
         <div class="music-storage" id="music-storage"></div>
         <div class="music-grid" id="music-grid"></div>
@@ -35356,7 +35356,7 @@ function renderMusicPage() {
     + state.musicFolders.map(folder => item(folder.id, folder.name, folder.color, '<button type="button" class="music-folder-edit" title="이름·색 바꾸기 / 삭제" onclick="event.stopPropagation();openMusicFolderModal(\'' + folder.id + '\')">⋯</button>')).join('');
   const list = musicVisibleTracks();
   const grid = document.getElementById('music-grid');
-  if (!list.length) grid.innerHTML = '<div class="music-empty">' + (state.musicTracks.length ? '표시할 트랙이 없습니다.' : '등록된 트랙이 없습니다.<br>파일을 끌어다 놓거나 ＋ 파일 / ＋ 유튜브로 추가하세요.') + '</div>';
+  if (!list.length) grid.innerHTML = '<div class="music-empty">' + (state.musicTracks.length ? '표시할 트랙이 없습니다.' : '등록된 트랙이 없습니다.<br>파일을 끌어다 놓거나 ＋로 추가하세요.') + '</div>';
   else if (musicView.byAlbum) {
     let html = '', last = null;
     list.forEach(track => { const album = track.album || '앨범 없음'; if (album !== last) { html += '<div class="music-album-head">' + esc(album) + '</div>'; last = album; } html += renderMusicCard(track); });
@@ -35585,7 +35585,8 @@ function musicReupload(id) {
   input.click();
 }
 function openMusicYoutubeModal() {
-  musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">유튜브 링크 추가</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
+  musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">곡 추가</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
+    + '<button type="button" class="music-primary" onclick="musicCloseModal(); musicPickFiles();">PC 파일 선택</button><div class="music-or">또는 유튜브 링크</div>'
     + '<label class="music-field">URL<input id="music-yt-url" type="text" placeholder="https://www.youtube.com/watch?v=..." spellcheck="false" onchange="musicFetchYoutube()"></label>'
     + '<label class="music-field">제목<input id="music-yt-title" type="text" placeholder="자동으로 가져오거나 직접 입력"></label>'
     + '<label class="music-field">아티스트(채널)<input id="music-yt-artist" type="text"></label>'

@@ -1,0 +1,10 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+ok(html.includes('<button type="button" class="music-primary" onclick="openMusicYoutubeModal()" title="곡 추가" aria-label="곡 추가">＋</button>'), '도구 모음 ＋ 하나');
+ok(!html.includes('>＋ 파일</button>') && !html.includes('>＋ 유튜브</button>'), '기존 두 버튼 제거');
+const fn = html.slice(html.indexOf('function openMusicYoutubeModal'), html.indexOf('async function musicFetchYoutube'));
+ok(fn.includes('<div class="music-modal-title">곡 추가</div>'), '모달 제목 곡 추가');
+ok(fn.includes('onclick="musicCloseModal(); musicPickFiles();">PC 파일 선택</button><div class="music-or">또는 유튜브 링크</div>'), 'PC 파일 선택 + 구분선');
+ok(fn.indexOf('PC 파일 선택') < fn.indexOf('id="music-yt-url"') && fn.includes('musicAddYoutube()'), '유튜브 입력부 유지');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);
