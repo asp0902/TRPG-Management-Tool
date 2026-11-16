@@ -2209,6 +2209,7 @@ tr.ct-row-end .ct-select:focus {
 .music-audio { width: 100%; }
 .music-card-file { position: absolute; left: 4px; bottom: 4px; background: rgba(255,255,255,0.9); color: #111; font-size: 9px; font-style: normal; font-weight: 800; padding: 1px 5px; border-radius: 4px; }
 .music-card.drop-target { outline: 2px dashed #111; outline-offset: -2px; }
+.music-attach input { border: 1px solid #ddd; border-radius: 6px; padding: 3px 8px; font: inherit; font-size: 11.5px; min-width: 160px; flex: 1; }
 .music-attach { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .music-src { display: inline-flex; }
 .music-src button { border-radius: 0 !important; }
@@ -35368,7 +35369,7 @@ function musicVisibleTracks() {
 function musicFmtTime(sec) { sec = Math.round(sec || 0); return sec ? Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0') : ''; }
 function renderMusicCard(track) {
   const folder = musicFolderOf(track);
-  const cover = track.kind === 'youtube' ? track.thumbnail : musicCoverUrls[track.id];
+  const cover = track.kind === 'youtube' ? (musicCoverUrls[track.id] || track.thumbnail) : musicCoverUrls[track.id]; // 파일 표지가 있으면 우선(유튜브 연결 파일 곡, #295)
   const hasFile = track.kind === 'file' || track.attached;
   const missing = hasFile && !musicLocalIds.has(track.id);
   const canDrop = track.kind === 'youtube';
@@ -35594,10 +35595,11 @@ async function openMusicDetail(id, source) {
   if (track.kind === 'file' || track.attached) { try { blob = await musicBlobGet(id); } catch (e) {} }
   const src = track.kind === 'file' ? 'file' : (source || (blob ? 'file' : 'youtube')); // 첨부 파일이 있으면 기본은 파일
   if (blob && src === 'file') url = URL.createObjectURL(blob);
-  const attachRow = track.kind !== 'youtube' ? '' : '<div class="music-attach">'
+  const attachRow = track.kind === 'file' ? '<div class="music-attach"><input id="music-link-url" type="text" spellcheck="false" onkeydown="musicLinkKey(event,\'' + id + '\',this)"><button type="button" onclick="musicLinkYoutube(\'' + id + '\',document.getElementById(\'music-link-url\').value)">유튜브 주소 연결</button><span class="music-error" id="music-link-error"></span></div>'
+    : track.kind !== 'youtube' ? '' : '<div class="music-attach">'
     + (track.attached && blob ? '<span class="music-src"><button type="button" class="' + (src === 'youtube' ? 'on' : '') + '" onclick="openMusicDetail(\'' + id + '\',\'youtube\')">유튜브</button><button type="button" class="' + (src === 'file' ? 'on' : '') + '" onclick="openMusicDetail(\'' + id + '\',\'file\')">파일</button></span>' : '')
     + (track.attached && !blob ? '<span class="music-card-missing">이 기기에 파일 없음 (' + esc(track.fileName) + ') <button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button></span>' : '')
-    + (track.attached && blob ? '<span class="music-hint">' + esc(track.fileName) + '</span><button type="button" onclick="musicAttachPick(\'' + id + '\')">교체</button><button type="button" class="music-danger" onclick="musicDetach(\'' + id + '\')">떼어내기</button>' : '')
+    + (track.attached && blob ? '<span class="music-hint">' + esc(track.fileName) + '</span><button type="button" onclick="musicAttachPick(\'' + id + '\')">교체</button><button type="button" class="music-danger" onclick="musicDetach(\'' + id + '\')">떼어내기</button><button type="button" onclick="musicUnlinkYoutube(\'' + id + '\')">유튜브 연결 해제</button>' : '')
     + (!track.attached ? '<button type="button" onclick="musicAttachPick(\'' + id + '\')">파일 첨부</button><span class="music-hint">또는 카드 위로 음원 파일을 끌어 놓기</span>' : '') + '</div>';
   const folderOpts = '<option value="">분류 없음</option>' + state.musicFolders.map(folder => '<option value="' + folder.id + '"' + (folder.id === track.folderId ? ' selected' : '') + '>' + esc(folder.name) + '</option>').join('');
   const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)"' + (key === 'tags' ? ' onkeydown="tagInputEnter(event,this)" data-committed="' + esc(track.tags.map(tag => '#' + tag).join(' ')) + '"' : '') + ' value="' + esc(key === 'tags' ? track.tags.map(tag => '#' + tag).join(' ') : track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
@@ -35722,11 +35724,35 @@ function musicAttachPick(id) {
 async function musicDetach(id) {
   const track = state.musicTracks.find(item => item.id === id);
   if (!track?.attached || !confirm('첨부한 음원 파일을 떼어낼까요?\n이 기기에 저장된 파일이 삭제되고 유튜브 링크·제목·폴더는 유지됩니다.')) return;
-  try { await musicBlobDelete([id]); } catch (e) { console.warn(e); }
+  try { await musicBlobDelete([id, 'cover:' + id]); } catch (e) { console.warn(e); }
+  if (musicCoverUrls[id]) { URL.revokeObjectURL(musicCoverUrls[id]); delete musicCoverUrls[id]; }
   musicLocalIds.delete(id);
   track.attached = false; track.fileName = ''; track.size = 0;
   persist(); renderMusicPage();
   if (document.getElementById('music-modal-backdrop')) openMusicDetail(id, 'youtube');
+}
+// 파일 곡에 유튜브 주소 연결(#295): #257 의 「유튜브 + 첨부 파일」 형태로 바꾼다. Blob 은 파일 곡·첨부 모두 트랙 id 키(표지는 'cover:<id>')라 옮길 것이 없다.
+function musicLinkKey(event, id, el) {
+  if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return;
+  event.preventDefault();
+  musicLinkYoutube(id, el.value);
+}
+function musicLinkYoutube(id, text) {
+  const track = state.musicTracks.find(item => item.id === id);
+  if (!track || track.kind !== 'file') return;
+  const yid = musicParseYoutubeId(text), error = document.getElementById('music-link-error');
+  if (!yid) { if (error) error.textContent = '유튜브 링크를 알아볼 수 없습니다.'; return; }
+  track.kind = 'youtube'; track.youtubeId = yid; track.url = 'https://www.youtube.com/watch?v=' + yid; track.attached = true;
+  track.thumbnail = 'https://i.ytimg.com/vi/' + yid + '/hqdefault.jpg'; // 파일 표지가 있으면 카드에서 그쪽이 우선
+  persist(); renderMusicPage();
+  if (document.getElementById('music-modal-backdrop')) openMusicDetail(id, 'file'); // 재생 기본은 파일
+}
+function musicUnlinkYoutube(id) {
+  const track = state.musicTracks.find(item => item.id === id);
+  if (!track || track.kind !== 'youtube' || !track.attached) return;
+  track.kind = 'file'; track.attached = false; track.youtubeId = ''; track.url = ''; track.thumbnail = ''; // 파일은 그대로
+  persist(); renderMusicPage();
+  if (document.getElementById('music-modal-backdrop')) openMusicDetail(id);
 }
 function musicCardDragOver(event) {
   if (!event.dataTransfer?.types?.includes('Files')) return;
