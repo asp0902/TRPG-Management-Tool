@@ -9112,7 +9112,7 @@ select.sh-field-input,
         <div class="bookmark-modal-preview" id="bookmark-thumb-preview"></div>
         <div class="bookmark-form-row">
           <div class="bookmark-form-label">태그</div>
-          <input class="bookmark-form-input" id="bookmark-tags" placeholder="#자료 #세션 #영감" spellcheck="false" oninput="renderBookmarkTagSuggestions()">
+          <input class="bookmark-form-input" id="bookmark-tags" placeholder="#자료 #세션 #영감" spellcheck="false" oninput="renderBookmarkTagSuggestions()" onkeydown="tagInputEnter(event,this)">
           <div class="bookmark-tag-suggestions" id="bookmark-tag-suggestions"></div>
         </div>
         <div class="bookmark-form-row">
@@ -10517,6 +10517,24 @@ function normalizeCssMacroTags(input, fallbackTag = '') {
       seen.add(key);
       return true;
     });
+}
+// 태그 입력칸에서 Enter: 확정된 부분(el.dataset.committed) 뒤에 새로 입력한 글을 태그 하나(띄어쓰기 허용)로 '#' 를 붙여 바꾸고 끝에 공백을 둔다(#293).
+// 앞부분이 바뀌었으면 칸 전체를 normalizeCssMacroTags 로 정리. 빈 입력·새 글 없음·한글 조합 중에는 아무 것도 하지 않는다(기존 Enter 동작 유지).
+function tagInputEnter(event, el) {
+  if (!event || event.key !== 'Enter' || event.isComposing || event.keyCode === 229 || !el) return;
+  const value = el.value, committed = el.dataset.committed || '';
+  if (!value.trim() || value.trim() === committed.trim()) return;
+  let tags;
+  if (committed && value.startsWith(committed)) {
+    const rest = value.slice(committed.length).trim(); // 새 글에 '#'·쉼표가 있으면 그 규칙으로 여러 태그, 없으면 통째로 태그 하나
+    tags = normalizeCssMacroTags(committed).concat(rest.includes('#') || rest.includes(',') ? normalizeCssMacroTags(rest.startsWith('#') ? rest : '#' + rest) : [rest]);
+  } else tags = normalizeCssMacroTags(value);
+  event.preventDefault();
+  tags = normalizeCssMacroTags(tags); // 중복(대소문자 무시)·공백 정리
+  el.value = tags.map(tag => '#' + tag).join(' ') + ' ';
+  el.dataset.committed = el.value;
+  el.dispatchEvent(new Event('input', { bubbles: true })); // 북마크 태그 추천 갱신
+  el.dispatchEvent(new Event('change', { bubbles: true })); // MUSIC 은 change 로 저장(musicEditField)
 }
 function formatCssMacroTagsText(tags) {
   return normalizeCssMacroTags(tags).map(tag => `#${tag}`).join(' ');
@@ -34849,6 +34867,7 @@ function toggleBookmarkTagSuggestion(tag) {
   const tags = normalizeCssMacroTags(input.value || '');
   tags.push(tag);
   input.value = normalizeCssMacroTags(tags).map(item => `#${item}`).join(' ');
+  input.dataset.committed = input.value;
   renderBookmarkTagSuggestions();
 }
 function renderBookmarkTagFilters() {
@@ -34936,6 +34955,7 @@ function openBookmarkModal(bookmarkId = '') {
   document.getElementById('bookmark-title').value = bookmark?.title || '';
   document.getElementById('bookmark-thumb').value = bookmark?.thumbnail || '';
   document.getElementById('bookmark-tags').value = normalizeCssMacroTags(bookmark?.tags).map(tag => `#${tag}`).join(' ');
+  document.getElementById('bookmark-tags').dataset.committed = document.getElementById('bookmark-tags').value;
   document.getElementById('bookmark-notes').value = bookmark?.notes || '';
   document.getElementById('bookmark-delete-btn').style.display = bookmark ? '' : 'none';
   setBookmarkFetchStatus('');
@@ -35580,7 +35600,7 @@ async function openMusicDetail(id, source) {
     + (track.attached && blob ? '<span class="music-hint">' + esc(track.fileName) + '</span><button type="button" onclick="musicAttachPick(\'' + id + '\')">교체</button><button type="button" class="music-danger" onclick="musicDetach(\'' + id + '\')">떼어내기</button>' : '')
     + (!track.attached ? '<button type="button" onclick="musicAttachPick(\'' + id + '\')">파일 첨부</button><span class="music-hint">또는 카드 위로 음원 파일을 끌어 놓기</span>' : '') + '</div>';
   const folderOpts = '<option value="">분류 없음</option>' + state.musicFolders.map(folder => '<option value="' + folder.id + '"' + (folder.id === track.folderId ? ' selected' : '') + '>' + esc(folder.name) + '</option>').join('');
-  const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)" value="' + esc(key === 'tags' ? track.tags.map(tag => '#' + tag).join(' ') : track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
+  const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)"' + (key === 'tags' ? ' onkeydown="tagInputEnter(event,this)" data-committed="' + esc(track.tags.map(tag => '#' + tag).join(' ')) + '"' : '') + ' value="' + esc(key === 'tags' ? track.tags.map(tag => '#' + tag).join(' ') : track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
   musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + attachRow
     + (track.kind === 'file' && !url ? '<button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button>' : '')
