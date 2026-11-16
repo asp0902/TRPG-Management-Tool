@@ -35670,7 +35670,7 @@ async function openMusicDetail(id, source) {
   let url = '', blob = null;
   if (track.kind === 'file' || track.attached) { try { blob = await musicBlobGet(id); } catch (e) {} }
   if (!blob && (track.kind === 'file' || track.attached) && track.sha256 && musicCanDownload()) { showToast('음원을 받는 중…'); blob = await musicDownloadTrack(track); renderMusicPage(); }
-  const src = track.kind === 'file' ? 'file' : (source || (blob ? 'file' : 'youtube')); // 첨부 파일이 있으면 기본은 파일
+  const src = track.kind === 'file' ? 'file' : (source || 'youtube'); // 유튜브 카드는 첨부 파일이 있어도 열면 유튜브가 기본(#310), 상세의 유튜브/파일 전환 버튼으로 파일 재생
   if (blob && src === 'file') url = URL.createObjectURL(blob);
   const attachRow = track.kind === 'file' ? '<div class="music-attach"><input id="music-link-url" type="text" spellcheck="false" onkeydown="musicLinkKey(event,\'' + id + '\',this)"><button type="button" onclick="musicLinkYoutube(\'' + id + '\',document.getElementById(\'music-link-url\').value)">유튜브 주소 연결</button><span class="music-error" id="music-link-error"></span></div>'
     : track.kind !== 'youtube' ? '' : '<div class="music-attach">'
