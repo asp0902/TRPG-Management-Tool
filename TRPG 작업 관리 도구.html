@@ -24902,7 +24902,8 @@ function githubSyncSaveLog(recs) { // 같은 id 는 덮어쓰고 최근 20건만
   } catch (e) {}
 }
 if (typeof document !== 'undefined') {
-  ['mousedown', 'keydown', 'touchstart'].forEach(type => document.addEventListener(type, () => { lastUserMouseKeyAt = Date.now(); }, true));
+  ['mousedown', 'touchstart'].forEach(type => document.addEventListener(type, () => { lastUserMouseKeyAt = Date.now(); }, true));
+  document.addEventListener('keydown', e => { if (e.key === 'Tab' || e.key === 'Escape' || e.ctrlKey || e.metaKey || e.altKey) lastUserMouseKeyAt = Date.now(); }, true); // 글자 입력은 제외(입력 중 풀림을 놓치지 않도록)
   document.addEventListener('focusout', e => {
     const t = githubSyncTrace, el = e.target;
     if (!t || e.relatedTarget || !el || !el.tagName || !document.hasFocus() || Date.now() - lastUserMouseKeyAt < 1000) return;
@@ -24911,6 +24912,40 @@ if (typeof document !== 'undefined') {
     t.recs.push(rec);
     githubSyncSaveLog([rec]);
   }, true);
+}
+// 동기화와 무관한 입력 칸 포커스 풀림 감시(#270, 진단 전용): kind 'focus-lost' 를 같은 로그에 남긴다.
+// 입력 요소가 DOM 에서 지워지면 Chrome 은 focusout 을 내지 않으므로 0.5초마다 추적 요소의 activeElement 여부도 본다.
+const githubSyncRenderRing = [];
+function githubSyncRingPush(name) { githubSyncRenderRing.push({ t: Date.now(), n: name }); if (githubSyncRenderRing.length > 30) githubSyncRenderRing.shift(); }
+if (typeof document !== 'undefined') {
+  ['renderBlocks', 'rbSelectChapter', 'renderCurrentRulebookDetailState', 'renderList', 'renderMemoPanel', 'renderBlockMemoMarkers', 'refreshAfterImport', 'applyRulebookHistorySnapshot', 'persist'].forEach(name => {
+    const fn = window[name];
+    if (typeof fn !== 'function' || fn.__ringWrapped) return;
+    const wrapped = function() { githubSyncRingPush(name); return fn.apply(this, arguments); };
+    wrapped.__ringWrapped = true;
+    window[name] = wrapped;
+  });
+  let focusTrack = null;
+  const isInputEl = el => !!el && !!el.tagName && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.isContentEditable);
+  const describe = el => !el ? '' : (el === document.body ? 'body' : githubSyncDescribeEl(el));
+  const logFocusLost = (el, via, related, stack) => {
+    if (!document.hasFocus() || Date.now() - lastUserMouseKeyAt < 1000) return;
+    const now = Date.now();
+    githubSyncSaveLog([{ id: 'fl-' + now + '-' + Math.random().toString(36).slice(2, 6), kind: 'focus-lost', via, at: new Date(now).toISOString(), page: typeof currentPage === 'string' ? currentPage : '',
+      el: describe(el), data: Object.assign({}, el.dataset), isConnected: el.isConnected, active: describe(document.activeElement), related: describe(related),
+      syncInFlight: !!githubSyncInFlight, ime: imeComposing, stack: stack || '', renders: githubSyncRenderRing.filter(r => r.t >= now - 3000).map(r => ({ ago: now - r.t, n: r.n })) }]);
+  };
+  document.addEventListener('focusin', e => { if (isInputEl(e.target)) focusTrack = e.target; }, true);
+  document.addEventListener('focusout', e => {
+    if (!isInputEl(e.target)) return;
+    if (focusTrack === e.target) focusTrack = null;
+    logFocusLost(e.target, 'focusout', e.relatedTarget, new Error().stack);
+  }, true);
+  setInterval(() => {
+    if (!focusTrack || document.activeElement === focusTrack) return;
+    const el = focusTrack; focusTrack = null;
+    logFocusLost(el, 'poll', null, '');
+  }, 500);
 }
 // 자동 동기화 중 입력 커서가 풀리면 끝난 뒤 되돌린다(#267): 시작 시 포커스된 입력 요소·선택 범위를 기억, 끝났을 때 포커스가 body/null 이고 요소가 그대로 있으면 복원. 조합 중이면 건너뜀.
 function githubSyncCaptureFocus() {

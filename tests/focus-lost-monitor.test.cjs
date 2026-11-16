@@ -1,0 +1,10 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+const blk = html.slice(html.indexOf('const githubSyncRenderRing'), html.indexOf('// 자동 동기화 중 입력 커서가 풀리면'));
+['renderBlocks', 'rbSelectChapter', 'renderCurrentRulebookDetailState', 'renderList', 'renderMemoPanel', 'renderBlockMemoMarkers', 'refreshAfterImport', 'applyRulebookHistorySnapshot', 'persist'].forEach(n => ok(blk.includes("'" + n + "'"), '감싸기 ' + n));
+ok(blk.includes("kind: 'focus-lost'") && blk.includes('isConnected: el.isConnected') && blk.includes('syncInFlight') && blk.includes('ime: imeComposing'), '기록 항목');
+ok(blk.includes('r.t >= now - 3000') && blk.includes('> 30'), '직전 3초·고리 30개');
+ok(blk.includes("}, 500);") && blk.includes("'poll'"), '요소 제거 대비 0.5초 확인');
+ok(html.includes("e.key === 'Tab' || e.key === 'Escape' || e.ctrlKey || e.metaKey || e.altKey) lastUserMouseKeyAt"), '글자 입력은 사용자 이동 제외 조건에서 뺌');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);
