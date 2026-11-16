@@ -16438,6 +16438,7 @@ function rbStopInlineMemoDrag() {
 }
 
 function rbOpenInlineMemoEditor(options = {}) {
+  rbHideInlineMemoPopup(); // 이미 떠 있는 미리보기 제거(#261)
   const editor = rbEnsureInlineMemoEditor();
   const body = editor.querySelector('.rb-inline-note-editor-body');
   const title = editor.querySelector('.rb-inline-note-editor-title');
@@ -16679,6 +16680,8 @@ function rbPositionInlineMemoPopup(anchorEl, popup) {
 }
 
 function rbShowInlineMemoPopup(noteEl) {
+  const memoEditor = document.getElementById('rb-inline-note-editor');
+  if (memoEditor && getComputedStyle(memoEditor).display !== 'none') { rbHideInlineMemoPopup(); return; } // 편집 팝업이 열려 있으면 미리보기를 띄우지 않는다(#261)
   const noteHtml = rbGetInlineMemoHtml(noteEl);
   if (!noteHtml) return;
   const popup = rbEnsureInlineMemoPopup();
