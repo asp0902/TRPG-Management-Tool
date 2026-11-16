@@ -2314,6 +2314,7 @@ tr.ct-row-end .ct-select:focus {
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 16px;
 }
+.bookmark-grid-break { grid-column: 1 / -1; height: 0; } /* 고정 묶음과 비고정 묶음 사이 줄바꿈(#277). 빈 줄이 gap 한 칸을 더 만들어 묶음 사이 간격은 32px */
 .bookmark-empty {
   grid-column: 1 / -1;
   border: 1px dashed #dadada;
@@ -34891,7 +34892,7 @@ function renderBookmarkPage() {
   }
   closeBookmarkAttachPopover();
   closeBookmarkTagPopover();
-  grid.innerHTML = pinnedFirst.map(bookmark => `
+  grid.innerHTML = pinnedFirst.map((bookmark, i) => (i && !bookmark.pinned && pinnedFirst[i - 1].pinned ? '<div class="bookmark-grid-break" aria-hidden="true"></div>' : '') + `
     <article class="bookmark-card${bookmark.pinned ? ' pinned' : ''}" data-bookmark-id="${bookmark.id}">
       <button type="button" class="bookmark-pin-btn" aria-pressed="${bookmark.pinned ? 'true' : 'false'}" title="${bookmark.pinned ? '고정 해제' : '상단에 고정'}" aria-label="${bookmark.pinned ? '고정 해제' : '상단에 고정'}" onclick="event.stopPropagation();toggleBookmarkPin('${bookmark.id}')"><i class="fa-solid fa-thumbtack" aria-hidden="true"></i></button>
       <div class="bookmark-thumb-wrap">
