@@ -1,0 +1,10 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+ok(html.includes("const GITHUB_SYNC_FOCUS_LOG_KEY = 'trpg-sync-focus-log';"), '키 이름');
+ok(html.includes('.slice(-20)'), '최근 20건');
+ok(html.includes('!t || e.relatedTarget || !el || !el.tagName || !document.hasFocus() || Date.now() - lastUserMouseKeyAt < 1000'), 'relatedTarget·사용자 입력 1초 제외');
+ok(html.includes('new Error().stack') && html.includes('stageMs'), 'stack·단계 시간');
+['download', 'idle', 'decide', 'persist', 'stringify', 'upload', 'pull', 'refresh'].forEach(s => ok(html.includes("githubSyncMark('" + s + "')"), '단계 ' + s));
+ok(!/GITHUB_SYNC_DATA_KEYS = \[[^\]]*focus/.test(html), '동기화 데이터 제외');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);

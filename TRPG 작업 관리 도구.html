@@ -24769,12 +24769,14 @@ function utf8ToBase64(text) {
   return btoa(binary);
 }
 async function putGitHubSyncPayload(payload, sha = '') {
+  githubSyncMark('stringify');
   const body = {
     message: `자동 동기화 ${new Date(payload.savedAt).toLocaleString('ko-KR')}`,
     content: utf8ToBase64(JSON.stringify(payload)),
     branch: GITHUB_SYNC_BRANCH,
   };
   if (sha) body.sha = sha;
+  githubSyncMark('upload');
   const response = await githubSyncRequest(getGitHubSyncApiUrl(), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -24790,6 +24792,7 @@ function rememberGitHubSync(sha, syncedAt) {
   githubSyncDirtySince = 0;
 }
 async function applyGitHubSyncRemote(remote, refresh = true, options = {}) {
+  githubSyncMark('pull');
   const payload = makeImportPayload(remote.data);
   if (!importPayloadHasData(payload)) {
     throw new Error(remote.size > 1024
@@ -24803,6 +24806,7 @@ async function applyGitHubSyncRemote(remote, refresh = true, options = {}) {
   const saved = await persistNow();
   bootMark('gh-persisted');
   rememberGitHubSync(remote.sha, saved.savedAt);
+  githubSyncMark('refresh');
   if (refresh) refreshAfterImport(!options.keepView);
   bootMark('gh-refreshed');
 }
@@ -24812,6 +24816,7 @@ async function uploadGitHubSyncState(meta, options = {}) {
     const message = `이 기기의 데이터가 비어 있는데 GitHub에는 ${Math.round(meta.size / 1024)}KB의 데이터가 있습니다. 빈 데이터로 덮어쓰지 않았습니다.`;
     if (!options.manual || !confirm(`${message}\n\n정말 빈 데이터로 덮어쓸까요?`)) throw new Error(message);
   }
+  githubSyncMark('persist');
   const payload = await persistNow();
   const sha = await putGitHubSyncPayload(payload, meta.exists ? meta.sha : '');
   rememberGitHubSync(sha, payload.savedAt);
@@ -24823,6 +24828,7 @@ async function runGitHubSync(options = {}) {
   await flushPersist();
   bootMark('gh-sync-start');
   const meta = await getGitHubSyncMeta();
+  githubSyncMark('download');
   bootMark('gh-meta-done');
   if (options.forcePull) {
     if (!meta.exists) throw new Error('GitHub에 저장된 최신본이 없습니다.');
@@ -24844,7 +24850,9 @@ async function runGitHubSync(options = {}) {
   let remote = null;
   if (meta.exists && (!lastSha || remoteChanged)) { remote = await getGitHubSyncRemote(meta); bootMark('gh-download-parse-done'); }
   const remoteSavedAt = Date.parse(remote?.data?.savedAt || remote?.data?.exportedAt || '') || 0;
-  if (options.automatic) await waitForTypingIdle(); // 입력·한글 조합 중에는 화면을 다시 그리지 않도록 입력이 멈춘 뒤에 적용
+  githubSyncMark('idle');
+  if (options.automatic) await waitForTypingIdle();
+  githubSyncMark('decide'); // 입력·한글 조합 중에는 화면을 다시 그리지 않도록 입력이 멈춘 뒤에 적용
   // 받는 동안(백그라운드 시작 동기화 포함) 사용자가 편집했을 수 있으니 변경 여부를 다시 본다 — 편집이 있으면 pull 하지 않고 충돌 규칙을 따른다.
   const localChangedNow = localChanged || githubSyncDirty;
   const decision = getGitHubSyncDecision({
@@ -24874,6 +24882,34 @@ async function runGitHubSync(options = {}) {
   setGitHubSyncStatus(meta.exists ? '최신 상태입니다.' : '동기화할 데이터가 없습니다.', 'success');
   return true;
 }
+// 자동 동기화 중 입력 칸 포커스가 저절로 풀린 원인·화면 멈춤 측정 기록(#268). localStorage 키 GITHUB_SYNC_FOCUS_LOG_KEY 에 최근 20건, 동기화 데이터에는 넣지 않는다.
+// 콘솔 확인: JSON.parse(localStorage.getItem('trpg-sync-focus-log'))
+const GITHUB_SYNC_FOCUS_LOG_KEY = 'trpg-sync-focus-log';
+let githubSyncTrace = null, lastUserMouseKeyAt = 0;
+function githubSyncMark(stage) { // 직전 단계 소요(ms)를 steps 에 더하고 다음 단계로
+  const t = githubSyncTrace; if (!t) return;
+  const now = performance.now();
+  t.steps[t.stage] = (t.steps[t.stage] || 0) + Math.round(now - t.at);
+  t.stage = stage; t.at = now;
+}
+function githubSyncSaveLog(recs) { // 같은 id 는 덮어쓰고 최근 20건만 유지
+  try {
+    const log = JSON.parse(localStorage.getItem(GITHUB_SYNC_FOCUS_LOG_KEY)) || [];
+    const ids = recs.map(r => r.id);
+    localStorage.setItem(GITHUB_SYNC_FOCUS_LOG_KEY, JSON.stringify(log.filter(r => !ids.includes(r.id)).concat(recs).slice(-20)));
+  } catch (e) {}
+}
+if (typeof document !== 'undefined') {
+  ['mousedown', 'keydown', 'touchstart'].forEach(type => document.addEventListener(type, () => { lastUserMouseKeyAt = Date.now(); }, true));
+  document.addEventListener('focusout', e => {
+    const t = githubSyncTrace, el = e.target;
+    if (!t || e.relatedTarget || !el || !el.tagName || !document.hasFocus() || Date.now() - lastUserMouseKeyAt < 1000) return;
+    if (!(el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.isContentEditable)) return;
+    const rec = { id: Date.now() + '-' + t.recs.length, at: new Date().toISOString(), page: typeof currentPage === 'string' ? currentPage : '', el: el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(' ').join('.') : ''), stage: t.stage, stageMs: Math.round(performance.now() - t.at), steps: { ...t.steps }, stack: new Error().stack };
+    t.recs.push(rec);
+    githubSyncSaveLog([rec]);
+  }, true);
+}
 // 자동 동기화 중 입력 커서가 풀리면 끝난 뒤 되돌린다(#267): 시작 시 포커스된 입력 요소·선택 범위를 기억, 끝났을 때 포커스가 body/null 이고 요소가 그대로 있으면 복원. 조합 중이면 건너뜀.
 function githubSyncCaptureFocus() {
   const el = document.activeElement;
@@ -24898,6 +24934,7 @@ function syncGitHubState(options = {}) {
   if (githubSyncTimer) clearTimeout(githubSyncTimer);
   githubSyncTimer = null;
   const focusSnap = options.automatic ? githubSyncCaptureFocus() : null;
+  if (options.automatic) githubSyncTrace = { stage: 'meta', at: performance.now(), steps: {}, recs: [] };
   githubSyncInFlight = runGitHubSync(options).catch(err => {
     console.error('GitHub sync failed:', err);
     setGitHubSyncStatus(err?.message || 'GitHub 동기화에 실패했습니다.', 'error');
@@ -24906,6 +24943,11 @@ function syncGitHubState(options = {}) {
     githubSyncInFlight = null;
     updateGitHubSyncButton();
     githubSyncRestoreFocus(focusSnap);
+    const trace = githubSyncTrace; githubSyncTrace = null;
+    if (trace && trace.recs.length) { // 기록이 있으면 끝난 뒤 최종 단계별 시간을 덧붙인다
+      trace.steps[trace.stage] = (trace.steps[trace.stage] || 0) + Math.round(performance.now() - trace.at);
+      githubSyncSaveLog(trace.recs.map(r => Object.assign(r, { finalSteps: trace.steps })));
+    }
     syncAttachmentsToGitHub(); // 첨부 파일은 JSON 과 별개로 파일별 백그라운드 업로드
   });
   updateGitHubSyncButton();
