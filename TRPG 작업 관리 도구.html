@@ -24,7 +24,9 @@ body {
   display: flex; height: 100vh; height: 100dvh; overflow: hidden;
   background: var(--main-bg); color: var(--text);
   font-size: 14px; line-height: 1.5;
+  font-feature-settings: "halt"; /* 전각 괄호 【】 등의 글꼴 자체 여백 제거(#259). text-spacing-trim:trim-both 는 Chrome 156 에서 미지원이라 halt 사용. 글꼴에 halt 필요 */
 }
+textarea, input, select, button { font-feature-settings: inherit; } /* 입력칸은 UA 기본이 normal 이라 따로 물려받는다(#259) */
 
 /* ─── SIDEBAR ─── */
 #sidebar {
@@ -1614,6 +1616,7 @@ tr.ct-row-end .ct-select:focus {
   overflow-anchor: none;
 }
 .css-macro-preview-body {
+  font-feature-settings: normal; /* 코코포리아·롤20 모양 PREVIEW 는 실제 채팅과 맞춘다(#259) */
   /* 코코포리아 채팅 환경: 본문 폭 328px(padding·border 제외), Roboto 14px/20.02px, pre-wrap (값은 CCFOLIA_PREVIEW) */
   /* 칸이 넓으면 본문 폭 328px(= 328 + 좌우 여백 32 + 테두리 2), 좁으면 칸에 맞춰 줄인다(가로 스크롤 방지). */
   box-sizing: border-box;
