@@ -24874,10 +24874,30 @@ async function runGitHubSync(options = {}) {
   setGitHubSyncStatus(meta.exists ? '최신 상태입니다.' : '동기화할 데이터가 없습니다.', 'success');
   return true;
 }
+// 자동 동기화 중 입력 커서가 풀리면 끝난 뒤 되돌린다(#267): 시작 시 포커스된 입력 요소·선택 범위를 기억, 끝났을 때 포커스가 body/null 이고 요소가 그대로 있으면 복원. 조합 중이면 건너뜀.
+function githubSyncCaptureFocus() {
+  const el = document.activeElement;
+  if (!el || el === document.body) return null;
+  const tag = el.tagName;
+  if (tag === 'TEXTAREA' || tag === 'INPUT') { try { return { el, start: el.selectionStart, end: el.selectionEnd, dir: el.selectionDirection }; } catch (e) { return { el }; } }
+  if (el.isContentEditable) { const sel = window.getSelection(); return { el, range: sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null }; }
+  return null;
+}
+function githubSyncRestoreFocus(snap) {
+  if (!snap || !snap.el.isConnected || imeComposing) return;
+  const cur = document.activeElement;
+  if (cur && cur !== document.body) return; // 사용자가 다른 곳으로 옮겼으면 그대로 둔다
+  snap.el.focus({ preventScroll: true });
+  try {
+    if (snap.range && snap.range.startContainer.isConnected) { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(snap.range); }
+    else if (snap.start != null) snap.el.setSelectionRange(snap.start, snap.end, snap.dir || 'none');
+  } catch (e) {}
+}
 function syncGitHubState(options = {}) {
   if (githubSyncInFlight) return githubSyncInFlight;
   if (githubSyncTimer) clearTimeout(githubSyncTimer);
   githubSyncTimer = null;
+  const focusSnap = options.automatic ? githubSyncCaptureFocus() : null;
   githubSyncInFlight = runGitHubSync(options).catch(err => {
     console.error('GitHub sync failed:', err);
     setGitHubSyncStatus(err?.message || 'GitHub 동기화에 실패했습니다.', 'error');
@@ -24885,6 +24905,7 @@ function syncGitHubState(options = {}) {
   }).finally(() => {
     githubSyncInFlight = null;
     updateGitHubSyncButton();
+    githubSyncRestoreFocus(focusSnap);
     syncAttachmentsToGitHub(); // 첨부 파일은 JSON 과 별개로 파일별 백그라운드 업로드
   });
   updateGitHubSyncButton();

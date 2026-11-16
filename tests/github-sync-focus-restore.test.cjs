@@ -1,0 +1,10 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+const sync = html.slice(html.indexOf('function githubSyncCaptureFocus'), html.indexOf('async function saveGitHubSyncSettings'));
+ok(sync.includes('options.automatic ? githubSyncCaptureFocus() : null'), '자동 동기화에서만 포커스 기억');
+ok(/\.finally\(\(\) => \{[\s\S]*githubSyncRestoreFocus\(focusSnap\)/.test(sync), 'finally 에서 복원');
+ok(sync.includes('imeComposing') && sync.includes('!snap.el.isConnected'), '조합 중·요소 사라짐은 복원 안 함');
+ok(sync.includes('cur !== document.body'), '사용자가 옮긴 포커스는 유지');
+ok(sync.includes('preventScroll: true'), '스크롤 유지');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);
