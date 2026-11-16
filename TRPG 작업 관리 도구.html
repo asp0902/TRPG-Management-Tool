@@ -2185,6 +2185,10 @@ tr.ct-row-end .ct-select:focus {
 .music-modal-backdrop { position: fixed; inset: 0; z-index: 12500; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
 .music-modal { width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow-y: auto; background: #fff; border-radius: 14px; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; color: #333; }
 .music-modal-head { display: flex; align-items: center; gap: 8px; }
+#music-card-menu { min-width: 0; width: max-content; } /* 수정하기·삭제하기 메뉴 가로 크기 줄임(#307) */
+#music-card-menu .ds-ctx-item { padding: 6px 12px; }
+.music-add-file { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #333; background: #f6f6f6; border-radius: 6px; padding: 5px 8px; }
+.music-add-file > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .music-yt-status { font-size: 11.5px; color: #666; display: flex; align-items: center; gap: 6px; }
 .music-yt-status[data-state="loading"]::before { content: ''; width: 10px; height: 10px; border: 2px solid #ccc; border-top-color: #111; border-radius: 50%; animation: music-spin 0.8s linear infinite; }
 .music-yt-status[data-state="done"] { color: #1a7f37; }
@@ -35780,8 +35784,8 @@ async function musicAddFiles(fileList, link) { // link: 곡 추가 창에 입력
   const target = state.musicFolders.some(folder => folder.id === musicView.folder) ? musicView.folder : '';
   for (const file of files) {
     const tags = await musicReadTags(file);
-    const yt = link && file === files[0] ? link : null;
-    const track = normalizeMusicTrack({ kind: yt ? 'youtube' : 'file', attached: !!yt, youtubeId: yt ? yt.id : '', url: yt ? 'https://www.youtube.com/watch?v=' + yt.id : '', thumbnail: yt ? (yt.thumb || 'https://i.ytimg.com/vi/' + yt.id + '/hqdefault.jpg') : '', title: (yt && yt.title) || tags.title || file.name.replace(/\.[^.]+$/, ''), artist: (yt && yt.artist) || tags.artist, album: (yt && yt.album) || tags.album, fileName: file.name, size: file.size, folderId: target, addedAt: Date.now(), duration: await musicAudioDuration(file) });
+    const yt = link && file === files[0] ? link : null; // 첫 파일에 창 입력값 적용(유튜브 주소가 있으면 「유튜브 + 첨부 파일」 카드)
+    const track = normalizeMusicTrack({ kind: yt && yt.id ? 'youtube' : 'file', attached: !!(yt && yt.id), youtubeId: yt && yt.id ? yt.id : '', url: yt && yt.id ? 'https://www.youtube.com/watch?v=' + yt.id : '', thumbnail: yt && yt.id ? (yt.thumb || 'https://i.ytimg.com/vi/' + yt.id + '/hqdefault.jpg') : '', title: (yt && yt.title) || tags.title || file.name.replace(/\.[^.]+$/, ''), artist: (yt && yt.artist) || tags.artist, album: (yt && yt.album) || tags.album, fileName: file.name, size: file.size, folderId: target, addedAt: Date.now(), duration: await musicAudioDuration(file) });
     try {
       await musicBlobPut(track.id, file);
       if (tags.cover) { const cover = new Blob([tags.cover.bytes], { type: tags.cover.mime }); await musicBlobPut('cover:' + track.id, cover); musicCoverUrls[track.id] = URL.createObjectURL(cover); }
@@ -35793,18 +35797,40 @@ async function musicAddFiles(fileList, link) { // link: 곡 추가 창에 입력
   persist(); renderMusicPage();
   musicSyncUploads(); // 음원 업로드(#296·#297)
 }
-function musicPickFiles(link, closeModal) {
+function musicPickFiles() {
   const input = document.createElement('input');
   input.type = 'file'; input.multiple = true; input.accept = MUSIC_AUDIO_EXTS.map(ext => '.' + ext).join(',');
-  input.onchange = () => { if (closeModal) musicCloseModal(); musicAddFiles(input.files, link); };
+  input.onchange = () => musicAddFiles(input.files);
   input.click();
 }
-// 곡 추가 창의 「파일 선택」: 유튜브 주소가 입력돼 있으면 그 정보(주소·제목·아티스트·앨범·썸네일)를 첫 파일 카드에 합친다. 파일 선택을 취소하면 창은 그대로 남는다.
+// 곡 추가 창의 「파일 선택」(#307): 파일을 곧바로 등록하지 않고 창에 담아 이름·크기를 보여 주고, 「추가」를 눌러야 등록한다. 빈 제목·아티스트·앨범은 파일 태그로 채운다.
+let musicAddPending = [];
 function musicPickFileFromModal() {
-  const val = id => (document.getElementById(id)?.value || '').trim(), yid = musicParseYoutubeId(val('music-yt-url')), thumb = document.getElementById('music-yt-thumb');
-  const link = yid ? { id: yid, title: val('music-yt-title'), artist: val('music-yt-artist'), album: val('music-yt-album'), thumb: thumb && !thumb.hidden && thumb.dataset.id === yid ? thumb.getAttribute('src') : '' } : null;
-  musicPickFiles(link, true);
+  const input = document.createElement('input');
+  input.type = 'file'; input.multiple = true; input.accept = MUSIC_AUDIO_EXTS.map(ext => '.' + ext).join(',');
+  input.onchange = () => musicAddSetFiles([...input.files]);
+  input.click();
 }
+async function musicAddSetFiles(list) {
+  const files = list.filter(musicIsAudioFile);
+  const error = document.getElementById('music-yt-error');
+  if (!files.length) { if (list.length && error) error.textContent = '지원하는 음원 파일(' + MUSIC_AUDIO_EXTS.join(', ') + ')이 아닙니다.'; return; }
+  musicAddPending = files;
+  if (error) error.textContent = '';
+  musicAddShowFiles();
+  try { // 입력칸이 비어 있으면 첫 파일의 태그로 채운다
+    const tags = await musicReadTags(files[0]), fill = (id, value) => { const el = document.getElementById(id); if (el && !el.value && value) el.value = value; };
+    fill('music-yt-title', tags.title || files[0].name.replace(/\.[^.]+$/, '')); fill('music-yt-artist', tags.artist); fill('music-yt-album', tags.album);
+  } catch (e) { /* 태그를 못 읽어도 직접 입력 */ }
+}
+function musicAddShowFiles() {
+  const row = document.getElementById('music-add-file'), name = document.getElementById('music-add-file-name');
+  if (!row || !name) return;
+  row.hidden = !musicAddPending.length;
+  const f = musicAddPending[0];
+  name.textContent = f ? f.name + ' (' + (f.size / 1048576).toFixed(1) + ' MB)' + (musicAddPending.length > 1 ? ' 외 ' + (musicAddPending.length - 1) + '개' : '') : '';
+}
+function musicAddClearFile() { musicAddPending = []; musicAddShowFiles(); }
 // ── 유튜브 트랙에 PC 음원 파일 첨부(#257): Blob 은 MUSIC_DB 의 트랙 id 키, 메타데이터에는 첨부 여부·파일 이름·길이만 ──
 async function musicAttachFile(id, file) {
   const track = state.musicTracks.find(item => item.id === id);
@@ -35891,9 +35917,9 @@ function musicYtKey(event) {
   musicFetchYoutube(true);
 }
 function openMusicYoutubeModal() {
-  musicYtLastId = '';
+  musicYtLastId = ''; musicAddPending = [];
   musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">곡 추가</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
-    + '<button type="button" class="music-primary" onclick="musicPickFileFromModal()">파일 선택</button><div class="music-or"></div>'
+    + '<button type="button" class="music-primary" onclick="musicPickFileFromModal()">파일 선택</button><div class="music-add-file" id="music-add-file" hidden><span id="music-add-file-name"></span><button type="button" onclick="musicAddClearFile()">제거</button></div><div class="music-or"></div>'
     + '<label class="music-field">URL<input id="music-yt-url" type="text" spellcheck="false" onchange="musicFetchYoutube(true)" onkeydown="musicYtKey(event)"></label>'
     + '<img id="music-yt-thumb" class="music-yt-thumb" alt="" hidden onerror="this.hidden=true">'
     + '<label class="music-field">제목<input id="music-yt-title" type="text"></label>'
@@ -35962,7 +35988,14 @@ async function musicFetchAlbumInfo(id) {
 }
 function musicYtThumbFor(id) { const t = document.getElementById('music-yt-thumb'); return t && !t.hidden && t.dataset.id === id && t.getAttribute('src') ? t.getAttribute('src') : 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg'; }
 function musicAddYoutube() {
-  const id = musicParseYoutubeId(document.getElementById('music-yt-url').value);
+  const val = el => (document.getElementById(el)?.value || '').trim(), id = musicParseYoutubeId(val('music-yt-url'));
+  if (musicAddPending.length) { // 파일이 담겨 있으면: 첫 파일에 주소(있으면)·제목·아티스트·앨범을 합쳐 등록
+    if (val('music-yt-url') && !id) { document.getElementById('music-yt-error').textContent = '유튜브 링크를 알아볼 수 없습니다.'; return; }
+    const thumb = document.getElementById('music-yt-thumb'), files = musicAddPending;
+    const link = { id, title: val('music-yt-title'), artist: val('music-yt-artist'), album: val('music-yt-album'), thumb: id && thumb && !thumb.hidden && thumb.dataset.id === id ? thumb.getAttribute('src') : '' };
+    musicAddPending = []; musicCloseModal(); musicAddFiles(files, link);
+    return;
+  }
   if (!id) { document.getElementById('music-yt-error').textContent = '유튜브 링크를 알아볼 수 없습니다.'; return; }
   const target = state.musicFolders.some(folder => folder.id === musicView.folder) ? musicView.folder : '';
   const added = normalizeMusicTrack({ kind: 'youtube', youtubeId: id, url: 'https://www.youtube.com/watch?v=' + id, thumbnail: musicYtThumbFor(id), title: document.getElementById('music-yt-title').value.trim() || '유튜브 ' + id, artist: document.getElementById('music-yt-artist').value.trim(), album: document.getElementById('music-yt-album').value.trim(), folderId: target, addedAt: Date.now() });
