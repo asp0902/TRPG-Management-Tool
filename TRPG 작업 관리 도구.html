@@ -2201,7 +2201,7 @@ tr.ct-row-end .ct-select:focus {
 .music-modal-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .music-field { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: #666; font-weight: 700; }
 .music-field input, .music-field textarea, .music-field select { border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12.5px; font-weight: 400; color: #222; }
-.music-field textarea { min-height: 60px; resize: vertical; }
+.music-field textarea { min-height: 60px; resize: none; overflow-y: hidden; }
 .music-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .music-fcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .music-fcol-tags { min-height: 0; }
@@ -35716,7 +35716,7 @@ async function openMusicDetail(id, source) {
     + (!track.attached ? '<button type="button" onclick="musicAttachPick(\'' + id + '\')">파일 첨부</button><span class="music-hint">또는 이 창·카드 위로 음원 파일을 끌어 놓기</span>' : '') + '</div>';
   const folderOpts = '<option value="">분류 없음</option>' + state.musicFolders.map(folder => '<option value="' + folder.id + '"' + (folder.id === track.folderId ? ' selected' : '') + '>' + esc(folder.name) + '</option>').join('');
   const tagsField = '<div class="music-field">태그' + tagEditorHtml('data-k="tags" onchange="musicEditField(' + String.fromCharCode(39) + id + String.fromCharCode(39) + ',this)"', track.tags, '') + '</div>';
-  const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)"' + ' value="' + esc(track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
+  const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" oninput="musicAutoGrow(this)" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)"' + ' value="' + esc(track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
   musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + attachRow
     + (track.kind === 'file' && !url ? '<button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button>' : '')
@@ -35724,6 +35724,7 @@ async function openMusicDetail(id, source) {
     + '<label class="music-field" style="grid-column:1/-1">폴더 <select onchange="musicEditField(\'' + id + '\',this,\'folderId\')">' + folderOpts + '</select></label>' + field('notes', '메모', 'textarea') + '</div>'
     + '<div class="music-modal-foot"><span class="music-hint">← → 이전·다음 곡</span><button type="button" class="music-danger" onclick="deleteMusicTrack(\'' + id + '\')">삭제</button></div>');
   musicPlaying = { id, url };
+  document.querySelectorAll('#music-modal-backdrop textarea[data-k]').forEach(musicAutoGrow); // 메모 칸 높이를 글 길이에 맞춘다(#312)
   document.querySelectorAll('#music-modal-backdrop .tag-editor').forEach(tagEditorRender);
   const box = document.querySelector('#music-modal-backdrop .music-modal');
   if (box && track.kind === 'youtube') { // 이 창 어디에 놓아도 이 곡에 파일 첨부(#299)
@@ -35732,6 +35733,7 @@ async function openMusicDetail(id, source) {
     box.addEventListener('drop', event => musicCardDrop(event, id));
   }
 }
+function musicAutoGrow(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight + el.offsetHeight - el.clientHeight) + 'px'; } // 테두리 두께까지 더해 스크롤이 생기지 않게 // 글 길이에 따라 입력칸 높이 자동 조절(#312)
 function musicEditField(id, el, key) {
   const track = state.musicTracks.find(item => item.id === id);
   if (!track) return;
