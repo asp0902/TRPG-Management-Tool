@@ -35747,20 +35747,17 @@ function openMusicYoutubeModal() {
     + '<label class="music-field">제목<input id="music-yt-title" type="text"></label>'
     + '<label class="music-field">아티스트(채널)<input id="music-yt-artist" type="text"></label>'
     + '<label class="music-field">앨범<input id="music-yt-album" type="text"></label>'
-    + '<div class="music-hint" id="music-yt-album-status"></div>'
-    + '<div class="music-hint" id="music-yt-status"></div>'
     + '<div class="music-error" id="music-yt-error"></div>'
     + '<div class="music-modal-foot"><button type="button" onclick="musicFetchYoutube()">제목 가져오기</button><button type="button" class="music-primary" onclick="musicAddYoutube()">추가</button></div>');
   document.getElementById('music-yt-url').focus();
 }
 async function musicFetchYoutube(auto) {
-  const url = document.getElementById('music-yt-url').value, id = musicParseYoutubeId(url), status = document.getElementById('music-yt-status'), thumb = document.getElementById('music-yt-thumb');
+  const url = document.getElementById('music-yt-url').value, id = musicParseYoutubeId(url), thumb = document.getElementById('music-yt-thumb');
   if (!id) { thumb.hidden = true; document.getElementById('music-yt-error').textContent = '유튜브 링크를 알아볼 수 없습니다.'; return; }
   if (auto && id === musicYtLastId) return;
   musicYtLastId = id;
   thumb.dataset.id = id; thumb.src = 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg'; thumb.hidden = false; // oEmbed 가 실패해도 id 기반 썸네일은 보여 준다
   document.getElementById('music-yt-error').textContent = '';
-  status.textContent = '조회 중...';
   try {
     const res = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent('https://www.youtube.com/watch?v=' + id));
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -35769,8 +35766,7 @@ async function musicFetchYoutube(auto) {
     if (!document.getElementById('music-yt-title').value) document.getElementById('music-yt-title').value = data.title || '';
     const artistEl = document.getElementById('music-yt-artist');
     if (!artistEl.value) { artistEl.value = data.author_name || ''; artistEl.dataset.auto = artistEl.value; } // 자동값 기억: 사용자가 고치면 달라져 덮어쓰지 않는다(#283)
-    status.textContent = '제목을 가져왔습니다.';
-  } catch (e) { status.textContent = '제목을 가져오지 못했습니다. 직접 입력해 주세요. (' + (e?.message || e) + ')'; }
+  } catch (e) { /* 제목을 못 가져오면 직접 입력(상태 문구 없음, #291) */ }
   musicFetchAlbumInfo(id); // 백그라운드(기다리지 않음)
 }
 // jina 본문(markdown)의 「## Music」 구간: 첫 「# 」=노래, 다음 「#### 」=아티스트, 그다음 일반 텍스트 줄=앨범. 실패하면 빈 값(#283)
@@ -35785,9 +35781,7 @@ function musicParseJinaMusic(content) {
   return out;
 }
 async function musicFetchAlbumInfo(id) {
-  const st = document.getElementById('music-yt-album-status');
-  if (!st) return;
-  st.textContent = '앨범 정보 조회 중… (URL이 외부 조회 서비스 jina 로 전송됨)';
+  if (!document.getElementById('music-yt-url')) return;
   const timer = bookmarkTimeoutSignal(null, BOOKMARK_META_SERVICE_TIMEOUT_MS[0]);
   let music = null;
   try {
@@ -35798,13 +35792,10 @@ async function musicFetchAlbumInfo(id) {
   } catch (e) { music = null; } finally { timer.clear(); }
   const urlEl = document.getElementById('music-yt-url');
   if (!urlEl || musicParseYoutubeId(urlEl.value) !== id) return; // 모달이 닫혔거나 URL 이 바뀐 뒤 늦게 온 응답은 무시
-  const stNow = document.getElementById('music-yt-album-status');
-  if (!music) { stNow.textContent = '앨범 정보를 가져오지 못했습니다. 직접 입력해 주세요.'; return; }
-  if (!music.album && !music.artist) { stNow.textContent = '등록된 앨범 정보가 없습니다.'; return; }
+  if (!music || (!music.album && !music.artist)) return; // 실패·정보 없음은 조용히(직접 입력)
   const albumEl = document.getElementById('music-yt-album'), artistEl = document.getElementById('music-yt-artist');
   if (music.album && !albumEl.value) albumEl.value = music.album;
   if (music.artist && (!artistEl.value || artistEl.value === artistEl.dataset.auto)) { artistEl.value = music.artist; artistEl.dataset.auto = music.artist; }
-  stNow.textContent = '앨범 정보를 가져왔습니다.';
 }
 function musicYtThumbFor(id) { const t = document.getElementById('music-yt-thumb'); return t && !t.hidden && t.dataset.id === id && t.getAttribute('src') ? t.getAttribute('src') : 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg'; }
 function musicAddYoutube() {

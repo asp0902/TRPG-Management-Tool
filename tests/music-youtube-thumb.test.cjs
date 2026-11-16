@@ -10,7 +10,7 @@ const els = {};
 const mkEl = () => ({ value: '', textContent: '', hidden: true, dataset: {}, src: '', attrs: {}, setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return k === 'src' ? this.src : this.attrs[k]; } });
 ['music-yt-url', 'music-yt-title', 'music-yt-artist', 'music-yt-status', 'music-yt-error', 'music-yt-thumb'].forEach(id => els[id] = mkEl());
 let calls = 0, oembedOk = true;
-const ctx = { document: { getElementById: id => els[id] }, encodeURIComponent, fetch: async () => { calls++; if (!oembedOk) throw new Error('mock fail'); return { ok: true, json: async () => ({ title: 'T', author_name: 'A', thumbnail_url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/mock.jpg' }) }; }, console };
+const ctx = { BOOKMARK_META_JINA_URL: 'https://r.jina.ai/', BOOKMARK_META_SERVICE_TIMEOUT_MS: [25000], bookmarkTimeoutSignal: () => ({ signal: undefined, clear() {} }), document: { getElementById: id => els[id] }, encodeURIComponent, fetch: async url => { if (!/oembed/.test(url)) return { ok: false, status: 500, json: async () => ({}) }; calls++; if (!oembedOk) throw new Error('mock fail'); return { ok: true, json: async () => ({ title: 'T', author_name: 'A', thumbnail_url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/mock.jpg' }) }; }, console };
 vm.createContext(ctx); vm.runInContext(code + ';this.f={musicFetchYoutube,musicYtKey,musicYtThumbFor,reset(){musicYtLastId=""}}', ctx);
 (async () => {
   const f = ctx.f;
