@@ -10,9 +10,9 @@ const code = cut('function normalizeCssMacroTags', 'function formatCssMacroTagsT
 const chips = [];
 const mkChip = t => ({ dataset: { t }, on: false, classList: { toggle(c, v) { this.owner.on = !!v; }, owner: null } });
 const tagInput = { value: '' };
-let persisted = 0, rendered = 0;
+let persisted = 0, rendered = 0, refreshed = 0;
 const ctx = { esc: x => String(x), state: { musicTracks: [{ id: 'm1', tags: ['내태그'] }] }, persist: () => persisted++, renderMusicPage: () => rendered++,
-  document: { querySelector: () => tagInput, querySelectorAll: () => chips }, tagEditorRefresh() {}, console, String, localStorage: { removeItem() {} } };
+  document: { querySelector: () => tagInput, querySelectorAll: () => chips }, tagEditorRefresh() {}, musicRefreshExistingTags() { refreshed++; }, console, String, localStorage: { removeItem() {} } };
 vm.createContext(ctx); vm.runInContext(code + ';this.f={musicTagKey,musicToggleTag,normalizeCssMacroTags}', ctx);
 const f = ctx.f, nt = f.normalizeCssMacroTags;
 const track = ctx.state.musicTracks[0];
@@ -20,7 +20,7 @@ ok(f.musicTagKey('긴장감 있는') === f.musicTagKey('긴장감있는') && f.m
 chips.push(...['경쾌한', '긴장감 있는', '내태그'].map(t => { const c = mkChip(t); c.classList.owner = c; return c; }));
 f.musicToggleTag('m1', '경쾌한');
 ok(JSON.stringify(track.tags) === JSON.stringify(['내태그', '경쾌한']) && tagInput.value === '#내태그 #경쾌한', '칩 클릭 → 태그 추가·입력칸 갱신');
-ok(chips.find(c => c.dataset.t === '경쾌한').on === true && chips.find(c => c.dataset.t === '긴장감 있는').on === false, '칩 강조 갱신');
+ok(refreshed >= 1, '태그를 붙이거나 빼면 기존 태그 목록을 다시 그림(#316)');
 ok(persisted === 1 && rendered === 1, 'persist·카드 갱신');
 f.musicToggleTag('m1', '경쾌한');
 ok(JSON.stringify(track.tags) === JSON.stringify(['내태그']) && tagInput.value === '#내태그', '다시 클릭 → 해제, 사용자 태그 유지');

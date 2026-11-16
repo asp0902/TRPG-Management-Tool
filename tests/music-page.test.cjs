@@ -25,7 +25,7 @@ const yt = ctx.html({ kind: 'youtube', youtubeId: 'dQw4w9WgXcQ' });
 assert.ok(yt.includes('src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1'));
 assert.ok(yt.includes('&loop=1&playlist=dQw4w9WgXcQ"'), '유튜브 반복 재생(#294): loop=1 + playlist=<id>');
 assert.ok(ctx.html({ kind: 'file' }, 'blob:x').includes('<audio'));
-assert.ok(ctx.html({ kind: 'file' }, 'blob:x').includes('<audio class="music-audio" controls autoplay loop src='), '파일 반복 재생(#294): audio loop');
+assert.ok(ctx.html({ kind: 'file' }, 'blob:x').includes('<audio class="music-audio" autoplay loop src='), '파일 반복 재생(#294): audio loop(커스텀 컨트롤, #316)');
 assert.ok(ctx.html({ kind: 'file' }, '').includes('이 기기에 파일 없음'));
 
 // ID3v2.3: TIT2(utf-16 BOM) / TPE1(latin1) / TALB(utf-8, v2.3 은 enc 3 없음이지만 디코더 확인) / APIC

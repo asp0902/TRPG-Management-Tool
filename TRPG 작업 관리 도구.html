@@ -2216,7 +2216,14 @@ tr.ct-row-end .ct-select:focus {
 .music-fields .music-field:last-child { grid-column: 1 / -1; }
 .music-player { background: #000; border-radius: 10px; overflow: hidden; display: flex; align-items: center; justify-content: center; min-height: 54px; }
 .music-player .music-yt { width: 100%; aspect-ratio: 16 / 9; border: 0; }
-.music-audio { width: 100%; color-scheme: dark; background: #000; } /* 파일 재생 플레이어를 검게(#314) */
+.music-audio { display: none; }
+.music-audio-player { width: 100%; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #000; color: #fff; font-size: 12px; }
+.music-modal .music-audio-player button { background: transparent; color: #fff; border: 0; padding: 4px 6px; font-size: 14px; cursor: pointer; min-width: 22px; }
+.music-ap-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.music-ap-seek, .music-ap-vol { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: #555; outline: none; margin: 0; cursor: pointer; }
+.music-ap-seek { flex: 1; min-width: 60px; } .music-ap-vol { width: 70px; }
+.music-ap-seek::-webkit-slider-thumb, .music-ap-vol::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; }
+.music-ap-seek::-moz-range-thumb, .music-ap-vol::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; }
 body.file-dragging iframe { pointer-events: none; } /* 파일을 끄는 동안 iframe 이 드롭을 가로채지 않게(#299) */
 .music-modal.drop-target { outline: 2px dashed #111; outline-offset: -4px; }
 .music-card-file { position: absolute; left: 4px; bottom: 4px; background: rgba(255,255,255,0.9); color: #111; font-size: 9px; font-style: normal; font-weight: 800; padding: 1px 5px; border-radius: 4px; }
@@ -35324,7 +35331,30 @@ function musicPlayerHtml(track, blobUrl) {
   if (track.kind === 'youtube' && !blobUrl) {
     return '<iframe class="music-yt" src="https://www.youtube.com/embed/' + encodeURIComponent(track.youtubeId) + '?autoplay=1&rel=0&loop=1&playlist=' + encodeURIComponent(track.youtubeId) + '" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>';
   }
-  return blobUrl ? '<audio class="music-audio" controls autoplay loop src="' + esc(blobUrl) + '"></audio>' : '<div class="music-nofile">이 기기에 파일 없음</div>';
+  return blobUrl ? '<div class="music-audio-player"><audio class="music-audio" autoplay loop src="' + esc(blobUrl) + '"></audio>'
+    + '<button type="button" class="music-ap-play" title="재생/일시정지" aria-label="재생/일시정지">❚❚</button><span class="music-ap-time">0:00 / 0:00</span>'
+    + '<input type="range" class="music-ap-seek" min="0" max="1000" value="0" aria-label="재생 위치">'
+    + '<button type="button" class="music-ap-mute" title="음소거" aria-label="음소거">🔊</button><input type="range" class="music-ap-vol" min="0" max="100" value="100" aria-label="음량"></div>' : '<div class="music-nofile">이 기기에 파일 없음</div>';
+}
+// 파일 재생 플레이어(검정 배경, #316): 기본 오디오 컨트롤 대신 재생/일시정지·시간·재생 위치·음소거·음량을 직접 그린다.
+function musicFmtClock(sec) { sec = Math.max(0, Math.floor(Number(sec) || 0)); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
+function musicAudioInit(root) {
+  const audio = root && root.querySelector('audio.music-audio');
+  if (!audio) return;
+  const play = root.querySelector('.music-ap-play'), time = root.querySelector('.music-ap-time'), seek = root.querySelector('.music-ap-seek'), mute = root.querySelector('.music-ap-mute'), vol = root.querySelector('.music-ap-vol');
+  const sync = () => {
+    time.textContent = musicFmtClock(audio.currentTime) + ' / ' + musicFmtClock(audio.duration);
+    if (!seek.dataset.drag) seek.value = audio.duration ? Math.round(audio.currentTime / audio.duration * 1000) : 0;
+    play.textContent = audio.paused ? '▶' : '❚❚'; mute.textContent = audio.muted || audio.volume === 0 ? '🔇' : '🔊';
+  };
+  ['timeupdate', 'loadedmetadata', 'play', 'pause', 'volumechange', 'durationchange'].forEach(type => audio.addEventListener(type, sync));
+  play.addEventListener('click', () => { if (audio.paused) audio.play().catch(() => {}); else audio.pause(); });
+  seek.addEventListener('pointerdown', () => { seek.dataset.drag = '1'; });
+  seek.addEventListener('input', () => { if (audio.duration) audio.currentTime = seek.value / 1000 * audio.duration; });
+  ['pointerup', 'change'].forEach(type => seek.addEventListener(type, () => { delete seek.dataset.drag; }));
+  mute.addEventListener('click', () => { audio.muted = !audio.muted; });
+  vol.addEventListener('input', () => { audio.volume = vol.value / 100; audio.muted = false; });
+  sync();
 }
 // ID3v2(mp3) 태그 읽기: 제목 TIT2, 아티스트 TPE1, 앨범 TALB, 표지 APIC. bytes = 파일 앞부분(헤더 포함). 다른 형식·태그 없음은 빈 값.
 function musicParseId3(bytes, TD) {
@@ -35542,8 +35572,7 @@ function musicToggleTag(id, tag) {
   track.tags = track.tags.some(t => musicTagKey(t) === key) ? track.tags.filter(t => musicTagKey(t) !== key) : normalizeCssMacroTags(track.tags.concat(tag)); // 해제는 공백 유무와 관계없이 둘 다 제거
   const input = document.querySelector('#music-modal-backdrop input[data-k="tags"]');
   if (input) { input.value = track.tags.map(t => '#' + t).join(' '); tagEditorRefresh(input); }
-  const on = new Set(track.tags.map(musicTagKey));
-  document.querySelectorAll('#music-modal-backdrop .music-tag-chip').forEach(chip => chip.classList.toggle('on', on.has(musicTagKey(chip.dataset.t))));
+  musicRefreshExistingTags(track); // 붙인 태그는 목록에서 빠지고, 뺀 태그는 다시 목록에 나타난다
   persist(); renderMusicPage();
 }
 // 앱 시작 시 예전 AI 태그 추천(삭제됨, #290)이 남긴 localStorage 값을 한 번 지운다.
@@ -35711,13 +35740,13 @@ async function musicDownloadTrack(track) {
   } catch (err) { showToast('음원을 받지 못했습니다: ' + (err?.message || err)); return null; }
 }
 // 이미 만들어진 태그(모든 곡의 태그 합집합)를 태그 칸 아래에 나열한다. 칩을 누르면 이 곡에 태그 추가/해제(#299 후속)
-function musicExistingTagsHtml(track) {
-  const seen = new Map();
-  state.musicTracks.forEach(t => (t.tags || []).forEach(tag => { const key = musicTagKey(tag); if (key && !seen.has(key)) seen.set(key, tag); }));
-  const on = new Set(track.tags.map(musicTagKey));
-  const q = String.fromCharCode(39);
-  return '<div class="music-tag-list">' + [...seen.values()].sort((a, b) => a.localeCompare(b, 'ko')).map(tag => '<button type="button" class="music-tag-chip' + (on.has(musicTagKey(tag)) ? ' on' : '') + '" data-t="' + esc(tag) + '" onclick="musicToggleTag(' + q + track.id + q + ',this.dataset.t)">' + esc(tag) + '</button>').join('') + '</div>';
+function musicExistingTagsInner(track) { // 다른 곡에 이미 만들어져 있고 이 곡에는 아직 없는 태그(이 곡에 붙은 태그는 입력칸의 칩으로 이미 보인다)
+  const seen = new Map(), on = new Set(track.tags.map(musicTagKey)), q = String.fromCharCode(39);
+  state.musicTracks.forEach(t => (t.tags || []).forEach(tag => { const key = musicTagKey(tag); if (key && !on.has(key) && !seen.has(key)) seen.set(key, tag); }));
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, 'ko')).map(tag => '<button type="button" class="music-tag-chip" data-t="' + esc(tag) + '" onclick="musicToggleTag(' + q + track.id + q + ',this.dataset.t)">' + esc(tag) + '</button>').join('');
 }
+function musicExistingTagsHtml(track) { return '<div class="music-tag-list">' + musicExistingTagsInner(track) + '</div>'; }
+function musicRefreshExistingTags(track) { const box = document.querySelector('#music-modal-backdrop .music-tag-list'); if (box && track) box.innerHTML = musicExistingTagsInner(track); }
 async function openMusicDetail(id, source) {
   musicDebug('openMusicDetail', id + ' ' + (source || ''));
   const track = state.musicTracks.find(item => item.id === id);
@@ -35745,6 +35774,7 @@ async function openMusicDetail(id, source) {
     + '<label class="music-field" style="grid-column:1/-1">폴더 <select onchange="musicEditField(\'' + id + '\',this,\'folderId\')">' + folderOpts + '</select></label>' + field('notes', '메모', 'textarea') + '</div>'
     + '<div class="music-modal-foot"><span class="music-hint">← → 이전·다음 곡</span><button type="button" class="music-danger" onclick="deleteMusicTrack(\'' + id + '\')">삭제</button></div>');
   musicPlaying = { id, url };
+  musicAudioInit(document.querySelector('#music-modal-backdrop .music-audio-player'));
   document.querySelectorAll('#music-modal-backdrop textarea[data-k]').forEach(musicAutoGrow); // 메모 칸 높이를 글 길이에 맞춘다(#312)
   document.querySelectorAll('#music-modal-backdrop .tag-editor').forEach(tagEditorRender);
   const box = document.querySelector('#music-modal-backdrop .music-modal');
@@ -35761,6 +35791,7 @@ function musicEditField(id, el, key) {
   key = key || el.dataset.k;
   track[key] = key === 'tags' ? normalizeCssMacroTags(el.value) : el.value;
   if (key === 'title') document.querySelector('#music-modal-backdrop .music-modal-title').textContent = musicTrackTitle(track);
+  if (key === 'tags') musicRefreshExistingTags(track);
   persist(); renderMusicPage();
 }
 // 카드 우클릭 메뉴(#306): 수정하기(상세 창 열기) / 삭제하기(확인 후 삭제)
