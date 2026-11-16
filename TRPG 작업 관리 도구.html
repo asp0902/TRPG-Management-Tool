@@ -2185,6 +2185,8 @@ tr.ct-row-end .ct-select:focus {
 .music-card-yt { position: absolute; right: 4px; bottom: 4px; background: rgba(0,0,0,0.7); color: #fff; font-size: 9px; font-style: normal; padding: 1px 5px; border-radius: 4px; }
 .music-card-body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .music-card-title { font-weight: 800; font-size: 12.5px; white-space: normal; overflow-wrap: anywhere; } /* 제목을 끝까지 보여 준다 */
+.music-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.music-card-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; background: #f3f3f3; border: 1px solid #e3e3e3; color: #555; font-size: 10.5px; font-weight: 700; max-width: 100%; overflow-wrap: anywhere; }
 .music-card-sub { font-size: 11.5px; color: #777; min-height: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .music-card-meta { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #999; justify-content: space-between; }
 .music-card-meta .music-dot { margin-right: -2px; }
@@ -35497,6 +35499,7 @@ function renderMusicCard(track) {
     + '<div class="music-card-cover">' + (cover ? '<img src="' + esc(cover) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span>♪</span>') + (track.kind === 'youtube' ? '<i class="music-card-yt">YouTube</i>' : '') + (track.kind === 'youtube' && track.attached ? '<i class="music-card-file">파일</i>' : '') + '</div>'
     + '<div class="music-card-body"><div class="music-card-title">' + esc(musicTrackTitle(track)) + '</div>'
     + '<div class="music-card-sub">' + esc(track.artist || '') + '</div>'
+    + ((track.tags || []).length ? '<div class="music-card-tags">' + track.tags.map(tag => '<span class="music-card-tag" style="' + esc(musicTagChipStyle(tag)) + '">' + esc(tag) + '</span>').join('') + '</div>' : '') // 태그 칩(분류 색 적용, #324)
     + '<div class="music-card-meta">' + (folder ? '<span class="music-dot" style="background:' + folder.color + '"></span>' + esc(folder.name) : '') + '<span>' + musicFmtTime(track.duration) + '</span></div>'
     + (missing ? '<div class="music-card-missing">이 기기에 파일 없음 <button type="button" onclick="event.stopPropagation();musicReupload(\'' + track.id + '\')">다시 올리기</button></div>' : '')
     + '</div></div>';
@@ -35814,7 +35817,8 @@ function musicTagCatSet(tag, catId) { // 한 태그는 한 분류에만 속한�
   if (cat) cat.tags.push(key);
   persist(); musicRefreshTagColors();
 }
-function musicRefreshTagColors() { // 열려 있는 상세 창의 칩 색을 다시 입힌다
+function musicRefreshTagColors() { // 열려 있는 상세 창의 칩 색과 카드의 태그 색을 다시 입힌다
+  renderMusicPage();
   document.querySelectorAll('#music-modal-backdrop .tag-editor').forEach(tagEditorRender);
   const track = state.musicTracks.find(item => item.id === (musicPlaying && musicPlaying.id));
   if (track) musicRefreshExistingTags(track);
