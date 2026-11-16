@@ -7,4 +7,8 @@ const at = html.indexOf('\n.rb-inline-note {');
 assert.ok(html.slice(at, html.indexOf('\n}', at)).includes('font-weight: bold; font-style: italic;'));
 const make = html.slice(html.indexOf('function rbCreateInlineMemoEl'), html.indexOf('function rbNotifyInlineMemoChanged') > html.indexOf('function rbCreateInlineMemoEl') ? html.indexOf('function rbNotifyInlineMemoChanged') : undefined);
 assert.ok(!/style\.fontWeight|style\.fontStyle|<b>|<i>|<strong>|<em>/.test(html.slice(html.indexOf('function rbCreateInlineMemoEl'), html.indexOf('function rbCreateInlineMemoEl') + 400)));
+// #264: 메모 배경은 초록(기본 0.22, 호버 0.36)
+const rule = html.slice(at, html.indexOf(String.fromCharCode(10) + '}', at));
+assert.ok(rule.includes('background: rgba(76, 175, 80, 0.22);'));
+assert.ok(html.includes('.rb-inline-note:hover { background: rgba(76, 175, 80, 0.36); }'));
 console.log('rb inline note style: OK');
