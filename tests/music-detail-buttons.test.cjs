@@ -1,0 +1,11 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+const fn = html.slice(html.indexOf('async function openMusicDetail'), html.indexOf('function musicEditField'));
+ok(!html.includes('이전·다음 곡') && fn.includes('<div class="music-modal-foot"><span></span><button'), '좌하단 「이전·다음 곡」 안내 문구 삭제(← → 키는 그대로)');
+ok(!fn.includes('>교체<') && !fn.includes('떼어내기') && !fn.includes('유튜브 연결 해제'), '교체·떼어내기·유튜브 연결 해제 버튼 삭제');
+ok(fn.includes("btn('수정', 'musicEditYoutubeUrl')") && fn.includes("btn('삭제', 'musicUnlinkYoutube', 'music-danger')") && fn.includes('ytInfo'), '유튜브 화면: 수정(주소)·삭제(유튜브 연결 삭제) 버튼 옆에 유튜브 주소');
+ok(fn.includes("btn('수정', 'musicAttachPick') + btn('삭제', 'musicDetach', 'music-danger') + '<span class=\"music-hint\">' + esc(track.fileName)"), '파일 화면: 수정(파일 교체)·삭제(파일 삭제) 버튼 옆에 파일명');
+ok(fn.includes("btn('수정', 'musicReplaceFilePick') + '<span class=\"music-hint\">' + esc(track.fileName)"), '파일 곡: 수정(파일 교체) 버튼 옆에 파일명');
+ok(html.includes('function musicEditYoutubeUrl') && html.includes("event.key === 'Enter'") && html.includes('async function musicReplaceFile'), '주소 수정(Enter 확정·Esc 취소)·파일 교체 함수');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);

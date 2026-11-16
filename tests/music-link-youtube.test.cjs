@@ -3,7 +3,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도�
 let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
 // Blob 키 체계: 파일 곡·유튜브 첨부 모두 트랙 id(표지 'cover:<id>') → 변환 시 Blob 이동 없음
 ok(html.includes("await musicBlobPut(track.id, file)") && html.includes("musicBlobPut('cover:' + track.id, cover)") && html.includes("await musicBlobPut(id, file); } catch (e) { showToast('저장 실패: ' + file.name"), 'Blob 키: 파일 곡도 첨부도 트랙 id 키, 표지는 cover:<id>');
-ok(html.includes('id="music-link-url"') && html.includes('유튜브 주소 연결</button>') && html.includes('유튜브 연결 해제</button>'), '파일 카드 상세에 연결 입력·버튼, 첨부 상태에 연결 해제 버튼');
+ok(html.includes('id="music-link-url"') && html.includes('유튜브 주소 연결</button>') && html.includes("btn('삭제', 'musicUnlinkYoutube', 'music-danger')"), '파일 카드 상세에 연결 입력·버튼, 첨부 상태에 연결 해제 버튼');
 ok(html.includes("(musicCoverUrls[track.id] || track.thumbnail)"), '카드 표지: 파일 표지 우선');
 ok(html.includes("musicBlobDelete([id, 'cover:' + id])"), '떼어내기 시 표지 Blob 도 함께 삭제');
 
