@@ -1,0 +1,18 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+const code = html.slice(html.indexOf('function musicParseJinaMusic'), html.indexOf('async function musicFetchAlbumInfo'));
+const ctx = {}; vm.createContext(ctx); vm.runInContext(code + ';this.f=musicParseJinaMusic', ctx);
+const NL = String.fromCharCode(10);
+const sample = ['# 영상', '## Music 1 song', '# The Shining - Main Title', '#### Chuck Cirino', '[The Shining - (Dies Irae) Main Title Theme composed by Wendy Carlos and Rachel Elkind](https://www.youtube.com/playlist?list=OLAK5x)', '[Music](https://www.youtube.com/channel/c)', '## Video details', 'Date', 'Views'].join(NL);
+const r = ctx.f(sample);
+ok(r.song === 'The Shining - Main Title' && r.artist === 'Chuck Cirino', '노래·아티스트');
+ok(r.album === 'The Shining - (Dies Irae) Main Title Theme composed by Wendy Carlos and Rachel Elkind', '링크형 앨범 인식(구간 밖 Date 금지)');
+ok(ctx.f(['## Music', '# S', '#### A', '[Music](u)', '## Video details', 'Date'].join(NL)).album === '', 'Music 링크·구간 밖 값은 앨범 아님');
+ok(ctx.f(['## Music', '# S', '#### A', '', '## Video details', 'Date'].join(NL)).album === '', '앨범 줄 없으면 구간 밖 읽지 않음');
+ok(html.includes('아티스트·채널<input') && !html.includes('아티스트(채널)'), '라벨 아티스트·채널');
+ok(html.includes('.music-add-file[hidden] { display: none; }'), '.music-add-file[hidden] 숨김');
+const cover = html.slice(html.indexOf("'<div class=\"music-card-cover\">'"), html.indexOf("'<div class=\"music-card-body\">"));
+ok(!cover.includes('music-card-yt') && !cover.includes('music-card-file'), '배지는 섬네일 안에 없음');
+ok(/music-card-badges"><span>' \+ musicFmtTime\(track\.duration\)[\s\S]*music-card-yt[\s\S]*music-card-file/.test(html), '배지는 meta 줄 우측');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);

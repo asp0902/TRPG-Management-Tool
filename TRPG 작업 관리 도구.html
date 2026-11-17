@@ -2182,7 +2182,8 @@ tr.ct-row-end .ct-select:focus {
 .music-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
 .music-card-cover { position: relative; aspect-ratio: 16 / 10; background: #ececec; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #aaa; overflow: hidden; }
 .music-card-cover img { width: 100%; height: 100%; object-fit: cover; }
-.music-card-yt { position: absolute; right: 4px; bottom: 4px; background: rgba(0,0,0,0.7); color: #fff; font-size: 9px; font-style: normal; padding: 1px 5px; border-radius: 4px; }
+.music-card-badges { display: inline-flex; align-items: center; gap: 4px; }
+.music-card-yt { background: #333; color: #fff; font-size: 9px; font-style: normal; padding: 1px 5px; border-radius: 4px; }
 .music-card-body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .music-card-title { font-weight: 800; font-size: 12.5px; white-space: normal; overflow-wrap: anywhere; } /* 제목을 끝까지 보여 준다 */
 .music-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
@@ -2199,6 +2200,7 @@ tr.ct-row-end .ct-select:focus {
 #music-card-menu { min-width: 0; width: max-content; } /* 수정하기·삭제하기 메뉴 가로 크기 줄임(#307) */
 #music-card-menu .ds-ctx-item { padding: 6px 12px; }
 .music-add-file { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #333; background: #f6f6f6; border-radius: 6px; padding: 5px 8px; }
+.music-add-file[hidden] { display: none; }
 .music-add-file > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .music-yt-status { font-size: 11.5px; color: #666; display: flex; align-items: center; gap: 6px; }
 .music-yt-status[data-state="loading"]::before { content: ''; width: 10px; height: 10px; border: 2px solid #ccc; border-top-color: #111; border-radius: 50%; animation: music-spin 0.8s linear infinite; }
@@ -2240,7 +2242,7 @@ tr.ct-row-end .ct-select:focus {
 .music-ap-seek::-moz-range-thumb, .music-ap-vol::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 0; }
 body.file-dragging iframe { pointer-events: none; } /* 파일을 끄는 동안 iframe 이 드롭을 가로채지 않게(#299) */
 .music-modal.drop-target { outline: 2px dashed #111; outline-offset: -4px; }
-.music-card-file { position: absolute; left: 4px; bottom: 4px; background: rgba(255,255,255,0.9); color: #111; font-size: 9px; font-style: normal; font-weight: 800; padding: 1px 5px; border-radius: 4px; }
+.music-card-file { background: #fff; border: 1px solid #ccc; color: #111; font-size: 9px; font-style: normal; font-weight: 800; padding: 1px 5px; border-radius: 4px; }
 .music-card.drop-target { outline: 2px dashed #111; outline-offset: -2px; }
 .music-attach input { border: 1px solid #ddd; border-radius: 6px; padding: 3px 8px; font: inherit; font-size: 11.5px; min-width: 160px; flex: 1; }
 .music-url-text { overflow-wrap: anywhere; min-width: 0; }
@@ -35496,11 +35498,11 @@ function renderMusicCard(track) {
   const missing = hasFile && !musicLocalIds.has(track.id);
   const canDrop = track.kind === 'youtube';
   return '<div class="music-card" draggable="true" data-id="' + track.id + '" ondragstart="event.dataTransfer.setData(\'text/music-track\',\'' + track.id + '\')" onclick="openMusicDetail(\'' + track.id + '\')" oncontextmenu="musicCardContext(event,\'' + track.id + '\')"' + (canDrop ? ' ondragover="musicCardDragOver(event)" ondragleave="this.classList.remove(\'drop-target\')" ondrop="musicCardDrop(event,\'' + track.id + '\')"' : '') + ' style="border-top-color:' + (folder?.color || '#e5e5e5') + '">'
-    + '<div class="music-card-cover">' + (cover ? '<img src="' + esc(cover) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span>♪</span>') + (track.kind === 'youtube' ? '<i class="music-card-yt">YouTube</i>' : '') + (track.kind === 'youtube' && track.attached ? '<i class="music-card-file">파일</i>' : '') + '</div>'
+    + '<div class="music-card-cover">' + (cover ? '<img src="' + esc(cover) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span>♪</span>') + '</div>'
     + '<div class="music-card-body"><div class="music-card-title">' + esc(musicTrackTitle(track)) + '</div>'
     + '<div class="music-card-sub">' + esc(track.artist || '') + '</div>'
     + ((track.tags || []).length ? '<div class="music-card-tags">' + track.tags.map(tag => '<span class="music-card-tag" style="' + esc(musicTagChipStyle(tag)) + '">' + esc(tag) + '</span>').join('') + '</div>' : '') // 태그 칩(분류 색 적용, #324)
-    + '<div class="music-card-meta">' + (folder ? '<span class="music-dot" style="background:' + folder.color + '"></span>' + esc(folder.name) : '') + '<span>' + musicFmtTime(track.duration) + '</span></div>'
+    + '<div class="music-card-meta">' + (folder ? '<span class="music-dot" style="background:' + folder.color + '"></span>' + esc(folder.name) : '') + '<span class="music-card-badges"><span>' + musicFmtTime(track.duration) + '</span>' + (track.kind === 'youtube' ? '<i class="music-card-yt">YouTube</i>' : '') + (track.kind === 'youtube' && track.attached ? '<i class="music-card-file">파일</i>' : '') + '</span></div>'
     + (missing ? '<div class="music-card-missing">이 기기에 파일 없음 <button type="button" onclick="event.stopPropagation();musicReupload(\'' + track.id + '\')">다시 올리기</button></div>' : '')
     + '</div></div>';
 }
@@ -36198,7 +36200,7 @@ function openMusicYoutubeModal() {
     + '<label class="music-field">URL<input id="music-yt-url" type="text" spellcheck="false" onchange="musicFetchYoutube(true)" onkeydown="musicYtKey(event)"></label>'
     + '<img id="music-yt-thumb" class="music-yt-thumb" alt="" hidden onerror="this.hidden=true">'
     + '<label class="music-field">제목<input id="music-yt-title" type="text"></label>'
-    + '<label class="music-field">아티스트(채널)<input id="music-yt-artist" type="text"></label>'
+    + '<label class="music-field">아티스트·채널<input id="music-yt-artist" type="text"></label>'
     + '<label class="music-field">앨범<input id="music-yt-album" type="text"></label>'
     + '<div class="music-error" id="music-yt-error"></div>'
     + '<div class="music-modal-foot"><div class="music-yt-status" id="music-yt-status" hidden></div><button type="button" class="music-primary" onclick="musicAddYoutube()">추가</button></div>');
@@ -36245,7 +36247,11 @@ function musicParseJinaMusic(content) {
   // 줄이 나뉜 형식: 「# 노래」 → 「#### 아티스트」 → 일반 글 한 줄(앨범)
   for (; i < lines.length; i++) { if (/^#\s+/.test(lines[i])) { out.song = lines[i].replace(/^#\s+/, '').trim(); break; } }
   for (i++; i < lines.length; i++) { if (/^####\s+/.test(lines[i])) { out.artist = lines[i].replace(/^####\s+/, '').trim(); break; } }
-  for (i++; i < lines.length; i++) { const t = lines[i].trim(); if (t && !/^[#!\[]/.test(t)) { out.album = t; break; } }
+  for (i++; i < lines.length; i++) { // 앨범: 일반 글 한 줄 또는 [텍스트](url) 링크(텍스트 「Music」 은 제외, #299)
+    const t = lines[i].trim(), lk = t.match(/^\[([^\]]+)\]\(/);
+    if (lk) { out.album = lk[1].trim() !== 'Music' ? lk[1].trim() : ''; break; }
+    if (t && !/^[#!\[]/.test(t)) { out.album = t; break; }
+  }
   if (!out.artist) { // 한 줄로 이어진 형식(#322): [![Image](...) # 노래 #### 아티스트 [앨범](...)](...)
     const flat = lines.join(' ').replace(/\s+/g, ' ');
     const m = flat.match(/#\s+(.+?)\s+#{4}\s+(.+?)(?:\s+\[([^\]]+)\]\(|\s*$)/);
