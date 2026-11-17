@@ -11298,9 +11298,85 @@ function multiEditingNow() { // 입력 중이면 받은 패치를 보류한다
   if (el.isContentEditable) return true;
   return (el.tagName === 'TEXTAREA') || (el.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'color', 'range', 'file', 'submit', 'hidden'].includes(el.type));
 }
-function multiRefreshUI() {
-  const focusSnap = githubSyncCaptureFocus();
-  try { refreshAfterImport(false); } catch (e) { console.warn('multi-window refresh failed', e); }
+// 컬렉션 → 영향받는 페이지(#314). 여기 없는 키(글머리 기호·찾기 기록·공유 메모 등)는 전체 다시 그리기로 폴백한다.
+const MULTI_PAGE_RENDER = {
+  musicTracks: 'music', musicFolders: 'music', musicTagCats: 'music',
+  characters: 'character', characterFolders: 'character',
+  bookmarks: 'bookmark', records: 'record', catalog: 'scenario',
+  cssMacros: 'css-macro', cssMacroFolders: 'css-macro', cssPopupDictionary: 'css-macro',
+  rulebooks: 'rulebook', dataSheets: 'rulebook',
+  scenarios: 'script', folders: 'script',
+  customFonts: 'fonts', manualFonts: 'fonts', recentFonts: 'fonts',
+};
+// 받은 패치가 건드린 컬렉션 → {id 집합}. id 없이 통째로 바뀐 키는 '*'.
+function multiTouchedOf(batches) {
+  const touched = new Map();
+  (batches || []).forEach(ops => (ops || []).forEach(op => {
+    if (!op || !op.key) return;
+    if (!touched.has(op.key)) touched.set(op.key, new Set());
+    const ids = touched.get(op.key);
+    if (op.type === 'items') { (op.set || []).forEach(item => ids.add(item.id)); (op.del || []).forEach(id => ids.add(id)); if (!(op.set || []).length && !(op.del || []).length) ids.add('*'); }
+    else if (op.type === 'scenario-nodes') ids.add(op.scenarioId);
+    else ids.add('*');
+  }));
+  return touched;
+}
+function multiCaptureScrolls() { // 스크롤 중인 요소를 id/클래스 선택자와 함께 기억한다
+  const out = [];
+  document.querySelectorAll('#sidebar *, #main *, #main, #sidebar').forEach(el => {
+    if (el.scrollTop > 0 || el.scrollLeft > 0) {
+      const sel = el.id ? '#' + CSS.escape(el.id) : (typeof el.className === 'string' && el.className.trim() ? el.tagName.toLowerCase() + '.' + el.className.trim().split(/\s+/).map(c => CSS.escape(c)).join('.') : '');
+      out.push({ el, sel, top: el.scrollTop, left: el.scrollLeft });
+    }
+  });
+  return out;
+}
+function multiRestoreScrolls(list) {
+  list.forEach(item => {
+    const el = item.el.isConnected ? item.el : (item.sel ? document.querySelector(item.sel) : null);
+    if (el) { el.scrollTop = item.top; el.scrollLeft = item.left; }
+  });
+}
+function multiRenderTouched(touched) { // 보이는 페이지가 영향받을 때만 그 페이지 렌더 함수를 부른다. 열린 모달은 닫지 않고, 지워진 항목의 모달만 닫는다
+  const pages = new Set([...touched.keys()].map(key => MULTI_PAGE_RENDER[key]));
+  const ids = key => touched.get(key) || new Set();
+  normalizeSidebarState();
+  if (pages.has('fonts')) { loadCustomFonts(); updateFontDropdown(); }
+  const cp = currentPage;
+  if (touched.has('scenarios') && state.currentId && !state.scenarios.some(sc => sc.id === state.currentId)) { refreshAfterImport(false); return; } // 열어 둔 시나리오가 지워짐
+  renderList();
+  if (cp === 'scenario' && pages.has('script') === false && touched.has('catalog')) renderCatalog();
+  if (cp === 'record' && touched.has('records')) renderRecordPage();
+  const timelineId = getRecordTimelineIdFromPage(cp);
+  if (timelineId && touched.has('records')) { if (state.records.some(r => r.id === timelineId)) renderRecordTimelinePage(timelineId); else refreshAfterImport(false); }
+  if (cp === 'css-macro' && pages.has('css-macro')) { ensureCssMacroHistory(); renderCssMacroPage(); refreshCssMacroTextareaHeights(document.getElementById('page-css-macro') || document); }
+  if (cp === 'bookmark' && touched.has('bookmarks')) renderBookmarkPage();
+  if (cp === 'music' && pages.has('music')) {
+    renderMusicPage();
+    if (musicPlaying && touched.has('musicTracks') && !state.musicTracks.some(t => t.id === musicPlaying.id)) musicCloseModal(); // 지워진 곡의 상세 창만 닫는다
+    if (document.getElementById('music-cat-backdrop')) musicCatRowsRefresh();
+  }
+  if (cp === 'character' && pages.has('character')) {
+    renderCharacterPage();
+    if (_chEditId && touched.has('characters') && !state.characters.some(c => c.id === _chEditId)) closeCharacterModal();
+  }
+  const sheetCharId = getCharacterSheetIdFromPage(cp);
+  if (sheetCharId && touched.has('characters')) { if (state.characters.some(c => c.id === sheetCharId)) renderCharacterSheetPage(sheetCharId); else refreshAfterImport(false); }
+  if (cp === 'rulebook' && pages.has('rulebook')) { try { renderRulebookPage(); restoreRulebookEditor(); renderMemoPanel(); } catch (e) { console.error('renderRulebookPage error:', e); } }
+  if (cp === 'datasheet' && touched.has('dataSheets')) { try { renderDataSheetEditor(); } catch (e) { console.error('renderDataSheetEditor error:', e); } }
+  if (cp === 'script' && touched.has('scenarios') && state.currentId && (ids('scenarios').has(state.currentId) || ids('scenarios').has('*'))) {
+    scenarioHistory.delete(state.currentId); // 다른 창의 변경은 실행취소 기록에 넣지 않는다(되돌리면 상대 변경이 사라지므로 기준점을 새로 잡는다)
+    renderCurrentScenarioView(getActiveTab()); ensureScenarioHistory(state.currentId);
+  }
+}
+function multiRefreshUI(touched) {
+  const focusSnap = githubSyncCaptureFocus(), scrolls = multiCaptureScrolls();
+  try {
+    const keys = touched ? [...touched.keys()] : [];
+    if (!keys.length || keys.some(key => !MULTI_PAGE_RENDER[key])) refreshAfterImport(false); // 매핑에 없으면 전체 다시 그리기(안전 폴백)
+    else multiRenderTouched(touched);
+  } catch (e) { console.warn('multi-window refresh failed', e); try { refreshAfterImport(false); } catch (e2) {} }
+  multiRestoreScrolls(scrolls);
   githubSyncRestoreFocus(focusSnap);
 }
 function multiHandlePatch(ops) {
@@ -11312,9 +11388,10 @@ function multiApplyPending() {
   const batches = multiWin.pending.splice(0);
   let conflicts = 0;
   batches.forEach(ops => { conflicts += multiApplyOps(ops); });
+  const touched = multiTouchedOf(batches);
   multiWin.applied = (multiWin.applied || 0) + 1;
   if (multiIsLeader()) persist({ fromPeer: true }); // 주 창: 받은 변경을 저장·원격 동기화 대상에 올린다
-  multiRefreshUI();
+  multiRefreshUI(touched);
   if (conflicts) { multiSchedulePatch(); if (typeof showToast === 'function') showToast('다른 창의 변경과 겹쳐 이 창의 내용으로 저장했습니다.'); }
 }
 document.addEventListener('focusout', () => { if (multiWin.pending.length) setTimeout(multiApplyPending, 0); });

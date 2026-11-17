@@ -1,0 +1,18 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
+const KEYS = ['scenarios','folders','cssMacroFolders','records','catalog','cssMacros','cssPopupDictionary','bookmarks','musicFolders','musicTagCats','musicTracks','rulebooks','dataSheets','characters','characterFolders','customFonts','manualFonts','recentFonts','customBulletSymbols','customBulletImages','findReplaceHistory','sharedMemoOwner'];
+const code = cut('const MULTI_PAGE_RENDER', 'function multiCaptureScrolls');
+const ctx = {}; vm.createContext(ctx); vm.runInContext(code + ';this.f={MULTI_PAGE_RENDER,multiTouchedOf}', ctx);
+const { MULTI_PAGE_RENDER, multiTouchedOf } = ctx.f;
+ok(MULTI_PAGE_RENDER.musicTracks === 'music' && MULTI_PAGE_RENDER.characters === 'character' && MULTI_PAGE_RENDER.bookmarks === 'bookmark' && MULTI_PAGE_RENDER.scenarios === 'script' && MULTI_PAGE_RENDER.records === 'record' && MULTI_PAGE_RENDER.cssMacros === 'css-macro' && MULTI_PAGE_RENDER.rulebooks === 'rulebook', '컬렉션→페이지 매핑');
+const unmapped = KEYS.filter(k => !MULTI_PAGE_RENDER[k]);
+ok(unmapped.join() === 'customBulletSymbols,customBulletImages,findReplaceHistory,sharedMemoOwner', '매핑 없는 키는 전체 다시 그리기 폴백 대상: ' + unmapped.join());
+const t = multiTouchedOf([[{ key: 'musicTracks', type: 'items', set: [{ id: 'a' }], del: ['b'], order: [] }], [{ key: 'scenarios', type: 'scenario-nodes', scenarioId: 's1', ops: [] }, { key: 'customFonts', type: 'value', value: [] }]]);
+ok([...t.get('musicTracks')].sort().join() === 'a,b' && [...t.get('scenarios')].join() === 's1' && [...t.get('customFonts')].join() === '*', '패치에서 건드린 키·id 집계');
+ok(html.includes('multiRefreshUI(touched);'), '패치 적용 뒤에는 touched 를 넘겨 부분 렌더');
+ok(html.includes('else multiRenderTouched(touched);') && html.includes('refreshAfterImport(false); // 매핑에 없으면 전체 다시 그리기(안전 폴백)'), '폴백·부분 렌더 분기');
+ok(html.includes('musicCloseModal(); // 지워진 곡의 상세 창만 닫는다') && html.includes('closeCharacterModal();') && html.includes('multiRestoreScrolls(scrolls);'), '삭제 항목 모달만 닫기·스크롤 복원');
+ok(html.includes("scenarioHistory.delete(state.currentId); // 다른 창의 변경은 실행취소 기록에 넣지 않는다"), '원격 변경은 실행취소 기록에 넣지 않음');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);
