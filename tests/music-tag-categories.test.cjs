@@ -8,7 +8,7 @@ ok(n >= 30, '태그 분류(musicTagCats)가 상태·저장·가져오기·합치
 ok(html.includes("state.musicTagCats = Array.isArray(raw.musicTagCats) ? raw.musicTagCats : null;") && html.includes('musicTagCats: Array.isArray(data.musicTagCats) ? data.musicTagCats.map(normalizeMusicTagCat) : null'), '불러오기·가져오기: 없으면 null → 기본 분류');
 ok(html.includes("'bookmarks','musicFolders','musicTagCats','musicTracks'"), '가져오기 취소 스냅샷에 포함');
 ok(html.includes('data-music-tags="1"') && html.includes('oncontextmenu="musicTagContext(event,this)"'), 'MUSIC 태그 칩만 분류 색·우클릭');
-ok(html.includes('class="music-cat-btn" onclick="openMusicTagCatManager()"') && html.includes('분류 관리…'), '분류 관리(이름 수정·추가·삭제) 진입: 「분류」 버튼·우클릭 메뉴');
+ok(html.includes('id="music-tagcat-btn"') && html.includes('onclick="openMusicTagCatManager()" title="태그 분류 이름·색 관리"') && html.includes('분류 관리…'), '분류 관리(이름 수정·추가·삭제) 진입: 상단 바 버튼·우클릭 메뉴');
 
 const code = cut('function musicTagKey', 'function musicToggleTag') .replace(/^[\s\S]*?(function musicTagKey)/, '$1') + cut('function musicTagCatDefaults', 'function musicExistingTagsInner');
 let persisted = 0, refreshed = 0, id = 0;

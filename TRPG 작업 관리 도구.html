@@ -2222,7 +2222,6 @@ tr.ct-row-end .ct-select:focus {
 .music-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .music-fcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .music-fcol-tags { min-height: 0; }
-.music-cat-btn { border: 1px solid #ddd; background: #fff; border-radius: 6px; padding: 1px 7px; font: inherit; font-size: 10.5px; color: #666; cursor: pointer; }
 .music-cat-row { display: flex; align-items: center; gap: 8px; }
 .music-cat-row input[type="color"] { width: 32px; height: 28px; padding: 0; border: 1px solid #ddd; border-radius: 6px; background: none; cursor: pointer; }
 .music-cat-name { flex: 1; min-width: 0; border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12px; }
@@ -8303,6 +8302,7 @@ select.sh-field-input,
       <button class="tab-btn active" data-tab="info" onclick="switchTab('info')">정보</button>
       <button class="tab-btn" data-tab="body" onclick="switchTab('body')">본문</button>
     </div>
+    <button class="tab-btn" id="music-tagcat-btn" type="button" style="display:none;width:auto;padding:0 10px" onclick="openMusicTagCatManager()" title="태그 분류 이름·색 관리"><i class="fa-solid fa-tags"></i> 태그 분류</button>
     <button class="btn btn-primary" id="save-btn" onclick="saveAll()">저장</button>
   </div>
 
@@ -35928,7 +35928,7 @@ async function openMusicDetail(id, source) {
       + (track.attached && !blob ? missing : '') + (!track.attached ? btn('파일 첨부', 'musicAttachPick') + '<span class="music-hint">또는 이 창·카드 위로 음원 파일을 끌어 놓기</span>' : '') + '</div>';
   }
   const folderOpts = '<option value="">분류 없음</option>' + state.musicFolders.map(folder => '<option value="' + folder.id + '"' + (folder.id === track.folderId ? ' selected' : '') + '>' + esc(folder.name) + '</option>').join('');
-  const tagsField = '<div class="music-field"><span><span class="music-tag-label" onclick="musicToggleTagList()" title="눌러서 이전에 만든 태그 보기">태그</span> <button type="button" class="music-cat-btn" onclick="openMusicTagCatManager()" title="태그 분류 이름·색 관리">분류</button></span>' + tagEditorHtml('data-k="tags" onchange="musicEditField(' + String.fromCharCode(39) + id + String.fromCharCode(39) + ',this)"', track.tags, '', true) + '</div>';
+  const tagsField = '<div class="music-field"><span><span class="music-tag-label" onclick="musicToggleTagList()" title="눌러서 이전에 만든 태그 보기">태그</span></span>' + tagEditorHtml('data-k="tags" onchange="musicEditField(' + String.fromCharCode(39) + id + String.fromCharCode(39) + ',this)"', track.tags, '', true) + '</div>';
   const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" oninput="musicAutoGrow(this)" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)"' + ' value="' + esc(track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
   musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + (track.kind === 'youtube' && !url ? '<div class="music-hint" id="music-yt-state">유튜브: 불러오는 중…</div>' : '') + attachRow
@@ -38476,6 +38476,7 @@ function switchPage(page) {
   document.getElementById('tab-group').style.display = isScript && cur() ? '' : 'none';
   document.getElementById('script-home-btn').style.display = isScript && cur() ? '' : 'none';
   document.getElementById('save-btn').style.display = isScript ? '' : 'none';
+  document.getElementById('music-tagcat-btn').style.display = page === 'music' ? '' : 'none'; // MUSIC 페이지에서만(#302)
   syncFormatBarVisibility();
 
   document.getElementById('page-scenario').style.display = page === 'scenario' ? 'flex' : 'none';
