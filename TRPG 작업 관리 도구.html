@@ -35726,14 +35726,26 @@ if (typeof window !== 'undefined') {
 // 유튜브 플레이어 상태 표시(#317): 재생이 멈추는 원인을 화면에서 바로 볼 수 있게 플레이어 아래에 상태·오류 코드를 보여 주고, 시작 직후 저절로 멈추면 한 번 다시 재생을 시도한다.
 const MUSIC_YT_STATES = { '-1': '시작 전', 0: '종료', 1: '재생 중', 2: '일시정지', 3: '버퍼링 중', 5: '대기' };
 const MUSIC_YT_ERRORS = { 2: '잘못된 요청', 5: '플레이어 오류', 100: '영상을 찾을 수 없음/비공개', 101: '퍼가기 불허', 150: '퍼가기 불허', 153: '퍼가기 설정 오류(리퍼러 없음)' };
-let musicYtWatch = { openedAt: 0, retried: false, played: false, resets: 0 };
+let musicYtWatch = { openedAt: 0, retried: false, played: false, resets: 0, last: null };
 function musicYtShow(text) { const el = document.getElementById('music-yt-state'); if (el) el.textContent = text; }
 function musicYtCommand(func, args) { const f = document.querySelector('#music-modal-backdrop iframe.music-yt'); if (f && f.contentWindow) f.contentWindow.postMessage(JSON.stringify({ event: 'command', func, args: args || [] }), 'https://www.youtube.com'); }
 function musicYtAttach() { // 상세 창을 연 직후 호출: iframe 이 있으면 상태 수신을 시작
-  musicYtWatch = { openedAt: Date.now(), retried: false, played: false, resets: 0 };
+  musicYtWatch = { openedAt: Date.now(), retried: false, played: false, resets: 0, last: null };
   const f = document.querySelector('#music-modal-backdrop iframe.music-yt');
   if (!f) return;
   f.addEventListener('load', () => { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), 'https://www.youtube.com'); } catch (e) {} });
+}
+// 상태 한 번에 대한 동작 결정(#312): 'loop' = 끝나서 처음부터, 'retry' = playVideo 재시도, '' = 아무것도 안 함.
+// 일시정지(2)는 한 번도 재생(1)된 적 없을 때만 자동 재생 — 재생된 뒤의 2 는 사용자 조작이므로 건드리지 않는다.
+// 「시작 전」(-1) 재시도는 직전 상태가 재생 중(1)일 때만 — 직전이 일시정지(2)면 사용자 조작 뒤라 재시도하지 않는다.
+function musicYtDecide(state) {
+  const w = musicYtWatch, last = w.last;
+  w.last = state;
+  if (state === 1) { w.played = true; return ''; }
+  if (state === 0) return 'loop';
+  if (state === 2 && !w.played && !w.retried && Date.now() - w.openedAt < 8000) { w.retried = true; return 'retry'; }
+  if (state === -1 && last === 1 && w.resets < 2) { w.resets++; return 'retry'; }
+  return '';
 }
 if (typeof window !== 'undefined') window.addEventListener('message', event => {
   if (event.origin !== 'https://www.youtube.com' || !document.getElementById('music-yt-state')) return;
@@ -35743,12 +35755,9 @@ if (typeof window !== 'undefined') window.addEventListener('message', event => {
   if (state === undefined || state === null) return;
   musicDebug('yt state', state);
   musicYtShow('유튜브: ' + (MUSIC_YT_STATES[state] || state));
-  if (state === 1) musicYtWatch.played = true;
-  if (state === 0) { musicYtCommand('seekTo', [0, true]); setTimeout(() => musicYtCommand('playVideo'), 200); } // 반복 재생: 끝나면 처음부터(playlist 방식 대신 직접 처리)
-  else if ((state === 2 && !musicYtWatch.retried && Date.now() - musicYtWatch.openedAt < 8000) || (state === -1 && musicYtWatch.played && musicYtWatch.resets < 2)) { // 시작 직후 저절로 멈추거나, 재생하던 영상이 뜻밖에 「시작 전」으로 돌아가면 다시 재생(최대 몇 번만)
-    if (state === 2) musicYtWatch.retried = true; else musicYtWatch.resets++;
-    setTimeout(() => musicYtCommand('playVideo'), 400);
-  }
+  const action = musicYtDecide(state);
+  if (action === 'loop') { musicYtCommand('seekTo', [0, true]); setTimeout(() => musicYtCommand('playVideo'), 200); } // 반복 재생: 끝나면 처음부터(playlist 방식 대신 직접 처리)
+  else if (action === 'retry') setTimeout(() => musicYtCommand('playVideo'), 400);
 });
 function musicStop() {
   musicDebug('musicStop', musicPlaying ? musicPlaying.id : '');
@@ -36141,12 +36150,12 @@ async function openMusicDetail(id, source) {
   } else if (track.kind === 'youtube') {
     if (src === 'file' && track.attached && blob) attachRow = '<div class="music-attach">' + toggle + btn('수정', 'musicAttachPick') + btn('삭제', 'musicDetach', 'music-danger') + '<span class="music-hint">' + esc(track.fileName) + '</span></div>'; // 파일 화면: 수정=파일 교체, 삭제=파일 삭제
     else attachRow = '<div class="music-attach">' + toggle + btn('수정', 'musicEditYoutubeUrl') + (track.attached ? btn('삭제', 'musicUnlinkYoutube', 'music-danger') : '') + ytInfo // 유튜브 화면: 수정=주소 수정, 삭제=유튜브 연결 삭제(파일은 유지)
-      + (track.attached && !blob ? missing : '') + (!track.attached ? btn('파일 첨부', 'musicAttachPick') + '<span class="music-hint">또는 이 창·카드 위로 음원 파일을 끌어 놓기</span>' : '') + '</div>';
+      + (track.attached && !blob ? missing : '') + '' + '</div>';
   }
   const folderOpts = '<option value="">분류 없음</option>' + state.musicFolders.map(folder => '<option value="' + folder.id + '"' + (folder.id === track.folderId ? ' selected' : '') + '>' + esc(folder.name) + '</option>').join('');
   const tagsField = '<div class="music-field"><span><span class="music-tag-label" onclick="musicToggleTagList()" title="눌러서 이전에 만든 태그 보기">태그</span></span>' + tagEditorHtml('data-k="tags" onchange="musicEditField(' + String.fromCharCode(39) + id + String.fromCharCode(39) + ',this)"', track.tags, '', true) + '</div>';
   const field = (key, label, tag = 'input') => '<label class="music-field">' + label + (tag === 'textarea' ? '<textarea data-k="' + key + '" oninput="musicAutoGrow(this)" onchange="musicEditField(\'' + id + '\',this)">' : '<input data-k="' + key + '" type="text" onchange="musicEditField(\'' + id + '\',this)"' + ' value="' + esc(track[key]) + '">') + (tag === 'textarea' ? esc(track[key]) + '</textarea>' : '') + '</label>';
-  musicOpenModal('<div class="music-modal-head"><button type="button" onclick="musicStep(-1)" title="이전 (←)">◀</button><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div><button type="button" onclick="musicStep(1)" title="다음 (→)">▶</button><button type="button" onclick="musicCloseModal()">✕</button></div>'
+  musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">' + esc(musicTrackTitle(track)) + '</div>' + (track.kind === 'youtube' && !track.attached ? btn('파일 첨부', 'musicAttachPick') : '') + '<button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<div class="music-player">' + musicPlayerHtml(track, url) + '</div>' + (track.kind === 'youtube' && !url ? '<div class="music-hint" id="music-yt-state">유튜브: 불러오는 중…</div>' : '') + attachRow
     + (track.kind === 'file' && !url ? '<button type="button" onclick="musicReupload(\'' + id + '\')">다시 올리기</button>' : '')
     + '<div class="music-fields">' + '<div class="music-fcol">' + field('title', '제목') + field('artist', '아티스트') + field('album', '앨범') + '</div><div class="music-fcol music-fcol-tags">' + tagsField + musicExistingTagsHtml(track) + '</div>'

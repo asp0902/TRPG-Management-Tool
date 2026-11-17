@@ -4,7 +4,18 @@ let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m);
 ok(html.includes("rel=0&enablejsapi=1&origin=' + encodeURIComponent(") && !html.includes('loop=1&playlist='), '유튜브 iframe 에 상태 수신(enablejsapi·origin), playlist 방식 반복 제거(#318)');
 ok(html.includes('id="music-yt-state">유튜브: 불러오는 중…</div>') && html.includes("musicYtShow('유튜브: ' + (MUSIC_YT_STATES[state] || state))"), '플레이어 아래 상태 표시(재생 중·일시정지·종료 등)');
 ok(html.includes("musicYtShow('유튜브 오류 ' + data.info") && html.includes('153: ') && html.includes('150: '), '오류 코드 표시');
-ok(html.includes('state === 2 && !musicYtWatch.retried && Date.now() - musicYtWatch.openedAt < 8000') && html.includes("state === -1 && musicYtWatch.played && musicYtWatch.resets < 2") && html.includes("musicYtCommand('playVideo')"), '시작 직후 저절로 멈추거나 재생 중 「시작 전」으로 돌아가면 다시 재생(횟수 제한)');
-ok(html.includes("if (state === 0) { musicYtCommand('seekTo', [0, true]);"), '반복 재생: 영상이 끝나면 처음부터 다시 재생')
+ok(html.includes('state === 2 && !w.played && !w.retried && Date.now() - w.openedAt < 8000') && html.includes('state === -1 && last === 1 && w.resets < 2') && html.includes("musicYtCommand('playVideo')"), '재시도 조건: 2 는 재생된 적 없을 때만, -1 은 직전이 1 일 때만(#312)');
+ok(html.includes("if (action === 'loop') { musicYtCommand('seekTo', [0, true]);") && html.includes("if (state === 0) return 'loop';"), '반복 재생: 영상이 끝나면 처음부터 다시 재생');
 ok(html.includes("event.origin !== 'https://www.youtube.com'"), '유튜브가 보낸 메시지만 처리');
+{ const vm = require('vm'), cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
+  const ctx = { Date }; vm.createContext(ctx);
+  vm.runInContext(cut('let musicYtWatch', 'function musicYtShow') + cut('// 상태 한 번에 대한 동작', "if (typeof window !== 'undefined') window.addEventListener") + ';this.run=(seq)=>{musicYtWatch={openedAt:Date.now(),retried:false,played:false,resets:0,last:null};return seq.map(musicYtDecide)}', ctx);
+  const run = seq => JSON.stringify(ctx.run(seq));
+  ok(run([1, 2]) === '["",""]', '[1,2] 사용자 일시정지: 재시도 없음');
+  ok(run([-1, 2]) === '["","retry"]', '[-1(초기),2] 재생된 적 없는 일시정지: 1회 재시도');
+  ok(run([-1, 2, 2]) === '["","retry",""]', '재시도는 한 번만');
+  ok(run([1, -1]) === '["","retry"]', '[1,-1] 재생 중 시작 전으로 돌아감: 재시도');
+  ok(run([1, 2, -1]) === '["","",""]', '[1,2,-1] 직전이 일시정지: 재시도 없음');
+  ok(run([1, -1, 1, -1, 1, -1]) === '["","retry","","retry","",""]', '-1 재시도 최대 2회');
+  ok(run([1, 0]) === '["","loop"]', '[1,0] 반복 재생 유지'); }
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);
