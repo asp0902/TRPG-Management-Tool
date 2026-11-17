@@ -2199,6 +2199,22 @@ tr.ct-row-end .ct-select:focus {
 .music-card-missing { font-size: 11px; color: #c0392b; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .music-card-missing button, .music-modal button { border: 1px solid #ddd; background: #fff; border-radius: 6px; padding: 3px 8px; font: inherit; font-size: 11.5px; cursor: pointer; }
 .music-modal button.music-primary { background: #111; color: #fff; border-color: #111; } /* .music-modal button(0,1,1)이 .music-primary 배경을 덮어 글자가 안 보이던 문제(#281) */
+.bgm-block { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid #e3e3e3; border-radius: 8px; background: #fafafa; }
+.bgm-empty { font-size: 12.5px; color: #888; flex: 1; }
+.bgm-empty.bgm-deleted { color: #c0392b; }
+.bgm-thumb { flex: none; width: 54px; height: 34px; border-radius: 5px; background: #ececec; color: #aaa; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
+.bgm-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.bgm-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bgm-title { font-weight: 800; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bgm-artist { font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bgm-btn, .bgm-play { border: 1px solid #ddd; background: #fff; border-radius: 6px; padding: 3px 10px; font: inherit; font-size: 11.5px; color: #444; cursor: pointer; }
+.bgm-play { width: 30px; padding: 3px 0; }
+.bgm-btn:hover, .bgm-play:hover { background: #f0f0f0; }
+.bgm-picker-q { width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; padding: 6px 10px; font: inherit; font-size: 12.5px; margin-bottom: 8px; }
+.bgm-picker-list { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.bgm-pick-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 1px solid #eee; background: #fff; border-radius: 8px; padding: 5px 8px; font: inherit; cursor: pointer; }
+.bgm-pick-row:hover { background: #f5f5f5; }
+.bgm-pick-empty { padding: 18px 0; text-align: center; font-size: 12px; color: #999; }
 .music-modal-backdrop { position: fixed; inset: 0; z-index: 12500; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; }
 .music-modal { width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow-y: auto; background: #fff; border-radius: 14px; padding: 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; font-size: 12.5px; color: #333; }
 .music-modal-head { display: flex; align-items: center; gap: 8px; }
@@ -9661,6 +9677,7 @@ const BTYPES = [
   { id:'column',  label:'단 나누기',  color:'#64748b' },
   { id:'divider', label:'구분선',     color:'#374151' },
   { id:'image',   label:'이미지',     color:'#4b5563' },
+  { id:'bgm',     label:'BGM',        color:'#0f766e' },
   { id: 'handout', label: '핸드아웃', color: '#475569' },
 ];
 const DEFAULT_SPEAKER_NAME = '화자';
@@ -12355,6 +12372,7 @@ function getBlockRangeClipboardTextForBlock(blockEl) {
   const block = getBlockArrayInfo(blockEl.dataset.id, cid)?.block || null;
   const presetMacro = getPresetBlockMacro(block);
 
+  if (block?.type === 'bgm') return bgmExportLine(block);
   if (presetMacro) return getPreferredPresetBlockMacro(block).trim();
   if ((block?.css || '').trim()) return block.css.trim();
 
@@ -14155,6 +14173,7 @@ function createBlockData(typeId) {
       mkRollResult('other'),
     ];
   }
+  if (typeId === 'bgm') b.trackId = ''; // MUSIC 곡 id(#308). 제목·섬네일은 저장하지 않고 렌더 때 읽는다
   if (typeId === 'divider') {
     b.dividerLineColor = DIVIDER_DEFAULT_LINE_COLOR;
     b.dividerAccentColor = DIVIDER_DEFAULT_ACCENT_COLOR;
@@ -14300,7 +14319,7 @@ function hasPromotableMainContentHtml(html = '') {
 function canPromoteMainContentToGenericChildren(block) {
   if (!block || typeof block !== 'object') return false;
   if (!Array.isArray(block.children) || block.children.length === 0) return false;
-  if (['ending', 'branch', 'roll', 'chapter', 'divider', 'image', 'intro', 'column'].includes(block.type)) {
+  if (['ending', 'branch', 'roll', 'chapter', 'divider', 'image', 'intro', 'column', 'bgm'].includes(block.type)) {
     return false;
   }
   return hasPromotableMainContentHtml(block.content || '');
@@ -15501,6 +15520,65 @@ function normalizeEmbeddedRollBlock(block, opts = {}) {
   if (typeof block.css !== 'string') block.css = '';
   return block;
 }
+// ── BGM 블록(#308): MUSIC 곡을 연결한다. trackId 만 저장하고 제목·섬네일·아티스트는 렌더 때 state.musicTracks 에서 읽는다 ──
+function bgmTrackOf(block) { return block && block.trackId ? (state.musicTracks || []).find(track => track.id === block.trackId) || null : null; }
+function bgmThumbOf(track) { return (typeof musicCoverUrls !== 'undefined' && musicCoverUrls[track.id]) || track.thumbnail || ''; }
+function bgmBlockHtml(b, cid) {
+  const q = String.fromCharCode(39), id = esc(b.id), c = esc(cid);
+  const pick = label => '<button type="button" class="bgm-btn" onclick="bgmOpenPicker(' + q + id + q + ',' + q + c + q + ')">' + label + '</button>';
+  const track = bgmTrackOf(b);
+  if (!b.trackId) return '<div class="bgm-block"><span class="bgm-empty"><i class="fa-solid fa-music"></i> BGM</span>' + pick('곡 선택') + '</div>';
+  if (!track) return '<div class="bgm-block"><span class="bgm-empty bgm-deleted"><i class="fa-solid fa-music"></i> 삭제된 곡</span>' + pick('곡 선택') + '</div>';
+  const thumb = bgmThumbOf(track), hasFile = track.kind === 'file' || track.attached;
+  const missing = hasFile && typeof musicLocalIds !== 'undefined' && musicLocalIds.size && !musicLocalIds.has(track.id) && track.kind === 'file';
+  return '<div class="bgm-block"><span class="bgm-thumb">' + (thumb ? '<img src="' + esc(thumb) + '" alt="" referrerpolicy="no-referrer">' : '<i class="fa-solid fa-music"></i>') + '</span>'
+    + '<span class="bgm-info"><span class="bgm-title">' + esc(musicTrackTitle(track)) + '</span><span class="bgm-artist">' + esc(track.artist || '') + (missing ? ' · 이 기기에 파일 없음' : '') + '</span></span>'
+    + '<button type="button" class="bgm-play" title="재생" onclick="bgmPlay(' + q + esc(track.id) + q + ')"><i class="fa-solid fa-play"></i></button>' + pick('바꾸기') + '</div>';
+}
+function bgmExportLine(block) { // 내보내기·복사: 「BGM: 제목 - 아티스트」(유튜브면 URL 덧붙임)
+  if (!block || !block.trackId) return 'BGM:';
+  const track = bgmTrackOf(block);
+  if (!track) return 'BGM: (삭제된 곡)';
+  return 'BGM: ' + [musicTrackTitle(track), track.artist].filter(Boolean).join(' - ') + (track.kind === 'youtube' && track.url ? ' ' + track.url : '');
+}
+async function bgmPlay(trackId) { // SCRIPT 에서도 MUSIC 상세 창으로 재생(PC 파일 곡은 이 기기 파일 목록을 읽은 뒤)
+  try { await musicLoadLocal(); } catch (e) {}
+  openMusicDetail(trackId);
+}
+let bgmPickCtx = null;
+function bgmOpenPicker(blockId, cid) {
+  bgmPickCtx = { blockId, cid };
+  document.getElementById('bgm-picker-backdrop')?.remove();
+  const bd = document.createElement('div');
+  bd.id = 'bgm-picker-backdrop'; bd.className = 'music-modal-backdrop';
+  bd.innerHTML = '<div class="music-modal" onclick="event.stopPropagation()"><div class="music-modal-head"><div class="music-modal-title">BGM 곡 선택</div><button type="button" onclick="bgmClosePicker()">✕</button></div>'
+    + '<input id="bgm-picker-q" class="bgm-picker-q" type="text" placeholder="제목·아티스트·태그 검색" spellcheck="false" oninput="bgmPickerRender()"><div id="bgm-picker-list" class="bgm-picker-list"></div></div>';
+  bd.addEventListener('mousedown', e => { if (e.target === bd) bgmClosePicker(); });
+  bd.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); bgmClosePicker(); } });
+  document.body.appendChild(bd);
+  bgmPickerRender();
+  document.getElementById('bgm-picker-q').focus();
+  musicLoadLocal().then(() => { if (document.getElementById('bgm-picker-backdrop')) bgmPickerRender(); }).catch(() => {});
+}
+function bgmClosePicker() { document.getElementById('bgm-picker-backdrop')?.remove(); bgmPickCtx = null; }
+function bgmPickerRender() {
+  const list = document.getElementById('bgm-picker-list'); if (!list) return;
+  const q = (document.getElementById('bgm-picker-q')?.value || '').trim().toLowerCase();
+  const tracks = (state.musicTracks || []).filter(track => !q || [musicTrackTitle(track), track.artist, track.album, ...(track.tags || [])].some(v => String(v || '').toLowerCase().includes(q)));
+  list.innerHTML = tracks.length ? tracks.map(track => {
+    const thumb = bgmThumbOf(track);
+    return '<button type="button" class="bgm-pick-row" data-id="' + esc(track.id) + '" onclick="bgmPickTrack(this.dataset.id)"><span class="bgm-thumb">' + (thumb ? '<img src="' + esc(thumb) + '" alt="" referrerpolicy="no-referrer">' : '<i class="fa-solid fa-music"></i>') + '</span><span class="bgm-info"><span class="bgm-title">' + esc(musicTrackTitle(track)) + '</span><span class="bgm-artist">' + esc(track.artist || '') + '</span></span></button>';
+  }).join('') : '<div class="bgm-pick-empty">' + ((state.musicTracks || []).length ? '검색 결과가 없습니다.' : 'MUSIC 페이지에 등록된 곡이 없습니다.') + '</div>';
+}
+function bgmPickTrack(trackId) {
+  const ctx = bgmPickCtx; bgmClosePicker();
+  if (!ctx) return;
+  const info = getBlockArrayInfo(ctx.blockId, ctx.cid);
+  if (!info || info.block.type !== 'bgm') return;
+  info.block.trackId = trackId;
+  commitBlockTreeChange('bgm:' + ctx.blockId + ':track', ctx.cid, { force: true });
+  renderRootBlocksByCid(info.rootCid || ctx.cid);
+}
 function getEmbeddedRollMacro(block) {
   return getRollMacro({ ...(block || {}), type: 'roll' });
 }
@@ -15560,6 +15638,8 @@ function getBlockConnectionLabel(block, index = 0) {
       const summary = truncateInlineText(extractBlockPlainText(block.content, ''), 28);
       return `[이미지] ${summary || `#${index + 1}`}`;
     }
+    case 'bgm':
+      return truncateInlineText(bgmExportLine(block), 34);
     default: {
       const summary = truncateInlineText(extractBlockPlainText(block.content, ''), 28);
       return summary ? `#${index + 1} ${summary}` : `#${index + 1} (빈 블록)`;
@@ -19400,6 +19480,9 @@ function mkBlockEl(b, cid, ctx = {}) {
           </div>
           <div class="img-preview">${isRenderableImageSrc(b.content) ? `<img src="${esc(b.content)}" style="max-width:100%;max-height:200px;border-radius:4px;margin-top:4px;">` : ''}</div>`;
       break;
+    case 'bgm':
+      bodyHtml = bgmBlockHtml(b, cid);
+      break;
     case 'callout': {
       const ct = b.calloutType || 'info';
       const ctMap = CALLOUT_TYPE_LABELS;
@@ -19424,7 +19507,7 @@ function mkBlockEl(b, cid, ctx = {}) {
       </div>`;
       break;
     default: {
-      const ph = { text:'내용을 입력하세요', investigate:'조사 내용', handout:'핸드아웃 내용', event:'이벤트 내용', bgm:'BGM / SE 정보', variation:'개변 내용', other:'기타 내용', info:'정보 내용' };
+      const ph = { text:'내용을 입력하세요', investigate:'조사 내용', handout:'핸드아웃 내용', event:'이벤트 내용', variation:'개변 내용', other:'기타 내용', info:'정보 내용' };
       bodyHtml = `<div class="block-ce" contenteditable="true" data-field="content" data-ph="${ph[b.type]||'내용'}" oninput="upd('${b.id}','content',this.innerHTML,'${cid}')"></div>`;
     }
   }
@@ -19456,7 +19539,9 @@ function mkBlockEl(b, cid, ctx = {}) {
   copyBtn.onclick = () => {
     const presetMacro = getPresetBlockMacro(b);
     let text;
-    if (presetMacro) {
+    if (b.type === 'bgm') {
+      text = bgmExportLine(b);
+    } else if (presetMacro) {
       text = getPreferredPresetBlockMacro(b);
     } else if ((b.css || '').trim()) {
       text = b.css.trim();
@@ -21447,6 +21532,7 @@ const BIP_ICONS = {
   column:  '<i class="fa-solid fa-table-columns"></i>',
   divider: '<i class="fa-solid fa-minus"></i>',
   image:   '<i class="fa-solid fa-image"></i>',
+  bgm:     '<i class="fa-solid fa-music"></i>',
 };
 let _bipInsertIdx = null, _bipCid = null, _bipTargetKey = null;
 // "하위 블록 추가" ＋ 버튼이 팝업을 열 때 caret/click 위치 컨텍스트를 보관한다.
@@ -42580,6 +42666,9 @@ function rbGetTocTitleFromBlock(block, fallbackIndex) {
       break;
     case 'divider':
       summary = '구분선';
+      break;
+    case 'bgm':
+      summary = bgmExportLine(block);
       break;
     default:
       summary = extractBlockPlainText(block.content || block.title || '', '');
