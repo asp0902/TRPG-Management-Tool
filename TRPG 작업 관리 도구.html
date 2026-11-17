@@ -8038,6 +8038,7 @@ tr:hover > .sh-coc-weapon-actions > *, tr:focus-within > .sh-coc-weapon-actions 
 .character-sheet-popup #ch-sheet-delete-btn,
 .character-sheet-popup #ch-dnd-builder-btn { display: none !important; }
 .character-sheet-popup #main { width: 100%; }
+.detached-window #app-page-tabs, .detached-window .page-dropdown, .detached-window .sidebar-logo-arrow { display: none !important; } /* 분리 창: 탭 줄·페이지 전환 숨김(#279) */
 .character-sheet-popup .ch-sheet-backdrop { display: flex !important; }
 .ch-dnd-builder-btn { background: #fff; border: 1px solid #0ea5e9; border-radius: 8px; cursor: pointer; font-size: 13px; color: #0284c7; padding: 6px 13px; font-family: inherit; font-weight: 600; flex-shrink: 0; }
 .ch-dnd-builder-btn:hover { background: #f0f9ff; border-color: #0284c7; }
@@ -11101,6 +11102,7 @@ async function load() {
 }
 async function persistNow() {
   if (isCharacterSheetPopupMode()) return await flushCharacterSheetPopupPersist();
+  if (multiNonLeader()) { multiPost({ kind: 'full', payload: makeStatePayload() }); return makeStatePayload(); } // 비주 창의 전체 교체(가져오기·복원 등)는 주 창이 받아 저장한다
   if (persistTimer) {
     clearTimeout(persistTimer);
     persistTimer = null;
@@ -11114,6 +11116,8 @@ function persist(options = {}) {
     return;
   }
   if (currentPage === 'datasheet') commitDataSheetHistoryFromPersist();
+  if (multiNonLeader()) { multiSchedulePatch(); return; } // 비주 창은 IndexedDB·GitHub 에 직접 쓰지 않고 변경만 주 창에 보낸다(#279)
+  if (!options.fromPeer) multiSchedulePatch();
   persistDirty = true;
   snapshotDirty = true;
   if (options.remoteDirty !== false) markGitHubSyncDirty();
@@ -11197,6 +11201,223 @@ function handleCharacterSheetSync(event) {
   if (!isCharacterSheetPopupMode()) persist({ remoteDirty: false, skipCharacterSheetSync: true });
 }
 if (characterSheetSyncChannel) characterSheetSyncChannel.addEventListener('message', handleCharacterSheetSync);
+
+// ═══════════════════════════════════════════════
+// 여러 창 동시 편집(#279): 탭 페이지를 별도 창으로 분리해도 같은 데이터를 함께 편집한다.
+// - 주 창(리더)만 IndexedDB 저장·원격 동기화·자동 백업을 한다(navigator.locks 'trpg-state-writer'). 주 창이 닫히면 다음 창이 승계한다.
+// - 창마다 persist() 때 직전 스냅샷과 비교해 바뀐 항목만 BroadcastChannel('trpg-state') 로 보낸다(최상위 컬렉션의 id 단위, 그 외는 키 단위).
+// - 비주 창은 IndexedDB 에 직접 쓰지 않는다. 받는 창은 패치를 state 에 적용하고 화면을 다시 그린다.
+// - 같은 항목을 두 창이 고치면 항목 단위 마지막 쓰기 우선. 입력 중이면 포커스가 빠질 때까지 보류하고, 그 사이 내 편집이 있으면 내 것을 다시 보낸다.
+// ═══════════════════════════════════════════════
+const MULTI_WIN_KEYS = ['scenarios', 'folders', 'cssMacroFolders', 'records', 'catalog', 'cssMacros', 'cssPopupDictionary', 'bookmarks', 'musicFolders', 'musicTagCats', 'musicTracks', 'rulebooks', 'dataSheets', 'characters', 'characterFolders', 'customFonts', 'manualFonts', 'recentFonts', 'customBulletSymbols', 'customBulletImages', 'findReplaceHistory', 'sharedMemoOwner'];
+const multiWin = {
+  id: characterSheetInstanceId,
+  channel: typeof BroadcastChannel === 'function' ? new BroadcastChannel('trpg-state') : null,
+  locksOk: typeof navigator !== 'undefined' && !!navigator.locks && typeof navigator.locks.request === 'function',
+  isLeader: true, peers: new Set(), snapshot: null, patchTimer: null, pending: [], outbox: [], dutiesStarted: false, helloTimer: null, fullWaiter: null,
+  detachedPage: (characterSheetPopupParams.get('detached') === '1' && characterSheetPopupParams.get('page')) || '',
+  returnTimers: new Map(),
+};
+function multiNonLeader() { return !!(multiWin.channel && multiWin.locksOk && !multiWin.isLeader); }
+function multiIsLeader() { return !multiNonLeader(); }
+function multiIsItems(value) { return Array.isArray(value) && value.every(item => item && typeof item === 'object' && !Array.isArray(item) && typeof item.id === 'string' && item.id); }
+function multiDescribe(value) {
+  if (multiIsItems(value)) { const map = new Map(); value.forEach(item => map.set(item.id, JSON.stringify(item))); return { items: true, order: value.map(item => item.id), map }; }
+  return { items: false, json: JSON.stringify(value === undefined ? null : value) };
+}
+function multiCapture() { const snap = new Map(); MULTI_WIN_KEYS.forEach(key => snap.set(key, multiDescribe(state[key]))); multiWin.snapshot = snap; }
+// 직전 스냅샷과 비교해 바뀐 항목만 모은다(스냅샷은 현재 상태로 갱신).
+function multiDiff() {
+  if (!multiWin.snapshot) { multiCapture(); return []; }
+  const ops = [], next = new Map();
+  MULTI_WIN_KEYS.forEach(key => {
+    const value = state[key], cur = multiDescribe(value), old = multiWin.snapshot.get(key);
+    next.set(key, cur);
+    if (!old || old.items !== cur.items) { ops.push({ key, type: 'value', value }); return; }
+    if (!cur.items) { if (cur.json !== old.json) ops.push({ key, type: 'value', value }); return; }
+    const set = [], del = [];
+    value.forEach(item => { if (old.map.get(item.id) !== cur.map.get(item.id)) set.push(item); });
+    old.map.forEach((json, id) => { if (!cur.map.has(id)) del.push(id); });
+    if (set.length || del.length || JSON.stringify(old.order) !== JSON.stringify(cur.order)) ops.push({ key, type: 'items', set, del, order: cur.order });
+  });
+  multiWin.snapshot = next;
+  return ops;
+}
+// 받은 패치를 state 에 적용한다. 내 쪽에 아직 보내지 않은 편집이 있는 항목은 건드리지 않고(내 것 우선) 충돌 수로 센다.
+function multiApplyOps(ops) {
+  let conflicts = 0;
+  if (!multiWin.snapshot) multiCapture();
+  (ops || []).forEach(op => {
+    const key = op.key; if (!MULTI_WIN_KEYS.includes(key)) return;
+    const old = multiWin.snapshot.get(key);
+    if (op.type === 'value') {
+      if (old && !old.items && JSON.stringify(state[key] === undefined ? null : state[key]) !== old.json) { conflicts++; return; } // 내 쪽에 아직 안 보낸 변경이 있으면 내 것 우선
+      state[key] = op.value; multiWin.snapshot.set(key, multiDescribe(op.value)); return;
+    }
+    if (!Array.isArray(state[key])) state[key] = [];
+    const arr = state[key]; let desc = old && old.items ? old : null;
+    if (!desc) { desc = multiDescribe(arr); if (!desc.items) desc = { items: true, order: [], map: new Map() }; multiWin.snapshot.set(key, desc); }
+    (op.set || []).forEach(item => {
+      const idx = arr.findIndex(x => x.id === item.id);
+      if (idx >= 0 && JSON.stringify(arr[idx]) !== desc.map.get(item.id)) { conflicts++; return; }
+      if (idx >= 0) arr[idx] = item; else arr.push(item);
+      desc.map.set(item.id, JSON.stringify(item));
+    });
+    (op.del || []).forEach(id => {
+      const idx = arr.findIndex(x => x.id === id); if (idx < 0) { desc.map.delete(id); return; }
+      if (JSON.stringify(arr[idx]) !== desc.map.get(id)) { conflicts++; return; }
+      arr.splice(idx, 1); desc.map.delete(id);
+    });
+    if (Array.isArray(op.order)) {
+      const byId = new Map(arr.map(item => [item.id, item])), rank = new Set(op.order);
+      const sorted = op.order.map(id => byId.get(id)).filter(Boolean).concat(arr.filter(item => !rank.has(item.id)));
+      arr.splice(0, arr.length, ...sorted);
+    }
+    desc.order = arr.map(item => item.id);
+  });
+  return conflicts;
+}
+function multiPost(message) { try { multiWin.channel && multiWin.channel.postMessage(Object.assign({ sender: multiWin.id }, message)); } catch (e) { console.warn('multi-window post failed', e); } }
+function multiSchedulePatch() {
+  if (!multiWin.channel) return;
+  if (multiWin.patchTimer) clearTimeout(multiWin.patchTimer);
+  multiWin.patchTimer = setTimeout(multiFlushPatch, 250);
+}
+function multiFlushPatch() {
+  if (multiWin.patchTimer) { clearTimeout(multiWin.patchTimer); multiWin.patchTimer = null; }
+  if (!multiWin.channel || !multiWin.snapshot) return;
+  const ops = multiDiff();
+  if (!ops.length) return;
+  if (multiWin.peers.size) multiPost({ kind: 'patch', ops });
+  else if (multiNonLeader()) multiWin.outbox.push(ops); // 주 창을 아직 못 찾았으면 보관했다가 연결되면 보낸다(저장은 주 창만)
+}
+function multiEditingNow() { // 입력 중이면 받은 패치를 보류한다
+  if (typeof imeComposing !== 'undefined' && imeComposing) return true;
+  const el = document.activeElement;
+  if (!el || el === document.body || (el.closest && el.closest('#cp-panel'))) return false;
+  if (el.isContentEditable) return true;
+  return (el.tagName === 'TEXTAREA') || (el.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'color', 'range', 'file', 'submit', 'hidden'].includes(el.type));
+}
+function multiRefreshUI() {
+  const focusSnap = githubSyncCaptureFocus();
+  try { refreshAfterImport(false); } catch (e) { console.warn('multi-window refresh failed', e); }
+  githubSyncRestoreFocus(focusSnap);
+}
+function multiHandlePatch(ops) {
+  if (multiEditingNow()) { multiWin.pending.push(ops); return; }
+  multiWin.pending.push(ops); multiApplyPending();
+}
+function multiApplyPending() {
+  if (!multiWin.pending.length || multiEditingNow()) return;
+  const batches = multiWin.pending.splice(0);
+  let conflicts = 0;
+  batches.forEach(ops => { conflicts += multiApplyOps(ops); });
+  multiWin.applied = (multiWin.applied || 0) + 1;
+  if (multiIsLeader()) persist({ fromPeer: true }); // 주 창: 받은 변경을 저장·원격 동기화 대상에 올린다
+  multiRefreshUI();
+  if (conflicts) { multiSchedulePatch(); if (typeof showToast === 'function') showToast('다른 창의 변경과 겹쳐 이 창의 내용으로 저장했습니다.'); }
+}
+document.addEventListener('focusout', () => { if (multiWin.pending.length) setTimeout(multiApplyPending, 0); });
+function multiApplyFull(payload) { // 전체 상태 교체(새 창 최초 동기화·가져오기/복원 등)
+  applyStatePayload(payload);
+  multiCapture();
+}
+function multiOnMessage(event) {
+  const msg = event && event.data;
+  if (!msg || msg.sender === multiWin.id) return;
+  if (msg.kind === 'hello') {
+    multiWin.peers.add(msg.sender);
+    if (msg.detachedPage && multiWin.returnTimers.has(msg.detachedPage)) { clearTimeout(multiWin.returnTimers.get(msg.detachedPage)); multiWin.returnTimers.delete(msg.detachedPage); } // 분리 창 새로고침이면 탭 복귀 취소
+    if (!multiWin.snapshot) multiCapture();
+    multiPost({ kind: 'hi', to: msg.sender });
+    if (msg.needFull && multiIsLeader()) { multiFlushPatch(); multiPost({ kind: 'full', to: msg.sender, payload: makeStatePayload() }); }
+    return;
+  }
+  if (msg.kind === 'hi') {
+    if (msg.to && msg.to !== multiWin.id) return;
+    multiWin.peers.add(msg.sender);
+    if (!multiWin.snapshot) multiCapture();
+    if (multiWin.outbox.length) { multiWin.outbox.splice(0).forEach(ops => multiPost({ kind: 'patch', ops })); }
+    return;
+  }
+  if (msg.kind === 'bye') { multiWin.peers.delete(msg.sender); return; }
+  if (msg.kind === 'full') {
+    if (msg.to && msg.to !== multiWin.id) return;
+    multiApplyFull(msg.payload);
+    if (multiWin.fullWaiter) { multiWin.fullWaiter(); multiWin.fullWaiter = null; }
+    else { multiRefreshUI(); if (multiIsLeader()) persist({ fromPeer: true }); }
+    return;
+  }
+  if (msg.kind === 'patch') { multiHandlePatch(msg.ops); return; }
+  if (msg.kind === 'tab-return') {
+    if (multiWin.detachedPage || !msg.page) return;
+    if (multiWin.returnTimers.has(msg.page)) clearTimeout(multiWin.returnTimers.get(msg.page));
+    multiWin.returnTimers.set(msg.page, setTimeout(() => { multiWin.returnTimers.delete(msg.page); if (typeof ensureAppPageTab === 'function') { ensureAppPageTab(msg.page); renderAppPageTabs(); } }, 1200));
+  }
+}
+// 주 창 승계: 이 창이 락을 얻으면 저장·동기화·백업을 이어받는다(이 창은 모든 패치를 받아 왔으므로 전체 상태를 가지고 있다).
+function multiPromote() {
+  multiWin.isLeader = true;
+  persistDirty = true; snapshotDirty = true;
+  persistNow().catch(err => console.warn('승계 저장 실패:', err));
+  startLeaderDuties();
+}
+async function multiStart() {
+  if (!multiWin.channel) return;
+  multiWin.channel.onmessage = multiOnMessage;
+  if (multiWin.locksOk) {
+    await new Promise(resolve => {
+      navigator.locks.request('trpg-state-writer', { ifAvailable: true }, async lock => {
+        if (lock) { multiWin.isLeader = true; resolve(); await new Promise(() => {}); }
+        else { multiWin.isLeader = false; resolve(); navigator.locks.request('trpg-state-writer', async () => { multiPromote(); await new Promise(() => {}); }); }
+      }).catch(() => resolve());
+    });
+  }
+  const needFull = multiNonLeader();
+  const waitFull = needFull ? new Promise(resolve => { multiWin.fullWaiter = resolve; setTimeout(() => { if (multiWin.fullWaiter) { multiWin.fullWaiter = null; resolve(); } }, 1500); }) : null;
+  multiPost({ kind: 'hello', needFull, detachedPage: multiWin.detachedPage });
+  if (waitFull) await waitFull;
+  if (needFull) { // 아직 주 창과 연결되지 않았으면 몇 초마다 다시 부른다(그동안의 편집은 보관)
+    if (!multiWin.snapshot) multiCapture();
+    multiWin.helloTimer = setInterval(() => { if (multiWin.peers.size) { clearInterval(multiWin.helloTimer); multiWin.helloTimer = null; } else multiPost({ kind: 'hello', needFull: false, detachedPage: multiWin.detachedPage }); }, 3000);
+  }
+}
+window.addEventListener('pagehide', () => {
+  try { multiFlushPatch(); } catch (e) {}
+  multiPost({ kind: 'bye' });
+  if (multiWin.detachedPage) multiPost({ kind: 'tab-return', page: multiWin.detachedPage });
+});
+window.addEventListener('beforeunload', event => { if (multiNonLeader() && multiWin.outbox.length) { event.preventDefault(); event.returnValue = ''; } }); // 아직 주 창에 전달 못 한 편집이 있으면 닫기 전에 묻는다
+// ── 탭 → 새 창으로 분리(①) ──
+function detachAppPage(page) {
+  if (!page || multiWin.detachedPage) return;
+  if (openAppPages.length <= 1) { showToast('탭이 하나뿐이라 분리할 수 없습니다.'); return; }
+  const url = location.pathname + '?page=' + encodeURIComponent(page) + '&detached=1';
+  let win = null;
+  try { win = window.open(url, 'trpg-detached-' + page, 'popup=yes,width=1100,height=800'); } catch (e) {}
+  if (!win) { showToast('팝업이 차단되어 새 창을 열 수 없습니다.'); return; }
+  closeAppPageTab(page);
+}
+function openAppPageTabMenu(event, page) {
+  event.preventDefault();
+  document.getElementById('app-tab-menu')?.remove();
+  const menu = document.createElement('div');
+  menu.id = 'app-tab-menu'; menu.className = 'ds-ctx-menu open'; menu.style.zIndex = 12700;
+  menu.innerHTML = '<div class="ds-ctx-item">새 창으로 분리</div>';
+  menu.addEventListener('click', () => { menu.remove(); detachAppPage(page); });
+  menu.addEventListener('contextmenu', e => e.preventDefault());
+  document.body.appendChild(menu);
+  menu.style.left = Math.max(4, Math.min(event.clientX, window.innerWidth - menu.offsetWidth - 4)) + 'px';
+  menu.style.top = Math.max(4, Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 4)) + 'px';
+  const close = e => { if (e.type === 'mousedown' && menu.contains(e.target)) return; menu.remove(); ['mousedown', 'keydown', 'scroll', 'resize', 'blur'].forEach(t => window.removeEventListener(t, close, true)); };
+  setTimeout(() => ['mousedown', 'keydown', 'scroll', 'resize', 'blur'].forEach(t => window.addEventListener(t, close, true)), 0);
+}
+function multiDragEndOutside(event) { // 탭을 브라우저 창 밖에 놓았는지(화면 좌표 기준)
+  if (event.dataTransfer && event.dataTransfer.dropEffect && event.dataTransfer.dropEffect !== 'none') return false;
+  const x = event.screenX, y = event.screenY;
+  if ((!x && !y) || !window.outerWidth) return false; // 좌표를 알 수 없거나 창 크기를 못 읽으면 분리하지 않는다
+  return x < window.screenX || x > window.screenX + window.outerWidth || y < window.screenY || y > window.screenY + window.outerHeight;
+}
 
 const HISTORY_LIMIT = 50;
 const HISTORY_MERGE_MS = 700;
@@ -25225,6 +25446,7 @@ if (typeof window !== 'undefined') {
   });
 }
 function syncGitHubState(options = {}) {
+  if (multiNonLeader()) { if (!options.automatic) showToast('동기화는 주 창에서만 실행됩니다.'); return Promise.resolve(false); }
   if (githubSyncInFlight) return githubSyncInFlight;
   if (githubSyncTimer) clearTimeout(githubSyncTimer);
   githubSyncTimer = null;
@@ -25237,6 +25459,7 @@ function syncGitHubState(options = {}) {
   }).finally(() => {
     githubSyncInFlight = null;
     updateGitHubSyncButton();
+    multiSchedulePatch(); // 동기화로 바뀐 데이터를 다른 창에도 전파(#279)
     const reason = githubSyncRestoreFocus(focusSnap);
     const trace = githubSyncTrace; githubSyncTrace = null;
     if (trace && focusSnap) { // 복구 결과·판정·sha 를 같은 로그에 1건 남긴다(#269)
@@ -38579,7 +38802,7 @@ function loadOpenAppPages() {
 }
 let openAppPages = loadOpenAppPages();
 function saveOpenAppPages() {
-  if (isCharacterSheetPopupMode()) return;
+  if (isCharacterSheetPopupMode() || multiWin.detachedPage) return; // 분리 창은 주 창의 열린 탭 목록을 건드리지 않는다
   localStorage.setItem(APP_OPEN_PAGES_KEY, JSON.stringify(normalizeAppPages(openAppPages)));
 }
 function ensureAppPageTab(page) {
@@ -38651,6 +38874,7 @@ const CSS_MACRO_PAGE_TITLES = {
   datasheet: '데이터 시트',
 };
 function switchPage(page) {
+  if (multiWin.detachedPage && page !== multiWin.detachedPage) return; // 분리 창은 그 페이지만 연다(#279)
   frClearFindHighlights();
   // 데이터 시트는 _dsEditId 휘발성에 의존하므로 직접 진입 불가 → 룰북으로 리다이렉트
   if (page === 'datasheet' && !findDataSheet(_dsEditId)) page = 'rulebook';
@@ -38677,7 +38901,7 @@ function switchPage(page) {
   closeSidebarOnCompactViewport();
   renderAppPageTabs();
   // datasheet는 새로고침 후 복구 불가하므로 last-page에 저장하지 않음
-  if (page !== 'datasheet' && !isCharacterSheetPopupMode()) localStorage.setItem('trpg-last-page', page);
+  if (page !== 'datasheet' && !isCharacterSheetPopupMode() && !multiWin.detachedPage) localStorage.setItem('trpg-last-page', page);
   closeCssPopupDictionary();
   document.querySelectorAll('.page-dropdown-item').forEach(item => {
     item.classList.toggle('active', item.dataset.page === (characterSheetId ? 'character' : (recordTimelineId ? 'record' : page)));
@@ -38882,12 +39106,22 @@ function bootMark(label) {
   const timings = window.__bootTimings || (window.__bootTimings = {});
   timings[label] = Math.round(performance.now());
 }
+// 주 창만 하는 일: 음원 업로드·원격 동기화·자동 백업·스냅샷(#279). 비주 창은 주 창이 되면 이어받는다.
+function startLeaderDuties() {
+  if (multiWin.dutiesStarted || isCharacterSheetPopupMode()) return;
+  multiWin.dutiesStarted = true;
+  if (gdriveConfigured()) setTimeout(() => musicSyncUploads(), 4000); // Drive 음원 업로드(#297): 조용히 토큰 갱신 시도, 안 되면 연결 필요 표시
+  const syncDone = initGitHubSync(); syncDone.catch(() => {}).then(restoreWebCharacterImages); // 동기화 pull 뒤에 웹 이미지를 dataURL 로 되돌린다(#233)
+  Promise.resolve(initAutoBackup()).catch(() => {});
+  initAppSnapshots();
+}
 async function bootstrapApp() {
   bootMark('boot-start');
   await load();
   bootMark('load-done');
   loadCustomFonts();
   updateFontDropdown();
+  if (!isCharacterSheetPopupMode()) { await multiStart(); if (multiNonLeader()) { loadCustomFonts(); updateFontDropdown(); } } // 역할(주 창/비주 창) 결정, 비주 창은 주 창의 최신 상태를 받는다(#279)
   openAppPages = normalizeAppPages(openAppPages).filter(page => {
     const characterId = getCharacterSheetIdFromPage(page);
     const timelineRecordId = getRecordTimelineIdFromPage(page);
@@ -38914,6 +39148,11 @@ async function bootstrapApp() {
     popupCharacter.activeSheetId = popupSheet.id;
     openAppPages = [getCharacterSheetPageId(popupCharacter.id)];
     switchPage(openAppPages[0]);
+  } else if (multiWin.detachedPage && normalizeAppPages([multiWin.detachedPage]).length) {
+    document.body.classList.add('detached-window'); // 탭 줄·페이지 전환 없이 그 페이지만(#279)
+    openAppPages = [multiWin.detachedPage];
+    switchPage(multiWin.detachedPage);
+    document.title = (getAppPageLabel(multiWin.detachedPage) || multiWin.detachedPage) + ' — TRPG';
   } else {
     // 마지막 페이지 복원
     const _lastPage = localStorage.getItem('trpg-last-page');
@@ -38930,11 +39169,8 @@ async function bootstrapApp() {
   bootMark('first-render-done');
   // GitHub 동기화는 첫 렌더 뒤 백그라운드로(원격이 바뀌었으면 34MB 받기·적용이 끝나야 화면이 뜨던 지연 제거). 버튼은 「동기화 중」으로 보인다.
   // 동기화 pull 뒤에 웹 이미지를 dataURL 로 되돌린다(#233).
-  if (!isCharacterSheetPopupMode() && gdriveConfigured()) setTimeout(() => musicSyncUploads(), 4000); // Drive 음원 업로드(#297): 조용히 토큰 갱신 시도, 안 되면 연결 필요 표시
-  if (!isCharacterSheetPopupMode()) { const syncDone = initGitHubSync(); syncDone.catch(() => {}).then(restoreWebCharacterImages); }
-  if (!isCharacterSheetPopupMode()) await initAutoBackup();
+  if (multiIsLeader()) startLeaderDuties();
   bootMark('autobackup-init-done');
-  initAppSnapshots();
   bootMark('boot-done');
   console.info('[boot ms]', JSON.stringify(window.__bootTimings));
 }
@@ -38950,6 +39186,14 @@ document.getElementById('sidebar-logo-wrap').addEventListener('click', function(
   const item = e.target.closest('.page-dropdown-item');
   if (item) { switchPage(item.dataset.page); return; }
   this.classList.toggle('open');
+});
+document.getElementById('app-page-tabs').addEventListener('contextmenu', function(e) {
+  const tab = e.target.closest('.app-page-tab');
+  if (tab && !multiWin.detachedPage) openAppPageTabMenu(e, tab.dataset.page);
+});
+document.getElementById('app-page-tabs').addEventListener('dragend', function(e) {
+  const tab = e.target.closest('.app-page-tab');
+  if (tab && !multiWin.detachedPage && multiDragEndOutside(e)) detachAppPage(tab.dataset.page);
 });
 document.getElementById('app-page-tabs').addEventListener('click', function(e) {
   const close = e.target.closest('.app-page-tab-close');
@@ -39024,6 +39268,7 @@ function flushBeforePageHide() {
   try {
     if (currentPage === 'script' && state.currentId) syncInfo({ commit: false });
     persist({ remoteDirty: false });
+    multiFlushPatch(); // 닫히기 직전 변경도 다른 창에 전달(#279)
     flushPersist().catch(err => {
       console.warn('last-minute persist failed:', err);
     });
