@@ -2245,11 +2245,13 @@ tr.ct-row-end .ct-select:focus {
 .music-modal .music-cat-row input[type="color"]::-moz-color-swatch { border: 1px solid rgba(0,0,0,.15); border-radius: 3px; }
 .music-cat-count { border: 1px solid #ddd; background: #fff; border-radius: 999px; padding: 1px 8px; font: inherit; font-size: 11px; color: #777; cursor: pointer; }
 .music-cat-count:hover, .music-cat-count.on { background: #f3f3f3; color: #333; }
-.music-cat-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 2px 0 8px 36px; }
-.music-cat-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 4px 1px 8px; border-radius: 999px; background: #f3f3f3; border: 1px solid #e3e3e3; color: #3a3a3a; font-size: 11.5px; font-weight: 700; }
+.music-cat-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 8px 0 10px 36px; }
+.music-cat-chip { position: relative; display: inline-flex; align-items: center; gap: 2px; padding: 1px 8px; border-radius: 999px; background: #f3f3f3; border: 1px solid #e3e3e3; color: #3a3a3a; font-size: 11.5px; font-weight: 700; }
 .music-cat-chip-name { cursor: text; }
-.music-cat-chip .music-cat-chip-x { border: 0; background: none; padding: 0 3px; font-size: 13px; line-height: 1; color: #888; cursor: pointer; }
-.music-cat-chip .music-cat-chip-x:hover { color: #c0392b; }
+.music-cat-chip .music-cat-chip-x { position: absolute; top: -6px; right: -6px; width: 14px; height: 14px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 50%; background: #fff; padding: 0; font-size: 11px; line-height: 1; color: #888; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; }
+.music-cat-chip:hover .music-cat-chip-x, .music-cat-chip:focus-within .music-cat-chip-x { opacity: 1; pointer-events: auto; }
+.music-cat-chip:has(.music-cat-chip-edit) .music-cat-chip-x { display: none; } /* 이름 편집 중에는 × 숨김 */
+.music-cat-chip .music-cat-chip-x:hover { color: #c0392b; border-color: #c0392b; }
 .music-cat-chip-edit, .music-cat-tag-input { border: 1px solid #ddd; border-radius: 999px; padding: 1px 8px; font: inherit; font-size: 11.5px; }
 .music-cat-tag-input { min-width: 150px; }
 .music-cat-name { flex: 1; min-width: 0; border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12px; }
@@ -36005,7 +36007,7 @@ function musicTagLabel(cat, key) { // 표시 이름: 곡에 붙은 원래 글자
 function musicTagUseCount(key) { return state.musicTracks.filter(track => (track.tags || []).some(tag => musicTagKey(tag) === key)).length; }
 function musicCatTagsHtml(cat) {
   return '<div class="music-cat-tags">' + cat.tags.map(key => '<span class="music-cat-chip" data-cat="' + esc(cat.id) + '" data-key="' + esc(key) + '" style="' + esc(musicTagChipStyle(key)) + '"><span class="music-cat-chip-name" title="눌러서 이름 수정" onclick="musicCatTagEditStart(this)">' + esc(musicTagLabel(cat, key)) + '</span><button type="button" class="music-cat-chip-x" title="삭제" onclick="musicCatTagDelete(this)">×</button></span>').join('')
-    + '<input type="text" class="music-cat-tag-input" data-cat="' + esc(cat.id) + '" placeholder="태그 추가 (Enter·쉼표)" spellcheck="false" onkeydown="musicCatTagAddKey(event,this)"></div>';
+    + '<input type="text" class="music-cat-tag-input" data-cat="' + esc(cat.id) + '" placeholder="태그 추가" spellcheck="false" onkeydown="musicCatTagAddKey(event,this)"></div>';
 }
 function musicCatRowsRefresh(focusCatId) {
   const rows = document.getElementById('music-cat-rows'); if (!rows) return;

@@ -25,4 +25,8 @@ ok(S.musicTracks.find(t => t.id === 't2').tags.join() === '밤,커피' && S.musi
 f.musicCatTagDelete({ closest: () => ({ dataset: { cat: 'c1', key: '커피' } }) });
 ok(S.musicTracks.every(t => !t.tags.includes('커피')) && !S.musicTagCats[0].tags.includes('커피') && !('커피' in S.musicTagCats[0].labels), '삭제: 분류와 모든 곡에서 제거');
 ok(html.includes("seen.set(key, musicTagLabel(cat, key))"), '등록 태그가 「이전에 만든 태그」 목록에 포함');
+ok(html.includes('.music-cat-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 8px 0 10px 36px; }'), '태그 영역 위 여백 8px(#311)');
+ok(/\.music-cat-chip \{ position: relative;[^}]*padding: 1px 8px;/.test(html) && /\.music-cat-chip \.music-cat-chip-x \{ position: absolute; top: -6px; right: -6px; width: 14px; height: 14px;[^}]*border-radius: 50%;[^}]*opacity: 0; pointer-events: none;/.test(html), '× 는 칩 우상단 겹친 원형·기본 숨김');
+ok(html.includes('.music-cat-chip:hover .music-cat-chip-x, .music-cat-chip:focus-within .music-cat-chip-x { opacity: 1; pointer-events: auto; }') && html.includes('.music-cat-chip:has(.music-cat-chip-edit) .music-cat-chip-x { display: none; }'), 'hover·focus 시 표시, 이름 편집 중 숨김');
+ok(html.includes('placeholder="태그 추가" spellcheck="false" onkeydown="musicCatTagAddKey') && !html.includes('태그 추가 (Enter'), 'placeholder 「태그 추가」(안내 제거)');
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);
