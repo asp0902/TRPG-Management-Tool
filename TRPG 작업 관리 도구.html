@@ -7197,6 +7197,8 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .character-card-rule { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.05em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .character-card-name { font-size: 14px; font-weight: 800; color: #111; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .character-card-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+.character-card-pair { cursor: pointer; background: #fdeef2; color: #a0455f; }
+.ch-modal-pair-select { margin-top: 6px; }
 .character-card-tag { font-size: 10px; color: #666; background: #f0f0f0; border-radius: 4px; padding: 1px 6px; }
 .character-card-memo { font-size: 11px; color: #999; line-height: 1.4; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .character-card-footer { display: flex; border-top: 1px solid #f0f0f0; flex-shrink: 0; }
@@ -9437,6 +9439,11 @@ select.sh-field-input,
       <div class="ch-modal-field">
         <div class="ch-modal-label">폴더</div>
         <select class="ch-modal-select" id="ch-folder-select"></select>
+      </div>
+      <div class="ch-modal-field">
+        <div class="ch-modal-label">페어</div>
+        <div class="ch-modal-tags" id="ch-modal-pairs"></div>
+        <select class="ch-modal-select ch-modal-pair-select" id="ch-pair-select" onchange="addChPair(this.value)"></select>
       </div>
       <div class="ch-modal-field">
         <div class="ch-modal-label">태그</div>
@@ -38522,6 +38529,7 @@ const _rbExpandedIds = new Set();
 // 캐릭터 페이지
 let _chEditId = null;
 let _chTags = [];
+let _chPairs = []; // 편집 모달의 페어 id(#300)
 let _chFilterTag = null;
 let _chSidebarSelectedId = null;
 let _openCharacterSheetId = null;
@@ -43075,6 +43083,7 @@ function normalizeCharacterEntry(ch) {
     ruleName: ch.ruleName || '',
     folderId: typeof ch.folderId === 'string' ? ch.folderId : '',
     tags: Array.isArray(ch.tags) ? ch.tags : [],
+    pairIds: [...new Set(Array.isArray(ch.pairIds) ? ch.pairIds.filter(x => typeof x === 'string' && x && x !== ch.id) : [])], // 양방향 페어(#300)
     image: ch.image || '',
     memo: ch.memo || '',
     color: normalizeCharacterColor(ch.color),
@@ -43090,6 +43099,20 @@ function normalizeCharacterEntry(ch) {
     sheetVersion: ch.sheetVersion || 0,
     sheetData: (ch.sheetData && typeof ch.sheetData === 'object') ? ch.sheetData : {},
   };
+}
+// 페어 양방향 반영(#300): id 캐릭터의 페어를 ids 로 정하고 상대 쪽도 맞춤
+function applyCharacterPairs(id, ids) {
+  const want = [...new Set((ids || []).filter(x => x && x !== id))];
+  state.characters.forEach(c => {
+    if (c.id === id) { c.pairIds = want.filter(x => state.characters.some(o => o.id === x)); return; }
+    const has = Array.isArray(c.pairIds) && c.pairIds.includes(id);
+    if (want.includes(c.id)) { if (!has) c.pairIds = [...(c.pairIds || []), id]; }
+    else if (has) c.pairIds = c.pairIds.filter(x => x !== id);
+  });
+}
+// 삭제된 캐릭터 id 를 남은 캐릭터 페어에서 제거(#300)
+function removeCharacterFromPairs(id) {
+  state.characters.forEach(c => { if (Array.isArray(c.pairIds) && c.pairIds.includes(id)) c.pairIds = c.pairIds.filter(x => x !== id); });
 }
 function compareCharactersByName(a, b) {
   return (a.name || '').localeCompare(b.name || '', 'ko', { sensitivity: 'base', numeric: true }) ||
@@ -43146,6 +43169,7 @@ function renderCharacterCard(ch) {
   const cardImage = getCharacterCardImage(ch);
   const thumbHtml = cardImage ? `<img src="${esc(cardImage)}" alt="" loading="lazy" decoding="async" onerror="this.replaceWith(document.createTextNode('🎭'))">` : '🎭';
   const tagsHtml = ch.tags.map(t => `<span class="character-card-tag">${esc(t)}</span>`).join('');
+  const pairsHtml = (ch.pairIds || []).map(pid => state.characters.find(o => o.id === pid)).filter(Boolean).map(o => `<span class="character-card-tag character-card-pair" title="페어" onclick="openCharacterModal('${o.id}')">♡ ${esc(o.name)}</span>`).join('');
   let ruleLabelHtml = '';
   if (ch.rulebookId) {
     const rb = state.rulebooks.find(r => r.id === ch.rulebookId);
@@ -43158,6 +43182,7 @@ function renderCharacterCard(ch) {
       <div class="character-card-body">
         ${ruleLabelHtml ? `<div class="character-card-rule">${ruleLabelHtml}</div>` : ''}
         <div class="character-card-name">${esc(ch.name)}</div>
+        ${pairsHtml ? `<div class="character-card-tags">${pairsHtml}</div>` : ''}
         ${tagsHtml ? `<div class="character-card-tags">${tagsHtml}</div>` : ''}
         ${ch.memo ? `<div class="character-card-memo">${esc(ch.memo)}</div>` : ''}
       </div>
@@ -43261,6 +43286,7 @@ function openCharacterModal(id) {
     document.getElementById('ch-invisible').checked = !!n.invisible;
     document.getElementById('ch-secret').checked = !!n.secret;
     _chTags = [...n.tags];
+    _chPairs = [...n.pairIds];
     deleteBtn.style.display = '';
   } else {
     headingEl.textContent = '캐릭터 추가';
@@ -43283,6 +43309,7 @@ function openCharacterModal(id) {
   onChRulebookChange();
   refreshCharacterModalInitiative();
   renderChModalTags();
+  renderChModalPairs();
   document.getElementById('ch-modal-backdrop').classList.add('open');
   if (currentPage === 'character' || getCharacterSheetIdFromPage(currentPage)) renderList();
   setTimeout(() => document.getElementById('ch-name')?.focus(), 80);
@@ -43324,6 +43351,7 @@ function closeCharacterModal() {
   document.getElementById('ch-modal-backdrop').classList.remove('open');
   _chEditId = null;
   _chTags = [];
+  _chPairs = [];
 }
 
 function renderChModalTags() {
@@ -43340,6 +43368,18 @@ function renderChModalTags() {
     return `<span class="ch-modal-tag${isOn ? ' on' : ''}" onclick="toggleChTag(${JSON.stringify(tag)})">${esc(tag)}</span>`;
   }).join('');
 }
+
+function renderChModalPairs() {
+  const box = document.getElementById('ch-modal-pairs'), sel = document.getElementById('ch-pair-select');
+  if (!box || !sel) return;
+  const byId = id => state.characters.find(c => c.id === id);
+  _chPairs = _chPairs.filter(byId);
+  box.innerHTML = _chPairs.length ? _chPairs.map(id => `<span class="ch-modal-tag on" onclick="removeChPair('${id}')" title="클릭하면 해제">${esc(byId(id).name)} ×</span>`).join('') : '<span style="font-size:12px;color:#bbb;">페어 없음</span>';
+  const rest = state.characters.filter(c => c.id !== _chEditId && !_chPairs.includes(c.id)).sort(compareCharactersByName);
+  sel.innerHTML = '<option value="">+ 페어</option>' + rest.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+}
+function addChPair(id) { if (id && !_chPairs.includes(id)) _chPairs.push(id); renderChModalPairs(); }
+function removeChPair(id) { _chPairs = _chPairs.filter(x => x !== id); renderChModalPairs(); }
 
 function toggleChTag(tag) {
   const idx = _chTags.indexOf(tag);
@@ -43465,6 +43505,7 @@ function saveCharacterModal() {
         }
       }
       syncCharacterSheets(ch);
+      applyCharacterPairs(ch.id, _chPairs);
     }
   } else {
     const newCh = {
@@ -43481,6 +43522,7 @@ function saveCharacterModal() {
       invisible,
       secret,
       createdAt: Date.now(),
+      pairIds: [],
       sheets: [],
       activeSheetId: ''
     };
@@ -43492,6 +43534,7 @@ function saveCharacterModal() {
       newCh.activeSheetId = inst.id;
     }
     state.characters.push(newCh);
+    applyCharacterPairs(newCh.id, _chPairs);
     _chSidebarSelectedId = newCh.id;
   }
   persist();
@@ -43507,6 +43550,7 @@ function deleteCharacter() {
   const deletedId = _chEditId;
   if (_chSidebarSelectedId === deletedId) _chSidebarSelectedId = null;
   state.characters = state.characters.filter(c => c.id !== deletedId);
+  removeCharacterFromPairs(deletedId);
   const sheetPage = getCharacterSheetPageId(deletedId);
   if (openAppPages.includes(sheetPage)) closeAppPageTab(sheetPage);
   persist();
@@ -43519,6 +43563,7 @@ function deleteCharacterById(id) {
   if (!confirm('이 캐릭터를 삭제하시겠습니까?')) return;
   if (_chSidebarSelectedId === id) _chSidebarSelectedId = null;
   state.characters = state.characters.filter(c => c.id !== id);
+  removeCharacterFromPairs(id);
   const sheetPage = getCharacterSheetPageId(id);
   if (openAppPages.includes(sheetPage)) closeAppPageTab(sheetPage);
   persist();
