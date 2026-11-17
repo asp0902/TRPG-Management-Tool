@@ -18,14 +18,14 @@ const reset = () => { MULTI = ['scenarios','folders','cssMacroFolders','records'
 let MULTI;
 reset();
 ok(f.multiDiff().length === 0, '변경 없으면 패치 없음');
-S.scenarios.push({ id: 's1', title: 'A' }); S.scenarios.push({ id: 's2', title: 'B' });
-let ops = f.multiDiff(); const sc = ops.find(o => o.key === 'scenarios');
+S.bookmarks.push({ id: 's1', title: 'A' }); S.bookmarks.push({ id: 's2', title: 'B' });
+let ops = f.multiDiff(); const sc = ops.find(o => o.key === 'bookmarks');
 ok(ops.length === 1 && sc.set.map(i => i.id).join() === 's1,s2' && sc.del.length === 0 && sc.order.join() === 's1,s2', '추가: 항목 단위 set + 순서');
-S.scenarios[0].title = 'A2'; ops = f.multiDiff();
+S.bookmarks[0].title = 'A2'; ops = f.multiDiff();
 ok(ops.length === 1 && ops[0].set.length === 1 && ops[0].set[0].id === 's1' && ops[0].set[0].title === 'A2', '수정: 바뀐 항목만');
-S.scenarios.splice(1, 1); ops = f.multiDiff();
+S.bookmarks.splice(1, 1); ops = f.multiDiff();
 ok(ops[0].del.join() === 's2' && ops[0].set.length === 0, '삭제: id 만');
-S.scenarios.unshift({ id: 's3', title: 'C' }); ops = f.multiDiff(); S.scenarios.reverse(); ops = f.multiDiff();
+S.bookmarks.unshift({ id: 's3', title: 'C' }); ops = f.multiDiff(); S.bookmarks.reverse(); ops = f.multiDiff();
 ok(ops.length === 1 && ops[0].set.length === 0 && ops[0].order.join() === 's1,s3', '순서만 바뀜');
 S.customFonts = ['a']; S.sharedMemoOwner = { memos: [{ id: 'm' }] }; ops = f.multiDiff();
 ok(ops.map(o => o.key).sort().join() === 'customFonts,sharedMemoOwner' && ops.every(o => o.type === 'value' || o.type === 'items'), '컬렉션이 아닌 설정은 키 단위');
@@ -33,21 +33,21 @@ ok(ops.map(o => o.key).sort().join() === 'customFonts,sharedMemoOwner' && ops.ev
 const B = { state: {} }; const ctxB = vm.createContext({ state: B.state, characterSheetPopupParams: new URLSearchParams(''), characterSheetInstanceId: 'b', navigator: {}, location: {} });
 vm.runInContext(code.replace("typeof BroadcastChannel === 'function' ? new BroadcastChannel('trpg-state') : null", 'null') + ';this.f={multiDiff,multiApplyOps,multiCapture}', ctxB);
 const fb = ctxB.f; MULTI.forEach(k => B.state[k] = JSON.parse(JSON.stringify(S[k]))); fb.multiCapture(); f.multiCapture();
-S.scenarios.push({ id: 's9', title: 'new' }); S.scenarios[0].title = 'edited';
+S.bookmarks.push({ id: 's9', title: 'new' }); S.bookmarks[0].title = 'edited';
 const sent = JSON.parse(JSON.stringify(f.multiDiff()));
 const conflicts = fb.multiApplyOps(sent);
-ok(conflicts === 0 && JSON.stringify(B.state.scenarios) === JSON.stringify(S.scenarios), '패치 적용 결과가 원본 창과 동일');
+ok(conflicts === 0 && JSON.stringify(B.state.bookmarks) === JSON.stringify(S.bookmarks), '패치 적용 결과가 원본 창과 동일');
 ok(fb.multiDiff().length === 0, '받은 패치를 적용한 뒤에는 다시 보낼 변경이 없음(핑퐁 방지)');
 // 충돌: B 가 s1 을 보내기 전에 편집, A 도 s1 편집 → B 는 자기 것 유지
-B.state.scenarios.find(i => i.id === 's1').title = 'B-local';
-S.scenarios.find(i => i.id === 's1').title = 'A-new'; const sent2 = JSON.parse(JSON.stringify(f.multiDiff()));
+B.state.bookmarks.find(i => i.id === 's1').title = 'B-local';
+S.bookmarks.find(i => i.id === 's1').title = 'A-new'; const sent2 = JSON.parse(JSON.stringify(f.multiDiff()));
 const c2 = fb.multiApplyOps(sent2);
-ok(c2 === 1 && B.state.scenarios.find(i => i.id === 's1').title === 'B-local', '같은 항목 동시 편집: 아직 안 보낸 내 편집 우선·충돌 1건');
+ok(c2 === 1 && B.state.bookmarks.find(i => i.id === 's1').title === 'B-local', '같은 항목 동시 편집: 아직 안 보낸 내 편집 우선·충돌 1건');
 const back = fb.multiDiff();
 ok(back.length === 1 && back[0].set[0].title === 'B-local', '내 편집은 다음 diff 에서 다시 전파됨');
 // 삭제 vs 편집
-B.state.scenarios.find(i => i.id === 's9').title = 'B-edit'; S.scenarios = S.scenarios.filter(i => i.id !== 's9'); const sent3 = JSON.parse(JSON.stringify(f.multiDiff()));
-ok(fb.multiApplyOps(sent3) === 1 && B.state.scenarios.some(i => i.id === 's9'), '삭제와 편집이 겹치면 편집한 쪽 유지');
+B.state.bookmarks.find(i => i.id === 's9').title = 'B-edit'; S.bookmarks = S.bookmarks.filter(i => i.id !== 's9'); const sent3 = JSON.parse(JSON.stringify(f.multiDiff()));
+ok(fb.multiApplyOps(sent3) === 1 && B.state.bookmarks.some(i => i.id === 's9'), '삭제와 편집이 겹치면 편집한 쪽 유지');
 ok(html.includes("function multiEditingNow()") && html.includes("document.addEventListener('focusout', () => { if (multiWin.pending.length) setTimeout(multiApplyPending, 0); });") && html.includes("다른 창의 변경과 겹쳐 이 창의 내용으로 저장했습니다."), '입력 중 패치 보류·포커스 빠질 때 적용·충돌 토스트');
 ok(html.includes("multiFlushPatch(); // 닫히기 직전 변경도 다른 창에 전달(#279)") && html.includes("if (multiNonLeader() && multiWin.outbox.length) { event.preventDefault()"), '닫히기 직전 변경 전파·미전달 편집 경고');
 ok(html.includes('function startLeaderDuties()') && html.includes('multiIsLeader()) startLeaderDuties();') && html.includes('  startLeaderDuties();'), '원격 동기화·백업은 주 창(승계 포함)만 시작');

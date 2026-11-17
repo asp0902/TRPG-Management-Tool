@@ -11226,6 +11226,98 @@ function multiDescribe(value) {
   return { items: false, json: JSON.stringify(value === undefined ? null : value) };
 }
 function multiCapture() { const snap = new Map(); MULTI_WIN_KEYS.forEach(key => snap.set(key, multiDescribe(state[key]))); multiWin.snapshot = snap; }
+// ── 시나리오 블록 단위 패치(#315) ──
+// 시나리오를 「id 가 있는 객체 배열」(blocks, children, 분기·판정 결과 등)로 이어진 노드 트리로 보고, 바뀐 노드(블록)만 주고받는다.
+// 노드 내용 = 자식 배열을 뺀 나머지 속성. 같은 id 가 트리에 두 번 나오면 블록 경로를 믿을 수 없어 시나리오 전체 패치로 폴백한다.
+function multiNodeContent(obj) {
+  const data = {}, arrays = [];
+  Object.keys(obj).forEach(key => {
+    const value = obj[key];
+    if (Array.isArray(value) && value.every(item => item && typeof item === 'object' && !Array.isArray(item) && typeof item.id === 'string' && item.id)) arrays.push(key);
+    else data[key] = value;
+  });
+  return { data, arrays };
+}
+function multiNodeJson(obj) { const c = multiNodeContent(obj); return JSON.stringify([c.data, c.arrays]); }
+function multiTreeIndex(root) {
+  const nodes = new Map(), orders = new Map(); let dupe = false;
+  const walk = (obj, parent, field, arr) => {
+    if (nodes.has(obj.id)) { dupe = true; return; }
+    const c = multiNodeContent(obj);
+    nodes.set(obj.id, { obj, parent, field, arr, json: JSON.stringify([c.data, c.arrays]), arrays: c.arrays });
+    c.arrays.forEach(f => { orders.set(obj.id + '|' + f, { parent: obj.id, field: f, ids: obj[f].map(child => child.id) }); obj[f].forEach(child => walk(child, obj.id, f, obj[f])); });
+  };
+  walk(root, null, '', null);
+  return { nodes, orders, dupe };
+}
+// 두 시나리오 사이에서 바뀐 노드만 모은다. 순서: 추가·수정(부모 먼저) → 삭제 → 부모별 순서. null 이면 폴백(시나리오 전체).
+function multiDiffScenario(oldObj, newObj) {
+  const a = multiTreeIndex(oldObj), b = multiTreeIndex(newObj);
+  if (a.dupe || b.dupe) return null;
+  const ops = [];
+  b.nodes.forEach((node, id) => {
+    const before = a.nodes.get(id);
+    if (!before || before.json !== node.json || before.parent !== node.parent || before.field !== node.field) {
+      const c = multiNodeContent(node.obj);
+      ops.push({ op: 'set', id, parent: node.parent, field: node.field, data: c.data, arrays: c.arrays });
+    }
+  });
+  a.nodes.forEach((node, id) => { if (!b.nodes.has(id)) ops.push({ op: 'del', id }); });
+  b.orders.forEach((order, key) => { const before = a.orders.get(key); if (!before || JSON.stringify(before.ids) !== JSON.stringify(order.ids)) ops.push({ op: 'order', parent: order.parent, field: order.field, ids: order.ids }); });
+  return ops;
+}
+// 노드 패치를 시나리오(root)에 적용한다. baseIdx(직전에 주고받은 기준 트리)가 있으면 내 쪽에 아직 안 보낸 편집이 있는 노드는 건드리지 않는다(블록 단위 내 것 우선).
+// 부모가 없어진 노드는 버린다(orphans). 반환: applied(적용된 패치 — 기준 트리에도 그대로 적용), conflicts, orphans, fallback.
+function multiApplyNodeOps(root, ops, baseIdx) {
+  const idx = multiTreeIndex(root);
+  if (idx.dupe) return { fallback: true, applied: [], conflicts: 0, orphans: 0 };
+  const applied = []; let conflicts = 0, orphans = 0;
+  const dropSubtree = id => { const node = idx.nodes.get(id); if (!node) return; node.arrays.forEach(f => (node.obj[f] || []).forEach(child => dropSubtree(child.id))); idx.nodes.delete(id); };
+  (ops || []).forEach(op => {
+    if (op.op === 'set') {
+      const cur = idx.nodes.get(op.id);
+      if (cur) {
+        const base = baseIdx && baseIdx.nodes.get(op.id);
+        if (base && cur.json !== base.json) { conflicts++; return; }
+        if (op.parent !== cur.parent || op.field !== cur.field) { // 다른 부모로 이동
+          if (cur.parent === null) return;
+          const np = idx.nodes.get(op.parent); if (!np) { orphans++; return; }
+          const at = cur.arr ? cur.arr.indexOf(cur.obj) : -1; if (at >= 0) cur.arr.splice(at, 1);
+          if (!Array.isArray(np.obj[op.field])) np.obj[op.field] = [];
+          np.obj[op.field].push(cur.obj); cur.parent = op.parent; cur.field = op.field; cur.arr = np.obj[op.field];
+        }
+        Object.keys(cur.obj).forEach(key => { if (!(key in op.data) && !op.arrays.includes(key)) delete cur.obj[key]; });
+        Object.keys(op.data).forEach(key => { cur.obj[key] = op.data[key]; });
+        op.arrays.forEach(f => { if (!Array.isArray(cur.obj[f])) cur.obj[f] = []; });
+        const c = multiNodeContent(cur.obj); cur.arrays = c.arrays; cur.json = JSON.stringify([c.data, c.arrays]);
+        applied.push(op);
+      } else {
+        const np = idx.nodes.get(op.parent); if (!np) { orphans++; return; } // 부모가 지워진 블록은 버림
+        const obj = Object.assign({}, op.data); op.arrays.forEach(f => { obj[f] = []; });
+        if (!Array.isArray(np.obj[op.field])) np.obj[op.field] = [];
+        np.obj[op.field].push(obj);
+        const c = multiNodeContent(obj);
+        idx.nodes.set(op.id, { obj, parent: op.parent, field: op.field, arr: np.obj[op.field], json: JSON.stringify([c.data, c.arrays]), arrays: c.arrays });
+        applied.push(op);
+      }
+    } else if (op.op === 'del') {
+      const cur = idx.nodes.get(op.id);
+      if (!cur) { applied.push(op); return; }
+      if (cur.parent === null) return;
+      const base = baseIdx && baseIdx.nodes.get(op.id);
+      if (base && cur.json !== base.json) { conflicts++; return; }
+      const at = cur.arr ? cur.arr.indexOf(cur.obj) : -1; if (at >= 0) cur.arr.splice(at, 1);
+      dropSubtree(op.id); applied.push(op);
+    } else if (op.op === 'order') {
+      const np = idx.nodes.get(op.parent), arr = np && np.obj[op.field];
+      if (!Array.isArray(arr)) return;
+      const byId = new Map(arr.map(item => [item.id, item])), listed = new Set(op.ids);
+      const sorted = op.ids.map(id => byId.get(id)).filter(Boolean).concat(arr.filter(item => !listed.has(item.id)));
+      arr.splice(0, arr.length, ...sorted); applied.push(op);
+    }
+  });
+  return { applied, conflicts, orphans };
+}
 // 직전 스냅샷과 비교해 바뀐 항목만 모은다(스냅샷은 현재 상태로 갱신).
 function multiDiff() {
   if (!multiWin.snapshot) { multiCapture(); return []; }
@@ -11235,10 +11327,19 @@ function multiDiff() {
     next.set(key, cur);
     if (!old || old.items !== cur.items) { ops.push({ key, type: 'value', value }); return; }
     if (!cur.items) { if (cur.json !== old.json) ops.push({ key, type: 'value', value }); return; }
-    const set = [], del = [];
-    value.forEach(item => { if (old.map.get(item.id) !== cur.map.get(item.id)) set.push(item); });
+    const set = [], del = [], nodeOps = [];
+    value.forEach(item => {
+      const oldJson = old.map.get(item.id);
+      if (oldJson === cur.map.get(item.id)) return;
+      if (key === 'scenarios' && oldJson !== undefined) { // 시나리오는 블록 단위 패치, 경로를 못 찾으면 시나리오 전체(#315)
+        let nodeDiff = null; try { nodeDiff = multiDiffScenario(JSON.parse(oldJson), item); } catch (e) {}
+        if (nodeDiff) { if (nodeDiff.length) nodeOps.push({ key, type: 'scenario-nodes', scenarioId: item.id, ops: nodeDiff }); return; }
+      }
+      set.push(item);
+    });
     old.map.forEach((json, id) => { if (!cur.map.has(id)) del.push(id); });
     if (set.length || del.length || JSON.stringify(old.order) !== JSON.stringify(cur.order)) ops.push({ key, type: 'items', set, del, order: cur.order });
+    nodeOps.forEach(op => ops.push(op));
   });
   multiWin.snapshot = next;
   return ops;
@@ -11253,6 +11354,17 @@ function multiApplyOps(ops) {
     if (op.type === 'value') {
       if (old && !old.items && JSON.stringify(state[key] === undefined ? null : state[key]) !== old.json) { conflicts++; return; } // 내 쪽에 아직 안 보낸 변경이 있으면 내 것 우선
       state[key] = op.value; multiWin.snapshot.set(key, multiDescribe(op.value)); return;
+    }
+    if (op.type === 'scenario-nodes') { // 시나리오 블록 단위 패치(#315)
+      const scenario = Array.isArray(state.scenarios) && state.scenarios.find(item => item.id === op.scenarioId), baseJson = old && old.items && old.map.get(op.scenarioId);
+      if (!scenario) { conflicts++; return; } // 시나리오가 이 창에서 지워짐
+      if (!baseJson) { conflicts++; return; } // 기준본이 없으면(이 창에서 새로 만든 시나리오) 건드리지 않는다
+      const baseObj = JSON.parse(baseJson), res = multiApplyNodeOps(scenario, op.ops, multiTreeIndex(baseObj));
+      if (res.fallback) { conflicts++; return; }
+      conflicts += res.conflicts + res.orphans;
+      multiApplyNodeOps(baseObj, res.applied, null); // 적용된 것만 기준본에도 반영 — 충돌로 남은 내 편집은 다음 diff 에서 다시 전파된다
+      old.map.set(op.scenarioId, JSON.stringify(baseObj));
+      return;
     }
     if (!Array.isArray(state[key])) state[key] = [];
     const arr = state[key]; let desc = old && old.items ? old : null;
