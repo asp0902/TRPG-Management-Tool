@@ -47,7 +47,7 @@ assert.equal(ctx.t({ kind: 'file', attached: true }).attached, false);
 // 첨부 파일 URL 이 있으면 유튜브 트랙도 audio, 없으면(다른 기기·유튜브 전환) iframe
 assert.ok(ctx.html({ kind: 'youtube', youtubeId: 'dQw4w9WgXcQ', attached: true }, 'blob:x').includes('<audio'));
 assert.ok(ctx.html({ kind: 'youtube', youtubeId: 'dQw4w9WgXcQ', attached: true }, '').includes('<iframe'));
-['async function musicAttachFile', 'async function musicDetach', 'music-card-file', 'musicCardDrop(event,'].forEach(k => assert.ok(html.includes(k), k));
+['async function musicAttachFile', 'async function musicDetach', 'fa-paperclip', 'musicCardDrop(event,'].forEach(k => assert.ok(html.includes(k), k));
 assert.ok(!fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').includes(String.fromCharCode(13, 13, 10)), 'CR 중복 없음');
 
 // 연결: 내비·페이지·동기화 키(메타데이터만), Blob 저장소는 별도 DB
