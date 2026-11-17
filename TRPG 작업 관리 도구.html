@@ -18932,6 +18932,7 @@ function openNativeColorPicker(initialColor, handlers = {}) {
   const { onPreview = null, onCommit = null, onCancel = null } = handlers;
   const input = document.createElement('input');
   input.type = 'color';
+  input.dataset.cpTemp = '1';
   input.value = normalizePickerColor(initialColor);
   input.style.position = 'fixed';
   input.style.left = '50%';
@@ -27846,6 +27847,7 @@ function closeColorPanel(options = {}) {
     applyChapterColorToDOM(cpTarget.blockId, cpTarget.key, cpTarget.originalColor);
   }
   if (cpTarget?.type === 'speech' && !apply) cpTarget.swatch.style.background = cpTarget.originalColor;
+  if (cpTarget?.type === 'native-input' && !apply && cpTarget.input.dataset.cpTemp) cpTarget.input.dispatchEvent(new Event('blur')); // 임시 인풋: 취소 처리·정리
   if (cpTarget?.type === 'quote' && !apply && cpTarget.quoteEl?.isConnected) {
     if (cpTarget.originalBackground) cpTarget.quoteEl.style.backgroundColor = cpTarget.originalBackground;
     else cpTarget.quoteEl.style.removeProperty('background-color');
@@ -27855,6 +27857,8 @@ function closeColorPanel(options = {}) {
     else cpTarget.quoteEl.style.removeProperty('border-left-color');
   }
   panel.style.display = 'none';
+  panel.style.zIndex = '';
+  backdrop.style.zIndex = '';
   panel.classList.remove('centered');
   panel.style.transform = '';
   backdrop.classList.remove('open');
@@ -27865,6 +27869,15 @@ function closeColorPanel(options = {}) {
 
 function applyColorPanel() {
   const color = cpGetCurrentColor();
+  if (cpTarget?.type === 'native-input') { // 전역 색 input 대체(#305)
+    const input = cpTarget.input;
+    closeColorPanel({ apply: true });
+    document.getElementById('cp-native').value = '#000000';
+    input.value = color;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    return;
+  }
   if (cpTarget?.type === 'speech') {
     cpTarget.native.value = color;
     cpTarget.swatch.style.background = color;
@@ -28104,6 +28117,20 @@ document.addEventListener('mousedown', function(e) {
   if (panel.style.display === 'none') return;
   if (!panel.contains(e.target) && !e.target.closest('.tb-color-btn')) closeColorPanel();
 });
+// 모든 input[type=color] 는 브라우저 기본 색 선택창 대신 앱 색상 패널(#cp-panel)을 연다(#305).
+// 적용하면 input.value 를 바꾸고 input·change 를 디스패치하므로 기존 핸들러가 그대로 동작한다. 취소는 값 변경 없음.
+document.addEventListener('click', function(e) {
+  const input = e.target instanceof Element ? e.target.closest('input[type="color"]') : null;
+  if (!input || input.closest('#cp-panel') || input.disabled) return;
+  e.preventDefault();
+  if (cpTarget) closeColorPanel();
+  cpTarget = { type: 'native-input', input, originalColor: input.value };
+  const rect = input.getBoundingClientRect();
+  const hiddenInput = rect.width < 4 || rect.height < 4 || !input.getClientRects().length; // 숨은 인풋·임시 인풋은 화면 가운데
+  cpOpenPanel('native', input.value, { anchorEl: input, centered: hiddenInput });
+  document.getElementById('cp-panel').style.zIndex = '30000'; // 모달 위
+  document.getElementById('cp-backdrop').style.zIndex = '29999';
+}, true);
 
 // ─── CE 콘텐츠 채우기 ───
 function setEditableHtml(target, html) {

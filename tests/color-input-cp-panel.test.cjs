@@ -1,0 +1,13 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+const a = html.indexOf("document.addEventListener('click', function(e) {\n  const input = e.target instanceof Element ? e.target.closest('input[type=\"color\"]')");
+ok(a > 0, '전역 캡처 click 리스너');
+const seg = html.slice(a, a + 1200);
+ok(seg.includes("input.closest('#cp-panel')") && seg.includes('e.preventDefault()') && seg.includes("type: 'native-input'") && seg.includes('}, true);'), '#cp-panel 내부 제외·기본 피커 차단·native-input 타깃·캡처 단계');
+ok(seg.includes('centered: hiddenInput') && seg.includes("style.zIndex = '30000'") && seg.includes("cp-backdrop').style.zIndex = '29999'"), '숨은/임시 인풋 가운데·모달 위 z-index');
+const ap = html.slice(html.indexOf('function applyColorPanel()'), html.indexOf('function applyColorPanel()') + 700);
+ok(ap.includes("cpTarget?.type === 'native-input'") && ap.includes("new Event('input', { bubbles: true })") && ap.includes("new Event('change', { bubbles: true })") && ap.indexOf('input.value = color') > 0, '적용 시 value 설정 + input·change 디스패치');
+ok(html.includes("cpTarget?.type === 'native-input' && !apply && cpTarget.input.dataset.cpTemp") && html.includes("input.dataset.cpTemp = '1'"), '임시 인풋 취소 처리(blur)');
+ok(html.includes("panel.style.zIndex = '';") && html.includes("backdrop.style.zIndex = '';"), '닫을 때 z-index 복원');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);
