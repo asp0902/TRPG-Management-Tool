@@ -2883,6 +2883,8 @@ body.file-dragging iframe { pointer-events: none; } /* 파일을 끄는 동안 i
 #save-btn { font-weight: 700; }
 /* 정보·본문 탭과 저장 버튼은 같은 크기(테두리 포함 box 기준)로 맞춘다. */
 #topbar { --topbar-btn-w: 65px; --topbar-btn-h: 29px; }
+#topbar #music-tagcat-btn { box-sizing: border-box; flex: none; width: var(--topbar-btn-h); height: var(--topbar-btn-h); padding: 0; display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 1px solid var(--border); border-radius: 6px; color: #dc2626; font-size: 14px; cursor: pointer; } /* .tab-btn 스타일을 쓰지 않아 색을 덮지 않는다(#309) */
+#topbar #music-tagcat-btn:hover { color: #b91c1c; background: #fef2f2; }
 #topbar .tab-btn, #topbar #save-btn { box-sizing: border-box; width: var(--topbar-btn-w); height: var(--topbar-btn-h); padding: 0; font-size: 13px; }
 
 /* ─── FORMAT BAR ─── */
@@ -8330,7 +8332,7 @@ select.sh-field-input,
       <button class="tab-btn active" data-tab="info" onclick="switchTab('info')">정보</button>
       <button class="tab-btn" data-tab="body" onclick="switchTab('body')">본문</button>
     </div>
-    <button class="tab-btn" id="music-tagcat-btn" type="button" style="display:none;width:auto;padding:0 10px" onclick="openMusicTagCatManager()" title="태그 관리"><i class="fa-solid fa-tags"></i> 태그 관리</button>
+    <button class="topbar-icon-btn" id="music-tagcat-btn" type="button" style="display:none" onclick="openMusicTagCatManager()" title="태그 관리" aria-label="태그 관리"><i class="fa-solid fa-tags"></i></button>
     <button class="btn btn-primary" id="save-btn" onclick="saveAll()">저장</button>
   </div>
 

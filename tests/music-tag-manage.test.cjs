@@ -2,7 +2,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
 let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
 const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
-ok(html.includes('<i class="fa-solid fa-tags"></i> 태그 관리</button>') && html.includes('<div class="music-modal-title">태그 관리</div>') && html.includes('data-act="manage">태그 관리…</div>'), '이름 변경: 버튼·창 제목·우클릭 메뉴');
+ok(html.includes('title="태그 관리" aria-label="태그 관리"><i class="fa-solid fa-tags"></i></button>') && html.includes('<div class="music-modal-title">태그 관리</div>') && html.includes('data-act="manage">태그 관리…</div>'), '이름 변경: 버튼·창 제목·우클릭 메뉴');
 ok(html.includes("'개</button>") && html.includes("title=\"태그 ' + cat.tags.length + '개 — 눌러서 펼치기\""), '「N개」 버튼·title 설명 유지');
 const ctx = { state: { musicTracks: [], musicTagCats: [] }, mkId: () => 'id', persist() {}, renderMusicPage() {}, musicRefreshTagColors() {}, document: { querySelector: () => null, getElementById: () => null }, confirm: () => true, musicPlaying: null };
 vm.createContext(ctx);

@@ -6,4 +6,6 @@ ok(b > 0 && sv > b && html.indexOf('id="topbar"') < b && sv - b < 500, '#topbar 
 ok(html.includes("document.getElementById('music-tagcat-btn').style.display = page === 'music' ? '' : 'none'"), 'switchPage 에서 MUSIC 일 때만 표시');
 ok(!html.includes('class="music-cat-btn"') && !html.includes('.music-cat-btn {'), '모달의 「분류」 버튼·CSS 제거');
 ok(html.includes('class="music-tag-label" onclick="musicToggleTagList()"'), '태그 라벨 클릭 목록 토글 유지');
+ok(html.includes('class="topbar-icon-btn" id="music-tagcat-btn"') && html.includes('title="태그 관리" aria-label="태그 관리"><i class="fa-solid fa-tags"></i></button>'), '아이콘만·title·aria-label(#309)');
+ok(/#topbar #music-tagcat-btn \{[^}]*color: #dc2626/.test(html) && /#topbar #music-tagcat-btn:hover \{[^}]*color: #b91c1c/.test(html) && !/id="music-tagcat-btn"[^>]*class="tab-btn"|class="tab-btn" id="music-tagcat-btn"/.test(html), '빨강 #dc2626·hover #b91c1c·tab-btn 미사용');
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);
