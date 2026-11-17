@@ -35,8 +35,8 @@ t = mk('#a'); e = key('Enter'); f.tagEditorKey(e, t.input); ok(!e.prevented && t
 // 한글 조합 중 무시
 t = mk(''); t.input.value = '조합'; e = key('Enter', { isComposing: true }); f.tagEditorKey(e, t.input); ok(!e.prevented && t.valueEl.value === '', '조합 중 Enter 무시(isComposing)');
 e = key('Enter', { keyCode: 229 }); f.tagEditorKey(e, t.input); ok(!e.prevented && t.valueEl.value === '', '조합 중 Enter 무시(keyCode 229)');
-// Backspace: 빈 칸에서 마지막 태그 제거 / 글이 있으면 일반 지우기
-t = mk('#a #b c'); e = key('Backspace', { keyCode: 8 }); f.tagEditorKey(e, t.input); ok(e.prevented && t.valueEl.value === '#a', '빈 칸 Backspace: 마지막 태그(b c) 하나 제거 (' + t.valueEl.value + ')');
+// Backspace(#313): 빈 칸에서도 태그를 지우지 않는다(입력칸 글자 지우기 기본 동작만)
+t = mk('#a #b c'); e = key('Backspace', { keyCode: 8 }); f.tagEditorKey(e, t.input); ok(!e.prevented && t.valueEl.value === '#a #b c', '빈 칸 Backspace: 태그 수 불변·기본 동작 유지 (' + t.valueEl.value + ')');
 t = mk('#a'); t.input.value = 'x'; e = key('Backspace', { keyCode: 8 }); f.tagEditorKey(e, t.input); ok(!e.prevented && t.valueEl.value === '#a', '입력 중 Backspace 는 일반 지우기');
 // 벗어날 때 확정
 t = mk('#a'); t.input.value = '남은 글'; f.tagEditorCommit(t.input); ok(t.valueEl.value === '#a #남은 글' && t.input.value === '', '입력칸을 벗어나면 남은 글을 태그로 확정');

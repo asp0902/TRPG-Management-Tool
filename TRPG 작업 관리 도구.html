@@ -10611,7 +10611,7 @@ function normalizeCssMacroTags(input, fallbackTag = '') {
       return true;
     });
 }
-// 칩 태그 입력기(#311): 세션 기록의 태그 입력과 같은 방식. Enter·쉼표·입력칸을 벗어날 때 태그로 확정(띄어쓰기 허용), 칩의 ×로 제거, 빈 칸에서 Backspace 로 마지막 태그 제거.
+// 칩 태그 입력기(#311): 세션 기록의 태그 입력과 같은 방식. Enter·쉼표·입력칸을 벗어날 때 태그로 확정(띄어쓰기 허용), 칩의 ×로만 제거(빈 칸 Backspace 로는 지우지 않는다, #313).
 // 값은 숨김 입력칸(.tag-editor-value)에 '#태그 #태그' 문자열로 두어, 북마크·MUSIC 의 기존 저장 코드(value 읽기, input/change 이벤트)를 그대로 쓴다.
 function tagEditorHtml(valueAttrs, tags, placeholder, music) { // 입력칸 + 그 바깥 아래에 만들어진 태그 칩(#319)
   const text = normalizeCssMacroTags(tags).map(tag => '#' + tag).join(' ');
@@ -10655,10 +10655,6 @@ function tagEditorKey(event, input) {
     if (event.key === 'Enter' && !input.value.trim()) return; // 빈 칸 Enter 는 기존 동작(예: 창 저장) 유지
     event.preventDefault();
     if (tagEditorAdd(editor, input.value)) input.value = '';
-  } else if (event.key === 'Backspace' && !input.value) {
-    const tags = tagEditorTags(editor);
-    if (!tags.length) return;
-    event.preventDefault(); tags.pop(); tagEditorSet(editor, tags);
   }
 }
 function tagEditorCommit(input) { // 입력칸을 벗어날 때 남은 글을 태그로 확정
@@ -34171,13 +34167,6 @@ function handleRecordSessionTagInputKeydown(event, inputEl) {
     event.preventDefault();
     addRecordSessionTagsFromText(inputEl.value);
     return;
-  }
-  if (event.key === 'Backspace' && !inputEl.value) {
-    const tags = normalizeRecordSessionTags(document.getElementById('rf-session-tag')?.value || '');
-    if (!tags.length) return;
-    event.preventDefault();
-    tags.pop();
-    setRecordSessionTagsEditorValue(tags);
   }
 }
 
