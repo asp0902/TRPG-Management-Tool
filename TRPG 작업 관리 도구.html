@@ -2223,7 +2223,10 @@ tr.ct-row-end .ct-select:focus {
 .music-fcol { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .music-fcol-tags { min-height: 0; }
 .music-cat-row { display: flex; align-items: center; gap: 8px; }
-.music-cat-row input[type="color"] { width: 32px; height: 28px; padding: 0; border: 1px solid #ddd; border-radius: 6px; background: none; cursor: pointer; }
+.music-modal .music-cat-row input[type="color"] { width: 28px; height: 28px; flex: none; box-sizing: border-box; padding: 0; border: 1px solid #ddd; border-radius: 6px; background: none; cursor: pointer; }
+.music-modal .music-cat-row input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.music-modal .music-cat-row input[type="color"]::-webkit-color-swatch { border: none; border-radius: 5px; }
+.music-modal .music-cat-row input[type="color"]::-moz-color-swatch { border: none; border-radius: 5px; }
 .music-cat-name { flex: 1; min-width: 0; border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12px; }
 .music-cat-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; border: 1px solid rgba(0,0,0,0.15); }
 .music-tag-menu-head { padding: 5px 14px; font-size: 11px; color: #888; }
