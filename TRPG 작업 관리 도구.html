@@ -2246,13 +2246,15 @@ tr.ct-row-end .ct-select:focus {
 .music-cat-count { border: 1px solid #ddd; background: #fff; border-radius: 999px; padding: 1px 8px; font: inherit; font-size: 11px; color: #777; cursor: pointer; }
 .music-cat-count:hover, .music-cat-count.on { background: #f3f3f3; color: #333; }
 .music-cat-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 8px 0 10px 36px; }
-.music-cat-chip { position: relative; display: inline-flex; align-items: center; gap: 2px; padding: 1px 8px; border-radius: 999px; background: #f3f3f3; border: 1px solid #e3e3e3; color: #3a3a3a; font-size: 11.5px; font-weight: 700; }
+.music-cat-chip { position: relative; display: inline-flex; align-items: center; gap: 2px; box-sizing: border-box; height: 24px; padding: 0 8px; border-radius: 999px; background: #f3f3f3; border: 1px solid #e3e3e3; color: #3a3a3a; font-size: 11.5px; font-weight: 700; }
 .music-cat-chip-name { cursor: text; }
 .music-cat-chip .music-cat-chip-x { position: absolute; top: -6px; right: -6px; width: 14px; height: 14px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 50%; background: #fff; padding: 0; font-size: 11px; line-height: 1; color: #888; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; }
 .music-cat-chip:hover .music-cat-chip-x, .music-cat-chip:focus-within .music-cat-chip-x { opacity: 1; pointer-events: auto; }
 .music-cat-chip:has(.music-cat-chip-edit) .music-cat-chip-x { display: none; } /* 이름 편집 중에는 × 숨김 */
 .music-cat-chip .music-cat-chip-x:hover { color: #c0392b; border-color: #c0392b; }
-.music-cat-chip-edit, .music-cat-tag-input { border: 1px solid #ddd; border-radius: 999px; padding: 1px 8px; font: inherit; font-size: 11.5px; }
+.music-cat-tag-input { border: 1px solid #ddd; border-radius: 999px; padding: 1px 8px; font: inherit; font-size: 11.5px; }
+.music-cat-chip .music-cat-chip-edit { border: 0; background: transparent; padding: 0; margin: 0; font: inherit; color: inherit; outline: none; min-width: 0; } /* 보기와 같은 높이·글자 — 칩 크기가 변하지 않게(#311) */
+.music-cat-chip:has(.music-cat-chip-edit) { border-color: #666 !important; } /* 분류 색 인라인 스타일보다 우선 */
 .music-cat-tag-input { min-width: 150px; }
 .music-cat-name { flex: 1; min-width: 0; border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12px; }
 .music-cat-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; border: 1px solid rgba(0,0,0,0.15); }
@@ -36038,7 +36040,9 @@ function musicCatTagAdd(catId, text) { // 등록: 이미 다른 분류에 있으
 }
 function musicCatTagEditStart(span) {
   const chip = span.closest('.music-cat-chip'), input = document.createElement('input');
-  input.type = 'text'; input.className = 'music-cat-chip-edit'; input.value = span.textContent; input.spellcheck = false; input.size = Math.max(4, input.value.length + 1);
+  const baseWidth = span.getBoundingClientRect().width, meter = document.createElement('canvas').getContext('2d');
+  input.type = 'text'; input.className = 'music-cat-chip-edit'; input.value = span.textContent; input.spellcheck = false; input.style.width = baseWidth + 'px'; // 폭은 원래 이름 폭에서 시작, 입력에 따라 늘어난다
+  input.addEventListener('input', () => { meter.font = getComputedStyle(input).font; input.style.width = Math.max(baseWidth, meter.measureText(input.value).width + 2) + 'px'; });
   let done = false;
   const finish = ok => { if (done) return; done = true; if (ok) musicCatTagRename(chip.dataset.cat, chip.dataset.key, input.value); else musicCatRowsRefresh(); };
   input.addEventListener('keydown', e => {
