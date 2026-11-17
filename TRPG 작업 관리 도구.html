@@ -2227,6 +2227,15 @@ tr.ct-row-end .ct-select:focus {
 .music-modal .music-cat-row input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
 .music-modal .music-cat-row input[type="color"]::-webkit-color-swatch { border: none; border-radius: 5px; }
 .music-modal .music-cat-row input[type="color"]::-moz-color-swatch { border: none; border-radius: 5px; }
+.music-cat-count { border: 1px solid #ddd; background: #fff; border-radius: 999px; padding: 1px 8px; font: inherit; font-size: 11px; color: #777; cursor: pointer; }
+.music-cat-count:hover, .music-cat-count.on { background: #f3f3f3; color: #333; }
+.music-cat-tags { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 2px 0 8px 36px; }
+.music-cat-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 4px 1px 8px; border-radius: 999px; background: #f3f3f3; border: 1px solid #e3e3e3; color: #3a3a3a; font-size: 11.5px; font-weight: 700; }
+.music-cat-chip-name { cursor: text; }
+.music-cat-chip .music-cat-chip-x { border: 0; background: none; padding: 0 3px; font-size: 13px; line-height: 1; color: #888; cursor: pointer; }
+.music-cat-chip .music-cat-chip-x:hover { color: #c0392b; }
+.music-cat-chip-edit, .music-cat-tag-input { border: 1px solid #ddd; border-radius: 999px; padding: 1px 8px; font: inherit; font-size: 11.5px; }
+.music-cat-tag-input { min-width: 150px; }
 .music-cat-name { flex: 1; min-width: 0; border: 1px solid #ddd; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 12px; }
 .music-cat-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; border: 1px solid rgba(0,0,0,0.15); }
 .music-tag-menu-head { padding: 5px 14px; font-size: 11px; color: #888; }
@@ -8305,7 +8314,7 @@ select.sh-field-input,
       <button class="tab-btn active" data-tab="info" onclick="switchTab('info')">정보</button>
       <button class="tab-btn" data-tab="body" onclick="switchTab('body')">본문</button>
     </div>
-    <button class="tab-btn" id="music-tagcat-btn" type="button" style="display:none;width:auto;padding:0 10px" onclick="openMusicTagCatManager()" title="태그 분류 이름·색 관리"><i class="fa-solid fa-tags"></i> 태그 분류</button>
+    <button class="tab-btn" id="music-tagcat-btn" type="button" style="display:none;width:auto;padding:0 10px" onclick="openMusicTagCatManager()" title="태그 관리"><i class="fa-solid fa-tags"></i> 태그 관리</button>
     <button class="btn btn-primary" id="save-btn" onclick="saveAll()">저장</button>
   </div>
 
@@ -25428,7 +25437,7 @@ function mergeImportPayload(payload) {
   state.musicFolders.push(...(payload.musicFolders || []));
   if (payload.musicTagCats) { // 합치기: 같은 id 의 분류는 태그만 합치고, 없는 분류는 추가(#323)
     musicTagCatsEnsure();
-    payload.musicTagCats.forEach(cat => { const same = state.musicTagCats.find(item => item.id === cat.id); if (!same) state.musicTagCats.push(cat); else cat.tags.forEach(key => { if (!same.tags.includes(key)) same.tags.push(key); }); });
+    payload.musicTagCats.forEach(cat => { const same = state.musicTagCats.find(item => item.id === cat.id); if (!same) state.musicTagCats.push(cat); else { cat.tags.forEach(key => { if (!same.tags.includes(key)) same.tags.push(key); }); same.labels = { ...(cat.labels || {}), ...(same.labels || {}) }; } });
   }
   state.musicTracks.push(...(payload.musicTracks || []));
   state.rulebooks.push(...payload.rulebooks);
@@ -35850,9 +35859,14 @@ async function musicDownloadTrack(track) {
 // ── 태그 분류와 색(#323): 분류마다 이름·파스텔 색을 갖고, 태그를 우클릭해 한 번 분류하면 모든 곡에서 같은 색으로 보인다. 이름은 수정·추가·삭제 가능. 상태(state.musicTagCats)로 저장·동기화된다 ──
 function musicTagCatDefaults() { return [['cat-situation', '상황', '#dcecfb'], ['cat-mood', '분위기', '#e8e0f7'], ['cat-emotion', '감정', '#fbe0e8'], ['cat-time', '시간대', '#fdf3d0'], ['cat-season', '계절', '#dff3dc'], ['cat-tempo', '템포', '#fde5d3']].map(([id, name, color]) => ({ id, name, color, tags: [] })); }
 const MUSIC_TAG_CAT_EXTRA_COLORS = ['#d9f1f1', '#ece4d9', '#f0ddf0', '#e3ecd0', '#fbe3d9', '#dde3f5'];
+function musicTagLabelsNormalize(raw) { // 표시 이름 { 태그키: 이름 } — 곡에 아직 안 쓰인 등록 태그용(#306)
+  const out = {};
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) Object.keys(raw).forEach(key => { if (key && typeof raw[key] === 'string' && raw[key].trim()) out[key] = raw[key].trim().slice(0, 40); });
+  return out;
+}
 function normalizeMusicTagCat(input) {
   const raw = input && typeof input === 'object' ? input : {};
-  return { id: typeof raw.id === 'string' && raw.id ? raw.id : mkId(), name: typeof raw.name === 'string' ? raw.name.slice(0, 20) : '', color: /^#[0-9a-f]{6}$/i.test(raw.color || '') ? raw.color.toLowerCase() : '#e8e8e8', tags: [...new Set((Array.isArray(raw.tags) ? raw.tags : []).filter(key => typeof key === 'string' && key))] };
+  return { id: typeof raw.id === 'string' && raw.id ? raw.id : mkId(), name: typeof raw.name === 'string' ? raw.name.slice(0, 20) : '', color: /^#[0-9a-f]{6}$/i.test(raw.color || '') ? raw.color.toLowerCase() : '#e8e8e8', tags: [...new Set((Array.isArray(raw.tags) ? raw.tags : []).filter(key => typeof key === 'string' && key))], labels: musicTagLabelsNormalize(raw.labels) };
 }
 function musicTagCatsEnsure() { state.musicTagCats = Array.isArray(state.musicTagCats) ? state.musicTagCats.map(normalizeMusicTagCat) : musicTagCatDefaults(); return state.musicTagCats; }
 function musicTagCatOf(tag) { const key = musicTagKey(tag); return (state.musicTagCats || []).find(cat => cat.tags.includes(key)) || null; }
@@ -35877,9 +35891,9 @@ function musicTagContext(event, el) { // 태그 칩 우클릭: 분류 지정 메
   musicCloseTagMenu();
   const tag = el.dataset.tag ? decodeURIComponent(el.dataset.tag) : (el.dataset.t || ''), cur = musicTagCatOf(tag);
   const menu = document.createElement('div');
-  menu.id = 'music-tag-menu'; menu.className = 'ds-ctx-menu open'; menu.style.zIndex = 10600;
+  menu.id = 'music-tag-menu'; menu.className = 'ds-ctx-menu open'; menu.style.zIndex = 12700; // 곡 모달(12500)·관리 창(12600) 위(#307)
   menu.innerHTML = '<div class="music-tag-menu-head">' + esc(tag) + ' · 분류</div>' + musicTagCatsEnsure().map(cat => '<div class="ds-ctx-item" data-cat="' + esc(cat.id) + '"><span class="music-cat-dot" style="background:' + cat.color + '"></span>' + esc(cat.name || '(이름 없음)') + (cur && cur.id === cat.id ? ' ✓' : '') + '</div>').join('')
-    + '<div class="ds-ctx-item" data-cat="">분류 없음' + (!cur ? ' ✓' : '') + '</div><div class="music-tag-menu-sep"></div><div class="ds-ctx-item" data-act="manage">분류 관리…</div>';
+    + '<div class="ds-ctx-item" data-cat="">분류 없음' + (!cur ? ' ✓' : '') + '</div><div class="music-tag-menu-sep"></div><div class="ds-ctx-item" data-act="manage">태그 관리…</div>';
   menu.addEventListener('click', e => { const t = e.target.closest('.ds-ctx-item'); if (!t) return; musicCloseTagMenu(); if (t.dataset.act === 'manage') openMusicTagCatManager(); else musicTagCatSet(tag, t.dataset.cat); });
   menu.addEventListener('contextmenu', e => e.preventDefault());
   document.body.appendChild(menu);
@@ -35892,14 +35906,91 @@ function musicTagCatManagerRows() {
   const q = String.fromCharCode(39);
   return musicTagCatsEnsure().map(cat => '<div class="music-cat-row"><input type="color" value="' + esc(cat.color) + '" title="색" oninput="musicTagCatEdit(' + q + esc(cat.id) + q + ',' + q + 'color' + q + ',this.value)">'
     + '<input type="text" class="music-cat-name" value="' + esc(cat.name) + '" maxlength="20" placeholder="분류 이름" spellcheck="false" oninput="musicTagCatEdit(' + q + esc(cat.id) + q + ',' + q + 'name' + q + ',this.value)">'
-    + '<span class="music-hint">태그 ' + cat.tags.length + '개</span><button type="button" class="music-danger" onclick="musicTagCatDelete(' + q + esc(cat.id) + q + ')">삭제</button></div>').join('');
+    + '<button type="button" class="music-cat-count' + (musicCatOpen.has(cat.id) ? ' on' : '') + '" data-cat="' + esc(cat.id) + '" title="태그 ' + cat.tags.length + '개 — 눌러서 펼치기" onclick="musicCatToggle(this)">' + cat.tags.length + '개</button><button type="button" class="music-danger" onclick="musicTagCatDelete(' + q + esc(cat.id) + q + ')">삭제</button></div>'
+    + (musicCatOpen.has(cat.id) ? musicCatTagsHtml(cat) : '')).join('');
+}
+let musicCatOpen = new Set(); // 펼친 분류 id(화면 내 임시, 저장 안 함)
+function musicTagLabel(cat, key) { // 표시 이름: 곡에 붙은 원래 글자 → labels → key(#306)
+  for (const track of state.musicTracks) for (const tag of (track.tags || [])) if (musicTagKey(tag) === key) return tag;
+  return (cat && cat.labels && cat.labels[key]) || key;
+}
+function musicTagUseCount(key) { return state.musicTracks.filter(track => (track.tags || []).some(tag => musicTagKey(tag) === key)).length; }
+function musicCatTagsHtml(cat) {
+  return '<div class="music-cat-tags">' + cat.tags.map(key => '<span class="music-cat-chip" data-cat="' + esc(cat.id) + '" data-key="' + esc(key) + '" style="' + esc(musicTagChipStyle(key)) + '"><span class="music-cat-chip-name" title="눌러서 이름 수정" onclick="musicCatTagEditStart(this)">' + esc(musicTagLabel(cat, key)) + '</span><button type="button" class="music-cat-chip-x" title="삭제" onclick="musicCatTagDelete(this)">×</button></span>').join('')
+    + '<input type="text" class="music-cat-tag-input" data-cat="' + esc(cat.id) + '" placeholder="태그 추가 (Enter·쉼표)" spellcheck="false" onkeydown="musicCatTagAddKey(event,this)"></div>';
+}
+function musicCatRowsRefresh(focusCatId) {
+  const rows = document.getElementById('music-cat-rows'); if (!rows) return;
+  rows.innerHTML = musicTagCatManagerRows();
+  if (focusCatId) { const input = [...rows.querySelectorAll('.music-cat-tag-input')].find(el => el.dataset.cat === focusCatId); if (input) input.focus(); }
+}
+function musicCatChanged(focusCatId) { // 태그·분류가 바뀐 뒤: 저장 + 카드·열린 상세 창·목록 갱신
+  persist(); renderMusicPage();
+  const track = state.musicTracks.find(item => item.id === (musicPlaying && musicPlaying.id)), editor = document.querySelector('#music-modal-backdrop .tag-editor[data-music-tags]');
+  if (track && editor) tagEditorSet(editor, track.tags || []);
+  musicRefreshTagColors(); musicCatRowsRefresh(focusCatId);
+}
+function musicCatToggle(btn) { const id = btn.dataset.cat; if (musicCatOpen.has(id)) musicCatOpen.delete(id); else musicCatOpen.add(id); musicCatRowsRefresh(musicCatOpen.has(id) ? id : ''); }
+function musicCatTagAddKey(event, input) {
+  if (event.isComposing || event.keyCode === 229) return;
+  if (event.key === 'Enter' || event.key === ',') { event.preventDefault(); musicCatTagAdd(input.dataset.cat, input.value); }
+}
+function musicCatTagAdd(catId, text) { // 등록: 이미 다른 분류에 있으면 이 분류로 옮긴다(한 태그는 한 분류)
+  const cats = musicTagCatsEnsure(), cat = cats.find(item => item.id === catId);
+  const names = String(text || '').split(',').map(name => name.replace(/\s+/g, ' ').trim().replace(/^#+/, '').trim()).filter(Boolean);
+  if (!cat || !names.length) { musicCatRowsRefresh(catId); return; }
+  names.forEach(name => {
+    const key = musicTagKey(name); if (!key) return;
+    cats.forEach(item => { item.tags = item.tags.filter(k => k !== key); });
+    cat.tags.push(key); cat.labels[key] = name.slice(0, 40);
+  });
+  musicCatChanged(catId);
+}
+function musicCatTagEditStart(span) {
+  const chip = span.closest('.music-cat-chip'), input = document.createElement('input');
+  input.type = 'text'; input.className = 'music-cat-chip-edit'; input.value = span.textContent; input.spellcheck = false; input.size = Math.max(4, input.value.length + 1);
+  let done = false;
+  const finish = ok => { if (done) return; done = true; if (ok) musicCatTagRename(chip.dataset.cat, chip.dataset.key, input.value); else musicCatRowsRefresh(); };
+  input.addEventListener('keydown', e => {
+    if (e.isComposing || e.keyCode === 229) return;
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  span.replaceWith(input); input.focus(); input.select();
+}
+function musicCatTagRename(catId, oldKey, rawName) { // 이름 수정: 모든 곡의 같은 태그를 새 이름으로, 분류 소속 유지, 겹치면 합침
+  const cats = musicTagCatsEnsure(), cat = cats.find(item => item.id === catId);
+  const name = String(rawName || '').replace(/\s+/g, ' ').trim().replace(/^#+/, '').trim().slice(0, 40), newKey = musicTagKey(name);
+  if (!cat || !newKey || name === musicTagLabel(cat, oldKey)) { musicCatRowsRefresh(); return; }
+  state.musicTracks.forEach(track => {
+    if (!(track.tags || []).some(tag => musicTagKey(tag) === oldKey)) return;
+    const seen = new Set(), out = [];
+    track.tags.forEach(tag => { const value = musicTagKey(tag) === oldKey ? name : tag, key = musicTagKey(value); if (!seen.has(key)) { seen.add(key); out.push(value); } });
+    track.tags = out;
+  });
+  if (newKey === oldKey) cat.labels[oldKey] = name;
+  else {
+    const existing = cats.find(item => item.tags.includes(newKey)), at = cat.tags.indexOf(oldKey);
+    cats.forEach(item => { item.tags = item.tags.filter(k => k !== oldKey); delete item.labels[oldKey]; });
+    if (!existing) cat.tags.splice(Math.min(Math.max(at, 0), cat.tags.length), 0, newKey);
+    (existing || cat).labels[newKey] = name;
+  }
+  musicCatChanged();
+}
+function musicCatTagDelete(btn) { // 삭제: 확인 후 분류와 모든 곡에서 제거
+  const chip = btn.closest('.music-cat-chip'), cats = musicTagCatsEnsure(), key = chip.dataset.key, cat = cats.find(item => item.id === chip.dataset.cat);
+  const n = musicTagUseCount(key);
+  if (!cat || !confirm('"' + musicTagLabel(cat, key) + '" 태그를 삭제할까요?\n이 태그를 쓰는 곡 ' + n + '개에서도 지워집니다.')) return;
+  state.musicTracks.forEach(track => { track.tags = (track.tags || []).filter(tag => musicTagKey(tag) !== key); });
+  cats.forEach(item => { item.tags = item.tags.filter(k => k !== key); delete item.labels[key]; });
+  musicCatChanged();
 }
 function openMusicTagCatManager() { // 분류 이름 수정·추가·삭제 창(상세 창 위에 겹쳐 열린다)
   document.getElementById('music-cat-backdrop')?.remove();
   const backdrop = document.createElement('div');
-  backdrop.id = 'music-cat-backdrop'; backdrop.className = 'music-modal-backdrop'; backdrop.style.zIndex = 10500;
-  backdrop.innerHTML = '<div class="music-modal" onclick="event.stopPropagation()"><div class="music-modal-head"><div class="music-modal-title">태그 분류 관리</div><button type="button" onclick="musicCloseTagCatManager()">✕</button></div>'
-    + '<div class="music-hint">태그를 우클릭하면 분류를 지정합니다. 분류 이름과 색은 여기서 바꿉니다.</div><div id="music-cat-rows">' + musicTagCatManagerRows() + '</div>'
+  backdrop.id = 'music-cat-backdrop'; backdrop.className = 'music-modal-backdrop'; backdrop.style.zIndex = 12600; // 곡 모달(12500) 위(#307)
+  backdrop.innerHTML = '<div class="music-modal" onclick="event.stopPropagation()"><div class="music-modal-head"><div class="music-modal-title">태그 관리</div><button type="button" onclick="musicCloseTagCatManager()">✕</button></div>'
+    + '<div class="music-hint">태그를 우클릭하면 분류를 지정합니다. 분류 이름·색과 분류별 태그(등록·이름 수정·삭제)를 여기서 관리합니다. 「N개」를 누르면 그 분류의 태그가 펼쳐집니다.</div><div id="music-cat-rows">' + musicTagCatManagerRows() + '</div>'
     + '<div class="music-modal-foot"><button type="button" onclick="musicTagCatAdd()">＋ 분류 추가</button><button type="button" class="music-primary" onclick="musicCloseTagCatManager()">닫기</button></div></div>';
   backdrop.addEventListener('mousedown', e => { if (e.target === backdrop) musicCloseTagCatManager(); });
   document.body.appendChild(backdrop);
@@ -35927,6 +36018,7 @@ function musicTagCatDelete(id) {
 function musicExistingTagsInner(track) { // 다른 곡에 이미 만들어져 있고 이 곡에는 아직 없는 태그(이 곡에 붙은 태그는 입력칸의 칩으로 이미 보인다)
   const seen = new Map(), on = new Set(track.tags.map(musicTagKey)), q = String.fromCharCode(39);
   state.musicTracks.forEach(t => (t.tags || []).forEach(tag => { const key = musicTagKey(tag); if (key && !on.has(key) && !seen.has(key)) seen.set(key, tag); }));
+  (state.musicTagCats || []).forEach(cat => cat.tags.forEach(key => { if (key && !on.has(key) && !seen.has(key)) seen.set(key, musicTagLabel(cat, key)); })); // 곡에 아직 안 쓰인 등록 태그도(#306)
   return [...seen.values()].sort((a, b) => a.localeCompare(b, 'ko')).map(tag => '<button type="button" class="music-tag-chip" data-t="' + esc(tag) + '" style="' + esc(musicTagChipStyle(tag)) + '" oncontextmenu="musicTagContext(event,this)" onclick="musicToggleTag(' + q + track.id + q + ',this.dataset.t)">' + esc(tag) + '</button>').join('');
 }
 function musicExistingTagsHtml(track) { return '<div class="music-tag-list hidden">' + musicExistingTagsInner(track) + '</div>'; } // 기본은 숨김, 「태그」 항목명을 누르면 보임(#321)
