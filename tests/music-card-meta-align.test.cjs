@@ -1,0 +1,10 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m); } else console.log('ok', m); };
+const css = html.match(/\.music-card-meta \{[^}]*\}/)[0];
+ok(!css.includes('justify-content') && css.includes('margin-top: 6px'), 'meta: justify-content 없음·margin-top 6px');
+ok(/\.music-card-badges \{[^}]*margin-left: auto/.test(html), '배지 margin-left:auto');
+const i = html.indexOf('<div class="music-card-meta">'), line = html.slice(i, html.indexOf('\n', i));
+ok(line.includes('<span class="music-card-folder">\' + esc(folder.name)'), '폴더명 span 으로 감쌈');
+ok(line.indexOf('music-card-folder') < line.indexOf('music-card-badges') && /<\/span>' \+ \(\(track\.tags[\s\S]*<\/span><\/div>'$/.test(line) || line.trimEnd().endsWith("'</span></div>'"), '폴더 있음/없음 모두 배지가 meta 마지막 자식');
+console.log('fails=' + fails); process.exit(fails ? 1 : 0);
