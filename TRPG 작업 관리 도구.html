@@ -47156,7 +47156,7 @@ function generateInsaneCocofoliaJSON(chId, sheetId) {
   var madness = (d.madnessState && typeof d.madnessState === 'object' && !Array.isArray(d.madnessState)) ? d.madnessState : {};
   var specialties = (d.specialties && typeof d.specialties === 'object' && !Array.isArray(d.specialties)) ? d.specialties : {};
   var targets = calcInsaneSpecialtyTargets(specialties);
-  var cmd = ['──특기 판정──'];
+  var cmd = ['@장면 열기', '@장면 닫기', '', '──특기 판정──']; // 장면 명령 선행(#297)
   INSANE_SPECIALTY_COLUMNS.forEach(function(col, colIndex) {
     col.names.forEach(function(name, rowIndex) {
       var fieldId = getInsaneSpecialtyFieldId(colIndex, rowIndex);
