@@ -27,4 +27,8 @@ ok(html.includes("<tbody>' + pinnedHtml + rowsHtml + '</tbody>") && html.include
 ok(html.includes("secHeaderHtml.replace('class=\"sh-section-hd\"', 'class=\"sh-section-hd sh-cypher-section-hd\"')") && html.includes('<span class="sh-hd-fields">') && !html.includes('sh-repeat-headfields'), '#326: 사이퍼 한도는 섹션 제목 줄 오른쪽 끝(표 위 줄 없음)');
 ok(html.includes('class="sh-hd-field" onclick="event.stopPropagation()"') && html.includes('class="sh-cypher-limit-input"') && html.includes("aria-label=\"' + esc(hf.ariaLabel || hf.label)"), '#326: 제목 줄 클릭과 충돌 방지·사이퍼와 같은 입력 모양·aria-label 사이퍼 한도');
 ok(/\.sh-hd-fields \{ margin-left: auto;/.test(html) && /\.sh-hd-field \{[^}]*text-transform: none;/.test(html), '#326: margin-left:auto·대문자 변환 영향 없음');
+ok(seg.includes("{ id: 'qty', label: '수량', type: 'text', width: 64 }") && seg.includes("{ id: 'desc', label: '설명', type: 'text', width: '60%' }"), '#327: 누메네라 장비 수량 width 64·설명 60%');
+ok(html.includes("typeof f.width === 'number') return '<th style=\"width:'") && html.includes("visibleFields.some(function(f) { return f.width; })"), '#327: 반복 표 필드 width 옵션(th·colgroup)');
+ok(!/\{ id: '[a-z]+', label: '[^']*', type: '[a-z]+'[^}]*width:/.test(html.slice(html.indexOf("key: 'cypher'"), html.indexOf("key: 'cypher'") + 12000)) , '#327: 사이퍼 템플릿에는 width 없음');
+ok(/\[data-template-key="numenera"\]\[data-section-id="equipment"\] td:nth-child\(2\) \.sh-repeat-input \{ text-align: center;/.test(html), '#327: 수량 입력 가운데 정렬(고정 행 포함)');
 process.exit(f ? 1 : 0);

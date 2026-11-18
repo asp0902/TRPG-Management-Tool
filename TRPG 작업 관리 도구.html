@@ -7394,6 +7394,8 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-field { display: flex; flex-direction: column; gap: 3px; }
 .sh-hd-fields { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
 .sh-hd-field { display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0; text-transform: none; font-weight: 700; }
+.sh-repeat-table[data-template-key="numenera"][data-section-id="equipment"] th:nth-child(2) { text-align: center; }
+.sh-repeat-table[data-template-key="numenera"][data-section-id="equipment"] td:nth-child(2) .sh-repeat-input { text-align: center; padding-left: 2px; padding-right: 2px; }
 .sh-pinned-row { background: #fafafa; }
 .sh-pinned-name { font-size: 12px; font-weight: 700; color: #444; padding: 0 4px; }
 .sh-field-label { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; overflow-wrap: anywhere; } /* 칸 폭을 넘는 라벨은 겹치지 않고 줄바꿈(#319) */
@@ -10226,8 +10228,8 @@ const SHEET_TEMPLATES = {
       ]},
       { id: 'equipment', label: '장비/소지품', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic', name: '쉰 SHINS', valueField: 'qty', type: 'number' }], fields: [
         { id: 'name', label: '이름', type: 'text' },
-        { id: 'qty', label: '수량', type: 'text' },
-        { id: 'desc', label: '설명', type: 'text' },
+        { id: 'qty', label: '수량', type: 'text', width: 64 },
+        { id: 'desc', label: '설명', type: 'text', width: '60%' },
       ]},
       { id: 'background', label: '배경', columns: 2, fields: [
         { id: 'description', label: '외모/설명', type: 'textarea', keepGridWidth: true },
@@ -46418,6 +46420,8 @@ function renderCharacterSheet(chId) {
           var popupHandler = 'openSheetOptionPopup(event,' + JSON.stringify(f.label) + ',' + JSON.stringify(f.options) + ')';
           return '<th><button type="button" class="sh-repeat-option-help" onclick="' + esc(popupHandler) + '" aria-haspopup="true">' + esc(f.label) + '</button></th>';
         }
+        if (typeof f.width === 'number') return '<th style="width:' + f.width + 'px;min-width:' + f.width + 'px;max-width:' + f.width + 'px">' + esc(f.label) + '</th>'; // 열 폭 옵션(#327): 숫자=고정 px, 문자열('60%')=비율
+        if (typeof f.width === 'string' && f.width) return '<th style="width:' + esc(f.width) + '">' + esc(f.label) + '</th>';
         return '<th>' + esc(f.label) + '</th>';
       }).join('') + (isCocWeapons ? '<th></th>' : '<th style="width:28px;"></th>');
       var rowsHtml = rows.map(function(row, rowIdx) {
@@ -46536,7 +46540,7 @@ function renderCharacterSheet(chId) {
       }).join('');
       if (headFieldsHtml) secHeaderHtml = secHeaderHtml.replace('class="sh-section-hd"', 'class="sh-section-hd sh-cypher-section-hd"').replace(/<\/div>$/, '<span class="sh-hd-fields">' + headFieldsHtml + '</span></div>');
       return '<div class="sh-section sh-repeat-section"' + repeatAttrs + '>' + secHeaderHtml
-        + '<div class="sh-section-body">' + guideHtml + '<table class="sh-repeat-table"' + repeatAttrs + '>' + (isCocWeapons ? '<colgroup>' + [40, 11, 11, 6, 6, 6, 6, 6, 8].map(function(width) { return '<col style="width:' + width + '%">'; }).join('') + '</colgroup>' : '') + '<thead><tr>' + thHtml + '</tr></thead><tbody>' + pinnedHtml + rowsHtml + '</tbody></table>'
+        + '<div class="sh-section-body">' + guideHtml + '<table class="sh-repeat-table"' + repeatAttrs + '>' + (isCocWeapons ? '<colgroup>' + [40, 11, 11, 6, 6, 6, 6, 6, 8].map(function(width) { return '<col style="width:' + width + '%">'; }).join('') + '</colgroup>' : (visibleFields.some(function(f) { return f.width; }) ? '<colgroup>' + visibleFields.map(function(f) { return f.width ? '<col style="width:' + (typeof f.width === 'number' ? f.width + 'px' : esc(f.width)) + '">' : '<col>'; }).join('') + '<col></colgroup>' : '')) + '<thead><tr>' + thHtml + '</tr></thead><tbody>' + pinnedHtml + rowsHtml + '</tbody></table>'
         + '<div class="sh-repeat-add-row"><button class="sh-repeat-add-btn" onclick="' + esc('addSheetRow(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ')') + '">＋ 항목 추가</button></div>'
         + '</div></div>';
     } else {
