@@ -459,6 +459,10 @@ tr.ct-row-end .ct-select:focus {
 .record-form-inline-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .record-timeline-editor { border: 1px solid #e5e5e5; border-radius: 6px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .record-timeline-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.record-timeline-head .record-timeline-title { margin-right: auto; }
+.record-timeline-page-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.record-timeline-clear-btn { color: #ef4444; }
+.record-timeline-clear-btn:disabled { opacity: 0.4; cursor: default; }
 .record-timeline-title { font-size: 10pt; font-weight: 800; color: #555; }
 .record-timeline-anchor, .record-timeline-event-form { display: grid; gap: 6px; }
 .record-timeline-anchor { grid-template-columns: 84px minmax(0, 1fr); align-items: center; }
@@ -9005,6 +9009,7 @@ select.sh-field-input,
                   <div class="record-timeline-head">
                     <div class="record-timeline-title">타임라인 정리</div>
                     <button type="button" class="record-inline-add-btn" id="rf-timeline-open" title="타임라인 탭에서 열기" aria-label="타임라인 탭에서 열기" onclick="openRecordTimelineTab()">열기</button>
+                    <button type="button" class="record-inline-add-btn record-timeline-clear-btn" id="rf-timeline-clear" title="타임라인 전체 삭제" aria-label="타임라인 전체 삭제" onclick="clearRecordTimeline(editingRecordId || '')">전체 삭제</button>
                   </div>
                   <div class="record-timeline-summary" id="rf-timeline-summary"></div>
                 </div>
@@ -34103,6 +34108,8 @@ function renderRecordTimelineEditor(rid = '', options = {}) {
   }
   const list = recordTimelineEl(rid, 'list');
   if (list) list.innerHTML = renderRecordTimelineItems(events, true, rid);
+  const clearBtn = document.getElementById(rid ? 'rt-timeline-clear' : 'rf-timeline-clear'); // 비어 있으면 전체 삭제 비활성(#322)
+  if (clearBtn) clearBtn.disabled = !events.length;
   fitRecordTimelineTextareas();
 }
 function resetRecordTimelineEventForm(rid = '') {
@@ -34241,6 +34248,17 @@ function editRecordTimelineEvent(id, rid = '') {
   fitRecordTimelineTextareas();
   recordTimelineEl(rid, 'title').focus();
 }
+// 타임라인 전체 삭제(#322): 확인 후 기준 사건·사건·보충사항을 모두 지운다. 저장된 기록은 개별 삭제와 같은 경로(commit)로 즉시 저장, 새 기록 초안은 draft 만 비운다.
+function clearRecordTimeline(rid = '') {
+  const events = getRecordTimelineEvents(rid);
+  if (!events.length) return;
+  const anchors = events.filter(item => item.type === 'anchor').length, notes = events.filter(item => item.type === 'note').length, items = events.filter(item => item.type === 'event').length;
+  if (!confirm('타임라인을 모두 삭제할까요?\n기준 사건 ' + anchors + '개·사건 ' + items + '개·보충사항 ' + notes + '개가 삭제되며 되돌릴 수 없습니다.')) return;
+  setRecordTimelineEvents(rid, []);
+  editingRecordTimelineAnchorId = null;
+  resetRecordTimelineEventForm(rid);
+  commitRecordTimeline(rid);
+}
 function deleteRecordTimelineEvent(id, rid = '') {
   setRecordTimelineEvents(rid, getRecordTimelineEvents(rid).filter(item => item.id !== id && item.parentId !== id));
   if (editingRecordTimelineEventId === id) resetRecordTimelineEventForm(rid);
@@ -34311,6 +34329,7 @@ function renderRecordTimelineSummary() {
   // 안내 문구는 첫 줄에 이어 붙여 한 줄을 아낀다(복사·추가 모달이 화면 안에 들어가게, #206).
   box.innerHTML = `<div>기준 사건: <b>${esc(anchorTitles.join(', ') || '없음')}</b> · 사건 ${eventItems.length}개${editingRecordId ? '' : ' <span class="record-timeline-summary-hint">· 기록을 저장하면 타임라인 탭에서 편집할 수 있어요.</span>'}</div>${top}`;
   if (openBtn) openBtn.disabled = !editingRecordId;
+  const clearBtn = document.getElementById('rf-timeline-clear'); if (clearBtn) clearBtn.disabled = !events.length;
 }
 function getRecordTimelineTabLabel(recordId) {
   const record = state.records.find(item => item.id === recordId);
@@ -34327,7 +34346,8 @@ function renderRecordTimelinePage(recordId) {
   editingRecordTimelineAnchorId = null;
   const rid = esc(JSON.stringify(recordId));
   host.innerHTML = `<div class="record-timeline-page-inner">
-    <div class="record-timeline-page-title">${esc(getRecordTimelineTabLabel(recordId))}</div>
+    <div class="record-timeline-page-head"><div class="record-timeline-page-title">${esc(getRecordTimelineTabLabel(recordId))}</div>
+      <button type="button" class="record-inline-add-btn record-timeline-clear-btn" id="rt-timeline-clear" onclick="clearRecordTimeline(${rid})">전체 삭제</button></div>
     <div class="record-timeline-editor">
       <div class="record-timeline-row">
         <span class="record-timeline-label">기준 추가</span>
