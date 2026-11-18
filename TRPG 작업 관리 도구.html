@@ -10162,56 +10162,56 @@ const SHEET_TEMPLATES = {
       { id: 'basic', label: '기본 정보', columns: 4, fields: [
         { id: 'playerName', label: '플레이어', type: 'text', colSpan: 2 },
         { id: 'charName', label: '캐릭터명', type: 'text', syncTarget: 'name', colSpan: 2 },
-        { id: 'descriptor', label: '수식어 DESCRIPTOR(ADJECTIVE)', type: 'text', colSpan: 2 },
-        { id: 'species', label: '종족 SPECIES(OPTIONAL)', type: 'text', colSpan: 2 },
-        { id: 'type', label: '유형 TYPE(NOUN)', type: 'select', options: ['글레이브 (Glaive)', '나노 (Nano)', '잭 (Jack)', '라이트 (Wright)', '딜브 (Delve)', '아르커스 (Arkus)'], colSpan: 2 },
-        { id: 'focus', label: '특징 FOCUS(VERB)', type: 'text', colSpan: 2 },
-        { id: 'tier', label: '티어 (Tier)', type: 'number' },
-        { id: 'xp', label: '경험치 (XP)', type: 'number' },
-        { id: 'effort', label: '노력 최대 (Effort)', type: 'number' },
-        { id: 'shins', label: '신스 (Shins)', type: 'number' },
+        { id: 'descriptor', label: '수식어 DESCRIPTOR ADJECTIVE', type: 'text', colSpan: 2 },
+        { id: 'species', label: '종족 SPECIES OPTIONAL', type: 'text', colSpan: 2 },
+        { id: 'type', label: '유형 TYPE NOUN', type: 'select', options: ['글레이브 (Glaive)', '나노 (Nano)', '잭 (Jack)', '라이트 (Wright)', '딜브 (Delve)', '아르커스 (Arkus)'], colSpan: 2 },
+        { id: 'focus', label: '특징 FOCUS VERB', type: 'text', colSpan: 2 },
+        { id: 'tier', label: '티어 TIER', type: 'number' },
+        { id: 'xp', label: '경험치 XP', type: 'number' },
+        { id: 'effort', label: '분발 EFFORT', type: 'number' },
+        { id: 'shins', label: '신스 SHINS', type: 'number' },
       ]},
       { id: 'pools', label: '스탯 풀', customType: 'numenera-pools' },
       { id: 'combat', label: '전투/방어', columns: 3, fields: [
-        { id: 'armor', label: '방어구 수치 (Armor)', type: 'number' },
+        { id: 'armor', label: '방어구 수치 ARMOR', type: 'number' },
         { id: 'recoveryRoll', label: '회복 주사위', type: 'text' },
-        { id: 'damageTrack', label: '피해 단계 (Damage Track)', type: 'select', options: ['정상 (Hale)', '손상 (Impaired)', '무력화 (Debilitated)', '사망 (Dead)'] },
+        { id: 'damageTrack', label: '피해 단계 DAMAGE TRACK', type: 'select', options: ['정상 (Hale)', '손상 (Impaired)', '무력화 (Debilitated)', '사망 (Dead)'] },
         { id: 'rec1', label: '회복 체크: 1 행동', type: 'checkbox' },
         { id: 'rec2', label: '회복 체크: 10 분', type: 'checkbox' },
         { id: 'rec3', label: '회복 체크: 1 시간', type: 'checkbox' },
         { id: 'rec4', label: '회복 체크: 10 시간', type: 'checkbox' },
       ]},
-      { id: 'skills', label: '기술 Skills', repeatable: true, fields: [
+      { id: 'skills', label: '기술 SKILLS', repeatable: true, fields: [
         { id: 'name', label: '기술명', type: 'text' },
         { id: 'level', label: '숙련도', type: 'select', options: ['훈련됨 (Trained)', '전문화 (Specialized)', '무능 (Inability)'] },
         { id: 'note', label: '메모', type: 'text' },
       ]},
-      { id: 'abilities', label: '어빌리티 Abilities', repeatable: true, fields: [
+      { id: 'abilities', label: '어빌리티 ABILITIES', repeatable: true, fields: [
         { id: 'name', label: '어빌리티명', type: 'text' },
         { id: 'cost', label: '풀 비용', type: 'text' },
         { id: 'activation', label: '활성화', type: 'select', options: ['행동 (Action)', '조력자 (Enabler)'] },
         { id: 'effect', label: '효과', type: 'text' },
       ]},
-      { id: 'attacks', label: '공격/무기 Attacks', repeatable: true, fields: [
+      { id: 'attacks', label: '공격/무기 ATTACKS', repeatable: true, fields: [
         { id: 'name', label: '무기명', type: 'text' },
         { id: 'damage', label: '피해', type: 'text' },
         { id: 'modifier', label: '수정치', type: 'text' },
         { id: 'notes', label: '특성', type: 'text' },
       ]},
-      { id: 'cyphers', label: '사이퍼 Cyphers', repeatable: true, headerFields: [{ id: 'cipherLimit', label: '사이퍼 한도', type: 'number', dataSection: 'basic' }], fields: [
+      { id: 'cyphers', label: '사이퍼 CYPHERS', repeatable: true, headerFields: [{ id: 'cipherLimit', label: '사이퍼 한도', type: 'number', dataSection: 'basic' }], fields: [
         { id: 'name', label: '이름', type: 'text' },
         { id: 'level', label: '레벨', type: 'number' },
         { id: 'form', label: '형태', type: 'text' },
         { id: 'effect', label: '효과', type: 'text' },
       ]},
-      { id: 'artifacts', label: '아티팩트 Artifacts', repeatable: true, fields: [
+      { id: 'artifacts', label: '아티팩트 ARTIFACTS', repeatable: true, fields: [
         { id: 'name', label: '이름', type: 'text' },
         { id: 'level', label: '레벨', type: 'number' },
         { id: 'form', label: '형태', type: 'text' },
         { id: 'effect', label: '효과', type: 'text' },
-        { id: 'depletion', label: '소진 (Depletion)', type: 'text' },
+        { id: 'depletion', label: '소진 DEPLETION', type: 'text' },
       ]},
-      { id: 'oddities', label: '오디티 Oddities', repeatable: true, fields: [
+      { id: 'oddities', label: '오디티 ODDITIES', repeatable: true, fields: [
         { id: 'name', label: '오디티명', type: 'text' },
         { id: 'desc', label: '설명', type: 'text' },
       ]},
@@ -10223,7 +10223,7 @@ const SHEET_TEMPLATES = {
       { id: 'background', label: '배경', columns: 2, fields: [
         { id: 'description', label: '외모/설명', type: 'textarea', keepGridWidth: true },
         { id: 'background', label: '배경 이야기', type: 'textarea', keepGridWidth: true },
-        { id: 'connections', label: '관계 (Connections)', type: 'textarea', keepGridWidth: true },
+        { id: 'connections', label: '관계 CONNECTIONS', type: 'textarea', keepGridWidth: true },
         { id: 'notes', label: '메모', type: 'textarea', keepGridWidth: true },
       ]},
     ]
@@ -49439,15 +49439,16 @@ function renderDnd5ePersonalitySection(sec, sectionData, chId, sheetId) {
 // ── 누메네라 스탯 풀 섹션 렌더러 ───────────────────────────
 function renderNumeneraPoolsSection(sec, sectionData, chId, sheetId) {
   sectionData = (sectionData && typeof sectionData === 'object' && !Array.isArray(sectionData)) ? sectionData : {};
+  var numeneraLabels = !sec.transpose; // 누메네라만 「힘 MIGHT」식 라벨(사이퍼 템플릿은 그대로, #321)
   var stats = [
-    { key: 'might',     label: '힘 (Might)' },
-    { key: 'speed',     label: '속도 (Speed)' },
-    { key: 'intellect', label: '지성 (Intellect)' },
+    { key: 'might',     label: numeneraLabels ? '힘 MIGHT' : '힘 (Might)' },
+    { key: 'speed',     label: numeneraLabels ? '속도 SPEED' : '속도 (Speed)' },
+    { key: 'intellect', label: numeneraLabels ? '지성 INTELLECT' : '지성 (Intellect)' },
   ];
   var rows = [
     { key: 'max',     label: '풀 최대', columnLabel: '최대 풀' },
     { key: 'current', label: '풀 현재', columnLabel: '현재 풀' },
-    { key: 'edge',    label: '엣지 (Edge)' },
+    { key: 'edge',    label: numeneraLabels ? '엣지 EDGE' : '엣지 (Edge)' },
   ];
   var transposed = !!sec.transpose;
   var columns = transposed ? rows : stats;

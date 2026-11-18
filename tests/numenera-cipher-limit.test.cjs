@@ -3,11 +3,13 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도�
 let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
 const a = html.indexOf("key: 'numenera'"), seg = html.slice(a, html.indexOf("key: 'cypher'", a));
 ok(!/id: 'cipherLimit'[^\n]*type: 'number' \},\n      \]\},/.test(seg.split("id: 'pools'")[0]) && !seg.split("id: 'pools'")[0].includes("id: 'cipherLimit'"), '기본 정보에서 사이퍼 한도 제거');
-ok(seg.includes("{ id: 'cyphers', label: '사이퍼 Cyphers', repeatable: true, headerFields: [{ id: 'cipherLimit', label: '사이퍼 한도', type: 'number', dataSection: 'basic' }]"), '사이퍼 섹션 headerFields(저장 위치는 기존 basic.cipherLimit)');
-['기술 Skills', '어빌리티 Abilities', '공격/무기 Attacks', '사이퍼 Cyphers', '아티팩트 Artifacts', '오디티 Oddities'].forEach(l => ok(seg.includes("label: '" + l + "'"), '섹션 이름 ' + l));
-ok(!/label: '[^']*\((Skills|Abilities|Attacks|Cyphers|Artifacts|Oddities)\)'/.test(seg), '섹션 이름 괄호 제거');
-ok(seg.includes("label: '티어 (Tier)'") && seg.includes("label: '소진 (Depletion)'"), '필드 라벨은 그대로');
-const c = html.slice(html.indexOf("id: 'cyphers', label: '사이퍼 CYPHERS'"), html.indexOf("id: 'cyphers', label: '사이퍼 CYPHERS'") + 400);
+ok(seg.includes("{ id: 'cyphers', label: '사이퍼 CYPHERS', repeatable: true, headerFields: [{ id: 'cipherLimit', label: '사이퍼 한도', type: 'number', dataSection: 'basic' }]"), '사이퍼 섹션 headerFields(저장 위치는 기존 basic.cipherLimit)');
+['기술 SKILLS', '어빌리티 ABILITIES', '공격/무기 ATTACKS', '사이퍼 CYPHERS', '아티팩트 ARTIFACTS', '오디티 ODDITIES'].forEach(l => ok(seg.includes("label: '" + l + "'"), '섹션 이름 ' + l));
+ok(!/label: '[^']*\((Skills|Abilities|Attacks|Cyphers|Artifacts|Oddities)\)'/.test(seg) && !/label: '[^']*\((Tier|XP|Effort|Shins|Armor|Damage Track|Depletion|Connections)\)'/.test(seg), '라벨 괄호 제거');
+ok(['수식어 DESCRIPTOR ADJECTIVE', '종족 SPECIES OPTIONAL', '유형 TYPE NOUN', '특징 FOCUS VERB', '티어 TIER', '경험치 XP', '분발 EFFORT', '신스 SHINS', '방어구 수치 ARMOR', '피해 단계 DAMAGE TRACK', '소진 DEPLETION', '관계 CONNECTIONS'].every(t => seg.includes("label: '" + t + "'")), '필드 라벨 새 표기(#321)');
+ok(seg.includes("options: ['글레이브 (Glaive)'") && seg.includes("'정상 (Hale)'") && seg.includes("'훈련됨 (Trained)'") && seg.includes("'행동 (Action)'"), 'select 선택지 값은 변경 없음(저장 데이터)');
+ok(html.includes("numeneraLabels ? '힘 MIGHT' : '힘 (Might)'") && html.includes("numeneraLabels ? '엣지 EDGE' : '엣지 (Edge)'"), '스탯 풀 라벨: 누메네라만 새 표기, 사이퍼(transpose)는 그대로');
+const cy = html.indexOf("key: 'cypher'"), ci = html.indexOf("id: 'cyphers', label: '사이퍼 CYPHERS'", cy), c = html.slice(ci, ci + 400);
 ok(!c.includes('headerFields'), 'cypher 템플릿은 변경 없음');
 // initSheetData: 새 시트도 basic.cipherLimit 준비, 기존 값은 보존
 const code = html.slice(html.indexOf('function initSheetData'), html.indexOf('function normalizeArianrhod2eSheetData'));
