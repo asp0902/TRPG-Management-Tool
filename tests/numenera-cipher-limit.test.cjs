@@ -3,7 +3,7 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도�
 let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
 const a = html.indexOf("key: 'numenera'"), seg = html.slice(a, html.indexOf("key: 'cypher'", a));
 ok(!/id: 'cipherLimit'[^\n]*type: 'number' \},\n      \]\},/.test(seg.split("id: 'pools'")[0]) && !seg.split("id: 'pools'")[0].includes("id: 'cipherLimit'"), '기본 정보에서 사이퍼 한도 제거');
-ok(seg.includes("{ id: 'cyphers', label: '사이퍼 CYPHERS', repeatable: true, headerFields: [{ id: 'cipherLimit', label: '사이퍼 한도', type: 'number', dataSection: 'basic' }]"), '사이퍼 섹션 headerFields(저장 위치는 기존 basic.cipherLimit)');
+ok(seg.includes("{ id: 'cyphers', label: '사이퍼 CYPHERS', repeatable: true, headerFields: [{ id: 'cipherLimit', label: '한도', ariaLabel: '사이퍼 한도', type: 'number', dataSection: 'basic' }]"), '사이퍼 섹션 headerFields(저장 위치는 기존 basic.cipherLimit)');
 ['기술 SKILLS', '어빌리티 ABILITIES', '공격/무기 ATTACKS', '사이퍼 CYPHERS', '아티팩트 ARTIFACTS', '오디티 ODDITIES'].forEach(l => ok(seg.includes("label: '" + l + "'"), '섹션 이름 ' + l));
 ok(!/label: '[^']*\((Skills|Abilities|Attacks|Cyphers|Artifacts|Oddities)\)'/.test(seg) && !/label: '[^']*\((Tier|XP|Effort|Shins|Armor|Damage Track|Depletion|Connections)\)'/.test(seg), '라벨 괄호 제거');
 ok(['수식어 DESCRIPTOR ADJECTIVE', '종족 SPECIES OPTIONAL', '유형 TYPE NOUN', '특징 FOCUS VERB', '티어 TIER', '경험치 XP', '분발 EFFORT', '방어구 수치 ARMOR', '피해 단계 DAMAGE TRACK', '소진 DEPLETION', '관계 CONNECTIONS'].every(t => seg.includes("label: '" + t + "'")), '필드 라벨 새 표기(#321)');
@@ -24,4 +24,7 @@ ok(html.includes("<tbody>' + pinnedHtml + rowsHtml + '</tbody>") && html.include
 { const code2 = html.slice(html.indexOf('function initSheetData'), html.indexOf('function normalizeArianrhod2eSheetData')); const c2 = {}; vm.createContext(c2); vm.runInContext(code2 + ';this.init=initSheetData', c2);
   const d2 = c2.init({ sections: [{ id: 'basic', fields: [] }, { id: 'equipment', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic' }], fields: [] }] }, '', '', '');
   ok(d2.basic.shins === '' && Array.isArray(d2.equipment) && d2.equipment.length === 0, '새 시트: basic.shins 준비·장비 행 배열에는 넣지 않음'); }
+ok(html.includes("secHeaderHtml.replace('class=\"sh-section-hd\"', 'class=\"sh-section-hd sh-cypher-section-hd\"')") && html.includes('<span class="sh-hd-fields">') && !html.includes('sh-repeat-headfields'), '#326: 사이퍼 한도는 섹션 제목 줄 오른쪽 끝(표 위 줄 없음)');
+ok(html.includes('class="sh-hd-field" onclick="event.stopPropagation()"') && html.includes('class="sh-cypher-limit-input"') && html.includes("aria-label=\"' + esc(hf.ariaLabel || hf.label)"), '#326: 제목 줄 클릭과 충돌 방지·사이퍼와 같은 입력 모양·aria-label 사이퍼 한도');
+ok(/\.sh-hd-fields \{ margin-left: auto;/.test(html) && /\.sh-hd-field \{[^}]*text-transform: none;/.test(html), '#326: margin-left:auto·대문자 변환 영향 없음');
 process.exit(f ? 1 : 0);

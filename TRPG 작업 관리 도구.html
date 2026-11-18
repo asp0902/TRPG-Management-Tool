@@ -7392,12 +7392,10 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 }
 @media(max-width:540px) { .sh-field-grid.cols-3, .sh-field-grid.cols-4 { grid-template-columns: repeat(2, 1fr); } }
 .sh-field { display: flex; flex-direction: column; gap: 3px; }
-.sh-repeat-headfields { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
-.sh-repeat-headfield { display: inline-flex; align-items: center; gap: 8px; }
-.sh-repeat-headinput { width: 90px; }
+.sh-hd-fields { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
+.sh-hd-field { display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0; text-transform: none; font-weight: 700; }
 .sh-pinned-row { background: #fafafa; }
 .sh-pinned-name { font-size: 12px; font-weight: 700; color: #444; padding: 0 4px; }
-.sh-repeat-headfield .sh-field-label { white-space: nowrap; }
 .sh-field-label { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; overflow-wrap: anywhere; } /* 칸 폭을 넘는 라벨은 겹치지 않고 줄바꿈(#319) */
 .sh-attr-level { font-size: 10px; color: #aaa; font-style: italic; line-height: 1.3; margin-top: 2px; }
 .sh-field-textarea.auto-grow { min-height: 34px; overflow: hidden; resize: none; }
@@ -10209,7 +10207,7 @@ const SHEET_TEMPLATES = {
         { id: 'modifier', label: '수정치', type: 'text' },
         { id: 'notes', label: '특성', type: 'text' },
       ]},
-      { id: 'cyphers', label: '사이퍼 CYPHERS', repeatable: true, headerFields: [{ id: 'cipherLimit', label: '사이퍼 한도', type: 'number', dataSection: 'basic' }], fields: [
+      { id: 'cyphers', label: '사이퍼 CYPHERS', repeatable: true, headerFields: [{ id: 'cipherLimit', label: '한도', ariaLabel: '사이퍼 한도', type: 'number', dataSection: 'basic' }], fields: [
         { id: 'name', label: '이름', type: 'text' },
         { id: 'level', label: '레벨', type: 'number' },
         { id: 'form', label: '형태', type: 'text' },
@@ -46533,10 +46531,12 @@ function renderCharacterSheet(chId) {
         var hfData = (sheetData[hfSec] && typeof sheetData[hfSec] === 'object' && !Array.isArray(sheetData[hfSec])) ? sheetData[hfSec] : {};
         var hfVal = hfData[hf.id] !== undefined && hfData[hf.id] !== null ? hfData[hf.id] : '';
         var hfHandler = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(hfSec) + ',' + JSON.stringify(hf.id) + ',this.value)';
-        return '<label class="sh-repeat-headfield"><span class="sh-field-label">' + esc(hf.label) + '</span><input class="sh-repeat-input sh-repeat-headinput" type="' + (hf.type === 'number' ? 'number' : 'text') + '" value="' + esc(String(hfVal)) + '" oninput="' + esc(hfHandler) + '"></label>';
+        // 섹션 제목 줄 오른쪽 끝에 넣는다(#326). 제목 줄 클릭과 겹치지 않게 입력칸 이벤트는 전파하지 않는다.
+        return '<label class="sh-hd-field" onclick="event.stopPropagation()"><span class="sh-hd-field-label">' + esc(hf.label) + '</span><input class="sh-cypher-limit-input" type="' + (hf.type === 'number' ? 'number' : 'text') + '" min="0" value="' + esc(String(hfVal)) + '" aria-label="' + esc(hf.ariaLabel || hf.label) + '" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" oninput="' + esc(hfHandler) + '"></label>';
       }).join('');
+      if (headFieldsHtml) secHeaderHtml = secHeaderHtml.replace('class="sh-section-hd"', 'class="sh-section-hd sh-cypher-section-hd"').replace(/<\/div>$/, '<span class="sh-hd-fields">' + headFieldsHtml + '</span></div>');
       return '<div class="sh-section sh-repeat-section"' + repeatAttrs + '>' + secHeaderHtml
-        + '<div class="sh-section-body">' + (headFieldsHtml ? '<div class="sh-repeat-headfields">' + headFieldsHtml + '</div>' : '') + guideHtml + '<table class="sh-repeat-table"' + repeatAttrs + '>' + (isCocWeapons ? '<colgroup>' + [40, 11, 11, 6, 6, 6, 6, 6, 8].map(function(width) { return '<col style="width:' + width + '%">'; }).join('') + '</colgroup>' : '') + '<thead><tr>' + thHtml + '</tr></thead><tbody>' + pinnedHtml + rowsHtml + '</tbody></table>'
+        + '<div class="sh-section-body">' + guideHtml + '<table class="sh-repeat-table"' + repeatAttrs + '>' + (isCocWeapons ? '<colgroup>' + [40, 11, 11, 6, 6, 6, 6, 6, 8].map(function(width) { return '<col style="width:' + width + '%">'; }).join('') + '</colgroup>' : '') + '<thead><tr>' + thHtml + '</tr></thead><tbody>' + pinnedHtml + rowsHtml + '</tbody></table>'
         + '<div class="sh-repeat-add-row"><button class="sh-repeat-add-btn" onclick="' + esc('addSheetRow(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ')') + '">＋ 항목 추가</button></div>'
         + '</div></div>';
     } else {
