@@ -1,0 +1,11 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const a = html.indexOf('function createScenarioItem(scenario)'), seg = html.slice(a, html.indexOf('createNew(folder.id);', a) + 400);
+ok(!/\.textContent = '(✕|✎|↪|＋|×)';/.test(seg), '사이드바 폴더·항목 액션 버튼에 문자 아이콘 없음');
+ok((seg.match(/fa-pen/g) || []).length === 3 && (seg.match(/fa-xmark/g) || []).length === 4 && (seg.match(/fa-plus/g) || []).length === 1 && (seg.match(/fa-arrow-turn-up/g) || []).length === 1, 'fa-pen·fa-xmark·fa-plus·fa-arrow-turn-up 사용(' + (seg.match(/fa-(pen|xmark|plus|arrow-turn-up)"/g) || []).length + '곳)');
+ok(seg.includes("setAttribute('aria-label', ") && /title = '(폴더 이름 변경|이름 변경|편집|삭제|폴더 삭제|폴더 이동)'/.test(seg), 'title 유지 + aria-label 부여');
+ok(/\.scenario-folder-btn, \.scenario-folder-action, \.scenario-item-move, \.scenario-item-del \{ width: 20px; height: 20px;/.test(html), '액션 버튼 20×20');
+ok(/\.scenario-item-move,\n\.scenario-item-del \{\n  background: transparent; border: none; color: #888; cursor: pointer;\n  padding: 0; font-size: 11px;/.test(html) && /\.scenario-folder-btn, \.scenario-folder-action \{\n  background: transparent; border: none; color: #888;/.test(html), '투명 배경·아이콘 #888·11px');
+ok(/\.scenario-folder-btn:hover, \.scenario-folder-action:hover \{ color: #fff; background: #242424; \}/.test(html) && /\.scenario-item-move:hover \{ color: #fff; background: #242424; \}/.test(html), 'hover #fff + 배경 #242424');
+process.exit(f ? 1 : 0);

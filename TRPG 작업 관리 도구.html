@@ -2756,13 +2756,16 @@ body.file-dragging iframe { pointer-events: none; } /* 파일을 끄는 동안 i
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .scenario-folder-actions { display: flex; align-items: center; gap: 2px; }
-.scenario-folder-btn {
-  background: none; border: none; color: #555; cursor: pointer;
-  padding: 2px 4px; font-size: 11px; border-radius: 3px;
+.scenario-folder-btn, .scenario-folder-action {
+  background: transparent; border: none; color: #888; cursor: pointer;
+  padding: 0; font-size: 11px; border-radius: 3px;
   opacity: 0; transition: opacity 0.1s, color 0.1s, background 0.1s;
 }
-.scenario-folder-head:hover .scenario-folder-btn { opacity: 1; }
-.scenario-folder-btn:hover { color: #fff; background: #242424; }
+.scenario-folder-head:hover .scenario-folder-btn, .scenario-folder-head:hover .scenario-folder-action { opacity: 1; }
+.scenario-folder-btn:hover, .scenario-folder-action:hover { color: #fff; background: #242424; }
+.scenario-folder-action.del:hover { color: #ef4444; }
+/* 사이드바 액션 버튼은 모두 20×20·아이콘 11px(Font Awesome, #324) */
+.scenario-folder-btn, .scenario-folder-action, .scenario-item-move, .scenario-item-del { width: 20px; height: 20px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 .scenario-folder-children { display: flex; flex-direction: column; }
 .scenario-folder.collapsed .scenario-folder-children { display: none; }
 .record-sidebar-date-group { display: flex; flex-direction: column; }
@@ -2800,8 +2803,8 @@ body.file-dragging iframe { pointer-events: none; } /* 파일을 끄는 동안 i
 .scenario-item:hover .scenario-item-actions { opacity: 1; }
 .scenario-item-move,
 .scenario-item-del {
-  background: none; border: none; color: #444; cursor: pointer;
-  padding: 2px 5px; font-size: 13px; border-radius: 3px;
+  background: transparent; border: none; color: #888; cursor: pointer;
+  padding: 0; font-size: 11px; border-radius: 3px;
   transition: color 0.1s, background 0.1s;
 }
 .scenario-item-move:hover { color: #fff; background: #242424; }
@@ -8283,6 +8286,7 @@ select.sh-field-input,
 
 @media (hover: none) {
   .scenario-folder-btn,
+  .scenario-folder-action,
   .scenario-item-actions,
   .tb-variation-copy-btn,
   .block-gap,
@@ -13285,7 +13289,7 @@ function createScenarioItem(scenario) {
   const delBtn = document.createElement('button');
   delBtn.className = 'scenario-item-del';
   delBtn.title = '삭제';
-  delBtn.textContent = '✕';
+  delBtn.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>'; delBtn.setAttribute('aria-label', delBtn.title);
   delBtn.onmousedown = e => e.stopPropagation();
   delBtn.onclick = e => delScenario(scenario.id, e);
 
@@ -13389,14 +13393,14 @@ function createCharacterSidebarItem(ch) {
   const moveBtn = document.createElement('button');
   moveBtn.className = 'scenario-item-move';
   moveBtn.title = '폴더 이동';
-  moveBtn.textContent = '↪';
+  moveBtn.innerHTML = '<i class="fa-solid fa-arrow-turn-up" aria-hidden="true"></i>'; moveBtn.setAttribute('aria-label', moveBtn.title);
   moveBtn.onmousedown = e => e.stopPropagation();
   moveBtn.onclick = e => openCharacterMoveMenu(e, ch.id);
 
   const editBtn = document.createElement('button');
   editBtn.className = 'scenario-item-move';
   editBtn.title = '편집';
-  editBtn.textContent = '✎';
+  editBtn.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i>'; editBtn.setAttribute('aria-label', editBtn.title);
   editBtn.onmousedown = e => e.stopPropagation();
   editBtn.onclick = e => {
     e.stopPropagation();
@@ -13406,7 +13410,7 @@ function createCharacterSidebarItem(ch) {
   const delBtn = document.createElement('button');
   delBtn.className = 'scenario-item-del';
   delBtn.title = '삭제';
-  delBtn.textContent = '✕';
+  delBtn.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>'; delBtn.setAttribute('aria-label', delBtn.title);
   delBtn.onmousedown = e => e.stopPropagation();
   delBtn.onclick = e => {
     e.stopPropagation();
@@ -13458,12 +13462,12 @@ function createCharacterFolderGroup(folder, characters) {
     const renameBtn = document.createElement('button');
     renameBtn.className = 'scenario-folder-action';
     renameBtn.title = '폴더 이름 변경';
-    renameBtn.textContent = '✎';
+    renameBtn.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i>'; renameBtn.setAttribute('aria-label', renameBtn.title);
     renameBtn.onclick = event => { event.stopPropagation(); renameFolder(folder.id, 'character'); };
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'scenario-folder-action del';
     deleteBtn.title = '폴더 삭제';
-    deleteBtn.textContent = '✕';
+    deleteBtn.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>'; deleteBtn.setAttribute('aria-label', deleteBtn.title);
     deleteBtn.onclick = event => { event.stopPropagation(); deleteCharacterFolder(folder.id); };
     actions.appendChild(renameBtn);
     actions.appendChild(deleteBtn);
@@ -13630,7 +13634,7 @@ function createCssMacroSidebarItem(itemData) {
   const delBtn = document.createElement('button');
   delBtn.className = 'scenario-item-del';
   delBtn.title = '삭제';
-  delBtn.textContent = '×';
+  delBtn.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>'; delBtn.setAttribute('aria-label', delBtn.title);
   delBtn.onmousedown = e => e.stopPropagation();
   delBtn.onclick = e => {
     e.stopPropagation();
@@ -13785,7 +13789,7 @@ function createFolderElement(folder) {
   const renameBtn = document.createElement('button');
   renameBtn.className = 'scenario-folder-btn';
   renameBtn.title = '이름 변경';
-  renameBtn.textContent = '✎';
+  renameBtn.innerHTML = '<i class="fa-solid fa-pen" aria-hidden="true"></i>'; renameBtn.setAttribute('aria-label', renameBtn.title);
   renameBtn.onmousedown = event => event.stopPropagation();
   renameBtn.onclick = event => {
     event.stopPropagation();
@@ -13795,7 +13799,7 @@ function createFolderElement(folder) {
   const addBtn = document.createElement('button');
   addBtn.className = 'scenario-folder-btn';
   addBtn.title = currentPage === 'css-macro' ? '폴더 안에 매크로 추가' : '폴더 안에 시나리오 추가';
-  addBtn.textContent = '＋';
+  addBtn.innerHTML = '<i class="fa-solid fa-plus" aria-hidden="true"></i>'; addBtn.setAttribute('aria-label', addBtn.title);
   addBtn.onmousedown = event => event.stopPropagation();
   addBtn.onclick = event => {
     event.stopPropagation();
