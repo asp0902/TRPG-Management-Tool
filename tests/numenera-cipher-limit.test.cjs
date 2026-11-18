@@ -8,7 +8,7 @@ ok(seg.includes("{ id: 'cyphers', label: '사이퍼 CYPHERS', repeatable: true, 
 ok(!/label: '[^']*\((Skills|Abilities|Attacks|Cyphers|Artifacts|Oddities)\)'/.test(seg) && !/label: '[^']*\((Tier|XP|Effort|Shins|Armor|Damage Track|Depletion|Connections)\)'/.test(seg), '라벨 괄호 제거');
 ok(['수식어 DESCRIPTOR ADJECTIVE', '종족 SPECIES OPTIONAL', '유형 TYPE NOUN', '특징 FOCUS VERB', '티어 TIER', '경험치 XP', '분발 EFFORT', '방어구 수치 ARMOR', '피해 단계 DAMAGE TRACK', '소진 DEPLETION', '관계 CONNECTIONS'].every(t => seg.includes("label: '" + t + "'")), '필드 라벨 새 표기(#321)');
 ok(seg.includes("options: ['글레이브 (Glaive)'") && seg.includes("'정상 (Hale)'") && seg.includes("'훈련됨 (Trained)'") && seg.includes("'행동 (Action)'"), 'select 선택지 값은 변경 없음(저장 데이터)');
-ok(html.includes("numeneraLabels ? '힘 MIGHT' : '힘 (Might)'") && html.includes("numeneraLabels ? '엣지 EDGE' : '엣지 (Edge)'"), '스탯 풀 라벨: 누메네라만 새 표기, 사이퍼(transpose)는 그대로');
+ok(html.includes("numeneraLabels ? '힘 MIGHT' : '힘 (Might)'") && html.includes("numeneraLabels ? '재능 EDGE' : '엣지 (Edge)'"), '스탯 풀 라벨: 누메네라만 새 표기, 사이퍼(transpose)는 그대로');
 const cy = html.indexOf("key: 'cypher'"), ci = html.indexOf("id: 'cyphers', label: '사이퍼 CYPHERS'", cy), c = html.slice(ci, ci + 400);
 ok(!c.includes('headerFields'), 'cypher 템플릿은 변경 없음');
 // initSheetData: 새 시트도 basic.cipherLimit 준비, 기존 값은 보존
