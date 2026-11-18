@@ -19,7 +19,7 @@ const d = ctx.init(tpl, '', '', '');
 ok(d.basic.cipherLimit === '' && Array.isArray(d.cyphers), '새 시트: basic.cipherLimit 초기화·표는 배열 그대로');
 ok(html.includes("saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(hfSec) + ',' + JSON.stringify(hf.id) + ',this.value)"), '머리 입력칸은 saveSheetField 로 기존 위치에 저장(값 보존)');
 ok(!seg.split("id: 'pools'")[0].includes("id: 'shins'"), '기본 정보에 신스 없음(#323)');
-ok(seg.includes("{ id: 'equipment', label: '장비/소지품', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic', name: '쉰 SHINS', valueField: 'qty', type: 'number' }]"), '장비/소지품 표 고정 첫 행(저장은 basic.shins)');
+ok(seg.includes("{ id: 'equipment', label: '장비/소지품', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic', name: '쉰 SHINS', valueField: 'qty', type: 'number', descField: 'desc', descId: 'shinsDesc' }]"), '장비/소지품 표 고정 첫 행(저장은 basic.shins)');
 ok(html.includes("<tbody>' + pinnedHtml + rowsHtml + '</tbody>") && html.includes('<tr class="sh-pinned-row"') && !html.includes('sh-pinned-row" draggable') , '고정 행은 일반 행 앞·드래그/삭제 컨트롤 없음');
 { const code2 = html.slice(html.indexOf('function initSheetData'), html.indexOf('function normalizeArianrhod2eSheetData')); const c2 = {}; vm.createContext(c2); vm.runInContext(code2 + ';this.init=initSheetData', c2);
   const d2 = c2.init({ sections: [{ id: 'basic', fields: [] }, { id: 'equipment', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic' }], fields: [] }] }, '', '', '');
@@ -39,4 +39,10 @@ ok(html.includes('var fieldDataSec = f.dataSection || sec.id;') && html.includes
   const d3 = c3.init({ sections: [{ id: 'basic', fields: [{ id: 'description', type: 'textarea', dataSection: 'background' }, { id: 'tier', type: 'number' }] }] }, '', '', '');
   ok(d3.background && d3.background.description === '' && d3.basic.tier === '' && d3.basic.description === undefined, '#329: 새 시트 초기화는 dataSection 객체에'); }
 ok(html.slice(html.indexOf("key: 'cypher'"), html.indexOf("key: 'cypher'") + 14000).includes("{ id: 'background', label: '배경 및 메모', columns: 2"), '#329: 사이퍼 템플릿 배경 섹션 불변');
+ok(html.includes("<input class=\"sh-repeat-input sh-pinned-name\" type=\"text\" value=\"' + esc(pr.name) + '\" readonly tabindex=\"-1\"") && !html.includes('<span class="sh-pinned-name">') && !html.includes('.sh-pinned-row { background'), '#330: 쉰 행 이름은 일반 입력칸 모양 readonly·배경 제거');
+ok(html.includes("pr.descField && f.id === pr.descField") && html.includes("JSON.stringify(prSec) + ',' + JSON.stringify(pr.descId) + ',this.value)"), '#330: 설명 편집 가능·basic.shinsDesc 저장');
+ok(html.includes('.sh-repeat-table[data-template-key="numenera"][data-section-id="equipment"] td { border-bottom: none; }') && !/\.sh-repeat-table td \{[^}]*border-bottom: none/.test(html), '#330: 행 구분선 제거는 누메네라 장비/소지품 표만');
+{ const code4 = html.slice(html.indexOf('function initSheetData'), html.indexOf('function normalizeArianrhod2eSheetData')); const c4 = {}; vm.createContext(c4); vm.runInContext(code4 + ';this.init=initSheetData', c4);
+  const d4 = c4.init({ sections: [{ id: 'basic', fields: [] }, { id: 'equipment', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic', descId: 'shinsDesc' }], fields: [] }] }, '', '', '');
+  ok(d4.basic.shins === '' && d4.basic.shinsDesc === '', '#330: 새 시트 basic.shinsDesc 초기화'); }
 process.exit(f ? 1 : 0);

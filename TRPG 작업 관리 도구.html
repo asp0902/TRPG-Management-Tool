@@ -7396,8 +7396,9 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-hd-field { display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0; text-transform: none; font-weight: 700; }
 .sh-repeat-table[data-template-key="numenera"][data-section-id="equipment"] th:nth-child(2) { text-align: center; }
 .sh-repeat-table[data-template-key="numenera"][data-section-id="equipment"] td:nth-child(2) .sh-repeat-input { text-align: center; padding-left: 2px; padding-right: 2px; }
-.sh-pinned-row { background: #fafafa; }
-.sh-pinned-name { font-size: 12px; font-weight: 700; color: #444; padding: 0 4px; }
+.sh-pinned-name { cursor: default; }
+.sh-pinned-name:focus { border-color: #e4e4e4; } /* 읽기 전용: 포커스 테두리 표시 안 함(#330) */
+.sh-repeat-table[data-template-key="numenera"][data-section-id="equipment"] td { border-bottom: none; } /* 누메네라 장비/소지품 표만 행 구분선 제거 */
 .sh-field-label { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; overflow-wrap: anywhere; } /* 칸 폭을 넘는 라벨은 겹치지 않고 줄바꿈(#319) */
 .sh-attr-level { font-size: 10px; color: #aaa; font-style: italic; line-height: 1.3; margin-top: 2px; }
 .sh-field-textarea.auto-grow { min-height: 34px; overflow: hidden; resize: none; }
@@ -10230,7 +10231,7 @@ const SHEET_TEMPLATES = {
         { id: 'name', label: '오디티명', type: 'text' },
         { id: 'desc', label: '설명', type: 'text' },
       ]},
-      { id: 'equipment', label: '장비/소지품', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic', name: '쉰 SHINS', valueField: 'qty', type: 'number' }], fields: [
+      { id: 'equipment', label: '장비/소지품', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic', name: '쉰 SHINS', valueField: 'qty', type: 'number', descField: 'desc', descId: 'shinsDesc' }], fields: [
         { id: 'name', label: '이름', type: 'text' },
         { id: 'qty', label: '수량', type: 'text', width: 64 },
         { id: 'desc', label: '설명', type: 'text', width: '60%' },
@@ -44411,6 +44412,7 @@ function initSheetData(tpl, name, image, memo) {
       var target = hf.dataSection || sec.id;
       if (!data[target] || typeof data[target] !== 'object' || Array.isArray(data[target])) data[target] = {};
       if (data[target][hf.id] === undefined) data[target][hf.id] = '';
+      if (hf.descId && data[target][hf.descId] === undefined) data[target][hf.descId] = '';
     });
   });
   return data;
@@ -46524,7 +46526,12 @@ function renderCharacterSheet(chId) {
         var prVal = prData[pr.id] !== undefined && prData[pr.id] !== null ? prData[pr.id] : '';
         var prHandler = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(prSec) + ',' + JSON.stringify(pr.id) + ',this.value)';
         var prCells = visibleFields.map(function(f) {
-          if (f.id === 'name') return '<td><span class="sh-pinned-name">' + esc(pr.name) + '</span></td>';
+          if (f.id === 'name') return '<td><input class="sh-repeat-input sh-pinned-name" type="text" value="' + esc(pr.name) + '" readonly tabindex="-1" aria-label="' + esc(pr.name) + '"></td>'; // 이름은 일반 입력칸 모양·편집 불가(#330)
+          if (pr.descField && f.id === pr.descField) { // 설명은 편집 가능, 저장은 dataSection 의 descId(basic.shinsDesc)
+            var prDescVal = prData[pr.descId] !== undefined && prData[pr.descId] !== null ? prData[pr.descId] : '';
+            var prDescHandler = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(prSec) + ',' + JSON.stringify(pr.descId) + ',this.value)';
+            return '<td><input class="sh-repeat-input" type="text" value="' + esc(String(prDescVal)) + '" aria-label="' + esc(pr.name) + ' 설명" oninput="' + esc(prDescHandler) + '"></td>';
+          }
           if (f.id === pr.valueField) return '<td><input class="sh-repeat-input" type="' + (pr.type === 'number' ? 'number' : 'text') + '" value="' + esc(String(prVal)) + '" aria-label="' + esc(pr.name) + '" oninput="' + esc(prHandler) + '"></td>';
           return '<td></td>';
         }).join('');
