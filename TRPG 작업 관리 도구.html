@@ -7391,6 +7391,8 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-repeat-headfields { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
 .sh-repeat-headfield { display: inline-flex; align-items: center; gap: 8px; }
 .sh-repeat-headinput { width: 90px; }
+.sh-pinned-row { background: #fafafa; }
+.sh-pinned-name { font-size: 12px; font-weight: 700; color: #444; padding: 0 4px; }
 .sh-repeat-headfield .sh-field-label { white-space: nowrap; }
 .sh-field-label { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; overflow-wrap: anywhere; } /* 칸 폭을 넘는 라벨은 겹치지 않고 줄바꿈(#319) */
 .sh-attr-level { font-size: 10px; color: #aaa; font-style: italic; line-height: 1.3; margin-top: 2px; }
@@ -10174,7 +10176,6 @@ const SHEET_TEMPLATES = {
         { id: 'tier', label: '티어 TIER', type: 'number' },
         { id: 'xp', label: '경험치 XP', type: 'number' },
         { id: 'effort', label: '분발 EFFORT', type: 'number' },
-        { id: 'shins', label: '신스 SHINS', type: 'number' },
       ]},
       { id: 'pools', label: '스탯 풀', customType: 'numenera-pools' },
       { id: 'combat', label: '전투/방어', columns: 3, fields: [
@@ -10220,7 +10221,7 @@ const SHEET_TEMPLATES = {
         { id: 'name', label: '오디티명', type: 'text' },
         { id: 'desc', label: '설명', type: 'text' },
       ]},
-      { id: 'equipment', label: '장비/소지품', repeatable: true, fields: [
+      { id: 'equipment', label: '장비/소지품', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic', name: '쉰 SHINS', valueField: 'qty', type: 'number' }], fields: [
         { id: 'name', label: '이름', type: 'text' },
         { id: 'qty', label: '수량', type: 'text' },
         { id: 'desc', label: '설명', type: 'text' },
@@ -44401,7 +44402,7 @@ function initSheetData(tpl, name, image, memo) {
   });
   // 반복 섹션 머리 입력칸(headerFields)은 dataSection(기본: 섹션 자신) 안에 저장한다 — 누메네라 사이퍼 한도는 기존 위치 basic.cipherLimit 그대로(#320)
   (tpl.sections || []).forEach(function(sec) {
-    (sec.headerFields || []).forEach(function(hf) {
+    (sec.headerFields || []).concat(sec.pinnedRows || []).forEach(function(hf) {
       var target = hf.dataSection || sec.id;
       if (!data[target] || typeof data[target] !== 'object' || Array.isArray(data[target])) data[target] = {};
       if (data[target][hf.id] === undefined) data[target][hf.id] = '';
@@ -46509,6 +46510,19 @@ function renderCharacterSheet(chId) {
           + '</ul>'
           + '</div>'
         : '';
+      // 고정 첫 행(#323): 삭제·이동·복제 대상이 아니고 장비 행 배열에도 들어가지 않는다. 값은 dataSection(기본 basic)에 그대로 저장한다.
+      var pinnedHtml = (sec.pinnedRows || []).map(function(pr) {
+        var prSec = pr.dataSection || sec.id;
+        var prData = (sheetData[prSec] && typeof sheetData[prSec] === 'object' && !Array.isArray(sheetData[prSec])) ? sheetData[prSec] : {};
+        var prVal = prData[pr.id] !== undefined && prData[pr.id] !== null ? prData[pr.id] : '';
+        var prHandler = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(prSec) + ',' + JSON.stringify(pr.id) + ',this.value)';
+        var prCells = visibleFields.map(function(f) {
+          if (f.id === 'name') return '<td><span class="sh-pinned-name">' + esc(pr.name) + '</span></td>';
+          if (f.id === pr.valueField) return '<td><input class="sh-repeat-input" type="' + (pr.type === 'number' ? 'number' : 'text') + '" value="' + esc(String(prVal)) + '" aria-label="' + esc(pr.name) + '" oninput="' + esc(prHandler) + '"></td>';
+          return '<td></td>';
+        }).join('');
+        return '<tr class="sh-pinned-row" data-pinned-row="' + esc(pr.id) + '">' + prCells + '<td></td></tr>';
+      }).join('');
       var headFieldsHtml = (sec.headerFields || []).map(function(hf) {
         var hfSec = hf.dataSection || sec.id;
         var hfData = (sheetData[hfSec] && typeof sheetData[hfSec] === 'object' && !Array.isArray(sheetData[hfSec])) ? sheetData[hfSec] : {};
@@ -46517,7 +46531,7 @@ function renderCharacterSheet(chId) {
         return '<label class="sh-repeat-headfield"><span class="sh-field-label">' + esc(hf.label) + '</span><input class="sh-repeat-input sh-repeat-headinput" type="' + (hf.type === 'number' ? 'number' : 'text') + '" value="' + esc(String(hfVal)) + '" oninput="' + esc(hfHandler) + '"></label>';
       }).join('');
       return '<div class="sh-section sh-repeat-section"' + repeatAttrs + '>' + secHeaderHtml
-        + '<div class="sh-section-body">' + (headFieldsHtml ? '<div class="sh-repeat-headfields">' + headFieldsHtml + '</div>' : '') + guideHtml + '<table class="sh-repeat-table"' + repeatAttrs + '>' + (isCocWeapons ? '<colgroup>' + [40, 11, 11, 6, 6, 6, 6, 6, 8].map(function(width) { return '<col style="width:' + width + '%">'; }).join('') + '</colgroup>' : '') + '<thead><tr>' + thHtml + '</tr></thead><tbody>' + rowsHtml + '</tbody></table>'
+        + '<div class="sh-section-body">' + (headFieldsHtml ? '<div class="sh-repeat-headfields">' + headFieldsHtml + '</div>' : '') + guideHtml + '<table class="sh-repeat-table"' + repeatAttrs + '>' + (isCocWeapons ? '<colgroup>' + [40, 11, 11, 6, 6, 6, 6, 6, 8].map(function(width) { return '<col style="width:' + width + '%">'; }).join('') + '</colgroup>' : '') + '<thead><tr>' + thHtml + '</tr></thead><tbody>' + pinnedHtml + rowsHtml + '</tbody></table>'
         + '<div class="sh-repeat-add-row"><button class="sh-repeat-add-btn" onclick="' + esc('addSheetRow(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ')') + '">＋ 항목 추가</button></div>'
         + '</div></div>';
     } else {

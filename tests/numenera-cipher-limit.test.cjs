@@ -6,7 +6,7 @@ ok(!/id: 'cipherLimit'[^\n]*type: 'number' \},\n      \]\},/.test(seg.split("id:
 ok(seg.includes("{ id: 'cyphers', label: '사이퍼 CYPHERS', repeatable: true, headerFields: [{ id: 'cipherLimit', label: '사이퍼 한도', type: 'number', dataSection: 'basic' }]"), '사이퍼 섹션 headerFields(저장 위치는 기존 basic.cipherLimit)');
 ['기술 SKILLS', '어빌리티 ABILITIES', '공격/무기 ATTACKS', '사이퍼 CYPHERS', '아티팩트 ARTIFACTS', '오디티 ODDITIES'].forEach(l => ok(seg.includes("label: '" + l + "'"), '섹션 이름 ' + l));
 ok(!/label: '[^']*\((Skills|Abilities|Attacks|Cyphers|Artifacts|Oddities)\)'/.test(seg) && !/label: '[^']*\((Tier|XP|Effort|Shins|Armor|Damage Track|Depletion|Connections)\)'/.test(seg), '라벨 괄호 제거');
-ok(['수식어 DESCRIPTOR ADJECTIVE', '종족 SPECIES OPTIONAL', '유형 TYPE NOUN', '특징 FOCUS VERB', '티어 TIER', '경험치 XP', '분발 EFFORT', '신스 SHINS', '방어구 수치 ARMOR', '피해 단계 DAMAGE TRACK', '소진 DEPLETION', '관계 CONNECTIONS'].every(t => seg.includes("label: '" + t + "'")), '필드 라벨 새 표기(#321)');
+ok(['수식어 DESCRIPTOR ADJECTIVE', '종족 SPECIES OPTIONAL', '유형 TYPE NOUN', '특징 FOCUS VERB', '티어 TIER', '경험치 XP', '분발 EFFORT', '방어구 수치 ARMOR', '피해 단계 DAMAGE TRACK', '소진 DEPLETION', '관계 CONNECTIONS'].every(t => seg.includes("label: '" + t + "'")), '필드 라벨 새 표기(#321)');
 ok(seg.includes("options: ['글레이브 (Glaive)'") && seg.includes("'정상 (Hale)'") && seg.includes("'훈련됨 (Trained)'") && seg.includes("'행동 (Action)'"), 'select 선택지 값은 변경 없음(저장 데이터)');
 ok(html.includes("numeneraLabels ? '힘 MIGHT' : '힘 (Might)'") && html.includes("numeneraLabels ? '엣지 EDGE' : '엣지 (Edge)'"), '스탯 풀 라벨: 누메네라만 새 표기, 사이퍼(transpose)는 그대로');
 const cy = html.indexOf("key: 'cypher'"), ci = html.indexOf("id: 'cyphers', label: '사이퍼 CYPHERS'", cy), c = html.slice(ci, ci + 400);
@@ -18,4 +18,10 @@ const tpl = { sections: [{ id: 'basic', fields: [{ id: 'tier', type: 'number' }]
 const d = ctx.init(tpl, '', '', '');
 ok(d.basic.cipherLimit === '' && Array.isArray(d.cyphers), '새 시트: basic.cipherLimit 초기화·표는 배열 그대로');
 ok(html.includes("saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(hfSec) + ',' + JSON.stringify(hf.id) + ',this.value)"), '머리 입력칸은 saveSheetField 로 기존 위치에 저장(값 보존)');
+ok(!seg.split("id: 'pools'")[0].includes("id: 'shins'"), '기본 정보에 신스 없음(#323)');
+ok(seg.includes("{ id: 'equipment', label: '장비/소지품', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic', name: '쉰 SHINS', valueField: 'qty', type: 'number' }]"), '장비/소지품 표 고정 첫 행(저장은 basic.shins)');
+ok(html.includes("<tbody>' + pinnedHtml + rowsHtml + '</tbody>") && html.includes('<tr class="sh-pinned-row"') && !html.includes('sh-pinned-row" draggable') , '고정 행은 일반 행 앞·드래그/삭제 컨트롤 없음');
+{ const code2 = html.slice(html.indexOf('function initSheetData'), html.indexOf('function normalizeArianrhod2eSheetData')); const c2 = {}; vm.createContext(c2); vm.runInContext(code2 + ';this.init=initSheetData', c2);
+  const d2 = c2.init({ sections: [{ id: 'basic', fields: [] }, { id: 'equipment', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic' }], fields: [] }] }, '', '', '');
+  ok(d2.basic.shins === '' && Array.isArray(d2.equipment) && d2.equipment.length === 0, '새 시트: basic.shins 준비·장비 행 배열에는 넣지 않음'); }
 process.exit(f ? 1 : 0);
