@@ -1,0 +1,11 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13,10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+ok(html.includes('id="ch-token-size" type="number" min="1" step="1" value="10"'), '#ch-token-size 기본 value 10');
+ok(html.includes("document.getElementById('ch-token-size').value = 10;"), '새 캐릭터 모달 초기화 10');
+ok(html.includes("normalizeCharacterTokenSize(document.getElementById('ch-token-size')?.value || 10)"), '저장 시 빈 칸 대체값 10');
+const a = html.indexOf('function normalizeCharacterTokenSize');
+const ctx = {}; vm.createContext(ctx); vm.runInContext(html.slice(a, html.indexOf('\n}', a) + 2) + ';this.n=normalizeCharacterTokenSize', ctx);
+ok(ctx.n(undefined) === 6 && ctx.n('') === 6 && ctx.n(0) === 6, '정규화 폴백 6 유지(옛 데이터 크기 불변)');
+ok(ctx.n(8) === 8 && ctx.n('12') === 12, '기존 캐릭터 값 불변');
+process.exit(f ? 1 : 0);

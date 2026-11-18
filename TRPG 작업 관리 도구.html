@@ -9458,7 +9458,7 @@ select.sh-field-input,
           </div>
           <div style="min-width:0;">
             <div class="ch-modal-label" style="margin-bottom:4px;">토큰 크기</div>
-            <input class="ch-modal-input" id="ch-token-size" type="number" min="1" step="1" value="6"
+            <input class="ch-modal-input" id="ch-token-size" type="number" min="1" step="1" value="10"
               style="width:100%;box-sizing:border-box;">
           </div>
         </div>
@@ -43959,7 +43959,7 @@ function openCharacterModal(id) {
     document.getElementById('ch-memo').value = '';
     document.getElementById('ch-color').value = '#888888';
     document.getElementById('ch-color-native').value = '#888888';
-    document.getElementById('ch-token-size').value = 6;
+    document.getElementById('ch-token-size').value = 10; // 새 캐릭터 기본 토큰 크기(#317)
     document.getElementById('ch-invisible').checked = false;
     document.getElementById('ch-secret').checked = false;
     _chTags = [];
@@ -44124,7 +44124,7 @@ function saveCharacterModal() {
   const ruleName = (document.getElementById('ch-rulename')?.value || '').trim();
   const memo = document.getElementById('ch-memo')?.value || '';
   const color = normalizeCharacterColor(document.getElementById('ch-color')?.value || '#888888');
-  const tokenSize = normalizeCharacterTokenSize(document.getElementById('ch-token-size')?.value || 6);
+  const tokenSize = normalizeCharacterTokenSize(document.getElementById('ch-token-size')?.value || 10);
   const invisible = document.getElementById('ch-invisible')?.checked || false;
   const secret = document.getElementById('ch-secret')?.checked || false;
   if (_chEditId) {
