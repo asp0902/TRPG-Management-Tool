@@ -468,7 +468,7 @@ tr.ct-row-end .ct-select:focus {
 .record-timeline-anchor { grid-template-columns: 84px minmax(0, 1fr); align-items: center; }
 .record-timeline-event-form { grid-template-columns: minmax(160px, 1fr) minmax(110px, 150px) 84px 84px minmax(180px, 1fr) auto; }
 /* 타임라인 탭: 모든 입력칸은 같은 가로 폭(1fr)이고 오른쪽에 56px 버튼 칸을 둔다. 글 길이에 따라 높이가 늘고 줄어든다. */
-.record-timeline-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) 56px; gap: 6px; align-items: start; }
+.record-timeline-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) 48px; gap: 6px; align-items: start; }
 .record-timeline-row > .record-timeline-label { line-height: 34px; }
 /* 사건 이름 · 소속 기준 · 전/후 · 거리를 한 줄로 */
 .record-timeline-meta { display: grid; grid-template-columns: minmax(0, 1fr) 130px 100px 76px; gap: 6px; align-items: start; }
@@ -476,8 +476,8 @@ tr.ct-row-end .ct-select:focus {
 .record-timeline-editor :is(.record-form-input, .record-form-select) { box-sizing: border-box; width: 100%; min-height: 34px; }
 .record-timeline-text { display: block; resize: none; overflow: hidden; line-height: 20px; }
 .record-timeline-editor :is(.record-form-select, input.record-form-input) { height: 34px; }
-.record-timeline-editor .record-inline-add-btn { box-sizing: border-box; width: 56px; min-width: 56px; height: 34px; padding: 0; text-align: center; align-self: start; }
-.record-timeline-editor .record-timeline-icon-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; flex: 0 0 34px; }
+.record-timeline-editor .record-inline-add-btn { box-sizing: border-box; width: 48px; min-width: 48px; height: 34px; padding: 0; text-align: center; align-self: start; }
+.record-timeline-editor .record-timeline-icon-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; flex: 0 0 22px; font-size: 11px; }
 .record-timeline-label { font-size: 9pt; font-weight: 700; color: #777; }
 .record-timeline-list { display: flex; flex-direction: column; gap: 6px; }
 .record-timeline-item { display: grid; grid-template-columns: 78px minmax(0, 1fr) auto; gap: 8px; align-items: start; padding: 8px; border-left: 3px solid #b8b8b8; background: #fafafa; }
@@ -486,12 +486,13 @@ tr.ct-row-end .ct-select:focus {
 .record-timeline-name { font-size: 9.5pt; font-weight: 700; overflow-wrap: anywhere; }
 .record-timeline-item.anchor .record-timeline-name, .record-timeline-item.anchor .record-timeline-anchor-edit { font-size: 10.5pt; }
 .record-timeline-desc { margin-top: 2px; font-size: 9pt; color: #666; white-space: pre-wrap; overflow-wrap: anywhere; }
-.record-timeline-actions { display: flex; gap: 3px; }
+.record-timeline-actions { display: flex; gap: 3px; align-self: center; } /* 버튼이 행 높이를 늘리지 않게 가운데 정렬(#325) */
+.record-timeline-editor .record-timeline-icon-btn i { font-size: 11px; }
 .record-timeline-icon-btn { width: 26px; height: 26px; border: 1px solid #ddd; background: #fff; color: #555; cursor: pointer; }
 .record-timeline-icon-btn:hover { border-color: #999; color: #111; }
 .record-timeline-note { margin-left: 24px; padding: 6px 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; background: #f3f3f3; font-size: 9pt; color: #555; }
 /* 보충사항 추가·편집 입력칸은 설명 입력칸(.record-timeline-row)과 같은 열(84px 라벨 열 + 6px gap 뒤)에서 시작한다. */
-.record-timeline-note-add { display: grid; grid-template-columns: 84px minmax(0, 1fr) 56px; gap: 6px; align-items: start; }
+.record-timeline-note-add { display: grid; grid-template-columns: 84px minmax(0, 1fr) 48px; gap: 6px; align-items: start; }
 .record-timeline-note-add > .record-timeline-note-ce, .record-timeline-note.editing > .record-timeline-note-ce { grid-column: 2; }
 .record-timeline-note-add > .record-inline-add-btn, .record-timeline-note.editing > .record-timeline-actions { grid-column: 3; }
 /* 보충사항 보기·편집 모드는 같은 박스 구조: 행은 배경·여백 없이 84px 열 + 글자 박스(2열) + 버튼(3열). 보기 모드 글자 박스는 입력칸(.info-ce)과 같은 크기·테두리·여백·글꼴이고 배경만 회색이다. */
@@ -34338,7 +34339,7 @@ function renderRecordTimelineSummary() {
 }
 function getRecordTimelineTabLabel(recordId) {
   const record = state.records.find(item => item.id === recordId);
-  return `${getRecordPlainTitle(record?.scenarioName) || '이름 없는 기록'} · 타임라인`;
+  return `타임라인 · ${getRecordPlainTitle(record?.scenarioName) || '이름 없는 기록'}`;
 }
 function openRecordTimelineTab(recordId = editingRecordId) {
   if (!recordId || !state.records.some(record => record.id === recordId)) return;
