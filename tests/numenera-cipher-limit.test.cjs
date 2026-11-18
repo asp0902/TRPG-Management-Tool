@@ -31,4 +31,12 @@ ok(seg.includes("{ id: 'qty', label: '수량', type: 'text', width: 64 }") && se
 ok(html.includes("typeof f.width === 'number') return '<th style=\"width:'") && html.includes("visibleFields.some(function(f) { return f.width; })"), '#327: 반복 표 필드 width 옵션(th·colgroup)');
 ok(!/\{ id: '[a-z]+', label: '[^']*', type: '[a-z]+'[^}]*width:/.test(html.slice(html.indexOf("key: 'cypher'"), html.indexOf("key: 'cypher'") + 12000)) , '#327: 사이퍼 템플릿에는 width 없음');
 ok(/\[data-template-key="numenera"\]\[data-section-id="equipment"\] td:nth-child\(2\) \.sh-repeat-input \{ text-align: center;/.test(html), '#327: 수량 입력 가운데 정렬(고정 행 포함)');
+ok(!seg.includes("{ id: 'background', label: '배경', columns: 2"), '#329: 누메네라 「배경」 섹션 제거');
+{ const bs = seg.slice(0, seg.indexOf("id: 'pools'"));
+  ok(['description', 'background', 'connections', 'notes'].every(id => new RegExp("\{ id: '" + id + "'[^\n]*type: 'textarea', keepGridWidth: true, colSpan: 2, dataSection: 'background' \}").test(bs)) && bs.indexOf("id: 'effort'") < bs.indexOf("id: 'description'"), '#329: 기본 정보 안 티어·경험치·분발 줄 아래에 2열 textarea 4개(저장 위치 background.*)'); }
+ok(html.includes('var fieldDataSec = f.dataSection || sec.id;') && html.includes("JSON.stringify(fieldDataSec) + ',' + JSON.stringify(f.id)"), '#329: 일반 필드 dataSection 읽기·쓰기');
+{ const code3 = html.slice(html.indexOf('function initSheetData'), html.indexOf('function normalizeArianrhod2eSheetData')); const c3 = {}; vm.createContext(c3); vm.runInContext(code3 + ';this.init=initSheetData', c3);
+  const d3 = c3.init({ sections: [{ id: 'basic', fields: [{ id: 'description', type: 'textarea', dataSection: 'background' }, { id: 'tier', type: 'number' }] }] }, '', '', '');
+  ok(d3.background && d3.background.description === '' && d3.basic.tier === '' && d3.basic.description === undefined, '#329: 새 시트 초기화는 dataSection 객체에'); }
+ok(html.slice(html.indexOf("key: 'cypher'"), html.indexOf("key: 'cypher'") + 14000).includes("{ id: 'background', label: '배경 및 메모', columns: 2"), '#329: 사이퍼 템플릿 배경 섹션 불변');
 process.exit(f ? 1 : 0);

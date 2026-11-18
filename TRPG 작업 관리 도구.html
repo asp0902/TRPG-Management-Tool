@@ -10181,6 +10181,10 @@ const SHEET_TEMPLATES = {
         { id: 'tier', label: '티어 TIER', type: 'number' },
         { id: 'xp', label: '경험치 XP', type: 'number' },
         { id: 'effort', label: '분발 EFFORT', type: 'number' },
+        { id: 'description', label: '외모/설명', type: 'textarea', keepGridWidth: true, colSpan: 2, dataSection: 'background' },
+        { id: 'background', label: '배경 이야기', type: 'textarea', keepGridWidth: true, colSpan: 2, dataSection: 'background' },
+        { id: 'connections', label: '관계 CONNECTIONS', type: 'textarea', keepGridWidth: true, colSpan: 2, dataSection: 'background' },
+        { id: 'notes', label: '메모', type: 'textarea', keepGridWidth: true, colSpan: 2, dataSection: 'background' },
       ]},
       { id: 'pools', label: '스탯 풀', customType: 'numenera-pools' },
       { id: 'combat', label: '전투/방어', columns: 3, fields: [
@@ -10230,12 +10234,6 @@ const SHEET_TEMPLATES = {
         { id: 'name', label: '이름', type: 'text' },
         { id: 'qty', label: '수량', type: 'text', width: 64 },
         { id: 'desc', label: '설명', type: 'text', width: '60%' },
-      ]},
-      { id: 'background', label: '배경', columns: 2, fields: [
-        { id: 'description', label: '외모/설명', type: 'textarea', keepGridWidth: true },
-        { id: 'background', label: '배경 이야기', type: 'textarea', keepGridWidth: true },
-        { id: 'connections', label: '관계 CONNECTIONS', type: 'textarea', keepGridWidth: true },
-        { id: 'notes', label: '메모', type: 'textarea', keepGridWidth: true },
       ]},
     ]
   },
@@ -44394,13 +44392,15 @@ function initSheetData(tpl, name, image, memo) {
       const sectionData = {};
       (sec.fields || []).forEach(function(f) {
         if (f.type === 'spacer') return;
-        if (f.type === 'checkbox') sectionData[f.id] = false;
-        else if (f.type === 'number') sectionData[f.id] = '';
-        else sectionData[f.id] = '';
+        var targetData = sectionData;
+        if (f.dataSection) { if (!data[f.dataSection] || typeof data[f.dataSection] !== 'object' || Array.isArray(data[f.dataSection])) data[f.dataSection] = {}; targetData = data[f.dataSection]; } // dataSection 필드는 그 섹션 객체에 초기화(#329)
+        if (f.type === 'checkbox') targetData[f.id] = false;
+        else if (f.type === 'number') targetData[f.id] = '';
+        else targetData[f.id] = '';
         // 캐릭터 기본값 동기화
-        if (f.syncTarget === 'name' && name) sectionData[f.id] = name;
-        if (f.syncTarget === 'image' && image) sectionData[f.id] = image;
-        if (f.syncTarget === 'memo' && memo) sectionData[f.id] = memo;
+        if (f.syncTarget === 'name' && name) targetData[f.id] = name;
+        if (f.syncTarget === 'image' && image) targetData[f.id] = image;
+        if (f.syncTarget === 'memo' && memo) targetData[f.id] = memo;
       });
       data[sec.id] = sectionData;
     }
@@ -46604,8 +46604,11 @@ function renderCharacterSheet(chId) {
             + '<div class="ar2e-origin-note" id="ar2e-lp-note-' + esc(f.id) + '-' + esc(sheetId) + '">' + esc(_ar2eLpNote(lpCfg, lpD)) + '</div>'
             + '</div></div>';
         }
-        var val = sectionData[f.id] !== undefined ? sectionData[f.id] : '';
-        var onInput = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + JSON.stringify(f.id) + ',this.' + (f.type === 'checkbox' ? 'checked' : 'value') + ')';
+        // dataSection: 값을 다른 섹션 객체에 저장하는 필드(#329 — 섹션을 합쳐도 기존 저장 위치를 그대로 쓴다)
+        var fieldDataSec = f.dataSection || sec.id;
+        var fieldData = f.dataSection ? ((sheetData[fieldDataSec] && typeof sheetData[fieldDataSec] === 'object' && !Array.isArray(sheetData[fieldDataSec])) ? sheetData[fieldDataSec] : {}) : sectionData;
+        var val = fieldData[f.id] !== undefined ? fieldData[f.id] : '';
+        var onInput = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(fieldDataSec) + ',' + JSON.stringify(f.id) + ',this.' + (f.type === 'checkbox' ? 'checked' : 'value') + ')';
         if (f.hasLevelDesc) onInput += ';_updateAttrLevelDesc(this,' + JSON.stringify(tpl.key) + ',' + JSON.stringify(f.id) + ')';
         if (f.triggersAgeAdjust) onInput += ';_updateAgeAdjustBox(' + JSON.stringify(sheetId) + ',this.value)';
         var inputHtml;
