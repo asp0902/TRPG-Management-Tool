@@ -7303,7 +7303,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .ch-sheet-no-template { text-align: center; padding: 48px 20px; color: #bbb; font-size: 14px; }
 /* Sheet section */
 .sh-section { border: 1px solid #ebebeb; border-radius: 10px; overflow: hidden; }
-.sh-section-hd { padding: 9px 14px; background: #f8f8f8; border-bottom: 1px solid #ebebeb; font-size: 11px; font-weight: 700; color: #555; letter-spacing: 0.06em; text-transform: uppercase; }
+.sh-section-hd { padding: 9px 14px; background: #f8f8f8; border-bottom: 1px solid #ebebeb; font-size: 12px; font-weight: 800; color: #555; letter-spacing: 0.06em; text-transform: uppercase; }
 .sh-cypher-section-hd { display: flex; align-items: center; gap: 8px; }
 .sh-cypher-count { display: inline-flex; align-items: center; gap: 3px; letter-spacing: 0; }
 .sh-cypher-limit-input { width: 40px; height: 22px; box-sizing: border-box; border: 1px solid #d8d8d8; border-radius: 4px; background: #fff; color: #333; font: inherit; text-align: center; }
@@ -7384,7 +7384,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 }
 @media(max-width:540px) { .sh-field-grid.cols-3, .sh-field-grid.cols-4 { grid-template-columns: repeat(2, 1fr); } }
 .sh-field { display: flex; flex-direction: column; gap: 3px; }
-.sh-field-label { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; }
+.sh-field-label { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; overflow-wrap: anywhere; } /* 칸 폭을 넘는 라벨은 겹치지 않고 줄바꿈(#319) */
 .sh-attr-level { font-size: 10px; color: #aaa; font-style: italic; line-height: 1.3; margin-top: 2px; }
 .sh-field-textarea.auto-grow { min-height: 34px; overflow: hidden; resize: none; }
 .sh-ar2-vitals { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)); gap: 8px; }
@@ -10158,10 +10158,10 @@ const SHEET_TEMPLATES = {
       { id: 'basic', label: '기본 정보', columns: 4, fields: [
         { id: 'playerName', label: '플레이어', type: 'text', colSpan: 2 },
         { id: 'charName', label: '캐릭터명', type: 'text', syncTarget: 'name', colSpan: 2 },
-        { id: 'descriptor', label: '수식어 DESCRIPTOR(ADJECTIVE)', type: 'text' },
-        { id: 'species', label: '종족 SPECIES(OPTIONAL)', type: 'text' },
-        { id: 'type', label: '유형 TYPE(NOUN)', type: 'select', options: ['글레이브 (Glaive)', '나노 (Nano)', '잭 (Jack)', '라이트 (Wright)', '딜브 (Delve)', '아르커스 (Arkus)'] },
-        { id: 'focus', label: '특징 FOCUS(VERB)', type: 'text' },
+        { id: 'descriptor', label: '수식어 DESCRIPTOR(ADJECTIVE)', type: 'text', colSpan: 2 },
+        { id: 'species', label: '종족 SPECIES(OPTIONAL)', type: 'text', colSpan: 2 },
+        { id: 'type', label: '유형 TYPE(NOUN)', type: 'select', options: ['글레이브 (Glaive)', '나노 (Nano)', '잭 (Jack)', '라이트 (Wright)', '딜브 (Delve)', '아르커스 (Arkus)'], colSpan: 2 },
+        { id: 'focus', label: '특징 FOCUS(VERB)', type: 'text', colSpan: 2 },
         { id: 'tier', label: '티어 (Tier)', type: 'number' },
         { id: 'xp', label: '경험치 (XP)', type: 'number' },
         { id: 'effort', label: '노력 최대 (Effort)', type: 'number' },
@@ -10231,10 +10231,10 @@ const SHEET_TEMPLATES = {
       { id: 'basic', label: '기본 정보', columns: 4, fields: [
         { id: 'playerName', label: '플레이어', type: 'text', colSpan: 2 },
         { id: 'charName', label: '캐릭터명', type: 'text', syncTarget: 'name', colSpan: 2 },
-        { id: 'descriptor', label: '수식어 DESCRIPTOR(ADJECTIVE)', type: 'text' },
-        { id: 'species', label: '종족 SPECIES(OPTIONAL)', type: 'text' },
-        { id: 'type', label: '유형 TYPE(NOUN)', type: 'text' },
-        { id: 'focus', label: '특징 FOCUS(VERB)', type: 'text' },
+        { id: 'descriptor', label: '수식어 DESCRIPTOR(ADJECTIVE)', type: 'text', colSpan: 2 },
+        { id: 'species', label: '종족 SPECIES(OPTIONAL)', type: 'text', colSpan: 2 },
+        { id: 'type', label: '유형 TYPE(NOUN)', type: 'text', colSpan: 2 },
+        { id: 'focus', label: '특징 FOCUS(VERB)', type: 'text', colSpan: 2 },
         { id: 'tier', label: '티어 (Tier)', type: 'number' },
         { id: 'effort', label: '분발 EFFORT', type: 'number' },
         { id: 'xp', label: '경험치 (XP)', type: 'number' },
