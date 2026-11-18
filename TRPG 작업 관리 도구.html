@@ -7395,7 +7395,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-hd-fields { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; }
 .sh-hd-field { display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0; text-transform: none; font-weight: 700; }
 .sh-repeat-table[data-template-key="numenera"][data-section-id="equipment"] th:nth-child(2) { text-align: center; }
-.sh-repeat-table[data-template-key="numenera"][data-section-id="equipment"] td:nth-child(2) .sh-repeat-input { text-align: center; padding-left: 2px; padding-right: 2px; }
+.sh-repeat-table[data-template-key="numenera"][data-section-id="equipment"] td:nth-child(2) .sh-repeat-input { display: block; width: 44px; margin: 0 auto; text-align: center; padding-left: 2px; padding-right: 2px; } /* 수량 입력칸 자체를 작게(쉰·일반 행 동일, #330) */
 .sh-pinned-name { cursor: default; }
 .sh-pinned-name:focus { border-color: #e4e4e4; } /* 읽기 전용: 포커스 테두리 표시 안 함(#330) */
 .sh-repeat-table[data-template-key="numenera"][data-section-id="equipment"] td { border-bottom: none; } /* 누메네라 장비/소지품 표만 행 구분선 제거 */
@@ -10231,9 +10231,9 @@ const SHEET_TEMPLATES = {
         { id: 'name', label: '오디티명', type: 'text' },
         { id: 'desc', label: '설명', type: 'text' },
       ]},
-      { id: 'equipment', label: '장비/소지품', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic', name: '쉰 SHINS', valueField: 'qty', type: 'number', descField: 'desc', descId: 'shinsDesc' }], fields: [
+      { id: 'equipment', label: '장비/소지품', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic', name: '쉰 SHINS', valueField: 'qty', type: 'text', descField: 'desc', descId: 'shinsDesc' }], fields: [
         { id: 'name', label: '이름', type: 'text' },
-        { id: 'qty', label: '수량', type: 'text', width: 64 },
+        { id: 'qty', label: '수량', type: 'text', width: 56 },
         { id: 'desc', label: '설명', type: 'text', width: '60%' },
       ]},
     ]

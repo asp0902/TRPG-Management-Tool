@@ -19,7 +19,7 @@ const d = ctx.init(tpl, '', '', '');
 ok(d.basic.cipherLimit === '' && Array.isArray(d.cyphers), '새 시트: basic.cipherLimit 초기화·표는 배열 그대로');
 ok(html.includes("saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(hfSec) + ',' + JSON.stringify(hf.id) + ',this.value)"), '머리 입력칸은 saveSheetField 로 기존 위치에 저장(값 보존)');
 ok(!seg.split("id: 'pools'")[0].includes("id: 'shins'"), '기본 정보에 신스 없음(#323)');
-ok(seg.includes("{ id: 'equipment', label: '장비/소지품', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic', name: '쉰 SHINS', valueField: 'qty', type: 'number', descField: 'desc', descId: 'shinsDesc' }]"), '장비/소지품 표 고정 첫 행(저장은 basic.shins)');
+ok(seg.includes("{ id: 'equipment', label: '장비/소지품', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic', name: '쉰 SHINS', valueField: 'qty', type: 'text', descField: 'desc', descId: 'shinsDesc' }]"), '장비/소지품 표 고정 첫 행(저장은 basic.shins)');
 ok(html.includes("<tbody>' + pinnedHtml + rowsHtml + '</tbody>") && html.includes('<tr class="sh-pinned-row"') && !html.includes('sh-pinned-row" draggable') , '고정 행은 일반 행 앞·드래그/삭제 컨트롤 없음');
 { const code2 = html.slice(html.indexOf('function initSheetData'), html.indexOf('function normalizeArianrhod2eSheetData')); const c2 = {}; vm.createContext(c2); vm.runInContext(code2 + ';this.init=initSheetData', c2);
   const d2 = c2.init({ sections: [{ id: 'basic', fields: [] }, { id: 'equipment', repeatable: true, pinnedRows: [{ id: 'shins', dataSection: 'basic' }], fields: [] }] }, '', '', '');
@@ -27,10 +27,10 @@ ok(html.includes("<tbody>' + pinnedHtml + rowsHtml + '</tbody>") && html.include
 ok(html.includes("secHeaderHtml.replace('class=\"sh-section-hd\"', 'class=\"sh-section-hd sh-cypher-section-hd\"')") && html.includes('<span class="sh-hd-fields">') && !html.includes('sh-repeat-headfields'), '#326: 사이퍼 한도는 섹션 제목 줄 오른쪽 끝(표 위 줄 없음)');
 ok(html.includes('class="sh-hd-field" onclick="event.stopPropagation()"') && html.includes('class="sh-cypher-limit-input"') && html.includes("aria-label=\"' + esc(hf.ariaLabel || hf.label)"), '#326: 제목 줄 클릭과 충돌 방지·사이퍼와 같은 입력 모양·aria-label 사이퍼 한도');
 ok(/\.sh-hd-fields \{ margin-left: auto;/.test(html) && /\.sh-hd-field \{[^}]*text-transform: none;/.test(html), '#326: margin-left:auto·대문자 변환 영향 없음');
-ok(seg.includes("{ id: 'qty', label: '수량', type: 'text', width: 64 }") && seg.includes("{ id: 'desc', label: '설명', type: 'text', width: '60%' }"), '#327: 누메네라 장비 수량 width 64·설명 60%');
+ok(seg.includes("{ id: 'qty', label: '수량', type: 'text', width: 56 }") && seg.includes("{ id: 'desc', label: '설명', type: 'text', width: '60%' }"), '#327: 누메네라 장비 수량 width 56·설명 60%');
 ok(html.includes("typeof f.width === 'number') return '<th style=\"width:'") && html.includes("visibleFields.some(function(f) { return f.width; })"), '#327: 반복 표 필드 width 옵션(th·colgroup)');
 ok(!/\{ id: '[a-z]+', label: '[^']*', type: '[a-z]+'[^}]*width:/.test(html.slice(html.indexOf("key: 'cypher'"), html.indexOf("key: 'cypher'") + 12000)) , '#327: 사이퍼 템플릿에는 width 없음');
-ok(/\[data-template-key="numenera"\]\[data-section-id="equipment"\] td:nth-child\(2\) \.sh-repeat-input \{ text-align: center;/.test(html), '#327: 수량 입력 가운데 정렬(고정 행 포함)');
+ok(/\[data-template-key="numenera"\]\[data-section-id="equipment"\] td:nth-child\(2\) \.sh-repeat-input \{ display: block; width: 44px; margin: 0 auto; text-align: center;/.test(html), '#327: 수량 입력 가운데 정렬(고정 행 포함)');
 ok(!seg.includes("{ id: 'background', label: '배경', columns: 2"), '#329: 누메네라 「배경」 섹션 제거');
 { const bs = seg.slice(0, seg.indexOf("id: 'pools'"));
   ok(['description', 'background', 'connections', 'notes'].every(id => new RegExp("\{ id: '" + id + "'[^\n]*type: 'textarea', keepGridWidth: true, colSpan: 2, dataSection: 'background' \}").test(bs)) && bs.indexOf("id: 'effort'") < bs.indexOf("id: 'description'"), '#329: 기본 정보 안 티어·경험치·분발 줄 아래에 2열 textarea 4개(저장 위치 background.*)'); }
