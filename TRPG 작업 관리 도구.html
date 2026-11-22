@@ -47945,7 +47945,20 @@ function generateInsaneCocofoliaJSON(chId, sheetId) {
   var madness = (d.madnessState && typeof d.madnessState === 'object' && !Array.isArray(d.madnessState)) ? d.madnessState : {};
   var specialties = (d.specialties && typeof d.specialties === 'object' && !Array.isArray(d.specialties)) ? d.specialties : {};
   var targets = calcInsaneSpecialtyTargets(specialties);
-  var cmd = ['@장면 열기', '@장면 닫기', '', '──특기 판정──']; // 장면 명령 선행(#297)
+  var cmd = ['@장면 열기', '@장면 닫기', '']; // 장면 명령 선행(#297)
+  var specNames = [];
+  INSANE_SPECIALTY_COLUMNS.forEach(function(col, colIndex) { col.names.forEach(function(name, rowIndex) { specNames.push({ name: name, target: targets[getInsaneSpecialtyFieldId(colIndex, rowIndex)] }); }); });
+  var abilityLines = (Array.isArray(d.abilities) ? d.abilities : []).map(function(item) { // 어빌리티 구역(#334): 지정특기가 특기 목록에 있을 때만 판정식
+    item = (item && typeof item === 'object') ? item : {};
+    var abName = String(item.name == null ? '' : item.name).trim();
+    if (!abName) return '';
+    var effect = String(item.effect == null ? '' : item.effect).replace(/[\r\n]+/g, ' ').trim();
+    var spec = String(item.specialty == null ? '' : item.specialty).trim();
+    var hit = specNames.find(function(entry) { return entry.name === spec; });
+    return (hit ? '2D6>=' + hit.target + ' ' : '') + '【' + abName + '】' + (hit ? '《' + spec + '》' : '') + (effect ? ' ' + effect : '');
+  }).filter(Boolean);
+  if (abilityLines.length) cmd.push('──어빌리티──'), abilityLines.forEach(function(line) { cmd.push(line); }), cmd.push('');
+  cmd.push('──특기 판정──');
   INSANE_SPECIALTY_COLUMNS.forEach(function(col, colIndex) {
     col.names.forEach(function(name, rowIndex) {
       var fieldId = getInsaneSpecialtyFieldId(colIndex, rowIndex);
