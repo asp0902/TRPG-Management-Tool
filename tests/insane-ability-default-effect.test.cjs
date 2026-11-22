@@ -1,0 +1,11 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const a = html.indexOf('  insane: {'), b = html.indexOf('defaultRows: [', html.indexOf("label: '어빌리티 리스트'", a));
+const rows = html.slice(b, html.indexOf(']}', b));
+ok(rows.includes("{ name: '기본공격', type: '공격', specialty: '', effect: '목표 1명을 선택해서 명중판정을 한다. 명중판정이 성공하고, 목표가 회피판정에 실패하면 1D6점 대미지.' }"), '기본공격 효과 문구');
+ok(rows.includes("{ name: '전장이동', type: '서포트', specialty: '', effect: '지원행동. 이 어빌리티를 사용하면 전투에 참가한 캐릭터 전원은 다음 라운드의 「라운드 시작」에 플롯을 한다.' }"), '전장이동 효과 문구');
+ok(rows.includes("{ name: '', type: '장비', specialty: '', effect: '' }"), '빈 장비 행 유지');
+const e = html.slice(html.indexOf('function ensureInsaneDefaultAbilities'), html.indexOf('function toggleInsaneAbilityEffect'));
+ok(e.includes("specialty: '', effect: '' }"), '기존 시트 보정 경로는 그대로(저장분 미변경)');
+process.exit(f ? 1 : 0);
