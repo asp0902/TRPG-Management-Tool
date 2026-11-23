@@ -18,7 +18,7 @@ ok(f.bgmExportLine({ trackId: 'f' }) === 'BGM: a.mp3', '파일 곡: 제목 없�
 ok(f.bgmExportLine({ trackId: 'zz' }) === 'BGM: (삭제된 곡)' && f.bgmExportLine({ trackId: '' }) === 'BGM:', '삭제된 곡·미선택 내보내기');
 ok(f.bgmBlockHtml({ id: 'b1', trackId: '' }, 'c').includes('곡 선택') && !f.bgmBlockHtml({ id: 'b1', trackId: '' }, 'c').includes('bgm-play'), '미선택: 곡 선택 버튼만');
 const sel = f.bgmBlockHtml({ id: 'b1', trackId: 'y' }, 'c');
-ok(sel.includes('T.jpg') && sel.includes('곡') && sel.includes('가수') && sel.includes("bgmPlay('y')") && sel.includes('바꾸기'), '선택됨: 섬네일·제목·아티스트·▶·바꾸기');
+ok(sel.includes('T.jpg') && sel.includes('곡') && sel.includes('가수') && sel.includes("bgmPlay('y')") && sel.includes('fa-right-left') && sel.includes('title="곡 바꾸기"') && sel.includes('aria-label="곡 바꾸기"') && sel.includes('class="bgm-play bgm-swap"') && !sel.includes('>바꾸기<'), '선택됨: 섬네일·제목·아티스트·▶·바꾸기 아이콘(fa-right-left, title·aria-label 곡 바꾸기, #346)');
 const del = f.bgmBlockHtml({ id: 'b1', trackId: 'zz' }, 'c');
 ok(del.includes('삭제된 곡') && del.includes('곡 선택') && !del.includes('bgm-play'), '삭제된 곡 표시 + 곡 선택');
 ctx.musicLocalIds = new Set(['other']);

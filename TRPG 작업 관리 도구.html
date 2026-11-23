@@ -16098,7 +16098,8 @@ function bgmBlockHtml(b, cid) {
   const missing = hasFile && typeof musicLocalIds !== 'undefined' && musicLocalIds.size && !musicLocalIds.has(track.id) && track.kind === 'file';
   return '<div class="bgm-block"><span class="bgm-thumb">' + (thumb ? '<img src="' + esc(thumb) + '" alt="" referrerpolicy="no-referrer">' : '<i class="fa-solid fa-music"></i>') + '</span>'
     + '<span class="bgm-info"><span class="bgm-title">' + esc(musicTrackTitle(track)) + '</span><span class="bgm-artist">' + esc(track.artist || '') + (missing ? ' · 이 기기에 파일 없음' : '') + '</span></span>'
-    + '<button type="button" class="bgm-play" title="재생" onclick="bgmPlay(' + q + esc(track.id) + q + ')"><i class="fa-solid fa-play"></i></button>' + pick('바꾸기') + '</div>';
+    + '<button type="button" class="bgm-play" title="재생" onclick="bgmPlay(' + q + esc(track.id) + q + ')"><i class="fa-solid fa-play"></i></button>'
+    + '<button type="button" class="bgm-play bgm-swap" title="곡 바꾸기" aria-label="곡 바꾸기" onclick="bgmOpenPicker(' + q + id + q + ',' + q + c + q + ')"><i class="fa-solid fa-right-left"></i></button></div>'; // 바꾸기는 아이콘(#346), 크기는 재생 버튼(.bgm-play)과 같다
 }
 function bgmExportLine(block) { // 내보내기·복사: 「BGM: 제목 - 아티스트」(유튜브면 URL 덧붙임)
   if (!block || !block.trackId) return 'BGM:';
