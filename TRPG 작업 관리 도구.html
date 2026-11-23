@@ -10691,6 +10691,22 @@ function formatCssMacroTagsText(tags) {
 // ── 태그 자동완성(#338): 마크업은 그대로 두고 .tag-editor-input 에 document 이벤트 위임. 값 변경은 tagEditorAdd 경로로만 ──
 const TAG_SUGGEST_MAX = 8;
 function tagSuggestKey(text) { return String(text || '').replace(/\s+/g, '').toLowerCase(); }
+const TAG_SUGGEST_CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+// key 안에서 q 가 처음 나오는 위치(없으면 -1). q 의 글자가 초성 자모(ㄱ~ㅎ)면 key 음절의 초성과, 그 밖의 글자는 그대로 비교(#341)
+function tagSuggestFind(key, q) {
+  for (let i = 0; i + q.length <= key.length; i++) {
+    let hit = true;
+    for (let j = 0; j < q.length && hit; j++) {
+      const qc = q[j], kc = key[i + j];
+      if (TAG_SUGGEST_CHO.includes(qc)) {
+        const code = kc.charCodeAt(0);
+        hit = kc === qc || (code >= 0xAC00 && code <= 0xD7A3 && TAG_SUGGEST_CHO[Math.floor((code - 0xAC00) / 588)] === qc);
+      } else hit = kc === qc;
+    }
+    if (hit) return i;
+  }
+  return -1;
+}
 // 후보 정렬(순수 함수): 이미 붙은 태그·중복 제외, 앞글자 일치 → 중간 일치, 같은 순위는 가나다순, 최대 max 개. 공백·대소문자 무시
 function tagSuggestRank(candidates, query, existing, max) {
   const q = tagSuggestKey(query);
@@ -10700,7 +10716,7 @@ function tagSuggestRank(candidates, query, existing, max) {
     const label = typeof item === 'string' ? item : String(item && item.label || ''), key = tagSuggestKey(label);
     if (!key || have.has(key) || seen.has(key)) return;
     seen.add(key);
-    const at = key.indexOf(q);
+    const at = tagSuggestFind(key, q);
     if (at >= 0) out.push({ label, rank: at === 0 ? 0 : 1, style: typeof item === 'string' ? '' : (item.style || '') });
   });
   out.sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label, 'ko'));
