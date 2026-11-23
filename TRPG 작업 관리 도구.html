@@ -2214,8 +2214,9 @@ tr.ct-row-end .ct-select:focus {
 .music-card-missing button, .music-modal button { border: 1px solid #ddd; background: #fff; border-radius: 6px; padding: 3px 8px; font: inherit; font-size: 11.5px; cursor: pointer; }
 .music-modal button.music-primary { background: #111; color: #fff; border-color: #111; } /* .music-modal button(0,1,1)이 .music-primary 배경을 덮어 글자가 안 보이던 문제(#281) */
 .bgm-block { display: flex; align-items: center; gap: 10px; padding: 0; } /* 박스는 바깥 .block 하나만(#342) */
-.block:has(> .block-body > .bgm-block) { background: #fafafa; } /* BGM 블록 기본 색 */
-.block.block-child > .block-body > .bgm-block { padding: 6px 8px; } /* 콜아웃 안쪽 블록은 본문 여백이 0 이라 여기서 보충 */
+.block:has(> .block-body > .bgm-block) { background: #fff; } /* BGM 블록 기본 색(#344) */
+.block.block-child > .block-body > .bgm-block { padding: 4px 8px; } /* 콜아웃 안쪽 블록은 본문 여백이 0 이라 여기서 보충 */
+:is(.callout-body, .nested-callout) .block-children-wrap > .block:has(> .block-body > .bgm-block) { width: calc(100% - 20px); max-width: calc(100% - 20px); margin: 5px 10px; box-sizing: border-box; } /* 판정(roll) 블록과 같은 좌우 10px inset·위아래 5px(#344) */
 .bgm-empty { font-size: 12.5px; color: #888; flex: 1; }
 .bgm-empty.bgm-deleted { color: #c0392b; }
 .bgm-thumb { flex: none; width: 54px; height: 34px; border-radius: 5px; background: #ececec; color: #aaa; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -2223,9 +2224,9 @@ tr.ct-row-end .ct-select:focus {
 .bgm-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .bgm-title { font-weight: 800; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bgm-artist { font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bgm-btn, .bgm-play { border: 1px solid #ddd; background: #fff; border-radius: 6px; padding: 3px 10px; font: inherit; font-size: 11.5px; color: #444; cursor: pointer; }
+.bgm-btn, .bgm-play { border: 1px solid #1a1a1a; background: #1a1a1a; border-radius: 6px; padding: 3px 10px; font: inherit; font-size: 11.5px; color: #fff; cursor: pointer; }
 .bgm-play { width: 30px; padding: 3px 0; }
-.bgm-btn:hover, .bgm-play:hover { background: #f0f0f0; }
+.bgm-btn:hover, .bgm-play:hover { background: #333; border-color: #333; }
 .bgm-picker-q { width: 100%; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; padding: 6px 10px; font: inherit; font-size: 12.5px; margin-bottom: 8px; }
 .bgm-picker-list { max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .bgm-pick-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 1px solid #eee; background: #fff; border-radius: 8px; padding: 5px 8px; font: inherit; cursor: pointer; }

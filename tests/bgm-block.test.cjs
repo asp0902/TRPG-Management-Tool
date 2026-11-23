@@ -26,6 +26,8 @@ ok(f.bgmBlockHtml({ id: 'b1', trackId: 'f' }, 'c').includes('이 기기에 파�
 ok(!JSON.stringify({ id: 'b', type: 'bgm', trackId: 'y' }).includes('곡'), '제목·섬네일은 블록에 저장하지 않음');
 { const css = html.match(/\.bgm-block \{[^}]*\}/)[0];
   ok(!/border|background|radius/.test(css) && css.includes('padding: 0'), '.bgm-block 자체 테두리·배경·둥근 모서리 없음(이중 박스 제거, #342)');
-  ok(/\.block:has\(> \.block-body > \.bgm-block\) \{ background: #fafafa; \}/.test(html), '바깥 .block 배경 #fafafa(테두리는 .block 기존 것)');
-  ok(/\.block\.block-child > \.block-body > \.bgm-block \{ padding: 6px 8px; \}/.test(html), '콜아웃 안쪽 블록 여백 보충'); }
+  ok(/\.block:has\(> \.block-body > \.bgm-block\) \{ background: #fff; \}/.test(html), '바깥 .block 배경 #fff(테두리는 .block 기존 것, #344)');
+  ok(/\.block\.block-child > \.block-body > \.bgm-block \{ padding: 4px 8px; \}/.test(html), '콜아웃 안쪽 블록 여백 보충');
+  ok(/:is\(\.callout-body, \.nested-callout\) \.block-children-wrap > \.block:has\(> \.block-body > \.bgm-block\) \{[^}]*width: calc\(100% - 20px\)[^}]*margin: 5px 10px/.test(html), '콜아웃 안 BGM: 판정 블록과 같은 좌우 10px inset·위아래 5px(#344)');
+  ok(/\.bgm-btn, \.bgm-play \{[^}]*border: 1px solid #1a1a1a; background: #1a1a1a;[^}]*color: #fff;/.test(html) && /\.bgm-btn:hover, \.bgm-play:hover \{ background: #333;/.test(html), 'BGM 버튼 #1a1a1a·글자 흰색·hover #333(#344)'); }
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);
