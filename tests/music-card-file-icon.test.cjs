@@ -1,0 +1,10 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const i = html.indexOf('<div class="music-card-meta">'), line = html.slice(i, html.indexOf('\n', i));
+const m = line.match(/\(track\.kind === 'file' \|\| track\.attached \? '<i class="fa-solid fa-paperclip"/);
+ok(!!m, '파일 아이콘 조건: kind===file || attached(#340)');
+const cond = (kind, attached) => kind === 'file' || attached;
+ok(cond('file', false) && cond('youtube', true) && !cond('youtube', false), '파일만·유튜브+첨부 표시, 유튜브만 숨김');
+ok(line.indexOf('fa-paperclip') < line.indexOf('fa-youtube') && line.indexOf('fa-youtube') < line.indexOf('fa-tag'), '순서 파일→유튜브→태그 유지');
+process.exit(f ? 1 : 0);
