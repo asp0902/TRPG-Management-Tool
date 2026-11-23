@@ -532,6 +532,10 @@ tr.ct-row-end .ct-select:focus {
 .tag-editor { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .tag-editor-input { width: 100%; box-sizing: border-box; border: 1px solid #e4e4e4; border-radius: 5px; outline: none; padding: 6px 8px; font-size: 13px; font-family: inherit; color: #222; background: #fff; }
 .tag-editor-input:focus { border-color: #000; }
+.tag-suggest-panel { position: fixed; z-index: 100500; box-sizing: border-box; max-height: 260px; overflow-y: auto; background: #fff; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.18); padding: 4px; display: flex; flex-direction: column; gap: 2px; }
+.tag-suggest-opt { padding: 4px 6px; border-radius: 6px; cursor: pointer; }
+.tag-suggest-opt:hover, .tag-suggest-opt.on { background: #f0f0f0; }
+.tag-suggest-chip { display: inline-block; max-width: 100%; padding: 1px 8px; border-radius: 999px; background: #f3f3f3; border: 1px solid #e3e3e3; color: #444; font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
 .tag-editor-chips:empty { display: none; }
 .record-session-tag-input {
   flex: 1 1 120px; min-width: 90px; border: none; outline: none; background: transparent;
@@ -10684,6 +10688,117 @@ function tagEditorCommit(input) { // 입력칸을 벗어날 때 남은 글을 �
 function formatCssMacroTagsText(tags) {
   return normalizeCssMacroTags(tags).map(tag => `#${tag}`).join(' ');
 }
+// ── 태그 자동완성(#338): 마크업은 그대로 두고 .tag-editor-input 에 document 이벤트 위임. 값 변경은 tagEditorAdd 경로로만 ──
+const TAG_SUGGEST_MAX = 8;
+function tagSuggestKey(text) { return String(text || '').replace(/\s+/g, '').toLowerCase(); }
+// 후보 정렬(순수 함수): 이미 붙은 태그·중복 제외, 앞글자 일치 → 중간 일치, 같은 순위는 가나다순, 최대 max 개. 공백·대소문자 무시
+function tagSuggestRank(candidates, query, existing, max) {
+  const q = tagSuggestKey(query);
+  if (!q) return [];
+  const have = new Set((existing || []).map(tagSuggestKey)), seen = new Set(), out = [];
+  (candidates || []).forEach(item => {
+    const label = typeof item === 'string' ? item : String(item && item.label || ''), key = tagSuggestKey(label);
+    if (!key || have.has(key) || seen.has(key)) return;
+    seen.add(key);
+    const at = key.indexOf(q);
+    if (at >= 0) out.push({ label, rank: at === 0 ? 0 : 1, style: typeof item === 'string' ? '' : (item.style || '') });
+  });
+  out.sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label, 'ko'));
+  return out.slice(0, max || TAG_SUGGEST_MAX);
+}
+// 화면별 후보: MUSIC(곡 태그 + 등록 태그) / 북마크 / CSS 매크로. 그 밖의 태그 입력칸(세션 기록·캐릭터 등)은 없음
+function tagSuggestCandidates(editor) {
+  const valueEl = editor && editor.querySelector('.tag-editor-value');
+  if (!valueEl) return [];
+  if (editor.dataset.musicTags) {
+    const list = [];
+    (state.musicTracks || []).forEach(track => (track.tags || []).forEach(tag => list.push({ label: tag, style: musicTagChipStyle(tag) })));
+    (state.musicTagCats || []).forEach(cat => cat.tags.forEach(key => { const label = musicTagLabel(cat, key); list.push({ label, style: musicTagChipStyle(label) }); }));
+    return list;
+  }
+  if (valueEl.id === 'bookmark-tags') return getAllBookmarkTags();
+  if (valueEl.dataset && valueEl.dataset.cssMacroId) {
+    const list = [];
+    (state.cssMacros || []).forEach(macro => normalizeCssMacroTags(macro && macro.tags).forEach(tag => list.push(tag)));
+    return list;
+  }
+  return [];
+}
+let tagSuggest = null; // { input, items, active, timer } — 열려 있는 패널 하나
+function tagSuggestClose() {
+  if (!tagSuggest) return;
+  clearInterval(tagSuggest.timer);
+  const input = tagSuggest.input;
+  tagSuggest = null;
+  document.getElementById('tag-suggest-panel')?.remove();
+  input.removeAttribute('aria-activedescendant'); input.setAttribute('aria-expanded', 'false');
+}
+function tagSuggestPlace() { // 입력칸 아래, 공간이 모자라면 위
+  const panel = document.getElementById('tag-suggest-panel');
+  if (!tagSuggest || !panel) return;
+  const r = tagSuggest.input.getBoundingClientRect(), w = Math.max(r.width, 160), h = panel.offsetHeight, below = window.innerHeight - r.bottom;
+  panel.style.width = w + 'px';
+  panel.style.left = Math.max(4, Math.min(r.left, window.innerWidth - w - 4)) + 'px';
+  panel.style.top = (below < h + 6 && r.top > below ? Math.max(4, r.top - h - 2) : r.bottom + 2) + 'px';
+}
+function tagSuggestPaint() {
+  const panel = document.getElementById('tag-suggest-panel');
+  if (!tagSuggest || !panel) return;
+  panel.innerHTML = tagSuggest.items.map((item, i) => '<div role="option" id="tag-suggest-opt-' + i + '" class="tag-suggest-opt' + (i === tagSuggest.active ? ' on' : '') + '" aria-selected="' + (i === tagSuggest.active) + '" data-i="' + i + '"><span class="tag-suggest-chip"' + (item.style ? ' style="' + esc(item.style) + '"' : '') + '>' + esc(item.label) + '</span></div>').join('');
+  const input = tagSuggest.input;
+  if (tagSuggest.active >= 0) input.setAttribute('aria-activedescendant', 'tag-suggest-opt-' + tagSuggest.active); else input.removeAttribute('aria-activedescendant');
+  tagSuggestPlace();
+}
+function tagSuggestUpdate(input) {
+  const editor = tagEditorOf(input);
+  const items = editor ? tagSuggestRank(tagSuggestCandidates(editor), input.value, tagEditorTags(editor), TAG_SUGGEST_MAX) : [];
+  if (!items.length) { tagSuggestClose(); return; }
+  if (tagSuggest && tagSuggest.input !== input) tagSuggestClose();
+  const timer = tagSuggest ? tagSuggest.timer : setInterval(() => { if (!tagSuggest || !tagSuggest.input.isConnected || document.activeElement !== tagSuggest.input) tagSuggestClose(); }, 250); // 모달 닫힘·재렌더로 입력칸이 사라지면 패널도 정리
+  tagSuggest = { input, items, active: -1, timer };
+  let panel = document.getElementById('tag-suggest-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'tag-suggest-panel'; panel.className = 'tag-suggest-panel'; panel.setAttribute('role', 'listbox');
+    panel.addEventListener('mousedown', event => { // 입력칸이 blur 되어 입력 글자가 먼저 태그가 되지 않게
+      event.preventDefault();
+      const opt = event.target.closest && event.target.closest('.tag-suggest-opt');
+      if (opt) tagSuggestPick(Number(opt.dataset.i));
+    });
+    document.body.appendChild(panel);
+  }
+  input.setAttribute('aria-controls', 'tag-suggest-panel'); input.setAttribute('aria-expanded', 'true'); input.setAttribute('aria-autocomplete', 'list');
+  tagSuggestPaint();
+}
+function tagSuggestPick(index) {
+  const s = tagSuggest, item = s && s.items[index];
+  if (!item) return;
+  const input = s.input, editor = tagEditorOf(input);
+  tagSuggestClose();
+  input.value = '';
+  if (editor) tagEditorAdd(editor, item.label);
+  if (input.isConnected) input.focus();
+}
+document.addEventListener('input', event => { if (event.target.classList && event.target.classList.contains('tag-editor-input')) tagSuggestUpdate(event.target); }); // 한글 조합 중에도 갱신
+document.addEventListener('keydown', event => { // 캡처 단계: 후보를 고른 Enter·Esc 는 입력칸의 기존 키 처리·모달 닫기보다 먼저 가로챈다
+  const s = tagSuggest;
+  if (!s || event.target !== s.input || event.isComposing || event.keyCode === 229) return; // 조합 중 키는 IME 몫
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    const n = s.items.length;
+    s.active = event.key === 'ArrowDown' ? (s.active + 1) % n : (s.active <= 0 ? n - 1 : s.active - 1);
+    tagSuggestPaint();
+  } else if (event.key === 'Enter' && s.active >= 0) {
+    event.preventDefault(); event.stopImmediatePropagation();
+    tagSuggestPick(s.active);
+  } else if (event.key === 'Escape') {
+    event.preventDefault(); event.stopImmediatePropagation(); // 목록만 닫고 모달은 그대로(같은 document 캡처 단계의 모달 Esc 처리보다 먼저)
+    tagSuggestClose();
+  } else if (event.key === 'Enter' || event.key === ',') { const input = s.input; setTimeout(() => tagSuggestUpdate(input), 0); } // 선택 없으면 기존 처리(입력 글자 그대로 새 태그) 후 목록 갱신
+}, true);
+document.addEventListener('focusout', event => { if (tagSuggest && event.target === tagSuggest.input) tagSuggestClose(); }, true);
+document.addEventListener('scroll', event => { if (tagSuggest && !(event.target.id === 'tag-suggest-panel')) tagSuggestClose(); }, true);
+window.addEventListener('resize', tagSuggestClose);
 function isCssMacroFieldColorValue(value = '') {
   return /^#(?:[\da-f]{3}|[\da-f]{6}|[\da-f]{8})$/i.test(String(value || '').trim());
 }
