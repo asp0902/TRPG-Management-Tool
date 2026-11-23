@@ -36931,9 +36931,19 @@ function musicParseJinaMusic(content) {
   if (!out.artist) { // 한 줄로 이어진 형식(#322): [![Image](...) # 노래 #### 아티스트 [앨범](...)](...)
     const flat = lines.join(' ').replace(/\s+/g, ' ');
     const m = flat.match(/#\s+(.+?)\s+#{4}\s+(.+?)(?:\s+\[([^\]]+)\]\(|\s*$)/);
-    if (m) { out.song = m[1].trim(); out.artist = m[2].replace(/\]\(.*$/, '').trim(); out.album = m[3] && m[3].trim() !== 'Music' ? m[3].trim() : ''; }
+    if (m) { out.song = m[1].trim(); out.artist = m[2].replace(/\]\(.*$/, '').trim(); out.album = m[3] && m[3].trim() !== 'Music' ? m[3].trim() : ''; if (!m[3]) out.glued = true; } // 앨범 링크가 없으면 「아티스트 앨범」이 경계 없이 붙었을 수 있다(#336)
   }
   return out;
+}
+// jina html 응답의 첫 videoAttributeViewModel 에서 노래·아티스트·앨범을 읽는다(#336). 네트워크와 무관한 순수 함수. 못 찾으면 null
+function musicParseJinaHtml(text) {
+  const src = String(text || ''), at = src.indexOf('"videoAttributeViewModel"');
+  if (at < 0) return null;
+  const next = src.indexOf('"videoAttributeViewModel"', at + 10), win = src.slice(at, next < 0 ? at + 8000 : Math.min(next, at + 8000));
+  const str = re => { const m = win.match(re); if (!m) return ''; try { return JSON.parse('"' + m[1] + '"').trim(); } catch (e) { return m[1].trim(); } };
+  const song = str(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/), artist = str(/"subtitle"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  const album = str(/"secondarySubtitle"\s*:\s*{\s*"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  return song || artist || album ? { song, artist, album } : null;
 }
 async function musicFetchAlbumInfo(id) {
   if (!document.getElementById('music-yt-url')) return;
@@ -36945,6 +36955,16 @@ async function musicFetchAlbumInfo(id) {
     if (!res.ok || !json || !json.data) throw new Error('HTTP ' + res.status);
     music = musicParseJinaMusic(json.data.content);
   } catch (e) { music = null; } finally { timer.clear(); }
+  if (music && !music.album) { // 앨범이 없을 때만 html 로 한 번 더(응답이 크다): 구조화 데이터의 아티스트·앨범을 쓴다(#336)
+    const t2 = bookmarkTimeoutSignal(null, BOOKMARK_META_SERVICE_TIMEOUT_MS[0]);
+    try {
+      const res = await fetch(BOOKMARK_META_JINA_URL + 'https://www.youtube.com/watch?v=' + id, { method: 'GET', mode: 'cors', credentials: 'omit', headers: { 'X-Return-Format': 'html' }, signal: t2.signal });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const parsed = musicParseJinaHtml(await res.text());
+      if (parsed && (parsed.artist || parsed.album)) music = { song: parsed.song, artist: parsed.artist || (music.glued ? '' : music.artist), album: parsed.album };
+      else if (music.glued) music.artist = '';
+    } catch (e) { if (music.glued) music.artist = ''; } finally { t2.clear(); } // 폴백이 실패하면 붙은 문자열은 아티스트에 넣지 않는다
+  }
   const urlEl = document.getElementById('music-yt-url');
   if (!urlEl || musicParseYoutubeId(urlEl.value) !== id) return; // 모달이 닫혔거나 URL 이 바뀐 뒤 늦게 온 응답은 무시
   if (!music || (!music.album && !music.artist)) return; // 실패·정보 없음은 조용히(직접 입력)
