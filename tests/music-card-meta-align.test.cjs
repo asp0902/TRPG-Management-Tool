@@ -7,5 +7,6 @@ ok(/\.music-card-body \{[^}]*flex: 1/.test(html), '.music-card-body flex:1(#337)
 ok(/\.music-card-badges \{[^}]*margin-left: auto/.test(html), '배지 margin-left:auto');
 const i = html.indexOf('<div class="music-card-meta">'), line = html.slice(i, html.indexOf('\n', i));
 ok(line.includes('<span class="music-card-folder">\' + esc(folder.name)'), '폴더명 span 으로 감쌈');
-ok(line.indexOf('music-card-folder') < line.indexOf('music-card-badges') && /<\/span>' \+ \(\(track\.tags[\s\S]*<\/span><\/div>'$/.test(line) || line.trimEnd().endsWith("'</span></div>'"), '폴더 있음/없음 모두 배지가 meta 마지막 자식');
+ok(line.indexOf('music-card-folder') < line.indexOf('music-card-badges') && /<\/span>' \+ \(track\.kind === 'youtube' && track\.attached[\s\S]*<\/span><\/div>'$/.test(line) || line.trimEnd().endsWith("'</span></div>'"), '폴더 있음/없음 모두 배지가 meta 마지막 자식');
+ok(/\.music-card-badges \{[^}]*gap: 9px/.test(html) && /\.music-card-tagbtn \{[^}]*gap: 3px/.test(html), '배지 gap 9px·태그 아이콘-개수 간격 3px 유지(#339)');
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);

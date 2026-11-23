@@ -14,7 +14,7 @@ ok(html.includes('아티스트·채널<input') && !html.includes('아티스트(�
 ok(html.includes('.music-add-file[hidden] { display: none; }'), '.music-add-file[hidden] 숨김');
 const cover = html.slice(html.indexOf("'<div class=\"music-card-cover\">'"), html.indexOf("'<div class=\"music-card-body\">"));
 ok(!cover.includes('fa-youtube') && !cover.includes('fa-paperclip') && !cover.includes('fa-tag'), '아이콘 배지는 섬네일 안에 없음(#301)');
-ok(/music-card-badges">' \+ \(\(track\.tags[\s\S]*fa-tag[\s\S]*fa-paperclip[\s\S]*fa-brands fa-youtube/.test(html) && html.includes('title="유튜브"') && html.includes('title="파일 첨부"'), 'meta 우측 끝 아이콘 순서 태그→파일→유튜브(#301)');
+ok(/music-card-badges\">' \+ \(track\.kind === 'youtube' && track\.attached[\s\S]*fa-paperclip[\s\S]*fa-brands fa-youtube[\s\S]*fa-tag/.test(html) && html.includes('title="유튜브"') && html.includes('title="파일 첨부"'), 'meta 우측 끝 아이콘 순서 파일→유튜브→태그(#339, 이전 #301)');
 ok(cover.includes('music-card-dur') && cover.includes('musicFmtTime(track.duration) ?') && html.includes('.music-card-dur { position: absolute; right: 4px; bottom: 4px; background: rgba(0,0,0,0.7)'), '곡 길이는 섬네일 우하단 겹침, 길이 없으면 미표시');
 ok(html.includes('music-card-tags collapsed') && html.includes('onclick="musicToggleCardTags(event, this)"') && /function musicToggleCardTags[\s\S]*?event\.stopPropagation\(\)[\s\S]*?classList\.toggle\('collapsed'\)/.test(html), '태그 줄 기본 접힘·토글(stopPropagation)');
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);

@@ -2196,7 +2196,7 @@ tr.ct-row-end .ct-select:focus {
 .music-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
 .music-card-cover { position: relative; aspect-ratio: 16 / 10; background: #ececec; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #aaa; overflow: hidden; }
 .music-card-cover img { width: 100%; height: 100%; object-fit: cover; }
-.music-card-badges { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.music-card-badges { display: inline-flex; align-items: center; gap: 9px; margin-left: auto; } /* 순서: 파일 → 유튜브 → 태그(#339) */
 .music-card-badges i, .music-card-tagbtn { color: #999; font-size: 12px; }
 .music-card-badges i:hover, .music-card-tagbtn:hover { color: #333; }
 .music-card-tagbtn { border: 0; background: none; padding: 0; cursor: pointer; font: inherit; font-size: 11px; display: inline-flex; align-items: center; gap: 3px; }
@@ -36199,7 +36199,7 @@ function renderMusicCard(track) {
     + '<div class="music-card-body"><div class="music-card-title">' + esc(musicTrackTitle(track)) + '</div>'
     + '<div class="music-card-sub">' + esc(track.artist || '') + '</div>'
     + ((track.tags || []).length ? '<div class="music-card-tags collapsed">' + track.tags.map(tag => '<span class="music-card-tag" style="' + esc(musicTagChipStyle(tag)) + '">' + esc(tag) + '</span>').join('') + '</div>' : '') // 태그 칩(분류 색 적용, #324)
-    + '<div class="music-card-meta">' + (folder ? '<span class="music-dot" style="background:' + folder.color + '"></span><span class="music-card-folder">' + esc(folder.name) + '</span>' : '') + '<span class="music-card-badges">' + ((track.tags || []).length ? '<button type="button" class="music-card-tagbtn" title="태그" onclick="musicToggleCardTags(event, this)"><i class="fa-solid fa-tag"></i> ' + track.tags.length + '</button>' : '') + (track.kind === 'youtube' && track.attached ? '<i class="fa-solid fa-paperclip" title="파일 첨부"></i>' : '') + (track.kind === 'youtube' ? '<i class="fa-brands fa-youtube" title="유튜브"></i>' : '') + '</span></div>'
+    + '<div class="music-card-meta">' + (folder ? '<span class="music-dot" style="background:' + folder.color + '"></span><span class="music-card-folder">' + esc(folder.name) + '</span>' : '') + '<span class="music-card-badges">' + (track.kind === 'youtube' && track.attached ? '<i class="fa-solid fa-paperclip" title="파일 첨부"></i>' : '') + (track.kind === 'youtube' ? '<i class="fa-brands fa-youtube" title="유튜브"></i>' : '') + ((track.tags || []).length ? '<button type="button" class="music-card-tagbtn" title="태그" onclick="musicToggleCardTags(event, this)"><i class="fa-solid fa-tag"></i> ' + track.tags.length + '</button>' : '') + '</span></div>'
     + (missing ? '<div class="music-card-missing">이 기기에 파일 없음 <button type="button" onclick="event.stopPropagation();musicReupload(\'' + track.id + '\')">다시 올리기</button></div>' : '')
     + '</div></div>';
 }
