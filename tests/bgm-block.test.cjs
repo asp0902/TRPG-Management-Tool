@@ -24,4 +24,8 @@ ok(del.includes('삭제된 곡') && del.includes('곡 선택') && !del.includes(
 ctx.musicLocalIds = new Set(['other']);
 ok(f.bgmBlockHtml({ id: 'b1', trackId: 'f' }, 'c').includes('이 기기에 파일 없음'), '이 기기에 파일 없는 PC 파일 곡 안내');
 ok(!JSON.stringify({ id: 'b', type: 'bgm', trackId: 'y' }).includes('곡'), '제목·섬네일은 블록에 저장하지 않음');
+{ const css = html.match(/\.bgm-block \{[^}]*\}/)[0];
+  ok(!/border|background|radius/.test(css) && css.includes('padding: 0'), '.bgm-block 자체 테두리·배경·둥근 모서리 없음(이중 박스 제거, #342)');
+  ok(/\.block:has\(> \.block-body > \.bgm-block\) \{ background: #fafafa; \}/.test(html), '바깥 .block 배경 #fafafa(테두리는 .block 기존 것)');
+  ok(/\.block\.block-child > \.block-body > \.bgm-block \{ padding: 6px 8px; \}/.test(html), '콜아웃 안쪽 블록 여백 보충'); }
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);
