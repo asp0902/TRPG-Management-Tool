@@ -26,6 +26,10 @@ const frag = '..."videoAttributeViewModel":{"title":"Farewell Threshold Laudanum
   ok(p.artist === 'Max Richter' && p.album === 'Henry May Long (Original Motion Picture Soundtrack)', 'html 순수 파싱: 아티스트·앨범(첫 항목만)');
   ok(p.song === 'Farewell Threshold Laudanum (From "Henry May Long" Soundtrack)', '제목의 \\" 복원');
   ok(f.musicParseJinaHtml('"videoAttributeViewModel":{"title":"T","subtitle":"A"}').album === '', 'secondarySubtitle 없으면 앨범 없음');
+  { const names = '"renderers":["richListHeaderRenderer","videoAttributeViewModel","other"],"title":"21","subtitle":"무관"' + frag;
+    const q = f.musicParseJinaHtml(names);
+    ok(q.artist === 'Max Richter' && q.album === 'Henry May Long (Original Motion Picture Soundtrack)' && q.song.startsWith('Farewell'), '렌더러 이름 목록·무관한 title 21 이 앞에 와도 데이터 객체만 읽음(회귀)');
+    ok(f.musicParseJinaHtml('"a":"videoAttributeViewModel","title":"21"') === null, '객체 없이 이름 문자열만 있으면 null'); }
   ok(f.musicParseJinaHtml('<html>없음</html>') === null, 'videoAttributeViewModel 없으면 null');
   // 붙은 한 줄 + html 폴백 성공
   reset(); md = glued; calls = []; htmlText = frag; await f.musicFetchAlbumInfo('RgBRkmf1n3Q');

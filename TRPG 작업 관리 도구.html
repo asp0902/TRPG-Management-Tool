@@ -36937,9 +36937,9 @@ function musicParseJinaMusic(content) {
 }
 // jina html 응답의 첫 videoAttributeViewModel 에서 노래·아티스트·앨범을 읽는다(#336). 네트워크와 무관한 순수 함수. 못 찾으면 null
 function musicParseJinaHtml(text) {
-  const src = String(text || ''), at = src.indexOf('"videoAttributeViewModel"');
+  const src = String(text || ''), at = src.indexOf('"videoAttributeViewModel":{');
   if (at < 0) return null;
-  const next = src.indexOf('"videoAttributeViewModel"', at + 10), win = src.slice(at, next < 0 ? at + 8000 : Math.min(next, at + 8000));
+  const next = src.indexOf('"videoAttributeViewModel":{', at + 10), win = src.slice(at, next < 0 ? at + 8000 : Math.min(next, at + 8000));
   const str = re => { const m = win.match(re); if (!m) return ''; try { return JSON.parse('"' + m[1] + '"').trim(); } catch (e) { return m[1].trim(); } };
   const song = str(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/), artist = str(/"subtitle"\s*:\s*"((?:[^"\\]|\\.)*)"/);
   const album = str(/"secondarySubtitle"\s*:\s*{\s*"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
