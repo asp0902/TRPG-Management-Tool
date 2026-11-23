@@ -2216,7 +2216,7 @@ tr.ct-row-end .ct-select:focus {
 .bgm-block { display: flex; align-items: center; gap: 10px; padding: 0; } /* 박스는 바깥 .block 하나만(#342) */
 .block:has(> .block-body > .bgm-block) { background: #fff; } /* BGM 블록 기본 색(#344) */
 .block.block-child > .block-body > .bgm-block { padding: 4px 8px; } /* 콜아웃 안쪽 블록은 본문 여백이 0 이라 여기서 보충 */
-:is(.callout-body, .nested-callout) .block-children-wrap > .block:has(> .block-body > .bgm-block) { width: calc(100% - 20px); max-width: calc(100% - 20px); margin: 5px 10px; box-sizing: border-box; } /* 판정(roll) 블록과 같은 좌우 10px inset·위아래 5px(#344) */
+:is(.callout-body, .nested-callout) .block-children-wrap > .block:has(> .block-body > .bgm-block) { width: calc(100% - 12px); max-width: calc(100% - 12px); margin: 3px 6px; box-sizing: border-box; } /* 바깥 여백 상하 3px·좌우 6px(#345, 판정 블록 5px 10px 보다 상하 2px·좌우 4px 작게) */
 .bgm-empty { font-size: 12.5px; color: #888; flex: 1; }
 .bgm-empty.bgm-deleted { color: #c0392b; }
 .bgm-thumb { flex: none; width: 54px; height: 34px; border-radius: 5px; background: #ececec; color: #aaa; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
