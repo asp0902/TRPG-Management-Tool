@@ -30,4 +30,8 @@ ok(!JSON.stringify({ id: 'b', type: 'bgm', trackId: 'y' }).includes('곡'), '제
   ok(/\.block\.block-child > \.block-body > \.bgm-block \{ padding: 4px 8px; \}/.test(html), '콜아웃 안쪽 블록 여백 보충');
   ok(/:is\(\.callout-body, \.nested-callout\) \.block-children-wrap > \.block:has\(> \.block-body > \.bgm-block\) \{[^}]*width: calc\(100% - 12px\)[^}]*max-width: calc\(100% - 12px\)[^}]*margin: 3px 6px/.test(html), '콜아웃 안 BGM 바깥 여백 상하 3px·좌우 6px(#345)');
   ok(/\.bgm-btn, \.bgm-play \{[^}]*border: 1px solid #1a1a1a; background: #1a1a1a;[^}]*color: #fff;/.test(html) && /\.bgm-btn:hover, \.bgm-play:hover \{ background: #333;/.test(html), 'BGM 버튼 #1a1a1a·글자 흰색·hover #333(#344)'); }
+{
+  ok(/\.block-body:has\(> \.bgm-block\) > \.block-children-wrap \{ margin-top: 0; \}/.test(html), 'BGM 본문의 빈 자식 영역 위 여백 제거 → 내용 세로 중앙(#349)');
+  ok(/\.callout-body > \.block-children-wrap > \.block:has\(> \.block-body > \.bgm-block\) \{ width: calc\(100% - 9px\); max-width: calc\(100% - 9px\); margin-right: 3px; \}/.test(html), '콜아웃 안 BGM 오른쪽 3px 로 좌우 보이는 여백 12px 동일(#349)');
+}
 console.log('fails=' + fails); process.exit(fails ? 1 : 0);
