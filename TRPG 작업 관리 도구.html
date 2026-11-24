@@ -19083,9 +19083,11 @@ function tbTableEditItems(table, model, elems, id) {
     { icon: '↓', label: '아래에 행 추가', action: () => tbInsertTableRow(table, model, elems, tbInsertRowPlan(model, cell.row + cell.rs), cell.col) },
     { icon: '←', label: '왼쪽에 열 추가', action: () => tbInsertTableCol(table, model, elems, tbInsertColPlan(model, cell.col), cell.row) },
     { icon: '→', label: '오른쪽에 열 추가', action: () => tbInsertTableCol(table, model, elems, tbInsertColPlan(model, cell.col + cell.cs), cell.row) },
+    { sep: true },
     { icon: '✕', label: '행 삭제', disabled: !delRow, action: () => delRow && tbDeleteTableRow(table, model, elems, delRow, cell.col) },
     { icon: '✕', label: '열 삭제', disabled: !delCol, action: () => delCol && tbDeleteTableCol(table, model, elems, delCol, cell.row) },
-    { icon: '🗑', label: '표 삭제', action: () => tbDeleteWholeTable(table) },
+    { sep: true },
+    { icon: '🗑', label: '표 삭제', danger: true, action: () => tbDeleteWholeTable(table) },
   ];
 }
 // ── 표 셀 범위 선택(#362): 브라우저 글자 선택에 기대지 않고 셀 범위를 직접 선택한다 ──
@@ -19217,7 +19219,7 @@ function tbTableCtxItems(e) {
   const cur = model.cells[id];
   if (cur.cs > 1 || cur.rs > 1) items.push({ icon: '▭', label: '셀 나누기', action: () => tbSplitTableCell(table, id, model, elems) });
   items.push({ sep: true }, ...tbTableEditItems(table, model, elems, id)); // 행·열 추가/삭제, 표 삭제(#360)
-  return items;
+  return [{ icon: '▦', label: '표', submenu: items }]; // 본 메뉴에는 「표 ▶」 한 줄만(#365)
 }
 // 표 크기 직접 입력(#361): 행 1~50, 열 1~20. 빈 값·숫자 아님은 1, 범위 밖은 가까운 한계값, 소수는 내림
 const TB_TABLE_MAX_ROWS = 50, TB_TABLE_MAX_COLUMNS = 20;
