@@ -25624,7 +25624,7 @@ function updateGitHubSyncButton() {
   btn.classList.toggle('needs-token', noToken);
   btn.textContent = noToken ? '토큰 필요' : (githubSyncInFlight ? '동기화 중' : (githubSyncStatusType === 'error' ? '동기화 확인' : (active ? '동기화 연결중' : '동기화')));
   const lastAt = localStorage.getItem(GITHUB_SYNC_LAST_AT_KEY);
-  btn.title = noToken ? 'GitHub 자동 백업을 쓰려면 토큰을 입력하세요.' : (githubSyncStatus || (lastAt ? `마지막 동기화: ${new Date(lastAt).toLocaleString()}` : 'GitHub 자동 동기화 설정'));
+  btn.title = noToken ? 'GitHub 자동 백업을 쓰려면 토큰을 입력하세요.' : (githubSyncFailureText() ? '동기화 실패: ' + githubSyncFailureText() : githubSyncStatus || (lastAt ? `마지막 동기화: ${new Date(lastAt).toLocaleString()}` : 'GitHub 자동 동기화 설정'));
 }
 function openGitHubSyncModal() {
   const token = getGitHubSyncToken();
@@ -25637,7 +25637,8 @@ function openGitHubSyncModal() {
   if (enabled) enabled.checked = localStorage.getItem(GITHUB_SYNC_ENABLED_KEY) !== '0';
   gdriveFieldRefresh();
   const lastAt = localStorage.getItem(GITHUB_SYNC_LAST_AT_KEY);
-  setGitHubSyncStatus(githubSyncStatus || (lastAt ? `마지막 동기화: ${new Date(lastAt).toLocaleString()}` : '연결되지 않음'), githubSyncStatusType);
+  const failText = githubSyncFailureText();
+  setGitHubSyncStatus(failText ? `동기화 실패 — ${failText}${lastAt ? ` · 마지막 성공: ${new Date(lastAt).toLocaleString()}` : ''}` : (githubSyncStatus || (lastAt ? `마지막 동기화: ${new Date(lastAt).toLocaleString()}` : '연결되지 않음')), failText ? 'error' : githubSyncStatusType);
   document.getElementById('github-sync-backdrop')?.classList.add('open');
   setTimeout(() => input?.focus(), 0);
 }
@@ -25673,12 +25674,37 @@ function scheduleGitHubSync() {
     syncGitHubState({ automatic: true });
   }, Math.max(0, due - Date.now()));
 }
+// 요청에 시간 제한이 없으면 큰 업로드가 멈춰도 오류 없이 영원히 「동기화 중」으로 남아 이후 동기화가 모두 같은 요청을 기다린다(#358). 기본 60초, 업로드는 본문 크기에 비례.
+const GITHUB_SYNC_TIMEOUT_MS = 60 * 1000;
+const GITHUB_SYNC_MAX_BODY_BYTES = 95 * 1024 * 1024; // Contents API 파일 한도 100MB 에 근접하면 요청 전에 이유를 알려 준다
+const GITHUB_SYNC_FAIL_KEY = 'trpg-github-sync-fail';
+const GITHUB_SYNC_FAIL_WARN_MS = 3 * 24 * 60 * 60 * 1000;
+function githubSyncTimeoutMs(bodyBytes = 0) { return GITHUB_SYNC_TIMEOUT_MS + Math.ceil(bodyBytes / 1048576) * 1500; }
+function githubSyncRecordFailure(message, now = Date.now()) { // 실패 이유·횟수·처음 실패한 시각을 남겨 재시작 후에도 보이게(#358)
+  let prev = null; try { prev = JSON.parse(localStorage.getItem(GITHUB_SYNC_FAIL_KEY) || 'null'); } catch (e) {}
+  const rec = { at: new Date(now).toISOString(), firstAt: prev && prev.firstAt || new Date(now).toISOString(), count: (prev && prev.count || 0) + 1, message: String(message || '') };
+  try { localStorage.setItem(GITHUB_SYNC_FAIL_KEY, JSON.stringify(rec)); } catch (e) {}
+  return rec;
+}
+function githubSyncClearFailure() { try { localStorage.removeItem(GITHUB_SYNC_FAIL_KEY); } catch (e) {} }
+function githubSyncFailureInfo() { try { return JSON.parse(localStorage.getItem(GITHUB_SYNC_FAIL_KEY) || 'null'); } catch (e) { return null; } }
+function githubSyncFailureText(rec = githubSyncFailureInfo(), now = Date.now()) {
+  if (!rec) return '';
+  const days = Math.floor((now - Date.parse(rec.firstAt)) / 86400000);
+  return `${rec.count}회 연속 실패${days >= 1 ? `(${days}일째)` : ''} · 마지막 실패 ${new Date(rec.at).toLocaleString()} · ${rec.message}`;
+}
 async function githubSyncRequest(url, options = {}) {
   const token = getGitHubSyncToken();
   if (!token) throw new Error('GitHub 토큰이 없습니다.');
-  const response = await fetch(url, {
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  const timeoutMs = options.timeoutMs || githubSyncTimeoutMs(typeof options.body === 'string' ? options.body.length : 0);
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  let response;
+  try {
+    response = await fetch(url, {
     cache: 'no-store',
     ...options,
+    signal: controller ? controller.signal : undefined,
     headers: {
       Accept: 'application/vnd.github+json',
       Authorization: `Bearer ${token}`,
@@ -25686,6 +25712,10 @@ async function githubSyncRequest(url, options = {}) {
       ...(options.headers || {}),
     },
   });
+  } catch (err) {
+    if (err && err.name === 'AbortError') throw new Error(`GitHub 요청 시간 초과(${Math.round(timeoutMs / 1000)}초): 네트워크가 느리거나 데이터가 너무 큽니다.`);
+    throw err;
+  } finally { if (timer) clearTimeout(timer); }
   if (options.allow404 && response.status === 404) return null;
   if (!response.ok) {
     let detail = '';
@@ -25759,11 +25789,13 @@ async function putGitHubSyncPayload(payload, sha = '') {
     branch: GITHUB_SYNC_BRANCH,
   };
   if (sha) body.sha = sha;
+  const bodyText = JSON.stringify(body);
+  if (bodyText.length > GITHUB_SYNC_MAX_BODY_BYTES) throw new Error(`동기화 데이터가 너무 큽니다(${Math.round(bodyText.length / 1048576)}MB). GitHub 파일 한도(100MB)에 가까워 올리지 않았습니다. 큰 이미지·글꼴을 줄여 주세요.`);
   githubSyncMark('upload');
   const response = await githubSyncRequest(getGitHubSyncApiUrl(), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: bodyText,
   });
   const result = await response.json();
   return result?.content?.sha || '';
@@ -25775,9 +25807,24 @@ function rememberGitHubSync(sha, syncedAt) {
   githubSyncDirty = false;
   githubSyncDirtySince = 0;
 }
+const GITHUB_SYNC_STALE_MS = 3 * 24 * 60 * 60 * 1000; // 원격본이 로컬 마지막 저장보다 이만큼 오래됐으면 위험한 pull 로 본다
+const GITHUB_SYNC_LOSS_LABELS = { scenarios: '시나리오', records: '기록', catalog: '카탈로그', cssMacros: 'CSS 매크로', bookmarks: '북마크', musicTracks: 'MUSIC 곡', musicFolders: 'MUSIC 폴더', characters: '캐릭터', rulebooks: '룰북', dataSheets: '데이터 시트', folders: '폴더', characterFolders: '캐릭터 폴더', cssMacroFolders: 'CSS 매크로 폴더' };
+function githubSyncPullRisk(payload, remoteSavedAt, localSavedAt, localState = state) { // 이 pull 이 지울 컬렉션(항목 수)과 원격본이 얼마나 오래됐는지
+  const lost = Object.keys(GITHUB_SYNC_LOSS_LABELS).filter(key => Array.isArray(localState[key]) && localState[key].length > 0 && Array.isArray(payload[key]) && payload[key].length === 0 && !(payload.absentKeys || []).includes(key))
+    .map(key => ({ key, label: GITHUB_SYNC_LOSS_LABELS[key], count: localState[key].length }));
+  const staleMs = remoteSavedAt && localSavedAt ? localSavedAt - remoteSavedAt : 0;
+  return { lost, stale: staleMs > GITHUB_SYNC_STALE_MS, staleDays: Math.floor(Math.max(0, staleMs) / 86400000) };
+}
 async function applyGitHubSyncRemote(remote, refresh = true, options = {}) {
   githubSyncMark('pull');
   const payload = makeImportPayload(remote.data);
+  const risk = githubSyncPullRisk(payload, Date.parse(remote.data?.savedAt || remote.data?.exportedAt || '') || 0, Date.parse(lastLocalSavedAt || '') || 0);
+  if (risk.lost.length || risk.stale) { // 위험한 pull: 자동은 막고, 수동은 무엇이 사라지는지 보여 주고 확인받는다(#358)
+    const detail = [risk.stale ? `GitHub 최신본이 이 기기의 마지막 저장보다 ${risk.staleDays}일 오래됐습니다.` : '', risk.lost.length ? '불러오면 이 기기의 ' + risk.lost.map(item => `${item.label} ${item.count}개`).join(', ') + '가 사라집니다.' : ''].filter(Boolean).join(' ');
+    if (options.automatic || options.startup || !confirm(`${detail}\n\n그래도 GitHub 최신본으로 교체할까요?\n(교체 직전 상태는 보호 스냅샷으로 남깁니다.)`)) throw new Error(`위험한 불러오기를 적용하지 않았습니다. ${detail} 직접 확인한 뒤 「최신본 불러오기」를 눌러 주세요.`);
+    const kept = await saveProtectionSnapshot(makeStatePayload(), 'GitHub 불러오기 직전' + (risk.lost.length ? ': ' + risk.lost.map(item => item.key).join(', ') : ''));
+    if (!kept) throw new Error('보호 스냅샷을 만들지 못해 불러오기를 중단했습니다.');
+  }
   if (!importPayloadHasData(payload)) {
     throw new Error(remote.size > 1024
       ? 'GitHub 최신본이 큰데 받은 데이터가 비어 있어 적용하지 않았습니다.'
@@ -25817,7 +25864,7 @@ async function runGitHubSync(options = {}) {
   bootMark('gh-meta-done');
   if (options.forcePull) {
     if (!meta.exists) throw new Error('GitHub에 저장된 최신본이 없습니다.');
-    await applyGitHubSyncRemote(await getGitHubSyncRemote(meta), true);
+    await applyGitHubSyncRemote(await getGitHubSyncRemote(meta), true, { manual: true });
     setGitHubSyncStatus(`GitHub 최신본을 불러왔습니다 (${githubSyncCountText()}).`, 'success');
     return true;
   }
@@ -25854,7 +25901,7 @@ async function runGitHubSync(options = {}) {
     throw new Error('동기화 충돌: 이 기기와 GitHub가 모두 변경되었습니다. 최신본 불러오기 또는 현재 데이터 업로드를 선택하세요.');
   }
   if (decision === 'pull') {
-    await applyGitHubSyncRemote(remote || await getGitHubSyncRemote(meta), true, { keepView: !!options.startup });
+    await applyGitHubSyncRemote(remote || await getGitHubSyncRemote(meta), true, { keepView: !!options.startup, automatic: !!options.automatic, startup: !!options.startup });
     setGitHubSyncStatus(`GitHub 최신본을 불러왔습니다 (${githubSyncCountText()}).`, 'success');
     if (options.startup) showToast('GitHub 최신본을 불러와 화면을 갱신했습니다.');
     return true;
@@ -25966,6 +26013,15 @@ if (typeof window !== 'undefined') {
     setTimeout(() => { if (lastPointerAt < since) githubSyncRestoreFocus(snap); }, 150);
   });
 }
+function githubSyncWarnLongFailure(fail) { // 3일 이상 실패가 이어지면 하루에 한 번 알려 준다
+  try {
+    if (!fail || Date.now() - Date.parse(fail.firstAt) < GITHUB_SYNC_FAIL_WARN_MS) return;
+    const key = 'trpg-github-sync-fail-warned', today = new Date().toLocaleDateString('sv-SE');
+    if (localStorage.getItem(key) === today) return;
+    localStorage.setItem(key, today);
+    showToast('동기화(GitHub)가 ' + Math.floor((Date.now() - Date.parse(fail.firstAt)) / 86400000) + '일째 실패 중입니다: ' + fail.message);
+  } catch (e) {}
+}
 function syncGitHubState(options = {}) {
   if (multiNonLeader()) { if (!options.automatic) showToast('동기화는 주 창에서만 실행됩니다.'); return Promise.resolve(false); }
   if (githubSyncInFlight) return githubSyncInFlight;
@@ -25975,9 +26031,11 @@ function syncGitHubState(options = {}) {
   if (options.automatic) githubSyncTrace = { stage: 'meta', at: performance.now(), steps: {}, recs: [], info: {} };
   githubSyncInFlight = runGitHubSync(options).catch(err => {
     console.error('GitHub sync failed:', err);
-    setGitHubSyncStatus(err?.message || '동기화에 실패했습니다.', 'error');
+    const fail = githubSyncRecordFailure(err?.message || '동기화에 실패했습니다.');
+    setGitHubSyncStatus((err?.message || '동기화에 실패했습니다.') + ' — ' + githubSyncFailureText(fail), 'error');
+    githubSyncWarnLongFailure(fail);
     return false;
-  }).finally(() => {
+  }).then(ok => { if (ok === true) githubSyncClearFailure(); return ok; }).finally(() => {
     githubSyncInFlight = null;
     updateGitHubSyncButton();
     multiSchedulePatch(); // 동기화로 바뀐 데이터를 다른 창에도 전파(#279)
@@ -26068,7 +26126,18 @@ function normalizeCatalogImportEntry(input = {}) {
     attachments: normalizeCatalogAttachments(input?.attachments),
   };
 }
+// 가져오기 payload 에 「키 자체가 없는」 컬렉션(옛 원격본·옛 백업은 musicTracks 등 새 컬렉션이 아예 없음)은 빈 값으로 만들지 않고 로컬 값을 유지한다(#358).
+const IMPORT_COLLECTION_KEYS = ['folders', 'cssMacroFolders', 'scenarios', 'records', 'catalog', 'cssMacros', 'cssPopupDictionary', 'bookmarks', 'musicFolders', 'musicTagCats', 'musicTracks', 'rulebooks', 'dataSheets', 'characters', 'characterFolders', 'customFonts', 'manualFonts', 'recentFonts', 'customBulletSymbols', 'customBulletImages', 'findReplaceHistory', 'sharedMemoOwner'];
+function importAbsentKeys(data) {
+  if (Array.isArray(data)) return IMPORT_COLLECTION_KEYS.filter(key => key !== 'scenarios');
+  return IMPORT_COLLECTION_KEYS.filter(key => key === 'sharedMemoOwner' ? !(data && data.sharedMemoOwner && typeof data.sharedMemoOwner === 'object') : !(data && Array.isArray(data[key])));
+}
 function makeImportPayload(data) {
+  const payload = makeImportPayloadRaw(data);
+  Object.defineProperty(payload, 'absentKeys', { value: importAbsentKeys(data), enumerable: false });
+  return payload;
+}
+function makeImportPayloadRaw(data) {
   if (Array.isArray(data)) {
     return {
       legacyArray: true,
@@ -26232,6 +26301,11 @@ function reassignImportedIdsForMerge(payload) {
   });
 }
 function replaceStateWithImportPayload(payload) {
+  if (payload.absentKeys && payload.absentKeys.length) { // 원본에 키가 없던 컬렉션은 현재 값을 그대로 둔다(#358)
+    const absent = payload.absentKeys; // 비열거 속성이라 복사하면 사라지므로 먼저 잡아 둔다
+    payload = Object.assign({}, payload);
+    absent.forEach(key => { if (key in state) payload[key] = state[key]; });
+  }
   state.folders = payload.folders;
   state.cssMacroFolders = payload.cssMacroFolders;
   state.scenarios = payload.scenarios;
