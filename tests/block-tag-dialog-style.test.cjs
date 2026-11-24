@@ -1,0 +1,11 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const rule = sel => { const i = html.indexOf(sel + ' {'); return i < 0 ? '' : html.slice(i, html.indexOf('}', i)); };
+const color = rule('.block-tag-dialog input[type="color"]');
+ok(/width: 24px; height: 24px; padding: 2px/.test(color) && /border: 1px solid #0002; border-radius: 4px/.test(color) && /background: #fff/.test(color), '태그 색상 입력칸: 24px, 테두리 1px, radius 4px, 흰 띠 2px(최근 색상 버튼과 같은 모양)');
+ok(/\.block-tag-recent-colors button \{ width: 24px; height: 24px; padding: 0; border: 1px solid #0002; border-radius: 4px; cursor: pointer; box-shadow: inset 0 0 0 2px #fff; \}/.test(html), '색상표 창과 공유하는 최근 색상 버튼 규칙은 변경 없음');
+ok(/\[data-delete\] \{ color: #fff; background: #b91c1c; border-color: #b91c1c; \}/.test(html), '삭제 버튼 활성 #b91c1c');
+ok(/\[data-delete\]:hover:not\(:disabled\) \{ color: #fff; background: #991b1b; border-color: #991b1b; \}/.test(html), '삭제 버튼 hover #991b1b');
+ok(/\[data-delete\]:disabled \{ opacity: \.55; cursor: default; \}/.test(html), '삭제 버튼 비활성 opacity .55');
+process.exit(f ? 1 : 0);
