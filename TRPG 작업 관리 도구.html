@@ -6524,7 +6524,7 @@ body.block-pointer-dragging {
   padding-bottom: 3px; /* 위는 접힘과 같아 열고 닫아도 ▼·제목 y 불변, 아래는 내용과 붙게(#348) */
 }
 .toggle-block-head.open + .toggle-content-wrap {
-  margin-top: 0; border-radius: 0 0 4px 4px; padding: 0 8px 4px;
+  margin-top: 0; border-radius: 0 0 4px 4px; padding: 0 8px 12px; /* 아래 여백 = 머리 줄 회색 상단 → 제목 글자 상단(보이는 12px) (#350) */
 }
 .toggle-content-wrap > .block-children-wrap > .block.block-text.block-child { min-height: 22px; }
 .toggle-content-wrap > .block-children-wrap > .block.block-text.block-child .block-text-ce { min-height: 22px; }
