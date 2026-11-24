@@ -18970,6 +18970,118 @@ function tbSplitTableCell(table, id, model, elems) {
   tbTableChanged(table, cell);
   return cell;
 }
+// ── 본문 표 행·열 추가/삭제(#360): #359 의 격자 모델을 재사용. 합쳐진 셀을 가로지르는 위치는 새 셀 대신 그 셀의 span 을 늘리고 줄인다 ──
+// 새 행이 들어갈 위치 at(0..rows): 그 경계를 가로지르는 셀(위·아래 칸이 같은 셀)은 rowspan 을 늘리고, 나머지 열에는 새 셀을 만든다
+function tbInsertRowPlan(model, at) {
+  const extend = [], newCols = [];
+  for (let c = 0; c < model.cols; c++) {
+    const above = at > 0 && at < model.rows ? model.grid[at - 1][c] : undefined;
+    if (above !== undefined && above === model.grid[at][c]) { if (!extend.includes(above)) extend.push(above); }
+    else newCols.push(c);
+  }
+  const skip = new Set(extend.flatMap(id => { const cell = model.cells[id]; return Array.from({ length: cell.cs }, (_, k) => cell.col + k); }));
+  return { at, extend, newCols: newCols.filter(c => !skip.has(c)) };
+}
+// 새 열이 들어갈 위치 at(0..cols): 가로지르는 셀은 colspan 을 늘리고, 나머지 행에는 새 셀(그 행의 DOM 안에서 col >= at 인 첫 셀 앞)
+function tbInsertColPlan(model, at) {
+  const extend = [], newRows = [];
+  for (let r = 0; r < model.rows; r++) {
+    const left = at > 0 && at < model.cols ? model.grid[r][at - 1] : undefined;
+    if (left !== undefined && left === model.grid[r][at]) { if (!extend.includes(left)) extend.push(left); continue; }
+    const before = model.cells.filter(cell => cell.domRow === r && cell.col >= at).sort((x, y) => x.col - y.col)[0];
+    newRows.push({ row: r, beforeId: before ? before.id : null });
+  }
+  const skip = new Set(extend.flatMap(id => { const cell = model.cells[id]; return Array.from({ length: cell.rs }, (_, k) => cell.row + k); }));
+  return { at, extend, newRows: newRows.filter(item => !skip.has(item.row)) };
+}
+// 행 삭제: 그 행에서만 존재하는 셀은 제거, 여러 행에 걸친 셀은 rowspan 을 줄이고(시작 칸이 삭제되는 행이면 다음 행으로 옮김). 행이 하나뿐이면 null
+function tbDeleteRowPlan(model, row) {
+  if (model.rows <= 1 || row < 0 || row >= model.rows) return null;
+  const remove = [], shrink = [], move = [];
+  model.cells.forEach(cell => {
+    if (cell.row > row || cell.row + cell.rs - 1 < row) return;
+    if (cell.rs === 1) { remove.push(cell.id); return; }
+    shrink.push(cell.id);
+    if (cell.row === row) {
+      const before = model.cells.filter(other => other.domRow === row + 1 && other.col > cell.col).sort((x, y) => x.col - y.col)[0];
+      move.push({ id: cell.id, toRow: row + 1, beforeId: before ? before.id : null });
+    }
+  });
+  return { row, remove, shrink, move };
+}
+// 열 삭제: 그 열에서만 존재하는 셀은 제거, 가로로 걸친 셀은 colspan 을 줄인다. 열이 하나뿐이면 null
+function tbDeleteColPlan(model, col) {
+  if (model.cols <= 1 || col < 0 || col >= model.cols) return null;
+  const remove = [], shrink = [];
+  model.cells.forEach(cell => {
+    if (cell.col > col || cell.col + cell.cs - 1 < col) return;
+    (cell.cs === 1 ? remove : shrink).push(cell.id);
+  });
+  return { col, remove, shrink };
+}
+function tbNewCell() { const td = document.createElement('td'); td.appendChild(document.createElement('br')); return td; }
+function tbCellAtGrid(table, row, col) { // 편집 뒤 표에서 (row, col) 을 덮는 셀
+  const { model, elems } = tbTableModel(table);
+  const r = Math.max(0, Math.min(row, model.rows - 1)), c = Math.max(0, Math.min(col, model.cols - 1));
+  const id = model.grid[r] && model.grid[r][c];
+  return id === undefined ? elems[0] : elems[id];
+}
+function tbInsertTableRow(table, model, elems, plan, caretCol) {
+  const tr = table.insertRow(plan.at);
+  let caret = null;
+  plan.newCols.forEach(c => { const td = tbNewCell(); tr.appendChild(td); if (!caret || c <= caretCol) caret = td; });
+  plan.extend.forEach(id => { const cell = model.cells[id]; tbSetSpan(elems[id], cell.cs, cell.rs + 1); });
+  tbTableChanged(table, caret || tbCellAtGrid(table, plan.at, caretCol));
+}
+function tbInsertTableCol(table, model, elems, plan, caretRow) {
+  let caret = null;
+  plan.newRows.forEach(item => {
+    const td = tbNewCell(), row = table.rows[item.row], ref = item.beforeId === null ? null : elems[item.beforeId];
+    if (ref && ref.parentNode === row) row.insertBefore(td, ref); else row.appendChild(td);
+    if (!caret || item.row <= caretRow) caret = td;
+  });
+  plan.extend.forEach(id => { const cell = model.cells[id]; tbSetSpan(elems[id], cell.cs + 1, cell.rs); });
+  tbTableChanged(table, caret || tbCellAtGrid(table, caretRow, plan.at));
+}
+function tbDeleteTableRow(table, model, elems, plan, caretCol) {
+  plan.move.forEach(item => { // 시작 칸이 지워지는 행의 합쳐진 셀: 내용째 다음 행으로
+    const row = table.rows[item.toRow], ref = item.beforeId === null ? null : elems[item.beforeId];
+    if (ref && ref.parentNode === row) row.insertBefore(elems[item.id], ref); else row.appendChild(elems[item.id]);
+  });
+  plan.shrink.forEach(id => { const cell = model.cells[id]; tbSetSpan(elems[id], cell.cs, cell.rs - 1); });
+  plan.remove.forEach(id => elems[id].remove());
+  table.rows[plan.row].remove();
+  tbTableChanged(table, tbCellAtGrid(table, plan.row, caretCol));
+}
+function tbDeleteTableCol(table, model, elems, plan, caretRow) {
+  plan.shrink.forEach(id => { const cell = model.cells[id]; tbSetSpan(elems[id], cell.cs - 1, cell.rs); });
+  plan.remove.forEach(id => elems[id].remove());
+  tbTableChanged(table, tbCellAtGrid(table, caretRow, plan.col));
+}
+function tbDeleteWholeTable(table) {
+  const root = table.closest('[contenteditable="true"]');
+  table.remove();
+  if (!root) return;
+  focusWithoutScroll(root);
+  const caret = document.createRange();
+  caret.selectNodeContents(root); caret.collapse(false);
+  const selection = window.getSelection();
+  selection && selection.removeAllRanges();
+  selection && selection.addRange(caret);
+  root.dispatchEvent(new Event('input', { bubbles: true }));
+}
+function tbTableEditItems(table, model, elems, id) {
+  const cell = model.cells[id], delRow = tbDeleteRowPlan(model, cell.row), delCol = tbDeleteColPlan(model, cell.col);
+  return [
+    { icon: '↑', label: '위에 행 추가', action: () => tbInsertTableRow(table, model, elems, tbInsertRowPlan(model, cell.row), cell.col) },
+    { icon: '↓', label: '아래에 행 추가', action: () => tbInsertTableRow(table, model, elems, tbInsertRowPlan(model, cell.row + cell.rs), cell.col) },
+    { icon: '←', label: '왼쪽에 열 추가', action: () => tbInsertTableCol(table, model, elems, tbInsertColPlan(model, cell.col), cell.row) },
+    { icon: '→', label: '오른쪽에 열 추가', action: () => tbInsertTableCol(table, model, elems, tbInsertColPlan(model, cell.col + cell.cs), cell.row) },
+    { icon: '✕', label: '행 삭제', disabled: !delRow, action: () => delRow && tbDeleteTableRow(table, model, elems, delRow, cell.col) },
+    { icon: '✕', label: '열 삭제', disabled: !delCol, action: () => delCol && tbDeleteTableCol(table, model, elems, delCol, cell.row) },
+    { icon: '🗑', label: '표 삭제', action: () => tbDeleteWholeTable(table) },
+  ];
+}
 // 우클릭한 표 셀 기준 메뉴 항목(선택 범위가 여러 셀이면 「선택한 셀 합치기」)
 function tbTableCtxItems(e) {
   const cell = e.target && e.target.closest ? e.target.closest('td,th') : null;
@@ -18992,6 +19104,7 @@ function tbTableCtxItems(e) {
   items.push({ icon: '↓', label: '아래 셀과 합치기', disabled: !down, action: () => down && tbMergeTableCells(table, down, elems) });
   const cur = model.cells[id];
   if (cur.cs > 1 || cur.rs > 1) items.push({ icon: '▭', label: '셀 나누기', action: () => tbSplitTableCell(table, id, model, elems) });
+  items.push({ sep: true }, ...tbTableEditItems(table, model, elems, id)); // 행·열 추가/삭제, 표 삭제(#360)
   return items;
 }
 function tbOpenTableMenu(button) {
