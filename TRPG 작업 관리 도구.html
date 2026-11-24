@@ -17960,7 +17960,12 @@ function appendChildInsertButton(actionsDiv, parentBlock, parentEl, cid = 'block
   return childBtn;
 }
 
-function tbGetVariationCtxItems(e) {
+function tbGetVariationCtxItems(e) { // 기존 항목 + 표 셀 항목(#359)
+  const items = tbGetVariationCtxItemsBase(e);
+  const tableItems = tbTableCtxItems(e);
+  return tableItems.length ? items.concat(items.length ? [{ sep: true }] : [], tableItems) : items;
+}
+function tbGetVariationCtxItemsBase(e) {
   const editable = e.target.closest?.('[contenteditable="true"]');
   if (!editable) return [];
   lastFocusedTA = editable;
@@ -18835,6 +18840,159 @@ function tbInsertTable(rows, columns, target = tbResolveFormatTarget()) {
   savedFormatTarget = { type: 'ce', ta: root, range: caret.cloneRange() };
   root.dispatchEvent(new Event('input', { bubbles: true }));
   return true;
+}
+// ── 본문 표 셀 합치기·나누기(#359): colspan/rowspan 만 쓴다. 격자 계산은 DOM 과 분리한 순수 함수 ──
+// spans: 행별 셀의 { cs, rs } 배열(DOM 순서). 반환 model: { cells[{id,row,col,cs,rs,domRow,domIndex}], grid[행][열]=셀 id, rows, cols }
+function tbGridModel(spans) {
+  const rows = spans.length, grid = [], cells = [];
+  for (let r = 0; r < rows; r++) grid[r] = grid[r] || [];
+  spans.forEach((row, r) => {
+    let c = 0;
+    row.forEach((span, i) => {
+      while (grid[r][c] !== undefined) c++;
+      const cs = Math.max(1, Math.floor(Number(span && span.cs)) || 1), rs = Math.min(Math.max(1, Math.floor(Number(span && span.rs)) || 1), rows - r);
+      const id = cells.length;
+      cells.push({ id, row: r, col: c, cs, rs, domRow: r, domIndex: i });
+      for (let dr = 0; dr < rs; dr++) for (let dc = 0; dc < cs; dc++) grid[r + dr][c + dc] = id;
+      c += cs;
+    });
+  });
+  const cols = grid.reduce((max, row) => Math.max(max, row.length), 0);
+  return { cells, grid, rows, cols };
+}
+function tbCellRect(cell) { return { r1: cell.row, c1: cell.col, r2: cell.row + cell.rs - 1, c2: cell.col + cell.cs - 1 }; }
+// 사각형이 합쳐진 셀을 일부만 걸치면 그 셀을 다 포함하도록 넓힌다
+function tbExpandRect(model, rect) {
+  let r1 = Math.max(0, Math.min(rect.r1, rect.r2)), r2 = Math.min(model.rows - 1, Math.max(rect.r1, rect.r2));
+  let c1 = Math.max(0, Math.min(rect.c1, rect.c2)), c2 = Math.min(model.cols - 1, Math.max(rect.c1, rect.c2));
+  for (let changed = true; changed;) {
+    changed = false;
+    model.cells.forEach(cell => {
+      const b = tbCellRect(cell);
+      if (b.r2 < r1 || b.r1 > r2 || b.c2 < c1 || b.c1 > c2) return;
+      if (b.r1 < r1) { r1 = b.r1; changed = true; }
+      if (b.r2 > r2) { r2 = b.r2; changed = true; }
+      if (b.c1 < c1) { c1 = b.c1; changed = true; }
+      if (b.c2 > c2) { c2 = b.c2; changed = true; }
+    });
+  }
+  return { r1, c1, r2, c2 };
+}
+// 사각형 범위를 하나로 합치는 계획: 왼쪽 위 → 오른쪽 아래 순서의 셀 id, 남길 셀(첫 셀), 새 colspan/rowspan. 합칠 게 없거나 격자에 구멍이 있으면 null
+function tbMergePlan(model, rect) {
+  const box = tbExpandRect(model, rect), ids = [];
+  for (let r = box.r1; r <= box.r2; r++) for (let c = box.c1; c <= box.c2; c++) {
+    const id = model.grid[r] && model.grid[r][c];
+    if (id === undefined) return null;
+    if (!ids.includes(id)) ids.push(id);
+  }
+  if (ids.length < 2) return null;
+  return { ids, keep: ids[0], remove: ids.slice(1), cs: box.c2 - box.c1 + 1, rs: box.r2 - box.r1 + 1, rect: box };
+}
+// 오른쪽/아래 셀과 합치기: 합친 결과가 사각형일 때만 계획을 돌려준다(아니면 null → 메뉴 비활성)
+function tbNeighborMergePlan(model, id, dir) {
+  const cell = model.cells[id];
+  if (!cell) return null;
+  const nid = dir === 'right' ? (model.grid[cell.row] || [])[cell.col + cell.cs] : (model.grid[cell.row + cell.rs] || [])[cell.col];
+  const next = nid === undefined ? null : model.cells[nid];
+  if (!next) return null;
+  if (dir === 'right' ? (next.row !== cell.row || next.rs !== cell.rs) : (next.col !== cell.col || next.cs !== cell.cs)) return null;
+  const a = tbCellRect(cell), b = tbCellRect(next);
+  return tbMergePlan(model, { r1: Math.min(a.r1, b.r1), c1: Math.min(a.c1, b.c1), r2: Math.max(a.r2, b.r2), c2: Math.max(a.c2, b.c2) });
+}
+// 셀 나누기 계획: 원래 칸 수로 되돌리며 새로 만들 칸의 (행, 열)과 그 칸이 들어갈 위치(같은 행에서 col 이 더 큰 첫 셀 id, 없으면 null)
+function tbSplitPlan(model, id) {
+  const cell = model.cells[id];
+  if (!cell || (cell.cs < 2 && cell.rs < 2)) return null;
+  const add = [];
+  for (let dr = 0; dr < cell.rs; dr++) for (let dc = 0; dc < cell.cs; dc++) {
+    if (!dr && !dc) continue;
+    const row = cell.row + dr, col = cell.col + dc;
+    const before = model.cells.filter(other => other.id !== id && other.domRow === row && other.col > col).sort((x, y) => x.col - y.col)[0];
+    add.push({ row, col, beforeId: before ? before.id : null });
+  }
+  return { add };
+}
+// 합친 셀 내용: 왼쪽 위 → 오른쪽 아래 순으로 이어 붙이되 비어 있지 않은 셀 사이만 <br> 로 구분, 빈 셀(<br> 뿐)은 버린다
+function tbMergedHtml(parts) {
+  const filled = parts.filter(html => String(html || '').replace(/<br\s*\/?>/gi, '').replace(/&nbsp;| |​|\s/gi, '') !== '');
+  return filled.length ? filled.join('<br>') : '<br>';
+}
+// ── DOM 연결 ──
+function tbTableModel(table) {
+  const rows = Array.from(table.rows), elems = [];
+  const model = tbGridModel(rows.map(row => Array.from(row.cells).map(cell => ({ cs: cell.colSpan, rs: cell.rowSpan }))));
+  rows.forEach(row => Array.from(row.cells).forEach(cell => elems.push(cell)));
+  return { model, elems }; // elems[id] = td (모델 id 는 행·DOM 순서와 같다)
+}
+function tbSetSpan(cell, cs, rs) {
+  if (cs > 1) cell.setAttribute('colspan', String(cs)); else cell.removeAttribute('colspan');
+  if (rs > 1) cell.setAttribute('rowspan', String(rs)); else cell.removeAttribute('rowspan');
+}
+function tbPlaceCaretInCell(cell) {
+  const root = cell && cell.closest('[contenteditable="true"]');
+  if (!root) return;
+  const caret = document.createRange();
+  caret.selectNodeContents(cell); caret.collapse(true);
+  focusWithoutScroll(root);
+  const selection = window.getSelection();
+  selection && selection.removeAllRanges();
+  selection && selection.addRange(caret);
+  savedCERange = caret.cloneRange();
+  _savedFormatSel = { ta: root, range: caret.cloneRange() };
+  savedFormatTarget = { type: 'ce', ta: root, range: caret.cloneRange() };
+}
+function tbTableChanged(table, caretCell) { // 기존 저장 경로: 편집 영역에 input 이벤트
+  const root = table.closest('[contenteditable="true"]');
+  if (caretCell) tbPlaceCaretInCell(caretCell);
+  if (root) root.dispatchEvent(new Event('input', { bubbles: true }));
+}
+function tbMergeTableCells(table, plan, elems) {
+  const keep = elems[plan.keep];
+  keep.innerHTML = tbMergedHtml(plan.ids.map(id => elems[id].innerHTML));
+  tbSetSpan(keep, plan.cs, plan.rs);
+  plan.remove.forEach(id => elems[id].remove());
+  tbTableChanged(table, keep);
+  return keep;
+}
+function tbSplitTableCell(table, id, model, elems) {
+  const plan = tbSplitPlan(model, id);
+  if (!plan) return null;
+  const cell = elems[id];
+  tbSetSpan(cell, 1, 1);
+  plan.add.forEach(item => {
+    const td = document.createElement('td');
+    td.appendChild(document.createElement('br'));
+    const row = table.rows[item.row];
+    const ref = item.beforeId === null ? null : elems[item.beforeId];
+    if (ref && ref.parentNode === row) row.insertBefore(td, ref); else row.appendChild(td);
+  });
+  tbTableChanged(table, cell);
+  return cell;
+}
+// 우클릭한 표 셀 기준 메뉴 항목(선택 범위가 여러 셀이면 「선택한 셀 합치기」)
+function tbTableCtxItems(e) {
+  const cell = e.target && e.target.closest ? e.target.closest('td,th') : null;
+  const table = cell && cell.closest('table.tb-editor-table');
+  if (!table || !table.closest('[contenteditable="true"]')) return [];
+  const { model, elems } = tbTableModel(table);
+  const id = elems.indexOf(cell);
+  if (id < 0) return [];
+  const items = [];
+  const sel = window.getSelection && window.getSelection();
+  const cellOf = node => { const el = node && (node.nodeType === 1 ? node : node.parentElement); const td = el && el.closest ? el.closest('td,th') : null; return td && table.contains(td) ? td : null; };
+  const a = sel && sel.rangeCount ? cellOf(sel.anchorNode) : null, b = sel && sel.rangeCount ? cellOf(sel.focusNode) : null;
+  if (a && b && a !== b && elems.includes(a) && elems.includes(b)) {
+    const ca = model.cells[elems.indexOf(a)], cb = model.cells[elems.indexOf(b)], ra = tbCellRect(ca), rb = tbCellRect(cb);
+    const plan = tbMergePlan(model, { r1: Math.min(ra.r1, rb.r1), c1: Math.min(ra.c1, rb.c1), r2: Math.max(ra.r2, rb.r2), c2: Math.max(ra.c2, rb.c2) });
+    if (plan) items.push({ icon: '▦', label: '선택한 셀 합치기', action: () => tbMergeTableCells(table, plan, elems) });
+  }
+  const right = tbNeighborMergePlan(model, id, 'right'), down = tbNeighborMergePlan(model, id, 'down');
+  items.push({ icon: '→', label: '오른쪽 셀과 합치기', disabled: !right, action: () => right && tbMergeTableCells(table, right, elems) });
+  items.push({ icon: '↓', label: '아래 셀과 합치기', disabled: !down, action: () => down && tbMergeTableCells(table, down, elems) });
+  const cur = model.cells[id];
+  if (cur.cs > 1 || cur.rs > 1) items.push({ icon: '▭', label: '셀 나누기', action: () => tbSplitTableCell(table, id, model, elems) });
+  return items;
 }
 function tbOpenTableMenu(button) {
   const rect = button.getBoundingClientRect();
