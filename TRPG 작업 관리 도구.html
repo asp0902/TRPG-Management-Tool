@@ -5358,6 +5358,7 @@ body.block-pointer-dragging {
 .image-block-modal-preview.visible { display: flex; }
 .image-block-modal-preview img { display: block; max-width: 100%; max-height: 240px; object-fit: contain; }
 .image-block-modal-save:disabled { opacity: 0.35; cursor: default; }
+.rb-modal.image-block-modal.drag-over { outline: 2px dashed #111; outline-offset: -6px; } /* 파일·이미지를 끌어 오는 동안 드롭 가능 표시(#351) */
 
 /* Roll */
 .block.block-roll {
@@ -20476,6 +20477,38 @@ function onImageBlockModalPaste(e) {
   document.getElementById('image-block-url').value = text;
   setImageBlockModalSource(text);
 }
+// 이미지 추가 모달 전체를 드롭 영역으로(#351). 모달이 열려 있을 때만, 본문의 드롭 처리(블록 이동·이미지 삽입·매크로)로 가지 않게 여기서 끝낸다.
+function imageBlockModalDropBox(e) {
+  const bd = document.getElementById('image-block-modal-backdrop');
+  return bd && bd.classList.contains('open') && e.target && e.target.closest ? e.target.closest('.image-block-modal') : null;
+}
+function imageBlockModalDroppedUrl(dt) { // 웹페이지에서 끌어 온 이미지: text/uri-list → text/plain 의 http(s) 주소
+  const lines = [dt && dt.getData('text/uri-list'), dt && dt.getData('text/plain')].join(String.fromCharCode(10)).split(/\r?\n/).map(line => line.trim());
+  return lines.find(line => /^https?:\/\//i.test(line)) || '';
+}
+['dragenter', 'dragover'].forEach(type => document.addEventListener(type, e => {
+  const box = imageBlockModalDropBox(e);
+  if (!box) return;
+  e.preventDefault(); e.stopPropagation();
+  box.classList.add('drag-over');
+}, true));
+document.addEventListener('dragleave', e => {
+  const box = document.querySelector('.image-block-modal.drag-over');
+  if (box && !(e.relatedTarget && box.contains(e.relatedTarget))) box.classList.remove('drag-over');
+}, true);
+document.addEventListener('drop', e => {
+  const box = imageBlockModalDropBox(e);
+  if (!box) return;
+  e.preventDefault(); e.stopPropagation();
+  box.classList.remove('drag-over');
+  const file = getImageFileFromTransfer(e.dataTransfer);
+  if (file) { setImageBlockModalFile(file); return; }
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) return; // 이미지가 아닌 파일은 무시하고 기존 선택 유지
+  const url = imageBlockModalDroppedUrl(e.dataTransfer);
+  if (!url) return;
+  document.getElementById('image-block-url').value = url;
+  setImageBlockModalSource(url);
+}, true);
 function submitImageBlockModal() {
   if (!isRenderableImageSrc(imageBlockModalSource) || typeof imageBlockModalSubmit !== 'function') return;
   const submit = imageBlockModalSubmit;
