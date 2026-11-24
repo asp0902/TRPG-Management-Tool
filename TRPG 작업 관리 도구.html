@@ -25253,8 +25253,12 @@ function renderAutoBackupSettings() {
 const SNAPSHOT_DB_NAME = 'trpg-scenario-editor-snapshots';
 const SNAPSHOT_STORE = 'snapshots';
 const SNAPSHOT_MIN_INTERVAL_MS = 5 * 60 * 1000;
-const SNAPSHOT_KEEP_RECENT = 10;
+// 보관 규칙(#357): 스냅샷 하나가 gzip 후 수십 MB 라 한도 400MB 안에 「날짜별 7일치」가 먼저 들어가야 한다(50MB 기준 7일 350MB + 여유 1개).
+// 용량이 모자라면 ① 같은 날의 여분 최근 스냅샷 → ② 가장 오래된 날짜별 → ③ 보호 스냅샷 순으로 지운다. 최신 1개는 항상 남긴다.
+const SNAPSHOT_KEEP_RECENT = 4;               // 날짜별과 별개로 남기는 최근 여분(서로 SNAPSHOT_RECENT_GAP_MS 이상 떨어진 것만)
+const SNAPSHOT_RECENT_GAP_MS = 30 * 60 * 1000;
 const SNAPSHOT_KEEP_DAYS = 7;
+const SNAPSHOT_PROTECT_DAYS = 14;             // 보호 스냅샷(컬렉션 비워짐 등)은 이 기간 자동 삭제 대상에서 제외
 const SNAPSHOT_MAX_BYTES = 400 * 1024 * 1024;
 let snapshotDirty = false;
 let snapshotLastAt = 0;
@@ -25290,6 +25294,19 @@ async function readSnapshotText(record) {
   return await new Response(record.blob.stream().pipeThrough(new DecompressionStream('gzip'))).text();
 }
 const listAppSnapshots = async () => (await snapshotTx('readonly', store => store.getAll()) || []).sort((a, b) => b.id.localeCompare(a.id));
+// 용량 조사용(#357): 현재 데이터에서 어디가 큰지 — 최상위 키별 JSON 크기와 가장 큰 문자열(임베드 이미지·글꼴 base64 등) 상위 목록. 콘솔에서 appPayloadSizeReport() 로 실행.
+function appPayloadSizeReport(payload = makeStatePayload(), top = 10) {
+  const keys = Object.keys(payload).map(key => ({ key, bytes: JSON.stringify(payload[key] === undefined ? null : payload[key]).length })).sort((x, y) => y.bytes - x.bytes);
+  const strings = [];
+  const walk = (value, path) => {
+    if (typeof value === 'string') { if (value.length > 20000) strings.push({ path, bytes: value.length, kind: value.slice(0, 22) }); return; }
+    if (Array.isArray(value)) value.forEach((item, i) => walk(item, path + '[' + i + ']'));
+    else if (value && typeof value === 'object') Object.keys(value).forEach(key => walk(value[key], path + '.' + key));
+  };
+  walk(payload, '');
+  strings.sort((x, y) => y.bytes - x.bytes);
+  return { totalBytes: keys.reduce((sum, item) => sum + item.bytes, 0), keys, biggestStrings: strings.slice(0, top) };
+}
 async function saveProtectionSnapshot(oldPayload, reason) { // 저장 직전 IndexedDB 에 있던 상태를 그대로 스냅샷으로(#356). 빈 데이터 검사·snapshotBusy 와 무관
   if (!oldPayload || typeof indexedDB === 'undefined') return false;
   try {
@@ -25297,7 +25314,8 @@ async function saveProtectionSnapshot(oldPayload, reason) { // 저장 직전 Ind
     const { gz, blob } = await gzipSnapshotText(json);
     const at = new Date().toISOString();
     const count = key => Array.isArray(oldPayload[key]) ? oldPayload[key].length : 0;
-    await snapshotTx('readwrite', store => store.put({ id: at, at, reason, protect: true, gz, blob, bytes: blob.size, rawBytes: json.length, scenarios: count('scenarios'), records: count('records'), cssMacros: count('cssMacros') }));
+    await snapshotTx('readwrite', store => store.put({ id: at, at, reason, protect: true, gz, blob, bytes: blob.size, rawBytes: json.length, scenarios: count('scenarios'), records: count('records'), cssMacros: count('cssMacros'), musicTracks: count('musicTracks'), characters: count('characters'), bookmarks: count('bookmarks') }));
+    try { await pruneAppSnapshots(); } catch (e) { console.warn(e); }
     return true;
   } catch (err) { console.error('protection snapshot failed:', err); return false; }
 }
@@ -25313,6 +25331,7 @@ async function saveAppSnapshot(reason = '') {
     const record = {
       id: at, at, reason, gz, blob, bytes: blob.size, rawBytes: json.length,
       scenarios: state.scenarios.length, records: state.records.length, cssMacros: state.cssMacros.length,
+      musicTracks: state.musicTracks.length, characters: state.characters.length, bookmarks: state.bookmarks.length, // 복원 전 내용 판단용(#357)
     };
     await snapshotTx('readwrite', store => store.put(record));
     snapshotLastAt = Date.now();
@@ -25324,23 +25343,46 @@ async function saveAppSnapshot(reason = '') {
     return false;
   } finally { snapshotBusy = false; }
 }
-async function pruneAppSnapshots() {
-  const list = await listAppSnapshots(); // 최신순
-  const keep = new Set(list.slice(0, SNAPSHOT_KEEP_RECENT).map(item => item.id));
-  const dayLimit = Date.now() - SNAPSHOT_KEEP_DAYS * 24 * 60 * 60 * 1000;
+// 가지치기 계획(순수 함수): list 는 {id, at, bytes, protect} 최신순. 지울 id 배열을 돌려준다.
+function planSnapshotPrune(list, now = Date.now(), opts = {}) {
+  const keepRecent = opts.keepRecent ?? SNAPSHOT_KEEP_RECENT, gap = opts.recentGapMs ?? SNAPSHOT_RECENT_GAP_MS;
+  const keepDays = opts.keepDays ?? SNAPSHOT_KEEP_DAYS, protectDays = opts.protectDays ?? SNAPSHOT_PROTECT_DAYS, maxBytes = opts.maxBytes ?? SNAPSHOT_MAX_BYTES;
+  const items = list.slice().sort((x, y) => Date.parse(y.at) - Date.parse(x.at));
+  if (!items.length) return [];
+  const dayOf = item => new Date(item.at).toLocaleDateString('sv-SE');
+  const role = new Map(); // id → 'latest' | 'protect' | 'daily' | 'recent'
+  role.set(items[0].id, 'latest');
+  items.forEach(item => { if (item.protect && now - Date.parse(item.at) <= protectDays * 86400000 && !role.has(item.id)) role.set(item.id, 'protect'); });
   const days = new Set();
-  list.forEach(item => {
-    if (Date.parse(item.at) < dayLimit) return;
-    const day = new Date(item.at).toLocaleDateString('sv-SE');
-    if (!days.has(day)) { days.add(day); keep.add(item.id); }
+  items.forEach(item => { // 날짜별: 그날의 가장 최신 하나(보호·최신으로 이미 표시된 것도 그날 몫으로 센다)
+    if (now - Date.parse(item.at) > keepDays * 86400000) return;
+    const day = dayOf(item);
+    if (days.has(day)) return;
+    days.add(day);
+    if (!role.has(item.id)) role.set(item.id, 'daily');
   });
-  let total = 0;
-  const remove = [];
-  list.forEach((item, index) => {
-    if (!keep.has(item.id)) { remove.push(item.id); return; }
-    total += item.bytes || 0;
-    if (index > 0 && total > SNAPSHOT_MAX_BYTES) remove.push(item.id);
+  let lastRecentAt = Infinity, recent = 0;
+  items.forEach(item => { // 최근 여분: 서로 gap 이상 떨어진 것만 keepRecent 개
+    if (recent >= keepRecent || now - Date.parse(item.at) > 86400000) return; // 최근 여분은 24시간 안의 것만
+    const at = Date.parse(item.at);
+    if (lastRecentAt - at < gap && lastRecentAt !== Infinity) return;
+    lastRecentAt = at; recent++;
+    if (!role.has(item.id)) role.set(item.id, 'recent');
   });
+  const remove = items.filter(item => !role.has(item.id)).map(item => item.id);
+  let total = items.filter(item => role.has(item.id)).reduce((sum, item) => sum + (item.bytes || 0), 0);
+  for (const kind of ['recent', 'daily', 'protect']) { // 용량 초과: 여분 최근 → 오래된 날짜별 → 보호 순(각각 오래된 것부터). 최신은 절대 지우지 않는다
+    if (total <= maxBytes) break;
+    for (const item of items.slice().reverse()) {
+      if (total <= maxBytes) break;
+      if (role.get(item.id) !== kind) continue;
+      remove.push(item.id); role.delete(item.id); total -= item.bytes || 0;
+    }
+  }
+  return remove;
+}
+async function pruneAppSnapshots() {
+  const remove = planSnapshotPrune(await listAppSnapshots());
   if (remove.length) await snapshotTx('readwrite', store => remove.forEach(id => store.delete(id)));
 }
 async function runSnapshotTick() {
@@ -25373,8 +25415,8 @@ async function renderSnapshotList() {
   let list = [];
   try { list = await listAppSnapshots(); } catch (err) { setSnapshotStatus('스냅샷 목록을 읽지 못했습니다: ' + (err?.message || err), 'error'); }
   box.innerHTML = list.length ? list.map(item => `<div class="snapshot-row">
-    <div class="snapshot-info"><div>${esc(new Date(item.at).toLocaleString())}${item.reason ? ` · ${esc(item.reason)}` : ''}</div>
-    <div class="snapshot-meta">시나리오 ${item.scenarios}개 · 기록 ${item.records}개 · CSS 매크로 ${item.cssMacros}개 · ${(item.bytes / 1048576).toFixed(1)}MB${item.gz ? ' (압축)' : ''}</div></div>
+    <div class="snapshot-info"><div>${item.protect ? '🛡 ' : ''}${esc(new Date(item.at).toLocaleString())}${item.reason ? ` · ${esc(item.reason)}` : ''}</div>
+    <div class="snapshot-meta">시나리오 ${item.scenarios}개 · 기록 ${item.records}개 · CSS 매크로 ${item.cssMacros}개${item.musicTracks != null ? ` · MUSIC ${item.musicTracks}곡` : ''}${item.characters != null ? ` · 캐릭터 ${item.characters}명` : ''}${item.bookmarks != null ? ` · 북마크 ${item.bookmarks}개` : ''} · ${(item.bytes / 1048576).toFixed(1)}MB${item.gz ? ' (압축)' : ''}</div></div>
     <button type="button" class="rb-modal-cancel" onclick="exportAppSnapshot('${esc(item.id)}')">내보내기</button>
     <button type="button" class="rb-modal-cancel" onclick="restoreAppSnapshot('${esc(item.id)}')">이 시점으로 복원</button>
   </div>`).join('') : '<div class="snapshot-empty">아직 스냅샷이 없습니다.</div>';
