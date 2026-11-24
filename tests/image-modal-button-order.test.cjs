@@ -1,0 +1,11 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const a = html.indexOf('id="image-block-modal-backdrop"'), b = html.indexOf('<!-- 링크 삽입 팝업 -->');
+const modal = html.slice(a, b), foot = modal.slice(modal.indexOf('<div class="rb-modal-footer">'));
+ok(foot.indexOf('id="image-block-modal-submit"') > 0 && foot.indexOf('id="image-block-modal-submit"') < foot.indexOf('rb-modal-cancel'), '이미지 모달 footer 순서: 추가(제출) → 취소(#352)');
+ok(/<button type="button" class="rb-modal-save image-block-modal-save" id="image-block-modal-submit"\s+onclick="submitImageBlockModal\(\)" disabled>추가<\/button>/.test(foot), '추가 버튼 id·class·onclick·disabled 유지');
+ok(/<button type="button" class="rb-modal-cancel" onclick="closeImageBlockModal\(\)">취소<\/button>/.test(foot), '취소 버튼 class·onclick 유지');
+ok(/getElementById\('image-block-modal-submit'\)\.textContent = editing \? '수정' : '추가'/.test(html), '수정 모드 「수정」 라벨 유지');
+ok(/\.rb-modal-footer \{ display: flex; justify-content: flex-end;/.test(html), 'footer 우측 정렬 유지');
+process.exit(f ? 1 : 0);
