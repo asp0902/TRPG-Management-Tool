@@ -1,0 +1,16 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const a = html.indexOf('let tbCellSel = null;'), b = html.indexOf('// 우클릭한 표 셀 기준 메뉴 항목');
+const sel = html.slice(a, b);
+ok(a > 0 && b > a, '셀 범위 선택 코드 구간 존재');
+ok(/id = 'tb-cell-sel-overlay'/.test(sel) && /pointer-events:none/.test(sel) && /appendChild\(el\)/.test(sel) && /document\.body\.appendChild/.test(sel), '강조는 body 덮개(pointer-events:none)');
+ok(!/classList\.(add|toggle)|setAttribute\(|\.className\s*=|\.style\.[a-zA-Z]+\s*=/.test(sel.replace(/Object\.assign\(el\.style/g, '').replace(/el\.style\.(cssText|display)\s*=/g, '')), '셀에는 클래스·속성·style 을 넣지 않음');
+ok(/addEventListener\('mousedown'.*true\)|addEventListener\('mousedown'/.test(sel) && /e\.shiftKey/.test(sel), '드래그·Shift+클릭 처리');
+ok(/e\.button === 2/.test(sel) && /tbCellInSel\(hit\.td\)/.test(sel), '범위 안 우클릭은 선택 유지');
+ok(/'Delete'/.test(sel) && /'Backspace'/.test(sel) && /innerHTML = '<br>'/.test(sel) && /dispatchEvent\(new Event\('input'/.test(sel), 'Delete/Backspace: 내용만 비우고 input 이벤트');
+ok(/addEventListener\('input'/.test(sel) && /addEventListener\('scroll'/.test(sel) && /addEventListener\('resize'/.test(sel) && /setTimeout/.test(sel), '입력 시 해제, 스크롤·리사이즈·0.1초마다 위치 재계산');
+ok(/function tbTableChanged\(table, caretCell\) \{[^\n]*\n\s*tbCellSelClear\(\);/.test(html), '표 편집 실행 시 선택 해제');
+ok(/if \(tbCellSel && tbCellSel\.table === table\)/.test(html) && /label: '선택한 셀 합치기'/.test(html), '메뉴는 셀 선택을 우선 사용');
+ok(/tbExpandRect\(model/.test(sel), '합쳐진 셀 걸치면 사각형 확장');
+process.exit(f ? 1 : 0);

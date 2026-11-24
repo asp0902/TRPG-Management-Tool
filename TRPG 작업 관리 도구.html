@@ -18948,6 +18948,7 @@ function tbPlaceCaretInCell(cell) {
   savedFormatTarget = { type: 'ce', ta: root, range: caret.cloneRange() };
 }
 function tbTableChanged(table, caretCell) { // 기존 저장 경로: 편집 영역에 input 이벤트
+  tbCellSelClear(); // 편집을 실행하면 셀 선택 해제(#362)
   const root = table.closest('[contenteditable="true"]');
   if (caretCell) tbPlaceCaretInCell(caretCell);
   if (root) root.dispatchEvent(new Event('input', { bubbles: true }));
@@ -19087,6 +19088,109 @@ function tbTableEditItems(table, model, elems, id) {
     { icon: '🗑', label: '표 삭제', action: () => tbDeleteWholeTable(table) },
   ];
 }
+// ── 표 셀 범위 선택(#362): 브라우저 글자 선택에 기대지 않고 셀 범위를 직접 선택한다 ──
+// 선택 상태는 이 변수에만 두고, 강조는 body 의 덮개 요소로 그린다(contenteditable 안의 셀에는 클래스·속성·style 을 넣지 않아 저장 HTML 을 오염시키지 않는다).
+let tbCellSel = null;   // { table, rect:{r1,c1,r2,c2}, anchor:{row,col} }
+let tbCellSelRaf = 0;
+let tbCellDrag = null;  // { table, cell, active }
+function tbCellSelClear() {
+  tbCellSel = null;
+  const el = document.getElementById('tb-cell-sel-overlay');
+  if (el) el.style.display = 'none';
+}
+function tbCellSelRender() { // 선택 범위를 덮는 사각형을 셀 위치에서 다시 계산
+  if (!tbCellSel || !tbCellSel.table.isConnected) { tbCellSelClear(); return; }
+  let el = document.getElementById('tb-cell-sel-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'tb-cell-sel-overlay';
+    el.style.cssText = 'position:fixed;pointer-events:none;z-index:9000;box-sizing:border-box;border:2px solid #2563eb;background:rgba(37,99,235,0.18);display:none';
+    document.body.appendChild(el);
+  }
+  const { model, elems } = tbTableModel(tbCellSel.table), r = tbCellSel.rect;
+  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+  model.cells.forEach(cell => {
+    const b = tbCellRect(cell);
+    if (b.r2 < r.r1 || b.r1 > r.r2 || b.c2 < r.c1 || b.c1 > r.c2) return;
+    const rc = elems[cell.id].getBoundingClientRect();
+    left = Math.min(left, rc.left); top = Math.min(top, rc.top); right = Math.max(right, rc.right); bottom = Math.max(bottom, rc.bottom);
+  });
+  if (!isFinite(left)) { tbCellSelClear(); return; }
+  Object.assign(el.style, { display: 'block', left: left + 'px', top: top + 'px', width: (right - left) + 'px', height: (bottom - top) + 'px' });
+  if (!tbCellSelRaf) tbCellSelRaf = setTimeout(() => { tbCellSelRaf = 0; if (tbCellSel) tbCellSelRender(); }, 100); // 선택 중에는 0.1초마다 위치 재계산(스크롤·레이아웃 변화·페이지 전환 대응)
+}
+function tbCellSelSet(table, startCell, endCell) { // 두 셀이 만드는 사각형(합쳐진 셀을 걸치면 확장)
+  const { model, elems } = tbTableModel(table);
+  const a = model.cells[elems.indexOf(startCell)], b = model.cells[elems.indexOf(endCell)];
+  if (!a || !b) return false;
+  const ra = tbCellRect(a), rb = tbCellRect(b);
+  const rect = tbExpandRect(model, { r1: Math.min(ra.r1, rb.r1), c1: Math.min(ra.c1, rb.c1), r2: Math.max(ra.r2, rb.r2), c2: Math.max(ra.c2, rb.c2) });
+  tbCellSel = { table, rect, anchor: { row: a.row, col: a.col } };
+  tbCellSelRender();
+  return true;
+}
+function tbCellInSel(td) {
+  if (!tbCellSel || !tbCellSel.table.contains(td)) return false;
+  const { model, elems } = tbTableModel(tbCellSel.table), cell = model.cells[elems.indexOf(td)], r = tbCellSel.rect;
+  if (!cell) return false;
+  const b = tbCellRect(cell);
+  return !(b.r2 < r.r1 || b.r1 > r.r2 || b.c2 < r.c1 || b.c1 > r.c2);
+}
+function tbCellSelClearContents() { // Delete/Backspace: 선택된 셀들의 내용만 비운다(셀은 유지)
+  if (!tbCellSel) return;
+  const table = tbCellSel.table, root = table.closest('[contenteditable="true"]'), { model, elems } = tbTableModel(table), r = tbCellSel.rect;
+  model.cells.forEach(cell => {
+    const b = tbCellRect(cell);
+    if (b.r2 < r.r1 || b.r1 > r.r2 || b.c2 < r.c1 || b.c1 > r.c2) return;
+    elems[cell.id].innerHTML = '<br>';
+  });
+  tbCellSelClear();
+  if (root) root.dispatchEvent(new Event('input', { bubbles: true }));
+}
+function tbTableCellFromEvent(e) {
+  const td = e.target && e.target.closest ? e.target.closest('td,th') : null;
+  const table = td && td.closest('table.tb-editor-table');
+  return table && table.closest('[contenteditable="true"]') ? { td, table } : null;
+}
+document.addEventListener('mousedown', e => {
+  const hit = tbTableCellFromEvent(e);
+  if (!hit) { tbCellDrag = null; if (tbCellSel && !(e.target.closest && e.target.closest('.tb-ctx-menu'))) tbCellSelClear(); return; }
+  if (e.button === 2) { tbCellDrag = null; if (!(tbCellSel && tbCellSel.table === hit.table && tbCellInSel(hit.td))) tbCellSelClear(); return; } // 범위 안 우클릭은 선택 유지
+  if (e.button !== 0) return;
+  if (e.shiftKey) { // Shift+클릭: 캐럿(또는 직전 선택 시작) 셀에서 클릭한 셀까지
+    let anchor = null;
+    if (tbCellSel && tbCellSel.table === hit.table) { const m = tbTableModel(hit.table), c = m.model.cells.find(cell => cell.row === tbCellSel.anchor.row && cell.col === tbCellSel.anchor.col); anchor = c ? m.elems[c.id] : null; }
+    if (!anchor) {
+      const sel = window.getSelection(), node = sel && sel.rangeCount ? sel.anchorNode : null, el = node && (node.nodeType === 1 ? node : node.parentElement), td = el && el.closest ? el.closest('td,th') : null;
+      anchor = td && hit.table.contains(td) ? td : null;
+    }
+    if (anchor && anchor !== hit.td && tbCellSelSet(hit.table, anchor, hit.td)) { e.preventDefault(); window.getSelection().removeAllRanges(); tbCellDrag = null; return; }
+  }
+  tbCellSelClear();
+  tbCellDrag = { table: hit.table, cell: hit.td, active: false };
+}, true);
+document.addEventListener('mousemove', e => { // 다른 셀로 넘어가면 셀 선택 모드(한 셀 안의 드래그는 기존 글자 선택 그대로)
+  if (!tbCellDrag) return;
+  if (!(e.buttons & 1)) { tbCellDrag = null; return; }
+  const hit = tbTableCellFromEvent(e);
+  if (!hit || hit.table !== tbCellDrag.table) return;
+  if (!tbCellDrag.active && hit.td === tbCellDrag.cell) return;
+  tbCellDrag.active = true;
+  tbCellSelSet(hit.table, tbCellDrag.cell, hit.td);
+  const sel = window.getSelection();
+  if (sel) sel.removeAllRanges();
+  e.preventDefault();
+}, true);
+document.addEventListener('mouseup', () => { tbCellDrag = null; }, true);
+document.addEventListener('selectstart', e => { if (tbCellDrag && tbCellDrag.active) e.preventDefault(); }, true);
+document.addEventListener('keydown', e => {
+  if (!tbCellSel || ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
+  if ((e.key === 'Delete' || e.key === 'Backspace') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing) { e.preventDefault(); e.stopPropagation(); tbCellSelClearContents(); return; }
+  tbCellSelClear(); // Esc 와 그 밖의 키: 선택만 풀고 기본 동작
+}, true);
+document.addEventListener('input', () => { if (tbCellSel) tbCellSelClear(); }, true);
+document.addEventListener('scroll', () => { if (tbCellSel) tbCellSelRender(); }, true);
+window.addEventListener('resize', () => { if (tbCellSel) tbCellSelRender(); });
 // 우클릭한 표 셀 기준 메뉴 항목(선택 범위가 여러 셀이면 「선택한 셀 합치기」)
 function tbTableCtxItems(e) {
   const cell = e.target && e.target.closest ? e.target.closest('td,th') : null;
@@ -19099,7 +19203,10 @@ function tbTableCtxItems(e) {
   const sel = window.getSelection && window.getSelection();
   const cellOf = node => { const el = node && (node.nodeType === 1 ? node : node.parentElement); const td = el && el.closest ? el.closest('td,th') : null; return td && table.contains(td) ? td : null; };
   const a = sel && sel.rangeCount ? cellOf(sel.anchorNode) : null, b = sel && sel.rangeCount ? cellOf(sel.focusNode) : null;
-  if (a && b && a !== b && elems.includes(a) && elems.includes(b)) {
+  if (tbCellSel && tbCellSel.table === table) { // 셀 범위 선택이 있으면 그 범위 기준(#362)
+    const plan = tbMergePlan(model, tbCellSel.rect);
+    if (plan) items.push({ icon: '▦', label: '선택한 셀 합치기', action: () => tbMergeTableCells(table, plan, elems) });
+  } else if (a && b && a !== b && elems.includes(a) && elems.includes(b)) { // 보조: 브라우저 글자 선택
     const ca = model.cells[elems.indexOf(a)], cb = model.cells[elems.indexOf(b)], ra = tbCellRect(ca), rb = tbCellRect(cb);
     const plan = tbMergePlan(model, { r1: Math.min(ra.r1, rb.r1), c1: Math.min(ra.c1, rb.c1), r2: Math.max(ra.r2, rb.r2), c2: Math.max(ra.c2, rb.c2) });
     if (plan) items.push({ icon: '▦', label: '선택한 셀 합치기', action: () => tbMergeTableCells(table, plan, elems) });
