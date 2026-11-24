@@ -5103,6 +5103,8 @@ body.block-drag-active .block-gap-line {
   transition: background 0.1s, transform 0.1s;
 }
 .block-gap-btn:hover { background: #000; transform: scale(1.12); }
+/* 보이지 않는 ＋(22px 원)이 블록 위·아래 가장자리 클릭을 가로채 엉뚱한 곳에 블록을 넣던 것을 막는다: gap 줄에 마우스가 올라가(hover/gap-open) ＋가 보일 때만 클릭된다(#354) */
+.block-gap:not(:hover):not(.gap-open) .block-gap-btn { pointer-events: none; }
 
 /* ─── 블록 삽입 팝업 ─── */
 .block-insert-popup {
