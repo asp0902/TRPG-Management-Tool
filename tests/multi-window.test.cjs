@@ -4,7 +4,7 @@ let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m);
 const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
 // 정적: 비주 창 저장 금지·주 창 승계·분리 창 보호
 ok(html.includes("if (multiNonLeader()) { multiSchedulePatch(); return; }") && html.includes("if (multiNonLeader()) { multiPost({ kind: 'full'"), '비주 창은 persist/persistNow 에서 IndexedDB 에 직접 쓰지 않음');
-ok(html.includes("navigator.locks.request('trpg-state-writer', { ifAvailable: true }") && html.includes('multiPromote(); await new Promise(() => {})'), '리더 락·승계');
+ok(html.includes("navigator.locks.request('trpg-state-writer', { ifAvailable: true }") && html.includes('multiPromote(); await new Promise(release => { multiWin.releaseLock = release; })'), '리더 락·승계');
 ok(html.includes("if (multiNonLeader()) { if (!options.automatic) showToast('동기화는 주 창에서만 실행됩니다.'); return Promise.resolve(false); }"), '비주 창은 원격 동기화 금지');
 ok(html.includes("if (multiWin.detachedPage && page !== multiWin.detachedPage) return;") && html.includes('|| multiWin.detachedPage) return; // 분리 창은 주 창의 열린 탭 목록을 건드리지 않는다'), '분리 창: 다른 페이지 전환·열린 탭 저장 금지');
 ok(html.includes("window.open(url, 'trpg-detached-' + page") && html.includes("data-act") === html.includes("data-act") && html.includes('새 창으로 분리') && html.includes("multiDragEndOutside(e)) detachAppPage"), '탭 우클릭 메뉴·창 밖 끌어 놓기로 분리');

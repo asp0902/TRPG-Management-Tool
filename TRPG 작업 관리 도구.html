@@ -11081,9 +11081,44 @@ let persistDirty = false;
 let persistChain = Promise.resolve();
 let lastLocalSavedAt = '';
 
+// ── 구 버전 덮어쓰기 방지(#356) ──
+// 저장 때 같은 트랜잭션에서 작은 메타 레코드('meta': 마지막 저장의 키 목록·컬렉션 항목 수)를 읽고 함께 쓴다.
+// ① 저장된 메타에 내 payload 에 없는 최상위 키가 있으면 나는 더 구 버전 → 저장·동기화·스냅샷·자동 백업을 모두 멈추고 배너를 띄운다.
+// ② 내가 모르는 최상위 키는 읽을 때 보관했다가 저장 때 그대로 다시 쓴다(가드가 우회돼도 지워지지 않게).
+// ③ 항목이 있던 컬렉션이 한 번의 저장으로 0개가 되면 저장 전에 보호 스냅샷을 남긴다(저장 자체는 막지 않음).
+// 한계: 이 가드가 없는 이전 버전 탭이 이미 열려 있으면 막을 수 없다.
+const APP_STATE_META_KEY = 'meta';
+const APP_STATE_KNOWN_KEYS = ['version', 'savedAt', 'scenarios', 'folders', 'cssMacroFolders', 'records', 'catalog', 'cssMacros', 'cssPopupDictionary', 'bookmarks', 'musicFolders', 'musicTagCats', 'musicTracks', 'rulebooks', 'dataSheets', 'characters', 'characterFolders', 'customFonts', 'manualFonts', 'recentFonts', 'customBulletSymbols', 'customBulletImages', 'findReplaceHistory', 'sharedMemoOwner'];
+let unknownStateKeys = {};   // 이 버전이 모르는 최상위 키(더 새 버전이 저장한 것) — 저장 때 그대로 되돌려 쓴다
+let appStateBlocked = null;  // { reason, unknown[] } — 설정되면 저장·동기화·스냅샷·백업 중단
+function makeStateMeta(payload) {
+  const counts = {};
+  Object.keys(payload || {}).forEach(key => { if (Array.isArray(payload[key])) counts[key] = payload[key].length; });
+  return { keys: Object.keys(payload || {}), savedAt: payload && payload.savedAt || '', counts };
+}
+function appStateUnknownKeys(metaKeys, payload) { return (Array.isArray(metaKeys) ? metaKeys : []).filter(key => !(key in (payload || {}))); }
+function appStateZeroedCollections(meta, payload) { // 직전 저장에서 항목이 있었는데 이번 payload 에서 빈 배열이 된 컬렉션
+  const counts = meta && meta.counts || {};
+  return Object.keys(counts).filter(key => counts[key] > 0 && Array.isArray(payload[key]) && payload[key].length === 0);
+}
+function appStateBlock(reason, unknown) {
+  if (appStateBlocked) return;
+  appStateBlocked = { reason, unknown: unknown || [] };
+  try { clearInterval(snapshotTimer); snapshotTimer = null; } catch (e) {}
+  try { showAppStateBlockBanner(); } catch (e) { console.warn(e); }
+}
+function showAppStateBlockBanner() {
+  if (typeof document === 'undefined' || document.getElementById('app-state-block-banner')) return;
+  const bar = document.createElement('div');
+  bar.id = 'app-state-block-banner'; bar.setAttribute('role', 'alert');
+  bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:100600;background:#b91c1c;color:#fff;padding:8px 14px;font-size:13px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap';
+  bar.innerHTML = '<span>새 버전에서 저장된 데이터입니다. 덮어쓰지 않도록 저장을 멈췄습니다. 새로고침해 주세요.</span><button type="button" id="app-state-block-export" style="border:1px solid #fff;background:transparent;color:#fff;border-radius:6px;padding:3px 10px;cursor:pointer">지금 편집 내용 내보내기</button>';
+  document.body.appendChild(bar);
+  document.getElementById('app-state-block-export').onclick = () => { try { downloadBackupJson('trpg-tool-unsaved-' + getDateBackupStamp() + '.json'); } catch (e) { alert('내보내기에 실패했습니다: ' + (e && e.message || e)); } };
+}
 function makeStatePayload() {
   normalizeSidebarState();
-  return {
+  return Object.assign({}, unknownStateKeys, {
     version: APP_STATE_SCHEMA_VERSION,
     savedAt: new Date().toISOString(),
     scenarios: state.scenarios,
@@ -11108,9 +11143,11 @@ function makeStatePayload() {
     customBulletImages: state.customBulletImages,
     findReplaceHistory: state.findReplaceHistory,
     sharedMemoOwner: getSharedMemoOwner(),
-  };
+  });
 }
 function applyStatePayload(raw) {
+  unknownStateKeys = {};
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) Object.keys(raw).forEach(key => { if (!APP_STATE_KNOWN_KEYS.includes(key)) unknownStateKeys[key] = raw[key]; }); // 모르는 키 보존(#356)
   if (Array.isArray(raw)) {
     state.scenarios = raw;
     state.folders = [];
@@ -11205,32 +11242,40 @@ async function getIndexedState() {
     };
   });
 }
-async function putIndexedState(payload) {
+async function putIndexedState(payload, options = {}) {
+  // 한 트랜잭션: 메타를 읽어 가드 판단 → 문제 없으면 payload·메타를 함께 쓴다. 반환: { ok } | { blocked, unknown } | { zeroed, old }
   const db = await openAppStateDb();
+  let result = { ok: true };
   await new Promise((resolve, reject) => {
     const tx = db.transaction(APP_STATE_STORE_NAME, 'readwrite');
-    const req = tx.objectStore(APP_STATE_STORE_NAME).put(payload, APP_STATE_KEY);
-    req.onerror = () => {
-      closeAppStateDb(db);
-      reject(req.error || new Error('IndexedDB 쓰기에 실패했습니다.'));
+    const store = tx.objectStore(APP_STATE_STORE_NAME);
+    const metaReq = store.get(APP_STATE_META_KEY);
+    metaReq.onsuccess = () => {
+      const meta = metaReq.result || null, unknown = appStateUnknownKeys(meta && meta.keys, payload);
+      if (unknown.length) { result = { blocked: true, unknown }; return; }
+      const zeroed = options.zeroOk ? [] : appStateZeroedCollections(meta, payload);
+      if (zeroed.length) { const oldReq = store.get(APP_STATE_KEY); oldReq.onsuccess = () => { result = { zeroed, old: oldReq.result || null }; }; return; }
+      store.put(payload, APP_STATE_KEY);
+      store.put(makeStateMeta(payload), APP_STATE_META_KEY);
     };
-    tx.oncomplete = () => {
-      closeAppStateDb(db);
-      resolve();
-    };
-    tx.onerror = () => {
-      closeAppStateDb(db);
-      reject(tx.error || req.error || new Error('IndexedDB 쓰기 트랜잭션에 실패했습니다.'));
-    };
-    tx.onabort = () => {
-      closeAppStateDb(db);
-      reject(tx.error || new Error('IndexedDB 쓰기 트랜잭션이 중단되었습니다.'));
-    };
+    metaReq.onerror = () => { closeAppStateDb(db); reject(metaReq.error || new Error('IndexedDB 읽기에 실패했습니다.')); };
+    tx.oncomplete = () => { closeAppStateDb(db); resolve(); };
+    tx.onerror = () => { closeAppStateDb(db); reject(tx.error || new Error('IndexedDB 쓰기 트랜잭션에 실패했습니다.')); };
+    tx.onabort = () => { closeAppStateDb(db); reject(tx.error || new Error('IndexedDB 쓰기 트랜잭션이 중단되었습니다.')); };
   });
+  return result;
 }
 function queuePersistPayload(payload) {
   const job = persistChain.catch(() => {}).then(async () => {
-    await putIndexedState(payload);
+    if (appStateBlocked) throw new Error('새 버전에서 저장된 데이터라 저장을 멈췄습니다. 새로고침해 주세요.');
+    let result = await putIndexedState(payload);
+    if (result.blocked) { appStateBlock('newer-record', result.unknown); throw new Error('새 버전에서 저장된 데이터라 저장을 멈췄습니다. 새로고침해 주세요.'); }
+    if (result.zeroed) { // 컬렉션이 한 번에 0개가 됨: 저장 전에 직전 상태를 보호 스냅샷으로 남긴다(저장은 막지 않음)
+      const saved = await saveProtectionSnapshot(result.old, '컬렉션 비워짐: ' + result.zeroed.join(', '));
+      if (!saved) { try { showToast('보호 스냅샷을 남기지 못했습니다. 비운 컬렉션: ' + result.zeroed.join(', ')); } catch (e) {} }
+      result = await putIndexedState(payload, { zeroOk: true });
+      if (result.blocked) { appStateBlock('newer-record', result.unknown); throw new Error('새 버전에서 저장된 데이터라 저장을 멈췄습니다. 새로고침해 주세요.'); }
+    }
     lastLocalSavedAt = payload?.savedAt || lastLocalSavedAt;
     return payload;
   });
@@ -11686,14 +11731,24 @@ function multiApplyFull(payload) { // 전체 상태 교체(새 창 최초 동기
   applyStatePayload(payload);
   multiCapture();
 }
+function multiPeerIsNewer(keys) { // 상대가 내가 모르는 최상위 키를 가졌으면 상대가 더 새 버전: 나는 멈추고 주 창 락을 놓아 새 버전 창이 이어받게 한다
+  if (!Array.isArray(keys) || appStateBlocked) return !!appStateBlocked;
+  const unknown = keys.filter(key => !APP_STATE_KNOWN_KEYS.includes(key) && !(key in unknownStateKeys));
+  if (!unknown.length) return false;
+  appStateBlock('newer-window', unknown);
+  multiWin.isLeader = false;
+  try { if (multiWin.releaseLock) { multiWin.releaseLock(); multiWin.releaseLock = null; } } catch (e) {}
+  return true;
+}
 function multiOnMessage(event) {
   const msg = event && event.data;
   if (!msg || msg.sender === multiWin.id) return;
+  if ((msg.kind === 'hello' || msg.kind === 'hi') && multiPeerIsNewer(msg.keys)) return; // 더 새 버전 창이 있으면 이 창은 저장 권한을 넘기고 멈춘다(#356)
   if (msg.kind === 'hello') {
     multiWin.peers.add(msg.sender);
     if (msg.detachedPage && multiWin.returnTimers.has(msg.detachedPage)) { clearTimeout(multiWin.returnTimers.get(msg.detachedPage)); multiWin.returnTimers.delete(msg.detachedPage); } // 분리 창 새로고침이면 탭 복귀 취소
     if (!multiWin.snapshot) multiCapture();
-    multiPost({ kind: 'hi', to: msg.sender });
+    multiPost({ kind: 'hi', to: msg.sender, keys: Object.keys(makeStatePayload()) });
     if (msg.needFull && multiIsLeader()) { multiFlushPatch(); multiPost({ kind: 'full', to: msg.sender, payload: makeStatePayload() }); }
     return;
   }
@@ -11707,6 +11762,7 @@ function multiOnMessage(event) {
   if (msg.kind === 'bye') { multiWin.peers.delete(msg.sender); return; }
   if (msg.kind === 'full') {
     if (msg.to && msg.to !== multiWin.id) return;
+    if (multiPeerIsNewer(Object.keys(msg.payload || {}))) return; // 같은 가드를 전체 교체에도(#356)
     multiApplyFull(msg.payload);
     if (multiWin.fullWaiter) { multiWin.fullWaiter(); multiWin.fullWaiter = null; }
     else { multiRefreshUI(); if (multiIsLeader()) persist({ fromPeer: true }); }
@@ -11732,18 +11788,18 @@ async function multiStart() {
   if (multiWin.locksOk) {
     await new Promise(resolve => {
       navigator.locks.request('trpg-state-writer', { ifAvailable: true }, async lock => {
-        if (lock) { multiWin.isLeader = true; resolve(); await new Promise(() => {}); }
-        else { multiWin.isLeader = false; resolve(); navigator.locks.request('trpg-state-writer', async () => { multiPromote(); await new Promise(() => {}); }); }
+        if (lock) { multiWin.isLeader = true; resolve(); await new Promise(release => { multiWin.releaseLock = release; }); }
+        else { multiWin.isLeader = false; resolve(); navigator.locks.request('trpg-state-writer', async () => { if (appStateBlocked) return; multiPromote(); await new Promise(release => { multiWin.releaseLock = release; }); }); }
       }).catch(() => resolve());
     });
   }
   const needFull = multiNonLeader();
   const waitFull = needFull ? new Promise(resolve => { multiWin.fullWaiter = resolve; setTimeout(() => { if (multiWin.fullWaiter) { multiWin.fullWaiter = null; resolve(); } }, 1500); }) : null;
-  multiPost({ kind: 'hello', needFull, detachedPage: multiWin.detachedPage });
+  multiPost({ kind: 'hello', needFull, detachedPage: multiWin.detachedPage, keys: Object.keys(makeStatePayload()) });
   if (waitFull) await waitFull;
   if (needFull) { // 아직 주 창과 연결되지 않았으면 몇 초마다 다시 부른다(그동안의 편집은 보관)
     if (!multiWin.snapshot) multiCapture();
-    multiWin.helloTimer = setInterval(() => { if (multiWin.peers.size) { clearInterval(multiWin.helloTimer); multiWin.helloTimer = null; } else multiPost({ kind: 'hello', needFull: false, detachedPage: multiWin.detachedPage }); }, 3000);
+    multiWin.helloTimer = setInterval(() => { if (multiWin.peers.size) { clearInterval(multiWin.helloTimer); multiWin.helloTimer = null; } else multiPost({ kind: 'hello', needFull: false, keys: Object.keys(makeStatePayload()), detachedPage: multiWin.detachedPage }); }, 3000);
   }
 }
 window.addEventListener('pagehide', () => {
@@ -25109,6 +25165,7 @@ async function selectAutoBackupFileHandle() {
   });
 }
 async function writeAutoBackup(options = {}) {
+  if (appStateBlocked) return false; // #356
   const silent = !!options.silent;
   try {
     if (!autoBackupFileHandle) autoBackupFileHandle = await getStoredAutoBackupHandle();
@@ -25233,7 +25290,19 @@ async function readSnapshotText(record) {
   return await new Response(record.blob.stream().pipeThrough(new DecompressionStream('gzip'))).text();
 }
 const listAppSnapshots = async () => (await snapshotTx('readonly', store => store.getAll()) || []).sort((a, b) => b.id.localeCompare(a.id));
+async function saveProtectionSnapshot(oldPayload, reason) { // 저장 직전 IndexedDB 에 있던 상태를 그대로 스냅샷으로(#356). 빈 데이터 검사·snapshotBusy 와 무관
+  if (!oldPayload || typeof indexedDB === 'undefined') return false;
+  try {
+    const json = JSON.stringify(Object.assign({}, oldPayload, { exportedAt: oldPayload.savedAt || new Date().toISOString() }), null, 2);
+    const { gz, blob } = await gzipSnapshotText(json);
+    const at = new Date().toISOString();
+    const count = key => Array.isArray(oldPayload[key]) ? oldPayload[key].length : 0;
+    await snapshotTx('readwrite', store => store.put({ id: at, at, reason, protect: true, gz, blob, bytes: blob.size, rawBytes: json.length, scenarios: count('scenarios'), records: count('records'), cssMacros: count('cssMacros') }));
+    return true;
+  } catch (err) { console.error('protection snapshot failed:', err); return false; }
+}
 async function saveAppSnapshot(reason = '') {
+  if (appStateBlocked) return false;
   if (snapshotBusy || typeof indexedDB === 'undefined') return false;
   if (!hasGitHubSyncData()) return false; // 빈 데이터는 스냅샷으로 남기지 않는다
   snapshotBusy = true;
@@ -25695,6 +25764,7 @@ async function uploadGitHubSyncState(meta, options = {}) {
   rememberGitHubSync(sha, payload.savedAt);
 }
 async function runGitHubSync(options = {}) {
+  if (appStateBlocked) return false; // 구 버전이 새 데이터를 덮어쓰지 않도록 동기화 중단(#356)
   if (!getGitHubSyncToken()) throw new Error('GitHub 토큰을 먼저 입력하세요.');
   if (!isGitHubSyncEnabled() && !options.manual) return false;
   setGitHubSyncStatus('GitHub 최신본 확인 중...');
