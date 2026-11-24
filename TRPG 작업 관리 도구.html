@@ -18949,6 +18949,7 @@ function tbPlaceCaretInCell(cell) {
 }
 function tbTableChanged(table, caretCell) { // 기존 저장 경로: 편집 영역에 input 이벤트
   tbCellSelClear(); // 편집을 실행하면 셀 선택 해제(#362)
+  if (table.querySelector(':scope > colgroup') && tbReadColWidths(table, tbTableModel(table).model.cols) === null) tbWriteColWidths(table, null); // 열 수가 어긋난 colgroup 은 제거(#363)
   const root = table.closest('[contenteditable="true"]');
   if (caretCell) tbPlaceCaretInCell(caretCell);
   if (root) root.dispatchEvent(new Event('input', { bubbles: true }));
@@ -19040,6 +19041,7 @@ function tbInsertTableRow(table, model, elems, plan, caretCol) {
   tbTableChanged(table, caret || tbCellAtGrid(table, plan.at, caretCol));
 }
 function tbInsertTableCol(table, model, elems, plan, caretRow) {
+  const widths = tbReadColWidths(table, model.cols); // 열 너비 조절(#363)
   let caret = null;
   plan.newRows.forEach(item => {
     const td = tbNewCell(), row = table.rows[item.row], ref = item.beforeId === null ? null : elems[item.beforeId];
@@ -19047,6 +19049,7 @@ function tbInsertTableCol(table, model, elems, plan, caretRow) {
     if (!caret || item.row <= caretRow) caret = td;
   });
   plan.extend.forEach(id => { const cell = model.cells[id]; tbSetSpan(elems[id], cell.cs + 1, cell.rs); });
+  if (widths) tbWriteColWidths(table, tbInsertColWidth(widths, plan.at));
   tbTableChanged(table, caret || tbCellAtGrid(table, caretRow, plan.at));
 }
 function tbDeleteTableRow(table, model, elems, plan, caretCol) {
@@ -19060,8 +19063,10 @@ function tbDeleteTableRow(table, model, elems, plan, caretCol) {
   tbTableChanged(table, tbCellAtGrid(table, plan.row, caretCol));
 }
 function tbDeleteTableCol(table, model, elems, plan, caretRow) {
+  const widths = tbReadColWidths(table, model.cols); // 열 너비 조절(#363)
   plan.shrink.forEach(id => { const cell = model.cells[id]; tbSetSpan(elems[id], cell.cs - 1, cell.rs); });
   plan.remove.forEach(id => elems[id].remove());
+  if (widths) tbWriteColWidths(table, tbDeleteColWidth(widths, plan.col));
   tbTableChanged(table, tbCellAtGrid(table, caretRow, plan.col));
 }
 function tbDeleteWholeTable(table) {
@@ -19092,6 +19097,111 @@ function tbTableEditItems(table, model, elems, id) {
 }
 // ── 표 셀 범위 선택(#362): 브라우저 글자 선택에 기대지 않고 셀 범위를 직접 선택한다 ──
 // 선택 상태는 이 변수에만 두고, 강조는 body 의 덮개 요소로 그린다(contenteditable 안의 셀에는 클래스·속성·style 을 넣지 않아 저장 HTML 을 오염시키지 않는다).
+// ── 표 열 너비·행 높이 조절(#363): 열은 <colgroup><col style="width:N%">, 행은 <tr style="height:Npx">. 너비 계산은 DOM 과 분리한 순수 함수 ──
+function tbRound2(n) { return Math.round(n * 100) / 100; }
+function tbEvenWidths(n) { // n 칸 균등(합 100)
+  const w = Array.from({ length: n }, () => tbRound2(100 / n));
+  w[n - 1] = tbRound2(100 - w.slice(0, n - 1).reduce((a, b) => a + b, 0));
+  return w;
+}
+// left 열과 left+1 열이 너비를 주고받는다(합 유지). 각 열은 minPct 이상(둘 합의 절반을 넘지 않게 보정)
+function tbResizeColWidths(widths, left, deltaPct, minPct) {
+  const w = widths.slice(), pair = w[left] + w[left + 1], min = Math.min(minPct, pair / 2);
+  const a = tbRound2(Math.min(pair - min, Math.max(min, w[left] + deltaPct)));
+  w[left] = a; w[left + 1] = tbRound2(pair - a);
+  return w;
+}
+// 열 추가: 새 열 너비는 인접 열(왼쪽, 맨 앞이면 첫 열)의 절반을 떼어 받는다
+function tbInsertColWidth(widths, at) {
+  const w = widths.slice(), nb = at > 0 ? at - 1 : 0, half = tbRound2(w[nb] / 2);
+  w[nb] = tbRound2(w[nb] - half);
+  w.splice(at, 0, half);
+  return w;
+}
+// 열 삭제: 나머지 열에 비례 배분해 합 100 유지
+function tbDeleteColWidth(widths, col) {
+  const rest = widths.filter((_, i) => i !== col), sum = rest.reduce((a, b) => a + b, 0) || 1;
+  const w = rest.map(x => tbRound2(x * 100 / sum));
+  if (w.length) w[w.length - 1] = tbRound2(100 - w.slice(0, -1).reduce((a, b) => a + b, 0));
+  return w;
+}
+function tbReadColWidths(table, cols) { // 저장된 colgroup 의 % 너비. 열 수가 맞지 않거나 % 가 아니면 null(균등)
+  const els = Array.from(table.children).filter(el => el.tagName === 'COLGROUP').flatMap(g => Array.from(g.children).filter(el => el.tagName === 'COL'));
+  if (els.length !== cols) return null;
+  const w = els.map(el => { const m = /^\s*(\d+(?:\.\d+)?)%\s*$/.exec(el.style.width || ''); return m ? Number(m[1]) : NaN; });
+  return w.every(Number.isFinite) ? w : null;
+}
+function tbWriteColWidths(table, widths) { // widths 가 null 이면 colgroup 제거(균등으로 복귀)
+  Array.from(table.children).filter(el => el.tagName === 'COLGROUP').forEach(el => el.remove());
+  if (!widths) return;
+  const group = document.createElement('colgroup');
+  widths.forEach(w => { const col = document.createElement('col'); col.style.width = w + '%'; group.appendChild(col); });
+  table.insertBefore(group, table.firstChild);
+}
+// 경계 감지(좌표 기준, 손잡이 요소 없음): 셀 오른쪽/아래쪽 변 ±4px. 표의 바깥 변과 합쳐진 셀 안쪽을 지나는 경계는 제외
+function tbResizeHit(table, x, y) {
+  const { model, elems } = tbTableModel(table);
+  let hit = null;
+  model.cells.forEach(cell => {
+    const r = elems[cell.id].getBoundingClientRect();
+    if (!hit && cell.col + cell.cs < model.cols && y >= r.top && y <= r.bottom && Math.abs(x - r.right) <= 4) hit = { kind: 'col', index: cell.col + cell.cs };
+    if (!hit && cell.row + cell.rs < model.rows && x >= r.left && x <= r.right && Math.abs(y - r.bottom) <= 4) hit = { kind: 'row', index: cell.row + cell.rs - 1 };
+  });
+  return hit ? Object.assign(hit, { model }) : null;
+}
+let tbResizeDrag = null; // { table, kind, index, start, widths|height, size, changed }
+function tbResizeTableFromEvent(e) {
+  const table = e.target && e.target.closest ? e.target.closest('table.tb-editor-table') : null;
+  return table && table.closest('[contenteditable="true"]') && table.closest('#blocks-container,#rb-blocks-container') ? table : null;
+}
+function tbResizeSetCursor(kind) { document.documentElement.style.cursor = kind ? (kind === 'col' ? 'col-resize' : 'row-resize') : ''; }
+function tbResizeChanged(table) { // 저장 경로(input 1회)
+  const root = table.closest('[contenteditable="true"]');
+  if (root) root.dispatchEvent(new Event('input', { bubbles: true }));
+}
+document.addEventListener('mousemove', e => {
+  if (tbResizeDrag) {
+    const d = tbResizeDrag;
+    if (!(e.buttons & 1)) { tbResizeDrag = null; tbResizeSetCursor(null); return; }
+    e.preventDefault();
+    if (d.kind === 'col') {
+      const minPct = Math.min(32 / d.size * 100, 100 / d.widths.length);
+      tbWriteColWidths(d.table, tbResizeColWidths(d.widths, d.index - 1, (e.clientX - d.start) / d.size * 100, minPct));
+    } else {
+      d.table.rows[d.index].style.height = Math.max(16, Math.round(d.height + e.clientY - d.start)) + 'px';
+    }
+    d.changed = true;
+    return;
+  }
+  if (e.buttons) return;
+  const table = tbResizeTableFromEvent(e), hit = table && tbResizeHit(table, e.clientX, e.clientY);
+  tbResizeSetCursor(hit && hit.kind);
+}, true);
+document.addEventListener('mousedown', e => {
+  if (e.button !== 0 || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+  const table = tbResizeTableFromEvent(e), hit = table && tbResizeHit(table, e.clientX, e.clientY);
+  if (!hit) return;
+  e.preventDefault(); e.stopImmediatePropagation(); // 경계에서 시작한 드래그는 글자 선택·셀 범위 선택보다 우선
+  tbCellSelClear();
+  const rect = table.getBoundingClientRect();
+  tbResizeDrag = hit.kind === 'col'
+    ? { table, kind: 'col', index: hit.index, start: e.clientX, size: rect.width, widths: tbReadColWidths(table, hit.model.cols) || tbEvenWidths(hit.model.cols), changed: false }
+    : { table, kind: 'row', index: hit.index, start: e.clientY, height: table.rows[hit.index].getBoundingClientRect().height, changed: false };
+  tbResizeSetCursor(hit.kind);
+}, true);
+document.addEventListener('mouseup', () => {
+  if (!tbResizeDrag) return;
+  const d = tbResizeDrag;
+  tbResizeDrag = null; tbResizeSetCursor(null);
+  if (d.changed) tbResizeChanged(d.table);
+}, true);
+document.addEventListener('dblclick', e => { // 경계 더블클릭: 열은 전부 균등으로(colgroup 제거), 행은 높이 지정 제거
+  const table = tbResizeTableFromEvent(e), hit = table && tbResizeHit(table, e.clientX, e.clientY);
+  if (!hit) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (hit.kind === 'col') tbWriteColWidths(table, null); else { const tr = table.rows[hit.index]; tr.style.removeProperty('height'); if (!tr.getAttribute('style')) tr.removeAttribute('style'); }
+  tbResizeChanged(table);
+}, true);
 let tbCellSel = null;   // { table, rect:{r1,c1,r2,c2}, anchor:{row,col} }
 let tbCellSelRaf = 0;
 let tbCellDrag = null;  // { table, cell, active }
