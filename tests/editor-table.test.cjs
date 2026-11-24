@@ -7,6 +7,8 @@ const insert = extract('tbInsertTable');
 const menu = extract('tbOpenTableMenu');
 
 assert.match(html, /id="tb-table-btn"[^>]+title="표 만들기"/);
+assert.match(html, /#tb-table-btn i \{ position: relative; top: 0; font-size: 16px; \}/, '표 아이콘 16px = 구분선 아이콘 18×14 크기, 세로 보정 top:0 (#366)');
+assert.match(html, /#tb-table-btn \{ padding: 0 5px; \}/, '버튼 폭 26px 유지');
 assert.match(insert, /target\?\.type !== 'ce'/);
 assert.match(insert, /root\.closest\('#blocks-container,#rb-blocks-container'\)/);
 assert.match(insert, /range\.deleteContents\(\)/);
