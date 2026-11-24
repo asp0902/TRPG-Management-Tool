@@ -4049,6 +4049,12 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
   position: relative; top: -1px;
 }
 .callout-drag-handle:active { cursor: grabbing; }
+.callout-add-btn {
+  flex: none; margin-left: auto; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: rgba(0,0,0,0.4); font-size: 15px; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.callout-add-btn:hover { background: rgba(0,0,0,0.08); color: #111; }
 .callout-type-icon {
   width: 15px; height: 15px; margin-left: 4px; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
@@ -16496,6 +16502,7 @@ function getBranchBlockHtml(block, cid) {
                 ${calloutTypeTriggerHtml(ct, `el=>setBranchInnerCalloutType('${branchBlock.id}','${ib.id}',el)`)}
                 <input class="callout-title-inp" placeholder="" value="${esc(ib.title || '')}" oninput="updBranchInnerBlock('${branchBlock.id}','${ib.id}','title',this.value)" spellcheck="false">
                 <span class="branch-inner-callout-head-actions">
+                  <button class="branch-inner-block-act" title="블록 추가" aria-label="블록 추가" onmousedown="event.preventDefault()" onclick="event.stopPropagation();calloutAddChildPopup('${ib.id}','${cid}',this)">＋</button>
                   <button class="branch-inner-block-act" title="위로 이동" onmousedown="event.preventDefault()" onclick="moveBranchInnerBlock('${branchBlock.id}','${ib.id}','up','${cid}')" ${canMoveUp ? '' : 'disabled'}>↑</button>
                   <button class="branch-inner-block-act" title="아래로 이동" onmousedown="event.preventDefault()" onclick="moveBranchInnerBlock('${branchBlock.id}','${ib.id}','down','${cid}')" ${canMoveDown ? '' : 'disabled'}>↓</button>
                 </span>
@@ -20064,6 +20071,7 @@ function mkBlockEl(b, cid, ctx = {}) {
             ${calloutTypeTriggerHtml(ct, `el=>setCalloutType('${b.id}',el,'${cid}')`)}
             <input class="callout-title-inp" data-field="title" placeholder="" value="${esc(b.title||'')}"
               oninput="upd('${b.id}','title',this.value,'${cid}')">
+            <button type="button" class="callout-add-btn" title="블록 추가" aria-label="블록 추가" onmousedown="event.preventDefault()" onclick="event.stopPropagation();calloutAddChildPopup('${b.id}','${cid}',this)">＋</button>
           </div>
           ${contentHtml}
         </div>`;
@@ -22141,6 +22149,16 @@ let _bipInsertIdx = null, _bipCid = null, _bipTargetKey = null;
 // 동일 targetKey 의 popup 클릭 시 insertBlockFromBip 가 caret-aware 경로로 라우팅한다.
 let _bipChildInsertCtx = null;
 
+// 콜아웃(중첩·분기 내부 포함) 머리의 ＋: 자식 맨 뒤에 넣을 블록 종류를 고르는 팝업을 연다(#353).
+// 자식 사이 gap 의 ＋ 는 자식이 둘 이상일 때만 생기고(맨 앞·맨 뒤 gap 은 숨김) 바깥 목록 gap 의 눈에 안 보이는 ＋ 와 겹쳐 엉뚱한 곳에 들어가기도 했다.
+function calloutAddChildPopup(blockId, cid, btn) {
+  const targetKey = makeChildBlockTargetKey(blockId, cid);
+  const target = getBlockListByTargetKey(targetKey, 'blocks-container');
+  if (!target || !btn) return;
+  _bipChildInsertCtx = null;
+  const r = btn.getBoundingClientRect();
+  openInsertPopupAtPoint(r.left + r.width / 2, r.bottom + 4, cid, target.array.length, targetKey);
+}
 function insertBlockFromBip(typeId, insertIdx, targetKey) {
   if (
     _bipChildInsertCtx &&
