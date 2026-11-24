@@ -19081,8 +19081,28 @@ function tbDeleteWholeTable(table) {
   selection && selection.addRange(caret);
   root.dispatchEvent(new Event('input', { bubbles: true }));
 }
+// ── 표 셀 배경색(#364): td 의 inline style background-color 만 쓴다(클래스·data 속성 없음) ──
+function tbSetCellBackground(td, color) { // color '' 이면 제거하고, style 이 비면 속성째 제거
+  if (color) td.style.backgroundColor = color;
+  else { td.style.removeProperty('background-color'); if (!td.getAttribute('style')) td.removeAttribute('style'); }
+}
+function tbCellBackgroundTargets(table, model, elems, id) { // 셀 범위 선택(#362) 안에서 우클릭했으면 선택된 셀 전부, 아니면 우클릭한 셀 하나
+  if (!tbCellSel || tbCellSel.table !== table || !tbCellInSel(elems[id])) return [elems[id]];
+  const r = tbCellSel.rect;
+  return model.cells.filter(cell => { const b = tbCellRect(cell); return !(b.r2 < r.r1 || b.r1 > r.r2 || b.c2 < r.c1 || b.c1 > r.c2); }).map(cell => elems[cell.id]);
+}
+function tbOpenCellBackgroundPicker(cells) { // 패널을 열기 전에 대상 셀 목록을 확정해 둔다(패널을 열면 셀 선택이 풀려도 유지)
+  const editable = cells[0] && cells[0].closest('[contenteditable="true"]');
+  if (!editable) return;
+  if (cpTarget) closeColorPanel();
+  lastFocusedTA = editable;
+  const raw = cells[0].style.backgroundColor;
+  const color = raw ? (raw.startsWith('rgb') ? cpRgbToHex(raw) : normalizePickerColor(raw, '#ffffff')) : '#ffffff';
+  cpTarget = { type: 'table-cell', cells: cells.slice(), originals: cells.map(td => td.style.backgroundColor), editable };
+  cpOpenPanel('table-cell-bg', color, { centered: true });
+}
 function tbTableEditItems(table, model, elems, id) {
-  const cell = model.cells[id], delRow = tbDeleteRowPlan(model, cell.row), delCol = tbDeleteColPlan(model, cell.col);
+  const cell = model.cells[id], delRow = tbDeleteRowPlan(model, cell.row), delCol = tbDeleteColPlan(model, cell.col), targets = tbCellBackgroundTargets(table, model, elems, id);
   return [
     { icon: '↑', label: '위에 행 추가', action: () => tbInsertTableRow(table, model, elems, tbInsertRowPlan(model, cell.row), cell.col) },
     { icon: '↓', label: '아래에 행 추가', action: () => tbInsertTableRow(table, model, elems, tbInsertRowPlan(model, cell.row + cell.rs), cell.col) },
@@ -19091,6 +19111,9 @@ function tbTableEditItems(table, model, elems, id) {
     { sep: true },
     { icon: '✕', label: '행 삭제', disabled: !delRow, action: () => delRow && tbDeleteTableRow(table, model, elems, delRow, cell.col) },
     { icon: '✕', label: '열 삭제', disabled: !delCol, action: () => delCol && tbDeleteTableCol(table, model, elems, delCol, cell.row) },
+    { sep: true },
+    { icon: '🎨', label: '셀 배경색…', action: () => tbOpenCellBackgroundPicker(targets) },
+    ...(targets.some(td => td.style.backgroundColor) ? [{ icon: '✕', label: '셀 배경색 지우기', action: () => { targets.forEach(td => tbSetCellBackground(td, '')); tbTableChanged(table, null); } }] : []),
     { sep: true },
     { icon: '🗑', label: '표 삭제', danger: true, action: () => tbDeleteWholeTable(table) },
   ];
@@ -29177,6 +29200,11 @@ function cpPreviewCurrentColor() {
     applyRollPreviewColors({ ...block, [cpTarget.key]: cpGetCurrentColor() }, cpTarget.preview);
     return;
   }
+  if (cpTarget.type === 'table-cell') {
+    const color = cpGetCurrentColor();
+    cpTarget.cells.forEach(td => { if (td.isConnected) tbSetCellBackground(td, color); });
+    return;
+  }
   if (cpTarget.type === 'chapter') {
     applyChapterColorToDOM(cpTarget.blockId, cpTarget.key, cpGetCurrentColor());
   }
@@ -29278,6 +29306,7 @@ function closeColorPanel(options = {}) {
     const block = getEmbeddedColorTargetBlock(cpTarget);
     if (block) applyRollPreviewColors(block, cpTarget.preview);
   }
+  if (cpTarget?.type === 'table-cell' && !apply) cpTarget.cells.forEach((td, i) => { if (td.isConnected) tbSetCellBackground(td, cpTarget.originals[i]); }); // 취소: 원래 색으로 복귀
   if (cpTarget?.type === 'chapter' && !apply) {
     applyChapterColorToDOM(cpTarget.blockId, cpTarget.key, cpTarget.originalColor);
   }
@@ -29316,6 +29345,14 @@ function applyColorPanel() {
   if (cpTarget?.type === 'speech') {
     cpTarget.native.value = color;
     cpTarget.swatch.style.background = color;
+    closeColorPanel({ apply: true });
+    document.getElementById('cp-native').value = '#000000';
+    return;
+  }
+  if (cpTarget?.type === 'table-cell') {
+    const { cells, editable } = cpTarget;
+    cells.forEach(td => { if (td.isConnected) tbSetCellBackground(td, color); });
+    editable.dispatchEvent(new Event('input', { bubbles: true })); // 확정 시 1회
     closeColorPanel({ apply: true });
     document.getElementById('cp-native').value = '#000000';
     return;
