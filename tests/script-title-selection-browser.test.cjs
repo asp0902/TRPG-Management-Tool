@@ -38,7 +38,20 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
       };
     });
 
+    // 제목 위치는 CSS 전환(transition)으로 움직이므로 값이 두 번 연속 같아질 때(안정)까지 기다린 뒤 읽는다(#416)
+    const stableTitleState = async (cond) => {
+      let prev = null, last = null;
+      await page.waitForFunction(() => true);
+      for (let i = 0; i < 100; i++) {
+        last = await titleState();
+        if (cond(last) && prev !== null && Math.abs(prev.offset - last.offset) < 0.01) return last;
+        prev = last;
+        await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+      }
+      throw new Error('title state did not settle: ' + JSON.stringify(last));
+    };
     await page.locator('#body-display-title').focus();
+    await page.waitForFunction(() => document.getElementById('body-title-block').className.includes('title-editing')); // 포커스로 편집 상태가 걸릴 때까지(#416) — 이 상태는 포커스에 묶여 있어 안정 대기 없이 바로 읽는다
     const editing = await titleState();
     await page.locator('#body-title-block').screenshot({ path: path.join(os.tmpdir(), 'trpg-title-editing.png') });
     assert.match(editing.classes, /title-editing/);
@@ -46,29 +59,36 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
 
     await page.locator('#panel-body > .panel-inner > .body-add-area').click({ position: { x: 5, y: 5 } });
     await page.waitForFunction(() => !document.getElementById('body-title-block').className.includes('title-editing')); // 제목 편집 상태가 풀릴 때까지(#376)
-    const idle = await titleState();
+    const idle = await stableTitleState(st => !/title-editing/.test(st.classes));
     await page.locator('#body-title-block').screenshot({ path: path.join(os.tmpdir(), 'trpg-title-idle.png') });
     assert.doesNotMatch(idle.classes, /title-editing/);
     assert.match(idle.classes, /subtitle-empty/);
     assert.equal(idle.subtitleDisplay, 'none');
-    assert.ok(idle.offset > editing.offset + 5, `title must move to vertical center: editing=${editing.offset}, idle=${idle.offset}`);
+    assert.ok(idle.offset > editing.offset + 5, `title must move to vertical center: editing=${editing.offset}, idle=${idle.offset}, classes=${idle.classes}`);
 
     const textBlock = page.locator('#blocks-container > .block.block-text').first();
+    const selectedCount = () => page.locator('.block.selected').count();
     await textBlock.click();
-    assert.equal(await textBlock.evaluate(el => el.classList.contains('selected')), true);
+    await page.waitForFunction(() => document.querySelectorAll('.block.selected').length === 1);
+    assert.equal(await textBlock.evaluate(el => el.classList.contains('selected')), true, 'text block must be selected after click');
     await page.locator('#format-bar').dispatchEvent('mousedown', { button: 0 });
     assert.equal(await textBlock.evaluate(el => el.classList.contains('selected')), true, 'format toolbar must preserve selection');
     await page.locator('#panel-body > .panel-inner').dispatchEvent('mousedown', { button: 0 });
-    assert.equal(await page.locator('.block.selected').count(), 0, 'body margin must clear block selection');
+    await page.waitForFunction(() => document.querySelectorAll('.block.selected').length === 0).catch(() => {});
+    assert.equal(await selectedCount(), 0, 'body margin must clear block selection');
 
     await textBlock.click();
+    await page.waitForFunction(() => document.querySelectorAll('.block.selected').length === 1);
     await page.locator('#sidebar').dispatchEvent('mousedown', { button: 0 });
-    assert.equal(await page.locator('.block.selected').count(), 0, 'sidebar must clear block selection');
+    await page.waitForFunction(() => document.querySelectorAll('.block.selected').length === 0).catch(() => {});
+    assert.equal(await selectedCount(), 0, 'sidebar must clear block selection');
 
     const branchChoice = page.locator('#blocks-container > .block.block-branch .branch-choice').first();
     await branchChoice.click();
+    await page.waitForFunction(() => document.querySelectorAll('.branch-choice.active').length === 1);
     assert.equal(await page.locator('.branch-choice.active').count(), 1);
     await page.locator('#sidebar').dispatchEvent('mousedown', { button: 0 });
+    await page.waitForFunction(() => document.querySelectorAll('.branch-choice.active').length === 0).catch(() => {});
     assert.equal(await page.locator('.branch-choice.active').count(), 0, 'external click must clear branch choice selection');
 
     console.log(`script title and external selection browser checks: OK (title offset ${editing.offset.toFixed(1)}px -> ${idle.offset.toFixed(1)}px)`);
