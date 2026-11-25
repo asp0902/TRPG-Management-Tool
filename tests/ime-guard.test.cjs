@@ -6,7 +6,7 @@ const vm = require('node:vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
 
 // 조합 중 keydown 은 문서 캡처 단계에서 막는다(인라인 onkeydown 포함).
-assert.match(html, /document\.addEventListener\('keydown', e => \{\s*if \(isImeComposing\(e\)\) \{ (?:imeDeferEditorKey\(e\); )?e\.stopImmediatePropagation\(\); \}[\s\S]*?\}, true\);/);
+assert.match(html, /document\.addEventListener\('keydown', e => \{\s*(?:if \(e\.__imeReplay\) \{[^}]*\}[^\n]*\n\s*)?if \(isImeComposing\(e\)\) \{ (?:imeDeferEditorKey\(e\); )?e\.stopImmediatePropagation\(\); \}[\s\S]*?\}, true\);/);
 assert.match(html, /document\.addEventListener\('compositionstart'[\s\S]*?\}, true\);/);
 assert.match(html, /document\.addEventListener\('compositionend'[\s\S]*?\}, true\);/);
 assert.match(html, /if \(options\.automatic\) await waitForTypingIdle\(\);/, '자동 동기화 적용 전에 입력이 멈출 때까지 기다려야 합니다.');

@@ -1,7 +1,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
 let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
-const code = html.slice(html.indexOf('let imeDeferredEditorKey'), html.indexOf("document.addEventListener('keydown', e => {\n  if (isImeComposing(e)) { imeDeferEditorKey(e);"));
+const code = html.slice(html.indexOf('let imeDeferredEditorKey'), html.indexOf("document.addEventListener('keydown', e => {\n  if (e.__imeReplay)"));
 const SEL = 'textarea.ds-cell-input.ds-cell-editing, .ds-cell-rich[contenteditable="true"]'; // #375: 서식 편집 칸(contenteditable)까지
 (async () => {
   const listeners = [], calls = [];

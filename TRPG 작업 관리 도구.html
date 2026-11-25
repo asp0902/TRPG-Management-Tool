@@ -40489,9 +40489,34 @@ document.addEventListener('input', () => { lastTypingAt = Date.now(); }, true);
 // → Enter·Tab 은 기본 동작을 막고(Esc 는 브라우저의 조합 취소를 그대로 둔다), 조합이 확정된 뒤(compositionend 다음 틱) 일반 키와 똑같이 처리한다.
 // compositionend 가 이미 지났거나(Safari 는 compositionend 직후 Enter keydown) 오지 않으면 다음 틱/0.4초 안전장치로 처리. 한 번 처리되면 같은 키를 다시 처리하지 않는다.
 let imeDeferredEditorKey = null;
+// Enter 가 앱 동작(블록 분할·편집 종료·무시 등)이고 기본 줄바꿈을 원치 않는 다른 편집기들(#381): 조합 중 Enter 는 기본 동작을 막고, 조합 확정 뒤 그 편집기 자신의 keydown 처리를 한 번 다시 실행한다
+const IME_REPLAY_SELECTORS = 'textarea.ds-memo-input, textarea.record-timeline-text, .block-text-ce[contenteditable="true"], .block-ce[contenteditable="true"][onkeydown*="speechCeKeydown"], [contenteditable="true"][onkeydown*="handleIbTextCeEnter"]';
+let imeDeferredReplay = null;
+function imeDeferReplayKey(e) {
+  const el = e.target && e.target.closest ? e.target.closest(IME_REPLAY_SELECTORS) : null;
+  if (!el || e.key !== 'Enter' || e.ctrlKey || e.metaKey || e.altKey) return;
+  e.preventDefault();
+  if (imeDeferredReplay) return;
+  const rec = imeDeferredReplay = { el: el, shiftKey: !!e.shiftKey, timer: 0 };
+  const run = () => {
+    if (imeDeferredReplay !== rec) return;
+    imeDeferredReplay = null;
+    clearTimeout(rec.timer);
+    document.removeEventListener('compositionend', onEnd, true);
+    if (!el.isConnected) return;
+    const replay = new KeyboardEvent('keydown', { key: 'Enter', shiftKey: rec.shiftKey, bubbles: true, cancelable: true });
+    replay.__imeReplay = true; // 전역 조합 차단을 건너뛰고 편집기의 일반 Enter 처리로 전달
+    el.dispatchEvent(replay);
+  };
+  const onEnd = () => setTimeout(run, 0);
+  document.addEventListener('compositionend', onEnd, true);
+  rec.timer = setTimeout(run, 400);
+  if (!imeComposing) setTimeout(run, 0);
+}
 function imeDeferEditorKey(e) {
   const ta = e.target && e.target.closest ? e.target.closest('textarea.ds-cell-input.ds-cell-editing, .ds-cell-rich[contenteditable="true"]') : null;
-  if (!ta || !['Enter', 'Tab', 'Escape'].includes(e.key) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!ta) { imeDeferReplayKey(e); return; }
+  if (!['Enter', 'Tab', 'Escape'].includes(e.key) || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key !== 'Escape') e.preventDefault(); // Enter 줄바꿈·Tab 포커스 이동 기본 동작 차단
   if (imeDeferredEditorKey) return;
   const rec = imeDeferredEditorKey = { key: e.key, shiftKey: !!e.shiftKey, ta, timer: 0 };
@@ -40510,6 +40535,7 @@ function imeDeferEditorKey(e) {
   if (!imeComposing) setTimeout(run, 0);
 }
 document.addEventListener('keydown', e => {
+  if (e.__imeReplay) { lastTypingAt = Date.now(); return; } // 조합 확정 뒤 다시 보낸 Enter(#381)
   if (isImeComposing(e)) { imeDeferEditorKey(e); e.stopImmediatePropagation(); }
   else lastTypingAt = Date.now();
 }, true);
