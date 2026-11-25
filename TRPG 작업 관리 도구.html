@@ -7169,9 +7169,22 @@ body.block-pointer-dragging {
 
 /* 우클릭 시 cell hover 인디케이터 */
 .ds-table td { position: relative; }
-.ds-editor-body { flex: 1 1 auto; min-height: 0; min-width: 0; overflow: auto; padding: 18px 22px 60px; background: #fafafa; box-sizing: border-box; position: relative; }
+/* 고정(#386): 열 머리글·행 번호 열은 항상 sticky, 고정한 위 n행·왼쪽 n열은 JS(ds_applyFreeze)가 top/left 를 정한다. 접힌 테두리는 sticky 에서 따라 움직이지 않아 box-shadow 로 대신 그린다 */
+.ds-table thead tr th { position: sticky; top: 0; z-index: 7; box-shadow: inset 0 -1px 0 #e0e0e0; }
+.ds-table thead th.ds-select-all-corner { left: 0; z-index: 9; }
+.ds-table thead th.ds-frozen-col { z-index: 8; }
+.ds-table tbody td.ds-row-num { position: sticky; left: 0; z-index: 5; box-shadow: inset -1px 0 0 #e0e0e0; }
+.ds-table td.ds-frozen-col, .ds-table td.ds-frozen-row { position: sticky; z-index: 2; background-color: #fff; box-shadow: inset -1px -1px 0 #ececec; }
+.ds-table td.ds-frozen-row { z-index: 3; }
+.ds-table td.ds-frozen-col.ds-frozen-row { z-index: 4; }
+.ds-table tbody td.ds-row-num.ds-frozen-row { z-index: 6; background-color: #fafafa; }
+.ds-table td.ds-cat-name-cell.ds-frozen-row, .ds-table td.ds-memo-cell.ds-frozen-row { background-color: #fff; }
+.ds-table .ds-frozen-col-last { box-shadow: inset -3px 0 0 #b8b8b8 !important; }
+.ds-table .ds-frozen-row-last { box-shadow: inset 0 -3px 0 #b8b8b8 !important; }
+.ds-table .ds-frozen-col-last.ds-frozen-row-last { box-shadow: inset -3px 0 0 #b8b8b8, inset 0 -3px 0 #b8b8b8 !important; }
+.ds-editor-body { flex: 1 1 auto; min-height: 0; min-width: 0; overflow: auto; padding: 0 22px 60px 0; background: #fafafa; box-sizing: border-box; position: relative; } /* 위·왼쪽 여백은 .ds-table-wrap 의 margin 으로: sticky 머리글·행 번호가 스크롤 영역 가장자리에 붙게(#386) */
 .ds-empty { text-align: center; padding: 80px 20px; color: #aaa; font-size: 14px; }
-.ds-table-wrap { display: inline-block; min-width: 100%; max-width: none; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; overflow: visible; box-shadow: 0 1px 3px rgba(0,0,0,0.03); vertical-align: top; }
+.ds-table-wrap { display: inline-block; margin: 18px 0 0 22px; min-width: calc(100% - 22px); max-width: none; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; overflow: visible; box-shadow: 0 1px 3px rgba(0,0,0,0.03); vertical-align: top; }
 .ds-table { border-collapse: collapse; table-layout: fixed; }
 .ds-table th, .ds-table td { border: 1px solid #ececec; padding: 0; vertical-align: top; box-sizing: border-box; }
 .ds-table tbody tr.ds-row-valign-top > td { vertical-align: top; }
@@ -8324,7 +8337,8 @@ select.sh-field-input,
   .ds-editor-sub { display: none; }
   .ds-format-toolbar-left,
   .ds-format-toolbar-group { flex-shrink: 0; }
-  .ds-editor-body { padding: 12px 10px 40px; }
+  .ds-editor-body { padding: 0 10px 40px 0; }
+  .ds-table-wrap { margin: 12px 0 0 10px; min-width: calc(100% - 10px); }
 
   .record-form-modal,
   .rb-modal-backdrop,
@@ -41033,6 +41047,13 @@ function normalizeDataSheetEntry(ds) {
     createdAt: ds.createdAt || Date.now(),
   };
 }
+// 고정 행·열 개수(#386): 0..max 정수. 행·열을 끼우거나 지울 때 보정
+function ds_normFreeze(n, max) {
+  n = Math.floor(Number(n));
+  return isNaN(n) || n < 0 ? 0 : Math.min(n, Math.max(0, max));
+}
+function ds_freezeAfterInsert(n, at) { return at < n ? n + 1 : n; } // 고정 범위 안(at < n)에 끼우면 늘어남, 경계 바로 아래·밖이면 그대로
+function ds_freezeAfterRemove(n, removed) { return n - removed.filter(function(i) { return i < n; }).length; } // 고정 범위 안에서 지운 개수만큼 줄어듦
 function normalizeDataSheetSheet(sheet) {
   sheet = (sheet && typeof sheet === 'object' && !Array.isArray(sheet)) ? sheet : {};
   var columns = Array.isArray(sheet.columns) && sheet.columns.length
@@ -41049,6 +41070,8 @@ function normalizeDataSheetSheet(sheet) {
     rowHeaderWidth: ds_normalizeRowHeaderWidth(sheet.rowHeaderWidth),
     columns: columns,
     rows: rows,
+    frozenRows: ds_normFreeze(sheet.frozenRows, rows.length),
+    frozenCols: ds_normFreeze(sheet.frozenCols, columns.length),
   };
 }
 function normalizeDataSheetColumn(col) {
@@ -42273,6 +42296,8 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
   };
   var opt = function(cls, attr, click, icon, label) { return '<button type="button" class="ds-format-option ' + cls + '" ' + attr + NOFOCUS + ' onclick="' + click + '"><i class="fa-solid ' + icon + ' ds-format-option-icon"></i><span>' + label + '</span></button>'; };
   var SEP = '<div class="tb-sep"></div>';
+  var fz = function(kind, items) { return '<div class="tb-font-menu-section">' + (kind === 'rows' ? '행 고정' : '열 고정') + '</div>' + items.map(function(a) { return opt('ds-freeze-option', 'data-kind="' + kind + '" data-n="' + a[0] + '"', 'ds_setFreeze(\'' + kind + '\',' + (a[0] === 'cur' ? '\'cur\'' : a[0]) + ')', a[2], a[1]); }).join(''); };
+  var freeze = fz('rows', [[0, '고정 안 함', 'fa-ban'], [1, '1행', 'fa-thumbtack'], [2, '2행', 'fa-thumbtack'], ['cur', '현재 행까지', 'fa-thumbtack']]) + '<div class="ds-ctx-sep"></div>' + fz('cols', [[0, '고정 안 함', 'fa-ban'], [1, '1열', 'fa-thumbtack'], [2, '2열', 'fa-thumbtack'], ['cur', '현재 열까지', 'fa-thumbtack']]);
   var halign = [['left', '왼쪽'], ['center', '가운데'], ['right', '오른쪽'], ['justify', '양쪽']].map(function(a) { return opt('ds-halign-option', 'data-align="' + a[0] + '"', 'ds_applyCellTextAlign(\'' + a[0] + '\')', 'fa-align-' + a[0], a[1]); }).join('');
   var valign = [['top', '위쪽', 'fa-arrow-up'], ['middle', '가운데', 'fa-bars'], ['bottom', '아래쪽', 'fa-arrow-down']].map(function(a) { return opt('ds-valign-option', 'data-align="' + a[0] + '"', 'ds_applyRowVerticalAlign(\'' + a[0] + '\')', a[2], a[1]); }).join('');
   var wrap = [['overflow', '오버플로우', 'fa-right-long'], ['wrap', '줄바꿈', 'fa-turn-down'], ['clip', '자르기', 'fa-scissors']].map(function(a) { return opt('ds-wrap-option', 'data-wrap="' + a[0] + '" title="' + a[1] + '"', 'ds_applyCellWrap(\'' + a[0] + '\')', a[2], a[1]); }).join('');
@@ -42309,6 +42334,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + SEP
     + btn('ds-ruby-btn', 'ds_openRubyDialog()', '루비 문자 (편집 중 선택한 글자)', 'fa-language')
     + SEP
+    + picker('freeze', '고정', 'fa-thumbtack', freeze)
     + btn('ds-header-axis-btn', 'ds_toggleHeaderEditMode()', '행/열 이름 편집 전환', 'fa-right-left').replace('fa-right-left"', 'fa-right-left" id="ds-header-axis-icon"')
     + '</div>';
   ds_updateFormatToolbarState(ds);
@@ -43147,6 +43173,7 @@ function ds_updateFormatToolbarState(ds) {
   if (sizeInp && document.activeElement !== sizeInp) sizeInp.value = (hasStyleTargets && refStyle.size) ? String(refStyle.size) : '';
   var lhSel = document.getElementById('ds-lh-select');
   if (lhSel) lhSel.value = (hasStyleTargets && refStyle.lh) ? String(refStyle.lh) : '';
+  ds_updateFreezeMenu(ds);
   ds_positionFillHandle();
   ds_updateDataSheetStatusbar(ds);
 }
@@ -44294,6 +44321,8 @@ function ds_insertColumnAt(colId, after) {
   if (idx < 0) idx = ds.columns.length - 1;
   var insertAt = after ? idx + 1 : idx;
   ds.columns.splice(insertAt, 0, { id: mkId(), name: '', width: 160 });
+  var fSheet = _dsActiveSheet(ds);
+  if (fSheet) fSheet.frozenCols = ds_freezeAfterInsert(fSheet.frozenCols || 0, insertAt);
   persist();
   renderDataSheetEditor();
 }
@@ -44303,7 +44332,11 @@ function ds_removeColumn(colId) {
   if (ds.columns.length <= 1) { alert('마지막 열은 삭제할 수 없습니다.'); return; }
   if (!confirm('이 열을 삭제할까요? 모든 행의 해당 열 데이터도 함께 사라집니다.')) return;
   var _rmIdx = ds.columns.findIndex(function(c) { return c.id === colId; });
-  if (_rmIdx >= 0) ds.columns.splice(_rmIdx, 1);
+  if (_rmIdx >= 0) {
+    ds.columns.splice(_rmIdx, 1);
+    var fSheet = _dsActiveSheet(ds);
+    if (fSheet) fSheet.frozenCols = ds_freezeAfterRemove(fSheet.frozenCols || 0, [_rmIdx]);
+  }
   (ds.rows || []).forEach(function(r) {
     if (r.cells) delete r.cells[colId];
     if (r.cellAligns) delete r.cellAligns[colId];
@@ -44811,6 +44844,8 @@ function ds_insertRowAt(rowIdx, after, asCategory) {
   var insertAt = after ? rowIdx + 1 : rowIdx;
   if (insertAt < 0) insertAt = 0;
   if (insertAt > ds.rows.length) insertAt = ds.rows.length;
+  var fSheet = _dsActiveSheet(ds);
+  if (fSheet) fSheet.frozenRows = ds_freezeAfterInsert(fSheet.frozenRows || 0, insertAt);
   ds.rows.splice(insertAt, 0, {
     id: mkId(),
     isCategory: !!asCategory,
@@ -44850,6 +44885,8 @@ function ds_removeRows(idxs) { // 한 번에 지우고 persist() 도 한 번 →
   if (!removed.length) return;
   var viewport = ds_captureEditorViewport();
   for (var k = removed.length - 1; k >= 0; k--) ds.rows.splice(removed[k], 1);
+  var fSheet = _dsActiveSheet(ds);
+  if (fSheet) fSheet.frozenRows = ds_freezeAfterRemove(fSheet.frozenRows || 0, removed);
   _dsActiveRowIdx = _dsActiveRowIdx === null ? null : ds_rowShift(_dsActiveRowIdx, removed);
   _dsSelectedRowIdxs = _dsSelectedRowIdxs.map(function(i) { return ds_rowShift(i, removed); }).filter(function(i) { return i !== null; });
   _dsRowSelectionAnchorIdx = _dsRowSelectionAnchorIdx === null ? null : (ds_rowShift(_dsRowSelectionAnchorIdx, removed) ?? _dsSelectedRowIdxs[0] ?? null);
@@ -44892,6 +44929,67 @@ function ds_overflowRefreshRow(rowIdx) {
     if (inner) inner.style.width = Math.round(ds_overflowWidthFor(cols, row, idx)) + 'px';
   });
 }
+// 고정(#386): 열 머리글·행 번호 열은 항상 sticky, 사용자가 정한 위 n행·왼쪽 n열은 sticky 오프셋을 계산해 class 로 표시한다
+function ds_setFreeze(kind, n) {
+  var ds = findDataSheet(_dsEditId), sheet = _dsActiveSheet(ds);
+  if (!sheet) return;
+  if (n === 'cur') {
+    var r = _dsActiveCellRowIdx !== null ? _dsActiveCellRowIdx : _dsActiveRowIdx;
+    n = kind === 'rows' ? (r === null ? 0 : r + 1) : (_dsActiveCellColId ? ds_getColumnIndex(ds, _dsActiveCellColId) + 1 : 0);
+  }
+  if (kind === 'rows') sheet.frozenRows = ds_normFreeze(n, ds.rows.length); else sheet.frozenCols = ds_normFreeze(n, ds.columns.length);
+  var viewport = ds_captureEditorViewport();
+  _dsHideFormatMenus();
+  persist();
+  renderDataSheetEditor();
+  ds_restoreEditorViewport(viewport);
+}
+function ds_applyFreeze() {
+  var ds = findDataSheet(_dsEditId), sheet = _dsActiveSheet(ds), table = document.querySelector('#ds-editor-body table.ds-table');
+  if (!sheet || !table || !ds.rows) return;
+  var fr = ds_normFreeze(sheet.frozenRows, ds.rows.length), fc = ds_normFreeze(sheet.frozenCols, ds.columns.length);
+  var cg = table.querySelector('colgroup'), head = table.tHead;
+  var left = cg && cg.children[0] ? parseFloat(cg.children[0].style.width) || 0 : 0;
+  ds.columns.forEach(function(c, i) {
+    var on = i < fc;
+    table.querySelectorAll('[data-col-id="' + CSS.escape(c.id) + '"]').forEach(function(el) {
+      el.classList.toggle('ds-frozen-col', on);
+      el.classList.toggle('ds-frozen-col-last', on && i === fc - 1);
+      el.style.left = on ? left + 'px' : '';
+    });
+    left += (cg && cg.children[i + 1] ? parseFloat(cg.children[i + 1].style.width) : 0) || ds_getDataColumnWidth(c);
+  });
+  var top = head ? head.offsetHeight : 0;
+  Array.prototype.forEach.call(table.tBodies[0] ? table.tBodies[0].rows : [], function(tr) {
+    var idx = parseInt(tr.dataset.rowIdx, 10), on = !isNaN(idx) && idx < fr;
+    Array.prototype.forEach.call(tr.cells, function(td) {
+      td.classList.toggle('ds-frozen-row', on);
+      td.classList.toggle('ds-frozen-row-last', on && idx === fr - 1);
+      td.style.top = on ? top + 'px' : '';
+    });
+    if (on) top += tr.offsetHeight;
+  });
+}
+document.addEventListener('input', function(e) { // 고정 행 높이가 글자 입력으로 바뀌면 다음 고정 행 위치를 다시 계산
+  if (currentPage === 'datasheet' && e.target && e.target.closest && e.target.closest('#ds-editor-body')) setTimeout(ds_applyFreeze, 0);
+}, true);
+function ds_updateFreezeMenu(ds) {
+  var menu = document.getElementById('ds-freeze-menu'), sheet = _dsActiveSheet(ds);
+  if (!menu || !sheet) return;
+  var curRow = _dsActiveCellRowIdx !== null ? _dsActiveCellRowIdx : _dsActiveRowIdx;
+  var curCol = _dsActiveCellColId ? ds_getColumnIndex(ds, _dsActiveCellColId) : -1;
+  menu.querySelectorAll('.ds-freeze-option').forEach(function(btn) {
+    var kind = btn.dataset.kind, n = btn.dataset.n, now = kind === 'rows' ? (sheet.frozenRows || 0) : (sheet.frozenCols || 0), cur = kind === 'rows' ? (curRow === null ? 0 : curRow + 1) : curCol + 1;
+    if (n === 'cur') {
+      btn.disabled = cur <= 0;
+      btn.querySelector('span').textContent = kind === 'rows' ? (cur > 0 ? '현재 행(' + cur + ')까지' : '현재 행까지') : (cur > 0 ? '현재 열(' + ds_columnLabel(ds, curCol) + ')까지' : '현재 열까지');
+      btn.classList.toggle('active', cur > 0 && now === cur && cur > 2);
+    } else btn.classList.toggle('active', now === parseInt(n, 10));
+  });
+  var fbtn = document.getElementById('ds-freeze-btn');
+  if (fbtn) fbtn.classList.toggle('active', (sheet.frozenRows || 0) + (sheet.frozenCols || 0) > 0);
+}
+function ds_columnLabel(ds, idx) { var c = ds.columns[idx]; return c && c.name ? c.name : String(idx + 1); }
 function ds_autosizeVisibleCells() {
   var body = document.getElementById('ds-editor-body');
   if (!body) return;
@@ -44900,6 +44998,7 @@ function ds_autosizeVisibleCells() {
   body.querySelectorAll('tbody tr:not(.ds-row-fixed-h) textarea.ds-cell-input, tbody tr:not(.ds-row-fixed-h) textarea.ds-memo-input').forEach(function(ta) {
     ds_autosizeCell(ta);
   });
+  ds_applyFreeze();
   ds_positionFillHandle();
 }
 
@@ -44992,6 +45091,8 @@ function ds_openRowMenu(e, rowIdx, colId) {
   } else {
     ds_handleRowHeaderMouseDown(null, rowIdx);
   }
+  var fzSheet = _dsActiveSheet(ds), fzItems = [{ sep: true }, { label: '이 행까지 고정', action: function() { ds_setFreeze('rows', rowIdx + 1); } }];
+  if (fzSheet && (fzSheet.frozenRows || 0) > 0) fzItems.push({ label: '행 고정 해제', action: function() { ds_setFreeze('rows', 0); } });
   var delPlan = ds_planRowDelete(rowIdx, _dsSelectedRowIdxs, keepRange ? rangeInfo.rowIdxs : null), delItem = ds_rowDeleteItem(rowIdx, delPlan);
   var items;
   if (row.isCategory) {
@@ -45030,7 +45131,7 @@ function ds_openRowMenu(e, rowIdx, colId) {
       items.push({ label: '이 열 삭제', danger: true, action: function() { ds_removeColumn(colId); } });
     }
   }
-  _dsShowContextMenu(e.clientX, e.clientY, items);
+  _dsShowContextMenu(e.clientX, e.clientY, items.concat(fzItems));
 }
 function ds_openColumnMenu(e, colId) {
   e.preventDefault();
@@ -45042,7 +45143,11 @@ function ds_openColumnMenu(e, colId) {
     { label: '오른쪽에 열 삽입', action: function() { ds_insertColumnAt(colId, true); } },
     { sep: true },
     { label: '이 열 삭제', danger: true, action: function() { ds_removeColumn(colId); } },
+    { sep: true },
+    { label: '이 열까지 고정', action: function() { ds_setFreeze('cols', ds_getColumnIndex(ds, colId) + 1); } },
   ];
+  var cSheet = _dsActiveSheet(ds);
+  if (cSheet && (cSheet.frozenCols || 0) > 0) items.push({ label: '열 고정 해제', action: function() { ds_setFreeze('cols', 0); } });
   _dsShowContextMenu(e.clientX, e.clientY, items);
 }
 function _dsShowContextMenu(x, y, items) {

@@ -1,0 +1,15 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const code = html.slice(html.indexOf('function ds_normFreeze'), html.indexOf('function normalizeDataSheetSheet'));
+const ctx = {}; vm.createContext(ctx); vm.runInContext(code + ';this.f={ds_normFreeze,ds_freezeAfterInsert,ds_freezeAfterRemove}', ctx);
+const F = ctx.f;
+ok(F.ds_normFreeze(2, 5) === 2 && F.ds_normFreeze(9, 5) === 5 && F.ds_normFreeze(-1, 5) === 0 && F.ds_normFreeze('x', 5) === 0 && F.ds_normFreeze(undefined, 5) === 0 && F.ds_normFreeze(2.7, 5) === 2 && F.ds_normFreeze(3, 0) === 0, '고정 개수 정규화(범위 밖·비숫자·소수)');
+ok(F.ds_freezeAfterInsert(2, 0) === 3 && F.ds_freezeAfterInsert(2, 1) === 3 && F.ds_freezeAfterInsert(2, 2) === 2 && F.ds_freezeAfterInsert(0, 0) === 0, '삽입: 고정 범위 안이면 +1, 경계·밖이면 그대로');
+ok(F.ds_freezeAfterRemove(3, [0, 1]) === 1 && F.ds_freezeAfterRemove(3, [2, 5]) === 2 && F.ds_freezeAfterRemove(2, [4]) === 2 && F.ds_freezeAfterRemove(0, [0]) === 0, '삭제: 고정 범위 안에서 지운 개수만큼 -');
+ok(/frozenRows: ds_normFreeze\(sheet\.frozenRows, rows\.length\),\n\s*frozenCols: ds_normFreeze\(sheet\.frozenCols, columns\.length\)/.test(html), '시트별 저장·정규화(범위 밖 값 자름)');
+ok(/fSheet\.frozenRows = ds_freezeAfterInsert/.test(html) && /fSheet\.frozenRows = ds_freezeAfterRemove/.test(html) && /fSheet\.frozenCols = ds_freezeAfterInsert/.test(html) && /fSheet\.frozenCols = ds_freezeAfterRemove/.test(html), '행·열 삽입/삭제(#384 여러 행 삭제 포함) 연동');
+ok(/\.ds-table thead tr th \{ position: sticky; top: 0;/.test(html) && /\.ds-table tbody td\.ds-row-num \{ position: sticky; left: 0;/.test(html) && /td\.ds-frozen-col, \.ds-table td\.ds-frozen-row \{ position: sticky;/.test(html), '머리글·행 번호 항상 고정 + 고정 행/열 sticky');
+ok(/\.ds-frozen-col-last \{ box-shadow: inset -3px 0 0/.test(html) && /\.ds-frozen-row-last \{ box-shadow: inset 0 -3px 0/.test(html), '고정선 3px');
+ok(/picker\('freeze'/.test(html) && /function ds_setFreeze/.test(html) && /이 행까지 고정/.test(html) && /이 열까지 고정/.test(html) && /행 고정 해제/.test(html) && /열 고정 해제/.test(html), '진입점: 툴바·행/열 우클릭 메뉴');
+process.exit(f ? 1 : 0);
