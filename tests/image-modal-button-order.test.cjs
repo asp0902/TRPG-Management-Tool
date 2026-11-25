@@ -9,11 +9,3 @@ ok(/<button type="button" class="rb-modal-cancel" onclick="closeImageBlockModal\
 ok(/getElementById\('image-block-modal-submit'\)\.textContent = editing \? '수정' : '추가'/.test(html), '수정 모드 「수정」 라벨 유지');
 ok(/\.rb-modal-footer \{ display: flex; justify-content: flex-end;/.test(html), 'footer 우측 정렬 유지');
 process.exit(f ? 1 : 0);
-// 룰북 추가/편집 창(#368): [삭제] … [저장] [취소]
-(() => {
-  const h = require('fs').readFileSync(require('path').join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
-  const i = h.indexOf('id="rb-delete-btn"');
-  const seg = h.slice(i, h.indexOf('</div>', i));
-  if (!(seg.indexOf('saveRulebookModal()') > 0 && seg.indexOf('saveRulebookModal()') < seg.indexOf('closeRulebookModal()'))) { console.log('FAIL 룰북 모달 저장·취소 순서'); process.exit(1); }
-  console.log('ok 룰북 모달 저장·취소 순서');
-})();
