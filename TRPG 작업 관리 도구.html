@@ -7169,6 +7169,14 @@ body.block-pointer-dragging {
 
 /* 우클릭 시 cell hover 인디케이터 */
 .ds-table td { position: relative; }
+/* 데이터 확인(#392) */
+.ds-table td.ds-rule-list textarea.ds-cell-input { position: relative; z-index: 1; padding-right: 22px; }
+.ds-rule-chip { position: absolute; inset: 3px 20px 3px 3px; border-radius: 10px; z-index: 0; pointer-events: none; }
+.ds-rule-btn { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); z-index: 2; border: none; background: none; color: #888; cursor: pointer; font-size: 11px; padding: 2px 4px; border-radius: 4px; }
+.ds-rule-btn:hover { background: rgba(0,0,0,0.08); color: #222; }
+.ds-rule-check { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2; width: 16px; height: 16px; cursor: pointer; margin: 0; }
+.ds-table td.ds-rule-check-cell textarea.ds-cell-input { color: transparent; user-select: none; }
+.ds-table td.ds-rule-invalid::after { content: ''; position: absolute; top: 0; right: 0; border-top: 8px solid #dc2626; border-left: 8px solid transparent; pointer-events: none; z-index: 3; }
 /* 필터(#391) */
 .ds-table tbody tr.ds-row-filtered { display: none; }
 .ds-filter-btn { flex: 0 0 auto; border: none; background: none; color: #999; cursor: pointer; font-size: 11px; padding: 2px 4px; border-radius: 4px; }
@@ -8746,6 +8754,29 @@ select.sh-field-input,
     <div class="link-insert-actions">
       <button type="button" class="link-insert-btn primary" id="ds-sort-submit">실행</button>
       <button type="button" class="link-insert-btn cancel" id="ds-sort-cancel">취소</button>
+    </div>
+  </div>
+
+  <!-- 데이터 확인 팝업(#392): 삭제 맨 왼쪽, [실행] [취소] 순서 -->
+  <div id="ds-val-backdrop" class="link-insert-backdrop"></div>
+  <div id="ds-val-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-val-title">
+    <div class="link-insert-head">
+      <h2 id="ds-val-title" class="link-insert-title">데이터 확인</h2>
+      <div class="link-insert-head-actions"><button type="button" class="link-insert-close" id="ds-val-close" aria-label="닫기">×</button></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-body" style="display:flex;flex-direction:column;gap:10px;font-size:13px;">
+      <select id="ds-val-type" class="link-insert-input"><option value="">(규칙 없음)</option><option value="list">드롭다운</option><option value="check">체크박스</option><option value="number">숫자</option><option value="length">글자 길이</option></select>
+      <div id="ds-val-sec-list"><textarea id="ds-val-items" class="link-insert-input" rows="5" placeholder="항목을 한 줄에 하나씩 (끝에 색: 예) 완료 #bbf7d0)"></textarea></div>
+      <div id="ds-val-sec-check" style="display:none;gap:8px;"><label>켬 값 <input id="ds-val-on" class="link-insert-input" type="text" style="width:90px"></label> <label>끔 값 <input id="ds-val-off" class="link-insert-input" type="text" style="width:90px"></label></div>
+      <div id="ds-val-sec-num" style="display:none;gap:6px;align-items:center;"><select id="ds-val-op" class="link-insert-input" style="width:auto"><option value="between">사이</option><option value="gte">이상</option><option value="lte">이하</option><option value="gt">초과</option><option value="lt">미만</option><option value="eq">같음</option></select> <input id="ds-val-a" class="link-insert-input" type="text" style="width:80px"> <input id="ds-val-b" class="link-insert-input" type="text" style="width:80px"></div>
+      <label id="ds-val-sec-invalid" style="display:none;">잘못된 데이터 <select id="ds-val-invalid" class="link-insert-input" style="width:auto"><option value="warn">경고 표시</option><option value="reject">입력 거부</option></select></label>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-actions">
+      <button type="button" class="link-insert-btn" id="ds-val-remove" hidden style="margin-right:auto;">규칙 삭제</button>
+      <button type="button" class="link-insert-btn primary" id="ds-val-submit">실행</button>
+      <button type="button" class="link-insert-btn cancel" id="ds-val-cancel">취소</button>
     </div>
   </div>
 
@@ -41493,6 +41524,7 @@ function normalizeDataSheetRow(r, columns) {
     cellAligns: cellAligns,
     cellStyles: cellStyles,
     cellRich: cellRich,
+    cellRules: (function() { var o = {}; if (r.cellRules && typeof r.cellRules === 'object' && !Array.isArray(r.cellRules)) Object.keys(r.cellRules).forEach(function(k) { var n = ds_normRule(r.cellRules[k]); if (n) o[k] = n; }); return o; })(),
     cells: cells,
   };
 }
@@ -42529,6 +42561,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + SEP
     + btn('ds-ruby-btn', 'ds_openRubyDialog()', '루비 문자 (편집 중 선택한 글자)', 'fa-language')
     + btn('ds-filter-toggle-btn', 'ds_toggleFilter()', '필터 만들기', 'fa-filter')
+    + btn('ds-validate-btn', 'ds_openValDialog()', '데이터 확인 (드롭다운·체크박스·숫자 범위)', 'fa-list-check')
     + SEP
     + picker('freeze', '고정', 'fa-thumbtack', freeze)
     + btn('ds-header-axis-btn', 'ds_toggleHeaderEditMode()', '행/열 이름 편집 전환', 'fa-right-left').replace('fa-right-left"', 'fa-right-left" id="ds-header-axis-icon"')
@@ -43500,6 +43533,7 @@ function ds_setActiveRow(rowIdx) {
 
 function ds_setActiveCell(rowIdx, colId, options) {
   options = options || {};
+  if (_dsCellEditMode && (_dsActiveCellRowIdx !== parseInt(rowIdx) || _dsActiveCellColId !== colId)) ds_rejectInvalidActive(); // 다른 칸으로 옮기며 편집이 끝날 때도 입력 거부 적용(#392)
   rowIdx = parseInt(rowIdx);
   var ds = findDataSheet(_dsEditId);
   var row = ds && !isNaN(rowIdx) ? ds.rows[rowIdx] : null;
@@ -43884,6 +43918,9 @@ function ds_fillEnd(e) {
     var rc = srcRow.cellRich && srcRow.cellRich[srcColId]; // 글자 일부 서식도 따라간다(텍스트가 다르면 렌더에서 버려짐)
     if (rc) { if (!dstRow.cellRich || typeof dstRow.cellRich !== 'object') dstRow.cellRich = {}; dstRow.cellRich[dstColId] = rc; }
     else if (dstRow.cellRich) delete dstRow.cellRich[dstColId];
+    var ru = ds_ruleOf(srcRow, srcColId); // 데이터 확인 규칙도 따라간다(#392)
+    if (ru) { if (!dstRow.cellRules || typeof dstRow.cellRules !== 'object') dstRow.cellRules = {}; dstRow.cellRules[dstColId] = JSON.parse(JSON.stringify(ru)); }
+    else if (dstRow.cellRules) delete dstRow.cellRules[dstColId];
   }
   if (tgt.axis === 'v') {
     seed.colIds.forEach(function(colId) {
@@ -43984,6 +44021,9 @@ function ds_enterCellEditMode(rowIdx, colId, options) {
   options = options || {};
   var textarea = ds_getCellTextarea(rowIdx, colId);
   if (!textarea) return false;
+  var dsRule = findDataSheet(_dsEditId), ruleRow = dsRule && dsRule.rows[rowIdx];
+  if (ds_ruleOf(ruleRow, colId) && ds_ruleOf(ruleRow, colId).t === 'check') return false; // 체크박스 칸은 글자 편집 대신 Space·클릭으로 토글(#392)
+  _dsRuleOrig = { rowIdx: rowIdx, colId: colId, v: ruleRow && ruleRow.cells && ruleRow.cells[colId] != null ? String(ruleRow.cells[colId]) : '' };
   if (options.replaceText !== undefined) ds_richDiscard(rowIdx, colId); // 글자를 바꿔 쓰기 시작하면 글자 일부 서식은 버린다(#375)
   ds_focusCell(rowIdx, colId, { edit: true });
   if (options.replaceText !== undefined) {
@@ -44044,6 +44084,7 @@ function ds_handleCellInput(textareaEl) {
 }
 
 function ds_exitCellEditMode() {
+  ds_rejectInvalidActive();
   _dsCellEditMode = false;
   ds_applyCellEditModeUi();
   ds_updateFormatToolbarState();
@@ -44147,6 +44188,8 @@ function ds_handleCellKeydown(e, rowIdx, colId) {
     handled = ds_enterCellEditMode(rowIdx, colId);
   } else if (e.key === 'Backspace' || e.key === 'Delete') {
     handled = ds_clearSelectedCellValues();
+  } else if (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.altKey && ds_toggleChecks(rowIdx, colId)) {
+    handled = true; // 체크박스 칸 Space 토글(범위도 한 번에)
   } else if (ds_isPrintableTextKey(e)) {
     handled = ds_enterCellEditMode(rowIdx, colId, { replaceText: e.key });
   }
@@ -44559,6 +44602,18 @@ function _dsRenderFlatTable(ds) {
       if (richHtml) cellClasses.push('ds-has-rich');
       var wrapMode = ds_getCellStyle(row, c.id).wrap; // 텍스트 줄바꿈(#374)
       if (wrapMode === 'overflow') cellClasses.push('ds-wrap-overflow');
+      var rule = ds_ruleOf(row, c.id), ruleHtml = '';
+      if (rule) { // 데이터 확인(#392): 드롭다운 칩·▾, 체크박스, 잘못된 값 경고
+        if (!ds_ruleValid(rule, val)) cellClasses.push('ds-rule-invalid');
+        if (rule.t === 'list') {
+          var chip = rule.items.find(function(it) { return it.v === val; });
+          cellClasses.push('ds-rule-list');
+          ruleHtml = (chip && chip.c ? '<div class="ds-rule-chip" style="background:' + chip.c + ';"></div>' : '') + '<button type="button" class="ds-rule-btn" tabindex="-1" onmousedown="event.stopPropagation();event.preventDefault()" onclick="ds_openRuleMenu(event,' + rowIdx + ',\'' + esc(c.id) + '\')">▾</button>';
+        } else if (rule.t === 'check') {
+          cellClasses.push('ds-rule-check-cell');
+          ruleHtml = '<input type="checkbox" class="ds-rule-check" tabindex="-1"' + (val === rule.on ? ' checked' : '') + ' onmousedown="event.stopPropagation()" onclick="event.stopPropagation();ds_toggleCheck(' + rowIdx + ',\'' + esc(c.id) + '\')">';
+        }
+      }
       var cellClassAttr = cellClasses.length ? ' class="' + cellClasses.join(' ') + '"' : '';
       var isEditingCell = ds_isCellInEditMode(rowIdx, c.id);
       var editClass = isEditingCell ? ' ds-cell-editing' : '';
@@ -44569,6 +44624,7 @@ function _dsRenderFlatTable(ds) {
       return '<td' + cellClassAttr + (cst.bg ? ' style="background-color:' + esc(cst.bg) + ';"' : '') + ' data-col-id="' + esc(c.id) + '" oncontextmenu="ds_openRowMenu(event,' + rowIdx + ',\'' + esc(c.id) + '\')">'
         + '<textarea class="ds-cell-input ds-cell-align-' + textAlign + editClass + styleClass + '"' + styleAttr + ' rows="1" data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '" onmousedown="ds_handleCellMouseDown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" ondblclick="ds_enterCellEditMode(' + rowIdx + ',\'' + esc(c.id) + '\')" onkeydown="ds_handleCellKeydown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" onbeforeinput="ds_handleCellBeforeInput(event,this)" oncompositionstart="ds_handleCellCompositionStart(this)" onpaste="ds_handleCellPaste(event,this)" oninput="ds_handleCellInput(this)" onfocus="ds_handleCellFocus(this)" onblur="ds_autosizeCell(this)">' + esc(val) + '</textarea>'
         + ((richHtml || wrapMode === 'overflow') ? '<div class="ds-cell-rich ds-cell-align-' + textAlign + styleClass + '"' + styleAttr + ' data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '">' + ds_viewInner(richHtml || ds_richFromText(val), wrapMode, ds_overflowWidthFor(cols, row, ci)) + '</div>' : '')
+        + ruleHtml
         + '</td>';
     }).join('');
     return '<tr class="' + rowClass + _rhClass + '" data-row-idx="' + rowIdx + '"' + _rhStyle + ' onmousedown="ds_setActiveRow(' + rowIdx + ')">'
@@ -44632,6 +44688,7 @@ function ds_removeColumn(colId) {
   (ds.rows || []).forEach(function(r) {
     if (r.cells) delete r.cells[colId];
     if (r.cellAligns) delete r.cellAligns[colId];
+    if (r.cellRules) delete r.cellRules[colId];
   });
   if (_dsActiveCellColId === colId) {
     _dsActiveCellRowIdx = null;
@@ -45242,6 +45299,181 @@ function ds_insertRowAt(rowIdx, after, asCategory) {
   renderDataSheetEditor();
   ds_restoreEditorViewport(viewport);
 }
+// ── 데이터 확인(#392): row.cellRules[colId] = { t:'list'|'check'|'number'|'length', ... }. 규칙은 셀(행)에 붙어 정렬·행 이동·삽입·삭제를 자동으로 따라간다 ──
+var DS_RULE_OPS = ['between', 'gte', 'lte', 'gt', 'lt', 'eq'];
+var DS_RULE_COLORS = ['#fecaca', '#fed7aa', '#fef08a', '#bbf7d0', '#bfdbfe', '#ddd6fe', '#fbcfe8', '#e5e7eb'];
+function ds_normRule(r) {
+  if (!r || typeof r !== 'object') return null;
+  var out = { t: r.t }, reject = !!r.reject;
+  if (r.t === 'list') {
+    var items = (Array.isArray(r.items) ? r.items : []).map(function(it) { return { v: String(it && it.v != null ? it.v : '').slice(0, 200), c: it && /^#[0-9a-fA-F]{6}$/.test(it.c || '') ? it.c.toLowerCase() : '' }; }).filter(function(it) { return it.v !== ''; }).slice(0, 200);
+    if (!items.length) return null;
+    out.items = items; out.reject = reject; return out;
+  }
+  if (r.t === 'check') { out.on = String(r.on != null && r.on !== '' ? r.on : 'TRUE').slice(0, 50); out.off = String(r.off != null && r.off !== '' ? r.off : 'FALSE').slice(0, 50); return out; }
+  if (r.t === 'number' || r.t === 'length') {
+    if (DS_RULE_OPS.indexOf(r.op) < 0) return null;
+    out.op = r.op; out.a = String(r.a == null ? '' : r.a).slice(0, 30); out.b = String(r.b == null ? '' : r.b).slice(0, 30); out.reject = reject;
+    return isNaN(ds_parseNumber(out.a)) ? null : out;
+  }
+  return null;
+}
+function ds_ruleCompare(op, n, a, b) {
+  switch (op) {
+    case 'between': return !isNaN(b) && n >= Math.min(a, b) && n <= Math.max(a, b);
+    case 'gte': return n >= a; case 'lte': return n <= a; case 'gt': return n > a; case 'lt': return n < a; case 'eq': return n === a;
+  }
+  return true;
+}
+function ds_ruleValid(rule, v) { // 빈 칸은 항상 유효. 체크박스는 켬/끔 값만, 드롭다운은 목록 안의 값, 숫자·글자 길이는 비교 조건
+  v = v == null ? '' : String(v);
+  if (!rule || v === '') return true;
+  if (rule.t === 'list') return rule.items.some(function(it) { return it.v === v; });
+  if (rule.t === 'check') return v === rule.on || v === rule.off;
+  if (rule.t === 'number') { var n = ds_parseNumber(v); return !isNaN(n) && ds_ruleCompare(rule.op, n, ds_parseNumber(rule.a), ds_parseNumber(rule.b)); }
+  if (rule.t === 'length') return ds_ruleCompare(rule.op, v.length, ds_parseNumber(rule.a), ds_parseNumber(rule.b));
+  return true;
+}
+function ds_ruleOf(row, colId) { return row && row.cellRules ? row.cellRules[colId] || null : null; }
+function ds_setCellValue(rowIdx, colId, val) { // 드롭다운 선택·체크박스 토글: 값만 바꾸고(서식은 텍스트가 달라지면 버려짐) 한 번에 저장
+  var ds = findDataSheet(_dsEditId), row = ds && ds.rows[rowIdx];
+  if (!row || !ds_isDataRow(row)) return;
+  if (!row.cells) row.cells = {};
+  row.cells[colId] = val;
+  ds_richDiscard(rowIdx, colId);
+  var viewport = ds_captureEditorViewport();
+  persist();
+  renderDataSheetEditor();
+  ds_restoreEditorViewport(viewport);
+}
+function ds_openRuleMenu(e, rowIdx, colId) { // 드롭다운 칸의 ▾
+  e.preventDefault(); e.stopPropagation();
+  var ds = findDataSheet(_dsEditId), row = ds && ds.rows[rowIdx], rule = ds_ruleOf(row, colId);
+  if (!rule || rule.t !== 'list') return;
+  var r = e.currentTarget.getBoundingClientRect();
+  var items = rule.items.map(function(it) { return { label: it.v, action: function() { ds_setCellValue(rowIdx, colId, it.v); } }; });
+  items.push({ sep: true }, { label: '비우기', action: function() { ds_setCellValue(rowIdx, colId, ''); } });
+  _dsShowContextMenu(r.left, r.bottom + 2, items);
+}
+function ds_toggleCheck(rowIdx, colId) {
+  var ds = findDataSheet(_dsEditId), row = ds && ds.rows[rowIdx], rule = ds_ruleOf(row, colId);
+  if (!rule || rule.t !== 'check') return;
+  ds_setCellValue(rowIdx, colId, (row.cells && row.cells[colId]) === rule.on ? rule.off : rule.on);
+}
+function ds_toggleChecks(rowIdx, colId) { // Space: 선택한 칸(범위)의 체크박스를 한 번에 토글. 하나라도 꺼져 있으면 전부 켬
+  var ds = findDataSheet(_dsEditId);
+  if (!ds) return false;
+  var info = ds_getSelectedCellRangeInfo(ds), cells = [];
+  if (info && info.cellCount > 1) info.rowIdxs.forEach(function(ri) { info.colIds.forEach(function(ci) { cells.push([ri, ci]); }); });
+  else cells.push([rowIdx, colId]);
+  cells = cells.filter(function(c) { var ru = ds_ruleOf(ds.rows[c[0]], c[1]); return ru && ru.t === 'check'; });
+  if (!cells.length) return false;
+  var allOn = cells.every(function(c) { return (ds.rows[c[0]].cells || {})[c[1]] === ds_ruleOf(ds.rows[c[0]], c[1]).on; });
+  cells.forEach(function(c) { var row = ds.rows[c[0]], ru = ds_ruleOf(row, c[1]); if (!row.cells) row.cells = {}; row.cells[c[1]] = allOn ? ru.off : ru.on; ds_richDiscard(c[0], c[1]); });
+  var viewport = ds_captureEditorViewport();
+  persist();
+  renderDataSheetEditor();
+  ds_restoreEditorViewport(viewport);
+  return true;
+}
+// 「데이터 확인…」 대화상자: 대상 = 선택한 셀(범위·행/열 선택·활성 셀)
+var _dsValDialog = null; // { targets: [{rowIdx,colId}] }
+function ds_openValDialog() {
+  var ds = findDataSheet(_dsEditId), dlg = document.getElementById('ds-val-dialog');
+  var targets = ds ? (ds_getTextAlignTargetCells(ds) || []).filter(function(c) { return ds_isDataRow(c.row) && c.colId && c.colId !== DS_ROW_COL; }) : [];
+  if (!dlg || !targets.length) return;
+  _dsValDialog = { targets: targets.map(function(c) { return { rowIdx: c.rowIdx, colId: c.colId }; }) };
+  var rule = ds_ruleOf(targets[0].row, targets[0].colId) || { t: '' };
+  document.getElementById('ds-val-type').value = rule.t || '';
+  document.getElementById('ds-val-items').value = rule.t === 'list' ? rule.items.map(function(it) { return it.v + (it.c ? ' ' + it.c : ''); }).join('\n') : '';
+  document.getElementById('ds-val-on').value = rule.t === 'check' ? rule.on : 'TRUE';
+  document.getElementById('ds-val-off').value = rule.t === 'check' ? rule.off : 'FALSE';
+  document.getElementById('ds-val-op').value = rule.op || 'between';
+  document.getElementById('ds-val-a').value = rule.a || '';
+  document.getElementById('ds-val-b').value = rule.b || '';
+  document.getElementById('ds-val-invalid').value = rule.reject ? 'reject' : 'warn';
+  document.getElementById('ds-val-remove').hidden = !rule.t;
+  ds_valDialogSync();
+  document.getElementById('ds-val-backdrop').classList.add('open'); dlg.classList.add('open');
+  var base = getEditorCenterRect(), r = dlg.getBoundingClientRect();
+  dlg.style.left = Math.max(16, base.left + (base.width - r.width) / 2) + 'px';
+  dlg.style.top = Math.max(16, base.top + (base.height - r.height) / 2) + 'px';
+  document.getElementById('ds-val-type').focus();
+}
+function ds_valDialogSync() { // 유형에 따라 필요한 칸만 보임
+  var t = document.getElementById('ds-val-type').value;
+  document.getElementById('ds-val-sec-list').style.display = t === 'list' ? '' : 'none';
+  document.getElementById('ds-val-sec-check').style.display = t === 'check' ? 'flex' : 'none';
+  document.getElementById('ds-val-sec-num').style.display = (t === 'number' || t === 'length') ? 'flex' : 'none';
+  document.getElementById('ds-val-sec-invalid').style.display = (t === 'list' || t === 'number' || t === 'length') ? '' : 'none';
+  document.getElementById('ds-val-b').style.display = document.getElementById('ds-val-op').value === 'between' ? '' : 'none';
+}
+function ds_closeValDialog() {
+  document.getElementById('ds-val-backdrop')?.classList.remove('open');
+  document.getElementById('ds-val-dialog')?.classList.remove('open');
+  _dsValDialog = null;
+}
+function ds_valRuleFromDialog() { // 대화상자 값 → 규칙(잘못된 값이면 null)
+  var t = document.getElementById('ds-val-type').value, reject = document.getElementById('ds-val-invalid').value === 'reject';
+  if (t === 'list') {
+    var items = document.getElementById('ds-val-items').value.split('\n').map(function(line) {
+      line = line.trim();
+      var m = /^(.*?)\s+(#[0-9a-fA-F]{6})$/.exec(line);
+      return m ? { v: m[1].trim(), c: m[2] } : { v: line, c: '' };
+    }).filter(function(it) { return it.v; });
+    var seen = {};
+    items = items.filter(function(it) { if (seen[it.v]) return false; seen[it.v] = true; return true; });
+    return ds_normRule({ t: 'list', items: items, reject: reject });
+  }
+  if (t === 'check') return ds_normRule({ t: 'check', on: document.getElementById('ds-val-on').value, off: document.getElementById('ds-val-off').value });
+  if (t === 'number' || t === 'length') return ds_normRule({ t: t, op: document.getElementById('ds-val-op').value, a: document.getElementById('ds-val-a').value, b: document.getElementById('ds-val-b').value, reject: reject });
+  return null;
+}
+function ds_applyValDialog(remove) {
+  var st = _dsValDialog, ds = findDataSheet(_dsEditId);
+  if (!st || !ds) return;
+  var type = document.getElementById('ds-val-type').value, rule = remove || !type ? null : ds_valRuleFromDialog();
+  if (!remove && type && !rule) { document.getElementById('ds-val-type').focus(); return; } // 항목·숫자가 비었으면 닫지 않음
+  ds_closeValDialog();
+  st.targets.forEach(function(c) {
+    var row = ds.rows[c.rowIdx];
+    if (!row) return;
+    if (!row.cellRules) row.cellRules = {};
+    if (rule) row.cellRules[c.colId] = JSON.parse(JSON.stringify(rule)); else delete row.cellRules[c.colId];
+  });
+  var viewport = ds_captureEditorViewport();
+  persist(); // 한 번에 저장 → Ctrl+Z 한 번
+  renderDataSheetEditor();
+  ds_restoreEditorViewport(viewport);
+}
+var _dsRuleOrig = null; // 편집 시작 때의 { rowIdx, colId, v } — 「입력 거부」 규칙이 잘못된 값을 되돌릴 때 사용
+function ds_rejectInvalidActive() { // 편집을 끝낼 때: 입력 거부 규칙이고 값이 잘못됐으면 편집 전 값으로
+  var o = _dsRuleOrig;
+  _dsRuleOrig = null;
+  var ds = findDataSheet(_dsEditId), row = o && ds && ds.rows[o.rowIdx], rule = ds_ruleOf(row, o && o.colId);
+  if (!rule || !rule.reject) return;
+  var cur = row.cells && row.cells[o.colId] != null ? String(row.cells[o.colId]) : '';
+  if (ds_ruleValid(rule, cur)) return;
+  row.cells[o.colId] = o.v;
+  ds_richDiscard(o.rowIdx, o.colId);
+  persist();
+  setTimeout(function() { var viewport = ds_captureEditorViewport(); renderDataSheetEditor(); ds_restoreEditorViewport(viewport); }, 0);
+}
+(function() {
+  function bind() {
+    if (window.__dsValDialogBound) return;
+    window.__dsValDialogBound = true;
+    document.getElementById('ds-val-submit')?.addEventListener('click', function() { ds_applyValDialog(false); });
+    document.getElementById('ds-val-remove')?.addEventListener('click', function() { ds_applyValDialog(true); });
+    document.getElementById('ds-val-cancel')?.addEventListener('click', ds_closeValDialog);
+    document.getElementById('ds-val-close')?.addEventListener('click', ds_closeValDialog);
+    document.getElementById('ds-val-backdrop')?.addEventListener('click', ds_closeValDialog);
+    document.getElementById('ds-val-type')?.addEventListener('change', ds_valDialogSync);
+    document.getElementById('ds-val-op')?.addEventListener('change', ds_valDialogSync);
+    document.getElementById('ds-val-dialog')?.addEventListener('keydown', function(e) { if (e.key === 'Escape') { e.preventDefault(); ds_closeValDialog(); } });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind();
+})();
 // ── 필터(#391): sheet.filter = { cols: { [colId]: { hide: [숨길 값], cond: { type, a, b } } } } (객체가 있으면 필터 켜짐) ──
 var DS_FILTER_CONDS = ['empty', 'notempty', 'contains', 'equals', 'gt', 'lt', 'eq', 'between'];
 function ds_normFilter(f, columns) {
@@ -45424,7 +45656,7 @@ function ds_sortApply(keys, from, to, colIds) {
   var viewport = ds_captureEditorViewport();
   if (!colIds) ds.rows = _dsActiveSheet(ds).rows = perm.map(function(src) { return ds.rows[src]; });
   else {
-    var snap = ds.rows.map(function(r) { return colIds.map(function(id) { return { v: r.cells && r.cells[id], st: r.cellStyles && r.cellStyles[id], rc: r.cellRich && r.cellRich[id], al: r.cellAligns && r.cellAligns[id] }; }); });
+    var snap = ds.rows.map(function(r) { return colIds.map(function(id) { return { v: r.cells && r.cells[id], st: r.cellStyles && r.cellStyles[id], rc: r.cellRich && r.cellRich[id], al: r.cellAligns && r.cellAligns[id], ru: r.cellRules && r.cellRules[id] }; }); });
     perm.forEach(function(src, i) {
       if (src === i) return;
       var row = ds.rows[i];
@@ -45435,6 +45667,8 @@ function ds_sortApply(keys, from, to, colIds) {
         if (d.st) row.cellStyles[id] = d.st; else delete row.cellStyles[id];
         if (d.rc) row.cellRich[id] = d.rc; else delete row.cellRich[id];
         if (d.al) row.cellAligns[id] = d.al; else delete row.cellAligns[id];
+        row.cellRules = row.cellRules || {};
+        if (d.ru) row.cellRules[id] = d.ru; else delete row.cellRules[id];
       });
     });
   }
@@ -45724,7 +45958,7 @@ function ds_openRowMenu(e, rowIdx, colId) {
     ds_handleRowHeaderMouseDown(null, rowIdx);
   }
   var szRows = ds_fitTargetCols(rowIdx, _dsSelectedRowIdxs); // 셀 범위만 있을 때는 이 행만(구글 시트와 같음)
-  var fzSheet = _dsActiveSheet(ds), fzItems = [{ sep: true }].concat(keepRange && rangeInfo.cellCount > 1 ? [{ label: '범위 정렬…', action: function() { ds_openSortDialog(); } }] : []).concat([{ label: szRows.length > 1 ? '행 ' + szRows.length + '개 크기 조절…' : '이 행 크기 조절…', action: function() { ds_openSizeDialog('row', szRows); } }, { label: '이 행까지 고정', action: function() { ds_setFreeze('rows', rowIdx + 1); } }]);
+  var fzSheet = _dsActiveSheet(ds), fzItems = [{ sep: true }].concat(keepRange && rangeInfo.cellCount > 1 ? [{ label: '범위 정렬…', action: function() { ds_openSortDialog(); } }] : []).concat(colId && ds_isDataRow(row) ? [{ label: '데이터 확인…', action: function() { ds_openValDialog(); } }] : []).concat([{ label: szRows.length > 1 ? '행 ' + szRows.length + '개 크기 조절…' : '이 행 크기 조절…', action: function() { ds_openSizeDialog('row', szRows); } }, { label: '이 행까지 고정', action: function() { ds_setFreeze('rows', rowIdx + 1); } }]);
   if (fzSheet && (fzSheet.frozenRows || 0) > 0) fzItems.push({ label: '행 고정 해제', action: function() { ds_setFreeze('rows', 0); } });
   var delPlan = ds_planRowDelete(rowIdx, _dsSelectedRowIdxs, keepRange ? rangeInfo.rowIdxs : null), delItem = ds_rowDeleteItem(rowIdx, delPlan);
   var items;

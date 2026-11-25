@@ -46,5 +46,5 @@ listeners.drop[0].fn(ev({ dataTransfer: dtOf({ data: { 'text/plain': '그냥 글
 e = ev({ target: { closest: () => null }, dataTransfer: dtOf({}) }); listeners.drop[0].fn(e); ok(!e.p && !e.s, '모달 밖 드롭은 건드리지 않음');
 open = false; e = ev({ dataTransfer: dtOf({}) }); listeners.drop[0].fn(e); ok(!e.p && !e.s, '모달이 닫혀 있으면 본문 드롭 동작 불변');
 ok(/\.rb-modal\.image-block-modal\.drag-over \{ outline: 2px dashed #111;/.test(html), '드래그 중 테두리 강조 CSS');
-ok(!/드롭|끌어/.test(html.slice(html.indexOf('id="image-block-modal-backdrop"'), html.indexOf('<!-- 링크 삽입 팝업 -->'))), '모달 마크업에 안내 문구 추가 없음');
+ok(!/드롭|끌어/.test(html.slice(html.indexOf('id="image-block-modal-backdrop"'), html.indexOf('<!-- 루비 문자 팝업'))), '모달 마크업에 안내 문구 추가 없음');
 process.exit(f ? 1 : 0);
