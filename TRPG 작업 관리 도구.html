@@ -7175,15 +7175,17 @@ body.block-pointer-dragging {
 .ds-table tbody tr > td.ds-row-num { vertical-align: middle; }
 .ds-table tbody tr.ds-selected-row > td,
 .ds-table tbody td.ds-selected-col { background: #e8f0fe !important; }
-.ds-table tbody td.ds-selected-cell { background: #e8f0fe !important; }
+/* 셀 범위·활성 셀 표시는 오버레이(#ds-range-box · #ds-active-box)가 그린다(#383) */
 .ds-table tbody tr.ds-selected-row .ds-row-num,
 .ds-table thead th.ds-selected-col { background: #d2e3fc !important; color: #174ea6; font-weight: 700; }
 .ds-table thead th.ds-select-all-corner.ds-selected-all { background: #d2e3fc !important; }
 .ds-table tbody tr.ds-active-row > td { background: #f7fbff; }
 .ds-table tbody tr.ds-active-row .ds-row-num { color: #111; font-weight: 700; }
-.ds-table tbody td.ds-active-cell { box-shadow: inset 0 0 0 2px #8a8a8a; }
+#ds-range-box { position: absolute; display: none; box-sizing: border-box; border: 1px solid #1a73e8; background: rgba(26,115,232,0.12); pointer-events: none; z-index: 27; }
+#ds-active-box { position: absolute; display: none; box-sizing: border-box; border: 2px solid #1a73e8; pointer-events: none; z-index: 28; }
+#ds-range-box.visible, #ds-active-box.visible { display: block; }
 body.ds-cell-selecting, body.ds-cell-selecting * { user-select: none !important; cursor: cell !important; }
-#ds-fill-handle { position: absolute; width: 8px; height: 8px; background: #8a8a8a; border: 1px solid #fff; box-sizing: border-box; border-radius: 1px; cursor: crosshair; z-index: 30; display: none; }
+#ds-fill-handle { position: absolute; width: 10px; height: 10px; background: #1a73e8; border: 1px solid #fff; box-sizing: border-box; border-radius: 50%; cursor: crosshair; z-index: 30; display: none; }
 #ds-fill-handle.visible { display: block; }
 #ds-fill-preview { position: absolute; border: 2px dashed #1a73e8; background: rgba(26,115,232,0.08); box-sizing: border-box; z-index: 29; pointer-events: none; display: none; }
 #ds-fill-preview.visible { display: block; }
@@ -19331,7 +19333,8 @@ function tbCellSelRender() { // 선택 범위를 덮는 사각형을 셀 위치�
   if (!el) {
     el = document.createElement('div');
     el.id = 'tb-cell-sel-overlay';
-    el.style.cssText = 'position:fixed;pointer-events:none;z-index:9000;box-sizing:border-box;border:2px solid #2563eb;background:rgba(37,99,235,0.18);display:none';
+    el.style.cssText = 'position:fixed;pointer-events:none;z-index:9000;box-sizing:border-box;border:1px solid #1a73e8;background:rgba(26,115,232,0.12);display:none';
+    el.innerHTML = '<div class="tb-sel-active" style="position:absolute;box-sizing:border-box;border:2px solid #1a73e8;display:none"></div><div class="tb-sel-handle" style="position:absolute;right:-6px;bottom:-6px;width:10px;height:10px;box-sizing:border-box;border:1px solid #fff;border-radius:50%;background:#1a73e8"></div>';
     document.body.appendChild(el);
   }
   const { model, elems } = tbTableModel(tbCellSel.table), r = tbCellSel.rect;
@@ -19344,6 +19347,11 @@ function tbCellSelRender() { // 선택 범위를 덮는 사각형을 셀 위치�
   });
   if (!isFinite(left)) { tbCellSelClear(); return; }
   Object.assign(el.style, { display: 'block', left: left + 'px', top: top + 'px', width: (right - left) + 'px', height: (bottom - top) + 'px' });
+  const activeBox = el.querySelector('.tb-sel-active'), anchorCell = model.cells.find(cell => cell.row === tbCellSel.anchor.row && cell.col === tbCellSel.anchor.col); // 활성 셀(드래그 시작 셀): 2px 진한 파랑 테두리(#383). 점은 표시만 하고 동작은 없다(본문 표에는 채우기 기능이 없음)
+  if (activeBox && anchorCell) {
+    const ar = elems[anchorCell.id].getBoundingClientRect();
+    Object.assign(activeBox.style, { display: 'block', left: (ar.left - left - 1) + 'px', top: (ar.top - top - 1) + 'px', width: ar.width + 'px', height: ar.height + 'px' });
+  }
   if (!tbCellSelRaf) tbCellSelRaf = setTimeout(() => { tbCellSelRaf = 0; if (tbCellSel) tbCellSelRender(); }, 100); // 선택 중에는 0.1초마다 위치 재계산(스크롤·레이아웃 변화·페이지 전환 대응)
 }
 function tbCellSelSet(table, startCell, endCell) { // 두 셀이 만드는 사각형(합쳐진 셀을 걸치면 확장)
@@ -19352,7 +19360,7 @@ function tbCellSelSet(table, startCell, endCell) { // 두 셀이 만드는 사�
   if (!a || !b) return false;
   const ra = tbCellRect(a), rb = tbCellRect(b);
   const rect = tbExpandRect(model, { r1: Math.min(ra.r1, rb.r1), c1: Math.min(ra.c1, rb.c1), r2: Math.max(ra.r2, rb.r2), c2: Math.max(ra.c2, rb.c2) });
-  tbCellSel = { table, rect, anchor: { row: a.row, col: a.col } };
+  tbCellSel = { table, rect, anchor: { row: a.row, col: a.col }, endTd: endCell };
   tbCellSelRender();
   return true;
 }
@@ -19408,7 +19416,26 @@ document.addEventListener('mousemove', e => { // 다른 셀로 넘어가면 셀 
   if (sel) sel.removeAllRanges();
   e.preventDefault();
 }, true);
-document.addEventListener('mouseup', () => { tbCellDrag = null; }, true);
+// 본문 표 드래그 중 화면 가장자리 자동 스크롤(#383): 마지막 포인터 위치를 기억해 타이머로 스크롤하고 그 아래 셀까지 범위를 늘린다
+let tbDragScrollTimer = 0, tbDragPoint = { x: 0, y: 0 };
+document.addEventListener('mousemove', e => {
+  if (!tbCellDrag || !tbCellDrag.active || !(e.buttons & 1)) return;
+  tbDragPoint = { x: e.clientX, y: e.clientY };
+  if (tbDragScrollTimer) return;
+  tbDragScrollTimer = setInterval(() => {
+    const drag = tbCellDrag;
+    if (!drag || !drag.active) { clearInterval(tbDragScrollTimer); tbDragScrollTimer = 0; return; }
+    const parent = dragScrollParent(drag.table), root = parent === document.scrollingElement || parent === document.documentElement;
+    const rect = root ? { top: 0, bottom: window.innerHeight, left: 0, right: window.innerWidth } : parent.getBoundingClientRect();
+    const dy = dragAutoScrollDelta(tbDragPoint.y, rect.top, rect.bottom, 28), dx = dragAutoScrollDelta(tbDragPoint.x, rect.left, rect.right, 28);
+    if (dx || dy) parent.scrollBy(dx, dy);
+    const el = document.elementFromPoint(Math.min(rect.right - 2, Math.max(rect.left + 2, tbDragPoint.x)), Math.min(rect.bottom - 2, Math.max(rect.top + 2, tbDragPoint.y)));
+    const td = el && el.closest ? el.closest('td,th') : null;
+    if (td && drag.table.contains(td) && (!tbCellSel || tbCellSel.table !== drag.table || !tbCellInSelEnd(td))) tbCellSelSet(drag.table, drag.cell, td);
+  }, 40);
+}, true);
+function tbCellInSelEnd(td) { return !!tbCellSel && tbCellSel.endTd === td; }
+document.addEventListener('mouseup', () => { tbCellDrag = null; if (tbDragScrollTimer) { clearInterval(tbDragScrollTimer); tbDragScrollTimer = 0; } }, true);
 document.addEventListener('selectstart', e => { if (tbCellDrag && tbCellDrag.active) e.preventDefault(); }, true);
 document.addEventListener('keydown', e => {
   if (!tbCellSel || ['Shift', 'Control', 'Alt', 'Meta', 'CapsLock'].includes(e.key)) return;
@@ -42233,7 +42260,7 @@ function ds_richBind(d) {
     var text = e.clipboardData && e.clipboardData.getData ? String(e.clipboardData.getData('text/plain') || '').replace(/\r\n?/g, '\n') : '';
     text.split('\n').forEach(function(line, i) { if (i > 0) document.execCommand('insertLineBreak'); if (line) document.execCommand('insertText', false, line); });
   });
-  d.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+  d.addEventListener('mousedown', function(e) { e.stopPropagation(); ds_beginEditDragWatch(e, d.dataset.rowIdx, d.dataset.colId); }); // 편집 칸에서 시작한 드래그는 셀 경계를 넘으면 범위 선택으로(#383)
 }
 function ds_richPos(root, offset) { // 순수 텍스트 offset → DOM 위치(줄바꿈 <br> 는 글자 1개)
   var n = 0, walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT), node;
@@ -43050,6 +43077,7 @@ function ds_cellRangeDragMove(e) {
   }
   e.preventDefault();
   e.stopPropagation();
+  ds_startDragAutoScroll(e.clientX, e.clientY); // 가장자리 자동 스크롤(#383): 이미 돌고 있으면 포인터 위치만 갱신
   var coords = ds_getCellCoordsFromPoint(e.clientX, e.clientY);
   if (!coords) return;
   if (ctx.endRowIdx === coords.rowIdx && ctx.endColId === coords.colId) return;
@@ -43077,13 +43105,80 @@ function ds_cellRangeDragEnd(e) {
   }
 }
 
+// 편집 중인 셀에서 시작한 드래그(#383): 셀 안에서만 움직이면 글자 선택, 다른 셀로 넘어가는 순간 편집을 확정·종료하고 시작 셀부터 범위 선택(구글 시트처럼)
+var _dsEditDragWatch = null;
+function ds_beginEditDragWatch(e, rowIdx, colId) {
+  if (!e || e.button !== 0) return;
+  _dsEditDragWatch = { rowIdx: parseInt(rowIdx, 10), colId: colId, startX: e.clientX, startY: e.clientY, down: true };
+  document.addEventListener('mousemove', ds_editDragWatchMove, true);
+  document.addEventListener('mouseup', ds_editDragWatchEnd, true);
+}
+function ds_editDragWatchEnd() {
+  if (_dsEditDragWatch) _dsEditDragWatch.down = false;
+  document.removeEventListener('mousemove', ds_editDragWatchMove, true);
+  document.removeEventListener('mouseup', ds_editDragWatchEnd, true);
+}
+function ds_editDragWatchMove(e) {
+  var w = _dsEditDragWatch;
+  if (!w || !w.down) return;
+  if (!(e.buttons & 1)) { ds_editDragWatchEnd(); return; }
+  var c = ds_getCellCoordsFromPoint(e.clientX, e.clientY);
+  if (!c || (c.rowIdx === w.rowIdx && c.colId === w.colId)) return;
+  ds_editDragWatchEnd();
+  e.preventDefault();
+  var startDrag = function() {
+    if (!ds_isCellInEditMode(w.rowIdx, w.colId)) return;
+    ds_exitCellEditMode(); // 입력 중인 값은 입력 때마다 저장돼 있어 잃지 않는다(서식 편집 칸도 ds_applyCellEditModeUi 가 닫음)
+    var sel = window.getSelection();
+    if (sel) sel.removeAllRanges();
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    _dsCellSelectionDragCtx = { startRowIdx: w.rowIdx, startColId: w.colId, endRowIdx: c.rowIdx, endColId: c.colId, startX: w.startX, startY: w.startY, started: true };
+    document.body.classList.add('ds-cell-selecting');
+    document.addEventListener('mousemove', ds_cellRangeDragMove);
+    document.addEventListener('mouseup', ds_cellRangeDragEnd);
+    ds_setSelectedCellRange(w.rowIdx, w.colId, c.rowIdx, c.colId);
+    ds_startDragAutoScroll(e.clientX, e.clientY);
+  };
+  whenImeIdle(startDrag); // 한글 조합 중이면 조합이 확정된 뒤 전환(#377)
+}
+// 드래그 중 화면 가장자리에 닿으면 자동 스크롤(데이터 시트·본문 표 공통)
+function dragScrollParent(el) {
+  for (var n = el; n && n !== document.body; n = n.parentElement) {
+    var oy = getComputedStyle(n).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+function dragAutoScrollDelta(pos, from, to, margin) { // 가장자리 margin 안쪽/바깥에서 속도(px/틱), 가운데는 0
+  if (pos < from + margin) return -Math.min(40, 4 + (from + margin - pos) / 2);
+  if (pos > to - margin) return Math.min(40, 4 + (pos - (to - margin)) / 2);
+  return 0;
+}
+var _dsDragAutoScroll = null;
+function ds_startDragAutoScroll(x, y) {
+  var body = document.getElementById('ds-editor-body');
+  if (!body) return;
+  if (_dsDragAutoScroll) { _dsDragAutoScroll.x = x; _dsDragAutoScroll.y = y; return; }
+  var st = _dsDragAutoScroll = { x: x, y: y, timer: 0 };
+  st.timer = setInterval(function() {
+    var ctx = _dsCellSelectionDragCtx;
+    if (!ctx || !ctx.started || st !== _dsDragAutoScroll) { clearInterval(st.timer); if (st === _dsDragAutoScroll) _dsDragAutoScroll = null; return; }
+    var r = body.getBoundingClientRect(), dx = dragAutoScrollDelta(st.x, r.left + 60, r.right, 28), dy = dragAutoScrollDelta(st.y, r.top + 28, r.bottom, 28);
+    if (dx || dy) body.scrollBy(dx, dy);
+    var px = Math.min(r.right - 2, Math.max(r.left + 62, st.x)), py = Math.min(r.bottom - 2, Math.max(r.top + 30, st.y));
+    var coords = ds_getCellCoordsFromPoint(px, py);
+    if (!coords || (ctx.endRowIdx === coords.rowIdx && ctx.endColId === coords.colId)) return;
+    ctx.endRowIdx = coords.rowIdx; ctx.endColId = coords.colId;
+    ds_setSelectedCellRange(ctx.startRowIdx, ctx.startColId, ctx.endRowIdx, ctx.endColId);
+  }, 40);
+}
 function ds_handleCellMouseDown(e, rowIdx, colId) {
   var isSameEditingCell = ds_isCellInEditMode(rowIdx, colId);
   if (e) {
     e.stopPropagation();
     if (!isSameEditingCell) e.preventDefault();
   }
-  if (isSameEditingCell) ds_setActiveCell(rowIdx, colId, { keepEdit: true });
+  if (isSameEditingCell) { ds_setActiveCell(rowIdx, colId, { keepEdit: true }); ds_beginEditDragWatch(e, rowIdx, colId); }
   else {
     ds_focusCell(rowIdx, colId, { edit: false });
     ds_beginCellRangeDrag(e, rowIdx, colId);
@@ -43155,11 +43250,29 @@ function _dsFillEnsureEls(body) {
   else if (p.parentNode !== body) body.appendChild(p);
   return { h: h, p: p };
 }
+// 선택 모양(#383, 구글 시트식): 범위 전체에 반투명 파란 채움 + 외곽 1px, 활성 셀(드래그 시작 셀)에 2px 진한 파랑 테두리. 셀 배경색 위에서도 보이도록 오버레이로 그린다
+function ds_positionSelectionBoxes(body) {
+  var range = document.getElementById('ds-range-box'), active = document.getElementById('ds-active-box');
+  if (!range) { range = document.createElement('div'); range.id = 'ds-range-box'; body.appendChild(range); } else if (range.parentNode !== body) body.appendChild(range);
+  if (!active) { active = document.createElement('div'); active.id = 'ds-active-box'; body.appendChild(active); } else if (active.parentNode !== body) body.appendChild(active);
+  var ds = findDataSheet(_dsEditId), b = body.getBoundingClientRect();
+  function place(el, r) { el.style.left = (r.left - b.left + body.scrollLeft) + 'px'; el.style.top = (r.top - b.top + body.scrollTop) + 'px'; el.style.width = r.width + 'px'; el.style.height = r.height + 'px'; el.classList.add('visible'); }
+  function tdOf(rowIdx, colId) { var ta = ds_getCellTextarea(rowIdx, colId); return ta && ta.closest ? ta.closest('td') : null; }
+  range.classList.remove('visible'); active.classList.remove('visible');
+  var info = ds && ds_getSelectedCellRangeInfo(ds);
+  if (info && info.cellCount > 1) {
+    var first = tdOf(info.rowIdxs[0], info.colIds[0]), last = tdOf(info.rowIdxs[info.rowIdxs.length - 1], info.colIds[info.colIds.length - 1]);
+    if (first && last) { var a = first.getBoundingClientRect(), z = last.getBoundingClientRect(); place(range, { left: Math.min(a.left, z.left), top: Math.min(a.top, z.top), width: Math.max(a.right, z.right) - Math.min(a.left, z.left), height: Math.max(a.bottom, z.bottom) - Math.min(a.top, z.top) }); }
+  }
+  var ctx = ds && ds_getActiveCellContext(ds);
+  if (ctx) { var td = tdOf(ctx.rowIdx, ctx.colId); if (td) place(active, td.getBoundingClientRect()); }
+}
 function ds_positionFillHandle() {
   var body = document.getElementById('ds-editor-body');
   if (!body) return;
   if (!body._dsFillScrollBound) { body.addEventListener('scroll', ds_positionFillHandle); body._dsFillScrollBound = true; }
   var els = _dsFillEnsureEls(body);
+  ds_positionSelectionBoxes(body);
   if (_dsFillCtx) return; // 드래그 중에는 갱신하지 않음
   var anchor = ds_getFillAnchorCell();
   if (!anchor) { els.h.classList.remove('visible'); return; }
