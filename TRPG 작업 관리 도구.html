@@ -3892,7 +3892,7 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
   width: 100%; max-width: 100%; margin: 6px 0; border-collapse: collapse; table-layout: fixed;
 }
 /* 오버플로우 셀(#374): 오른쪽 셀이 비어 있으면 글자가 그 위로 넘쳐 보이고, 내용이 있으면 그 셀이 위에 덮어 잘려 보인다 */
-.tb-editor-table td[style*="white-space: nowrap"]:not([style*="overflow: hidden"]) + td:not(:has(> br:only-child)) { position: relative; z-index: 1; background-color: #fff; }
+.tb-editor-table td[style*="white-space: nowrap"]:not([style*="overflow: hidden"]) + td:not(:has(> br:only-child)) { position: relative; z-index: 1; background-color: var(--tb-cover-bg, #fff); } /* 덮개 색은 표가 놓인 곳의 실제 바탕색(tbRefreshCoverBg 가 편집 영역에 변수로 전달, 셀 자체 배경색(#364)은 inline 이 이김) */
 .tb-editor-table td {
   min-width: 0; padding: 6px 8px; border: 1px solid #bbb; vertical-align: top;
   overflow-wrap: anywhere; word-break: break-word;
@@ -19153,6 +19153,26 @@ function tbCellWrapMode(td) {
   if (td.style.whiteSpace !== 'nowrap') return 'wrap';
   return td.style.overflow === 'hidden' ? 'clip' : 'overflow';
 }
+// 오버플로우 덮개 색(#378): 표 둘레에서 처음 만나는 투명하지 않은 배경색. 편집 영역 요소의 CSS 변수로만 전달해 저장 내용(innerHTML)은 건드리지 않는다
+function tbCoverBgOf(el) {
+  for (var n = el; n && n.nodeType === 1; n = n.parentElement) {
+    var c = getComputedStyle(n).backgroundColor;
+    if (c && c !== 'transparent' && !/rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*0\s*\)/.test(c)) return c;
+  }
+  return '#fff';
+}
+let tbCoverRaf = 0;
+function tbRefreshCoverBg() {
+  tbCoverRaf = 0;
+  document.querySelectorAll('#blocks-container table.tb-editor-table, #rb-blocks-container table.tb-editor-table').forEach(function(table) {
+    if (!table.querySelector('td[style*="white-space: nowrap"]')) return;
+    var ce = table.closest('[contenteditable="true"]');
+    if (!ce) return;
+    var color = tbCoverBgOf(table.parentElement);
+    if (ce.style.getPropertyValue('--tb-cover-bg') !== color) ce.style.setProperty('--tb-cover-bg', color);
+  });
+}
+new MutationObserver(function() { if (!tbCoverRaf) tbCoverRaf = setTimeout(tbRefreshCoverBg, 50); }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
 function tbApplyCellWrap(table, cells, mode) {
   cells.forEach(function(td) {
     if (mode === 'overflow' || mode === 'clip') {

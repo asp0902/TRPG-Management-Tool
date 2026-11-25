@@ -26,4 +26,12 @@ ok(/whiteSpace = 'nowrap'/.test(html.slice(html.indexOf('function tbApplyCellWra
 ok(/removeProperty\('white-space'\)/.test(html) && /if \(!td\.getAttribute\('style'\)\) td\.removeAttribute\('style'\)/.test(html), '본문 표: 줄바꿈(기본)은 style 제거, 비면 속성째 제거');
 ok(/label: '텍스트 줄바꿈', submenu:/.test(html) && /tbCellBackgroundTargets\(table, model, elems, id\)/.test(html), '본문 표: 「표 ▶」 안 텍스트 줄바꿈 하위 메뉴, 셀 범위 선택 대상(#362)');
 ok(/\.tb-editor-table td\[style\*="white-space: nowrap"\]:not\(\[style\*="overflow: hidden"\]\) \+ td:not\(:has\(> br:only-child\)\)/.test(html), '오버플로우 셀의 오른쪽 내용 있는 셀이 위에 덮어 잘림');
+// 덮개 색(#378): 고정 흰색 대신 표 둘레의 실제 바탕색을 변수로 전달
+ok(/position: relative; z-index: 1; background-color: var\(--tb-cover-bg, #fff\)/.test(html) && !/z-index: 1; background-color: #fff;/.test(html), '덮개 배경은 var(--tb-cover-bg, #fff)(셀 자체 배경색 inline 이 우선)');
+const cov = html.slice(html.indexOf('function tbCoverBgOf'), html.indexOf('let tbCoverRaf'));
+const cctx = { getComputedStyle: el => ({ backgroundColor: el.bg }) }; vm.createContext(cctx); vm.runInContext(cov + ';this.f=tbCoverBgOf', cctx);
+const el = (bg, parent) => ({ nodeType: 1, bg, parentElement: parent || null });
+const root = el('rgb(255, 255, 255)'), toggle = el('rgb(249, 249, 249)', root), inner = el('rgba(0, 0, 0, 0)', toggle), tr = el('transparent', inner);
+ok(cctx.f(tr) === 'rgb(249, 249, 249)' && cctx.f(el('rgba(0, 0, 0, 0)', null)) === '#fff', '표 둘레에서 처음 만나는 투명하지 않은 배경색(없으면 #fff)');
+ok(/ce\.style\.setProperty\('--tb-cover-bg', color\)/.test(html) && /new MutationObserver\(function\(\) \{ if \(!tbCoverRaf\)/.test(html), '편집 영역 변수로만 전달(저장 innerHTML 불변), 변경 감시로 갱신');
 process.exit(f ? 1 : 0);
