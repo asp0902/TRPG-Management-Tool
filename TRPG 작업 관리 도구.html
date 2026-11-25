@@ -7462,6 +7462,12 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .sh-field-label { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; overflow-wrap: anywhere; } /* 칸 폭을 넘는 라벨은 겹치지 않고 줄바꿈(#319) */
 .sh-attr-level { font-size: 10px; color: #aaa; font-style: italic; line-height: 1.3; margin-top: 2px; }
 .sh-field-textarea.auto-grow { min-height: 34px; overflow: hidden; resize: none; }
+.sh-ar2-summary { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; font-size: 12px; color: #555; flex-wrap: wrap; }
+.sh-ar2-sum { font-weight: 800; color: #333; }
+.sh-ar2-sum.warn { color: #dc2626; }
+.sh-ar2-cap-label { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+.sh-ar2-cap { width: 52px; height: 24px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 5px; padding: 0 6px; font: inherit; text-align: center; }
+.ar2e-sk-card.ar2e-sk-over { border-color: #fca5a5; box-shadow: inset 0 0 0 1px #fca5a5; }
 .sh-ar2-vitals { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)); gap: 8px; }
 .sh-ar2-vital { border: 1px solid #e8e8e8; border-radius: 8px; background: #fafafa; padding: 8px; min-width: 0; }
 .sh-ar2-vital-title { font-size: 11px; font-weight: 800; color: #333; margin-bottom: 6px; }
@@ -47470,7 +47476,7 @@ function _ar2eSkillAreaResize(el) {
   if (!el || !el.closest) return;
   _ar2eEqualizeSkillAreas(el.closest('.ar2e-sk-card'));
 }
-function renderArianrhod2eSkillsSection(sec, rows, chId, sheetId) {
+function renderArianrhod2eSkillsSection(sec, rows, chId, sheetId, sheetData) {
   rows = Array.isArray(rows) ? rows : [];
   var WIDE = { effect: 1, desc: 1 };
   var MINPX = { name: 78, level: 40, slMax: 40, category: 56, timing: 56, roll: 56, target: 56, range: 56, cost: 56, condition: 84, critical: 72 };
@@ -47509,7 +47515,7 @@ function renderArianrhod2eSkillsSection(sec, rows, chId, sheetId) {
     }).join('');
     var delH = 'removeSheetRow(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',"skills",' + rowIdx + ')';
     var foldH = 'ds_ar2eToggleSkillFold(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + rowIdx + ',this)';
-    return '<div class="ar2e-sk-card' + (expanded ? '' : ' ar2e-sk-collapsed') + '">'
+    return '<div class="ar2e-sk-card' + (expanded ? '' : ' ar2e-sk-collapsed') + (ar2eSlTotals(sheetData).overRows.includes(rowIdx) ? ' ar2e-sk-over' : '') + '">'
       + '<div class="ar2e-sk-btns">'
       + '<button class="ar2e-sk-del" onclick="' + esc(delH) + '" title="삭제">✕</button>'
       + '<button class="ar2e-sk-fold' + (expanded ? ' open' : '') + '" onclick="' + esc(foldH) + '" aria-expanded="' + (expanded ? 'true' : 'false') + '" title="효과/해설 펼치기/접기">▾</button>'
@@ -47533,7 +47539,7 @@ function renderArianrhod2eSkillsSection(sec, rows, chId, sheetId) {
     + '</div>';
   return '<div class="sh-section sh-repeat-section" data-template-key="arianrhod2e" data-section-id="skills">'
     + '<div class="sh-section-hd rollable" onclick="toggleArianrhod2eSkillGuide()">' + esc(sec.label) + '</div>'
-    + '<div class="sh-section-body">' + guideHtml
+    + '<div class="sh-section-body">' + ar2eSummaryHtml(sheetData, 'skills', chId, sheetId) + guideHtml
     + '<div class="ar2e-sk-list">' + cardsHtml + '</div>'
     + '<div class="sh-repeat-add-row"><button class="sh-repeat-add-btn" onclick="' + esc(addH) + '">＋ 항목 추가</button></div>'
     + '</div></div>';
@@ -47902,12 +47908,98 @@ function ar2eCombatTotals(sheetData, mods) {
 function ar2eDiceExpr(extraDice, bonus) { // 음수는 2D-1 (2D+-1 아님), 0 은 2D
   return (2 + extraDice) + 'D' + (bonus > 0 ? '+' + bonus : bonus < 0 ? String(bonus) : '');
 }
+// ── 아리안로드 2E 보강(#380): 보너스 포인트·SL 총합·페이트·휴대 중량·코코포리아 줄 형식. 계산·문자열은 DOM 과 분리한 순수 함수 ──
+function ar2eFateMax(sheetData) { // 직접 입력한 값이 있으면 그 값(성장 반영), 없으면 메인==서포트 6, 아니면 5
+  const d = sheetData || {}, v = (d.combat || {}).fateMax;
+  if (v !== undefined && v !== null && String(v).trim() !== '') return ar2eInt(v);
+  const c = d.classes || {}, main = String(c.mainClass || '').trim(), support = String(c.supportClass || '').trim();
+  return main && main === support ? 6 : 5;
+}
+function ar2eBonusTotals(bonuses) { // 능력별 보너스(상한 보정 후) 합계 / 5
+  const total = (bonuses || []).reduce((sum, v) => sum + ar2eInt(v), 0);
+  return { total: total, max: 5, over: total > 5, remain: Math.max(0, 5 - total) };
+}
+function ar2eSkillLevel(row) { return ar2eInt(row.level !== undefined && row.level !== null && row.level !== '' ? row.level : row.sl); }
+function ar2eSlCap(sheetData) { const v = ((sheetData || {}).skillMeta || {}).slCap; return (v === undefined || v === null || String(v).trim() === '') ? 8 : ar2eInt(v); }
+function ar2eSlTotals(sheetData) { // 스킬 레벨 합계·상한, 개별 상한(slMax)을 넘은 행
+  const skills = Array.isArray((sheetData || {}).skills) ? sheetData.skills : [], overRows = [];
+  let total = 0;
+  skills.forEach((row, i) => {
+    if (!row || typeof row !== 'object') return;
+    const level = ar2eSkillLevel(row), max = ar2eInt(row.slMax);
+    total += level;
+    if (max > 0 && level > max) overRows.push(i);
+  });
+  const cap = ar2eSlCap(sheetData);
+  return { total: total, cap: cap, overTotal: total > cap, overRows: overRows };
+}
+const AR2E_WEAPON_PARTS = ['한손', '양손', '연금총', '커스텀'], AR2E_ARMOR_PARTS = ['머리', '몸통', '보조'];
+function ar2eCarryTotals(sheetData, strBase) { // 휴대 중량(아이템 중량×개수)/휴대 가능(근력 능력 기본치 총합), 장착한 무기·방어구 중량
+  const d = sheetData || {}, m = d.modifiers || {};
+  let carry = 0, weapon = 0, armor = 0;
+  (Array.isArray(d.items) ? d.items : []).forEach(it => {
+    if (!it || typeof it !== 'object') return;
+    const count = (it.count === undefined || it.count === null || String(it.count).trim() === '') ? 1 : ar2eInt(it.count);
+    carry += ar2eInt(it.weight) * count;
+  });
+  (Array.isArray(d.weapons) ? d.weapons : []).forEach(row => {
+    if (!row || typeof row !== 'object' || !ar2eIsEquipped(row)) return;
+    const w = ar2eInt(row.weight);
+    if (AR2E_WEAPON_PARTS.includes(row.part)) weapon += w; else if (AR2E_ARMOR_PARTS.includes(row.part)) armor += w;
+  });
+  const has = v => v !== undefined && v !== null && String(v).trim() !== '';
+  const carryShown = has(m.carryWeight) ? ar2eInt(m.carryWeight) : carry, limit = has(m.carryLimit) ? ar2eInt(m.carryLimit) : strBase; // 수동 입력이 있으면 그 값 우선(기존 값 보존)
+  return { carry: carryShown, limit: limit, weapon: weapon, armor: armor, strBase: strBase, overCarry: carryShown > limit, overWeapon: weapon > strBase, overArmor: armor > strBase };
+}
+function ar2eDash(v) { const t = String(v == null ? '' : v).trim(); return t || '-'; }
+function ar2eSkillLine(sk) { // ◆ LV n/ 스킬명 - (타이밍 | 대상 | 사거리 | 코스트) [판정 : …] [사용 조건 : …] [크리티컬 : …]
+  return '◆ LV ' + ar2eSkillLevel(sk) + '/ ' + String(sk.name == null ? '' : sk.name).trim() + ' - (' + [sk.timing, sk.target, sk.range, sk.cost].map(ar2eDash).join(' | ') + ') [판정 : ' + ar2eDash(sk.roll) + '] [사용 조건 : ' + ar2eDash(sk.condition) + '] [크리티컬 : ' + ar2eDash(sk.critical) + ']';
+}
+function ar2eItemLine(it) { // □ 품명 (수량 : n | 중량 : n)
+  const count = (it.count === undefined || it.count === null || String(it.count).trim() === '') ? 1 : ar2eInt(it.count);
+  return '□ ' + String(it.name == null ? '' : it.name).trim() + ' (수량 : ' + count + ' | 중량 : ' + ar2eInt(it.weight) + ')';
+}
+function ar2eMemoLines(tot) { return ['행동치:' + tot.initiative + ' | 이동력:' + tot.move, '물리방어력:' + tot.phyDef + ' | 마법방어력:' + tot.magDef]; }
 function _ar2eAbilityMods(sheetData) { // 능력치 섹션의 최종 수정치
   const d = sheetData || {}, raceRecord = _ar2eGetRaceRecord(d.classes && d.classes.race), classMods = _ar2eGetSelectedClassModifierRecords(d), out = {};
   _ARIANRHOD2E_ABILITIES.forEach(ability => { out[ability.key] = _ar2eCalcAbilityParts(d.abilities, raceRecord, ability.key, classMods).abilityMod; });
   return out;
 }
+function _ar2eAbilityPartsOf(sheetData, key) {
+  const d = sheetData || {};
+  return _ar2eCalcAbilityParts(d.abilities, _ar2eGetRaceRecord(d.classes && d.classes.race), key, _ar2eGetSelectedClassModifierRecords(d));
+}
+function ar2eSummaryTexts(sheetData) { // 화면 요약 문자열·경고 여부
+  const d = sheetData || {}, bonus = ar2eBonusTotals(_ARIANRHOD2E_ABILITIES.map(a => _ar2eAbilityPartsOf(d, a.key).baseBonus));
+  const sl = ar2eSlTotals(d), carry = ar2eCarryTotals(d, _ar2eAbilityPartsOf(d, 'str').total);
+  return {
+    bonus: { text: '보너스 ' + bonus.total + ' / ' + bonus.max + (bonus.total < bonus.max ? ' (남은 ' + bonus.remain + '점)' : ''), warn: bonus.over },
+    sl: { text: 'SL 총합 ' + sl.total + ' / ' + sl.cap, warn: sl.overTotal, overRows: sl.overRows },
+    carry: { text: '휴대 중량 ' + carry.carry + ' / ' + carry.limit, warn: carry.overCarry },
+    weapon: { text: '무기 ' + carry.weapon + ' · 방어구 ' + carry.armor + ' / 근력 ' + carry.strBase, warn: carry.overWeapon || carry.overArmor },
+  };
+}
+function ar2eSummaryHtml(sheetData, secId, chId, sheetId) { // 섹션 위 요약 줄(보너스·SL·휴대 중량·장비 중량)
+  const t = ar2eSummaryTexts(sheetData);
+  const span = key => '<span class="sh-ar2-sum' + (t[key].warn ? ' warn' : '') + '" data-ar2e-sum="' + key + '">' + esc(t[key].text) + '</span>';
+  if (secId === 'abilities') return '<div class="sh-ar2-summary">' + span('bonus') + '</div>';
+  if (secId === 'skills') {
+    const cap = ((sheetData || {}).skillMeta || {}).slCap, handler = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',"skillMeta","slCap",this.value)';
+    return '<div class="sh-ar2-summary">' + span('sl') + ' <label class="sh-ar2-cap-label">상한 <input class="sh-ar2-cap" type="number" placeholder="8" value="' + esc(cap == null ? '' : String(cap)) + '" oninput="' + esc(handler) + '" aria-label="SL 상한"></label></div>';
+  }
+  if (secId === 'items') return '<div class="sh-ar2-summary">' + span('carry') + '</div>';
+  if (secId === 'weapons') return '<div class="sh-ar2-summary">' + span('weapon') + '</div>';
+  return '';
+}
+function _ar2eRefreshSummaries(sheetData) {
+  const t = ar2eSummaryTexts(sheetData);
+  Object.keys(t).forEach(key => { const el = document.querySelector('[data-ar2e-sum="' + key + '"]'); if (el) { el.textContent = t[key].text; el.classList.toggle('warn', !!t[key].warn); } });
+  document.querySelectorAll('#ar2e-skill-list-anchor ~ * .ar2e-sk-card, .ar2e-sk-list .ar2e-sk-card').forEach((card, i) => card.classList.toggle('ar2e-sk-over', t.sl.overRows.includes(i)));
+  const fate = document.querySelector('[data-ar2e-vital="fateMax"]');
+  if (fate) fate.placeholder = String(ar2eFateMax(sheetData));
+}
 function _ar2eRefreshCombatTotals(sheetData) {
+  _ar2eRefreshSummaries(sheetData); // 보너스·SL·휴대 중량 요약(#380)
   const t = ar2eCombatTotals(sheetData, _ar2eAbilityMods(sheetData));
   const text = { hit: ar2eDiceExpr(t.hitDice, t.hit), attack: ar2eDiceExpr(t.attackDice, t.attack), evasion: ar2eDiceExpr(t.evasionDice, t.evasion), phyDef: t.phyDef, magDef: t.magDef, initiative: t.initiative, move: t.move };
   Object.keys(text).forEach(key => { const el = document.querySelector('[data-ar2e-total="' + key + '"]'); if (el) el.value = String(text[key]); });
@@ -48161,7 +48253,7 @@ function renderCharacterSheet(chId) {
     }
     if (tpl.key === 'arianrhod2e' && sec.id === 'skills' && sec.repeatable) {
       var skRows = Array.isArray(sheetData[sec.id]) ? sheetData[sec.id] : [];
-      return renderArianrhod2eSkillsSection(sec, skRows, chId, sheetId);
+      return renderArianrhod2eSkillsSection(sec, skRows, chId, sheetId, sheetData);
     }
     if (sec.repeatable) {
       var rows = Array.isArray(sheetData[sec.id]) ? sheetData[sec.id] : [];
@@ -48300,7 +48392,7 @@ function renderCharacterSheet(chId) {
       }).join('');
       if (headFieldsHtml) secHeaderHtml = secHeaderHtml.replace('class="sh-section-hd"', 'class="sh-section-hd sh-cypher-section-hd"').replace(/<\/div>$/, '<span class="sh-hd-fields">' + headFieldsHtml + '</span></div>');
       return '<div class="sh-section sh-repeat-section"' + repeatAttrs + '>' + secHeaderHtml
-        + '<div class="sh-section-body">' + guideHtml + '<table class="sh-repeat-table"' + repeatAttrs + '>' + (isCocWeapons ? '<colgroup>' + [40, 11, 11, 6, 6, 6, 6, 6, 8].map(function(width) { return '<col style="width:' + width + '%">'; }).join('') + '</colgroup>' : (visibleFields.some(function(f) { return f.width; }) ? '<colgroup>' + visibleFields.map(function(f) { return f.width ? '<col style="width:' + (typeof f.width === 'number' ? f.width + 'px' : esc(f.width)) + '">' : '<col>'; }).join('') + '<col></colgroup>' : '')) + '<thead><tr>' + thHtml + '</tr></thead><tbody>' + pinnedHtml + rowsHtml + '</tbody></table>'
+        + '<div class="sh-section-body">' + (tpl.key === 'arianrhod2e' ? ar2eSummaryHtml(sheetData, sec.id, chId, sheetId) : '') + guideHtml + '<table class="sh-repeat-table"' + repeatAttrs + '>' + (isCocWeapons ? '<colgroup>' + [40, 11, 11, 6, 6, 6, 6, 6, 8].map(function(width) { return '<col style="width:' + width + '%">'; }).join('') + '</colgroup>' : (visibleFields.some(function(f) { return f.width; }) ? '<colgroup>' + visibleFields.map(function(f) { return f.width ? '<col style="width:' + (typeof f.width === 'number' ? f.width + 'px' : esc(f.width)) + '">' : '<col>'; }).join('') + '<col></colgroup>' : '')) + '<thead><tr>' + thHtml + '</tr></thead><tbody>' + pinnedHtml + rowsHtml + '</tbody></table>'
         + '<div class="sh-repeat-add-row"><button class="sh-repeat-add-btn" onclick="' + esc('addSheetRow(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ')') + '">＋ 항목 추가</button></div>'
         + '</div></div>';
     } else {
@@ -49560,7 +49652,7 @@ function generateArianrhod2eCocofoliaJSON(chId, sheetId) {
   var hpCur = hasVal(combat.hpCur) ? n(combat.hpCur) : hpMax;
   var mpMax = n(combat.mpMax);
   var mpCur = hasVal(combat.mpCur) ? n(combat.mpCur) : mpMax;
-  var fateMax = n(combat.fateMax);
+  var fateMax = ar2eFateMax(d); // 비어 있으면 메인==서포트 6, 아니면 5(#380)
   var fateCur = hasVal(combat.fateCur) ? n(combat.fateCur) : fateMax;
   var tot = ar2eCombatTotals(d, _ar2eAbilityMods(d)); // 능력 수정치 + 장착 장비 + 보정(#369)
   var phyDef = tot.phyDef;
@@ -49572,8 +49664,7 @@ function generateArianrhod2eCocofoliaJSON(chId, sheetId) {
 
   var name = basic.charName || ch.name || '이름 없음';
 
-  var memoParts = [];
-  if (move) memoParts.push('이동력:' + move);
+  var memoParts = ar2eMemoLines(tot); // 행동치·이동력·물리방어력·마법방어력(#380)
   var classBits = [];
   if (classes.mainClass) classBits.push(classes.mainClass);
   if (classes.supportClass) classBits.push(classes.supportClass);
@@ -49586,7 +49677,6 @@ function generateArianrhod2eCocofoliaJSON(chId, sheetId) {
     { label: 'HP', value: hpCur, max: hpMax },
     { label: 'MP', value: mpCur, max: mpMax },
     { label: '페이트', value: fateCur, max: fateMax },
-    { label: '물방/마방', value: phyDef, max: magDef },
   ];
 
   var params = [
@@ -49616,6 +49706,10 @@ function generateArianrhod2eCocofoliaJSON(chId, sheetId) {
   cmd.push('2D+{지력} 에너미 식별');
   cmd.push('2D+{지력} 아이템 감정');
   cmd.push('2D+{지력} 마술 판정');
+  cmd.push('2D+{정신} 주가 판정');
+  cmd.push('2D+{재주} 연금술 판정');
+  cmd.push('2D+{근력} 도약 판정');
+  cmd.push('2D+{근력} 등반 판정');
   cmd.push('');
   cmd.push('──전투 판정──');
   cmd.push(ar2eDiceExpr(tot.hitDice, tot.hit) + ' 명중 판정');
@@ -49629,11 +49723,13 @@ function generateArianrhod2eCocofoliaJSON(chId, sheetId) {
   if (validSkills.length) {
     cmd.push('');
     cmd.push('──스킬──');
-    validSkills.forEach(function(sk) {
-      var roll = sk.roll ? String(sk.roll).trim() : '';
-      var line = roll ? roll + ' ' + sk.name : sk.name;
-      cmd.push(line);
-    });
+    validSkills.forEach(function(sk) { cmd.push(ar2eSkillLine(sk)); }); // ◆ LV n/ 스킬명 - (…) [판정 : …] … (#380)
+  }
+  var validItems = (Array.isArray(d.items) ? d.items : []).filter(function(it) { return it && it.name; });
+  if (validItems.length) {
+    cmd.push('');
+    cmd.push('──소지품──');
+    validItems.forEach(function(it) { cmd.push(ar2eItemLine(it)); });
   }
 
   var powers = Array.isArray(d.powers) ? d.powers : [];
@@ -51159,7 +51255,7 @@ function renderArianrhod2eVitalsPanel(sheetData, chId, sheetId) {
     var fieldsHtml = group.fields.map(function(field) {
       var val = field.value !== undefined ? field.value : (combatData[field.id] !== undefined && combatData[field.id] !== null ? combatData[field.id] : '');
       var handler = 'saveArianrhod2eVitalField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(field.id) + ',this.value,this)';
-      var inputAttrs = ' data-ar2e-vital="' + esc(field.id) + '"' + (field.readonly ? ' readonly tabindex="-1"' : ' oninput="' + esc(handler) + '"');
+      var inputAttrs = ' data-ar2e-vital="' + esc(field.id) + '"' + (field.readonly ? ' readonly tabindex="-1"' : ' oninput="' + esc(handler) + '"') + (field.id === 'fateMax' ? ' placeholder="' + ar2eFateMax(sheetData) + '" title="비워 두면 메인·서포트 클래스가 같을 때 6, 아니면 5"' : '');
       return '<div class="sh-ar2-vital-field">'
         + '<div class="sh-ar2-vital-label">' + esc(field.label) + '</div>'
         + '<input class="sh-ar2-vital-input" type="number" value="' + esc(String(val)) + '"' + inputAttrs + ' aria-label="' + esc(group.title + ' ' + field.label) + '">'
@@ -51229,7 +51325,7 @@ function renderArianrhod2eAbilitiesSection(sec, sectionData, sheetData, chId, sh
       + '</div>';
   }).join('');
   return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'
-    + '<div class="sh-section-body">' + vitalsHtml + '<div class="sh-ar2-abilities-scroll"><div class="sh-ar2-abilities">' + header + rows + '</div></div></div></div>';
+    + '<div class="sh-section-body">' + ar2eSummaryHtml(sheetData, 'abilities', chId, sheetId) + vitalsHtml + '<div class="sh-ar2-abilities-scroll"><div class="sh-ar2-abilities">' + header + rows + '</div></div></div></div>';
 }
 
 function renderDnd5ePersonalitySection(sec, sectionData, chId, sheetId) {
@@ -51841,7 +51937,7 @@ function saveSheetRepeatCell(chId, sheetId, sectionId, rowIdx, fieldId, value) {
   if (!sheet.data[sectionId][rowIdx]) sheet.data[sectionId][rowIdx] = {};
   sheet.data[sectionId][rowIdx][fieldId] = value;
   persist();
-  if (sheet.templateKey === 'arianrhod2e' && sectionId === 'weapons') _ar2eRefreshCombatTotals(sheet.data);
+  if (sheet.templateKey === 'arianrhod2e') _ar2eRefreshCombatTotals(sheet.data); // 장비·아이템·스킬 값이 바뀌면 요약 갱신(#380)
 }
 
 // 반복 섹션 행 추가
