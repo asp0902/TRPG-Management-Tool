@@ -8683,8 +8683,8 @@ select.sh-field-input,
       </div>
     </div>
     <div class="cp-footer">
-      <button class="cp-cancel-btn" onclick="closeColorPanel()">취소</button>
       <button class="cp-apply-btn" onclick="applyColorPanel()">적용</button>
+      <button class="cp-cancel-btn" onclick="closeColorPanel()">취소</button>
     </div>
   </div>
 
@@ -8948,8 +8948,8 @@ select.sh-field-input,
       <div class="clp-attach-list" id="clp-attach-list"></div>
     </div>
     <div class="clp-footer">
-      <button class="clp-close" onclick="closeCatalogLinksPopover(false)">취소</button>
       <button class="clp-save" onclick="closeCatalogLinksPopover(true)">저장</button>
+      <button class="clp-close" onclick="closeCatalogLinksPopover(false)">취소</button>
     </div>
   </div>
 
@@ -9407,8 +9407,8 @@ select.sh-field-input,
       </div>
       <div class="ds-modal-footer">
         <button class="ds-modal-del" type="button" id="ds-modal-del-btn" style="display:none;" onclick="deleteDataSheetFromModal()">삭제</button>
-        <button type="button" onclick="closeDataSheetModal()">취소</button>
         <button class="ds-modal-save" type="button" onclick="saveDataSheetModal()">저장</button>
+        <button type="button" onclick="closeDataSheetModal()">취소</button>
       </div>
     </div>
   </div>
@@ -9604,8 +9604,8 @@ select.sh-field-input,
       </div>
       <div class="dnd-builder-body" id="dnd-builder-body"></div>
       <div class="dnd-builder-foot">
-        <button class="dnd-builder-close" onclick="closeDnd5eBuilder()">취소</button>
         <button class="dnd-builder-apply" onclick="applyDnd5eBuilder()">시트에 적용</button>
+        <button class="dnd-builder-close" onclick="closeDnd5eBuilder()">취소</button>
       </div>
     </div>
   </div>
@@ -9620,8 +9620,8 @@ select.sh-field-input,
       <div class="coc-skill-modal-hint">이름에 따라 기본 수치가 자동 입력됩니다. 예: 언어, 과학, 예술/공예, 생존술</div>
       <div class="ch-modal-footer">
         <button class="ch-modal-delete" type="button" id="coc-custom-skill-delete-btn" style="display:none;margin-right:auto;" onclick="deleteCocCustomSkillFromModal()">삭제</button>
-        <button class="ch-modal-cancel" type="button" onclick="closeCocCustomSkillModal()">취소</button>
         <button class="ch-modal-save" type="button" id="coc-custom-skill-save-btn" onclick="saveCocCustomSkillModal()">저장</button>
+        <button class="ch-modal-cancel" type="button" onclick="closeCocCustomSkillModal()">취소</button>
       </div>
     </div>
   </div>
@@ -9731,8 +9731,8 @@ select.sh-field-input,
       </div>
       <div class="rb-modal-footer">
         <button type="button" class="rb-modal-cancel github-sync-disconnect" onclick="disconnectGitHubSync()">연결 해제</button>
-        <button type="button" class="rb-modal-cancel" onclick="closeGitHubSyncModal()">취소</button>
         <button type="button" class="rb-modal-save" onclick="saveGitHubSyncSettings()">저장 및 동기화</button>
+        <button type="button" class="rb-modal-cancel" onclick="closeGitHubSyncModal()">취소</button>
       </div>
     </div>
   </div>
@@ -34281,7 +34281,7 @@ function openColorSplitDialog(button) {
     + '<div class="mcs-note">코코포리아에서 줄이 치우치면 배율·위치 보정으로 맞추세요 (오른쪽으로 치우치면 ◀).</div>'
     + '<div class="mcs-error"></div>'
     + '<div class="css-macro-preview-chatbox"><div class="css-macro-preview-body mcs-preview"></div></div>'
-    + '<div class="mcs-actions"><button type="button" onclick="closeColorSplitDialog()">취소</button><button type="button" class="mcs-insert" onclick="insertColorSplitMacro()">넣기</button></div>'
+    + '<div class="mcs-actions"><button type="button" class="mcs-insert" onclick="insertColorSplitMacro()">넣기</button><button type="button" onclick="closeColorSplitDialog()">취소</button></div>'
     + '</div>';
   backdrop.addEventListener('mousedown', event => { if (event.target === backdrop) closeColorSplitDialog(); });
   document.body.appendChild(backdrop);
@@ -37740,7 +37740,7 @@ async function musicRecoverOpen() {
   musicOpenModal('<div class="music-modal-head"><div class="music-modal-title">기기에 남은 음원으로 복구</div><button type="button" onclick="musicCloseModal()">✕</button></div>'
     + '<div class="music-hint">현재 목록에 없는 음원 ' + cands.length + '개를 찾았습니다. 체크한 곡만 원래 id 그대로 추가합니다(태그·폴더는 비어 있음). 일부러 지운 곡의 파일일 수도 있으니 필요한 것만 남기세요.</div>'
     + '<div class="music-recover-list">' + rows + '</div>'
-    + '<div class="music-modal-foot"><button type="button" onclick="musicCloseModal()">취소</button><button type="button" class="music-primary" id="music-recover-ok" onclick="musicRecoverApply()">선택한 곡 복구</button></div>');
+    + '<div class="music-modal-foot"><button type="button" class="music-primary" id="music-recover-ok" onclick="musicRecoverApply()">선택한 곡 복구</button><button type="button" onclick="musicCloseModal()">취소</button></div>');
 }
 async function musicRecoverApply() {
   const picked = [...document.querySelectorAll('#music-modal-backdrop .music-recover-check')].filter(el => el.checked).map(el => musicRecoverCands[Number(el.dataset.i)]).filter(Boolean);
