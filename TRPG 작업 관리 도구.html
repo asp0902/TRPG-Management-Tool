@@ -45018,19 +45018,19 @@ function ds_applyFreeze() {
     table.querySelectorAll('[data-col-id="' + CSS.escape(c.id) + '"]').forEach(function(el) {
       el.classList.toggle('ds-frozen-col', on);
       el.classList.toggle('ds-frozen-col-last', on && i === fc - 1);
-      el.style.left = on ? left + 'px' : '';
+      el.style.left = on ? (left - (i > 0 ? 1 : 1)) + 'px' : ''; // 1px 겹쳐 배율(dpr 1.25/1.5)에서 칸 사이로 아래 내용이 비치지 않게(#386 후속)
     });
     left += (cg && cg.children[i + 1] ? parseFloat(cg.children[i + 1].style.width) : 0) || ds_getDataColumnWidth(c);
   });
-  var top = head ? head.offsetHeight : 0;
+  var top = head ? head.getBoundingClientRect().height : 0; // 소수 높이 그대로(배율에서 offsetHeight 반올림 오차 방지)
   Array.prototype.forEach.call(table.tBodies[0] ? table.tBodies[0].rows : [], function(tr) {
     var idx = parseInt(tr.dataset.rowIdx, 10), on = !isNaN(idx) && idx < fr;
     Array.prototype.forEach.call(tr.cells, function(td) {
       td.classList.toggle('ds-frozen-row', on);
       td.classList.toggle('ds-frozen-row-last', on && idx === fr - 1);
-      td.style.top = on ? top + 'px' : '';
+      td.style.top = on ? (top - 1) + 'px' : ''; // 위 칸과 1px 겹침
     });
-    if (on) top += tr.offsetHeight;
+    if (on) top += tr.getBoundingClientRect().height;
   });
 }
 document.addEventListener('input', function(e) { // 고정 행 높이가 글자 입력으로 바뀌면 다음 고정 행 위치를 다시 계산
