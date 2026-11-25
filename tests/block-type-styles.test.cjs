@@ -1,0 +1,10 @@
+const fs = require('fs'), path = require('path');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+ok(/\[contenteditable="true"\] h1 \{ font-size: 26px; font-weight: 800; color: #111; margin: 0\.9em 0 0\.35em; padding-bottom: 0\.2em; border-bottom: 1px solid #e5e5e5; \}/.test(html), '제목 1 규칙');
+ok(/\[contenteditable="true"\] h2 \{ font-size: 21px; font-weight: 700; color: #111; margin: 0\.8em 0 0\.3em; \}/.test(html) && /\[contenteditable="true"\] h3 \{ font-size: 17px; font-weight: 700; color: #222; margin: 0\.6em 0 0\.2em; \}/.test(html), '제목 2·3 규칙');
+ok(/\[contenteditable="true"\] h4 \{ font-size: 14px; font-weight: 700; color: #6b7280; letter-spacing: 0\.02em; margin: 0\.5em 0 0\.15em; \}/.test(html), '소제목 규칙(회색·여백으로 본문과 구분)');
+ok(/> h1:first-child[^{]*\{ margin-top: 0; \}/.test(html), '첫 요소 위 여백 0');
+ok(/const BLOCK_TYPE_CSS = \{ h1:'font-size:26px;font-weight:800;color:#111', h2:'font-size:21px;font-weight:700;color:#111', h3:'font-size:17px;font-weight:700;color:#222', h4:'font-size:14px;font-weight:700;color:#6b7280;letter-spacing:0\.02em' \}/.test(html), '매크로 경로 BLOCK_TYPE_CSS 도 같은 값');
+ok(['h1', 'h2', 'h3', 'h4'].every(v => html.includes('.tb-block-type-option[data-value="' + v + '"] { font-size: ') && new RegExp('\\.tb-block-type-option\\[data-value="' + v + '"\\] \\{ font-size: \\d+px; font-weight: \\d+; color: #[0-9a-f]+;').test(html)), '블록 유형 메뉴 항목 미리보기');
+process.exit(f ? 1 : 0);

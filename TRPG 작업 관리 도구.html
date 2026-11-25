@@ -3286,6 +3286,11 @@ ruby > rt { font-size: 0.5em; line-height: 1; font-weight: 400; }
 .tb-block-type-option:hover, .tb-block-type-option:focus, .tb-block-type-option[aria-selected="true"] {
   background: #e9e9e9; outline: none;
 }
+/* 블록 유형 메뉴 미리보기(#419): 각 유형 모양의 축소판 */
+.tb-block-type-option[data-value="h1"] { font-size: 15px; font-weight: 800; color: #111; }
+.tb-block-type-option[data-value="h2"] { font-size: 13px; font-weight: 700; color: #111; }
+.tb-block-type-option[data-value="h3"] { font-size: 12px; font-weight: 700; color: #222; }
+.tb-block-type-option[data-value="h4"] { font-size: 11px; font-weight: 700; color: #6b7280; letter-spacing: 0.02em; }
 .tb-select-font { width: 120px; } /* 글꼴 */
 .tb-lh-wrap { position: relative; width: 52px; height: 24px; flex: 0 0 52px; }
 #format-bar .tb-select-lh {
@@ -3697,6 +3702,13 @@ body.is-block-range-selecting * {
   /* 글꼴 span([style*="font-family"])이 line-height:0 을 주고 이 미리보기를 품으면 0 을 상속해 얇은 선으로 접힌다. 편집 칸 기본 줄 높이로 되돌린다. */
   line-height: 1.4;
 }
+/* 블록 유형(#419): 제목 1~3·소제목을 본문(14px/400)과 크기·굵기·색·여백으로 분명히 구분. 태그는 그대로(CSS만), 편집기(contenteditable) 공통 */
+[contenteditable="true"] h1, [contenteditable="true"] h2, [contenteditable="true"] h3, [contenteditable="true"] h4 { line-height: 1.3; }
+[contenteditable="true"] h1 { font-size: 26px; font-weight: 800; color: #111; margin: 0.9em 0 0.35em; padding-bottom: 0.2em; border-bottom: 1px solid #e5e5e5; }
+[contenteditable="true"] h2 { font-size: 21px; font-weight: 700; color: #111; margin: 0.8em 0 0.3em; }
+[contenteditable="true"] h3 { font-size: 17px; font-weight: 700; color: #222; margin: 0.6em 0 0.2em; }
+[contenteditable="true"] h4 { font-size: 14px; font-weight: 700; color: #6b7280; letter-spacing: 0.02em; margin: 0.5em 0 0.15em; }
+[contenteditable="true"] > h1:first-child, [contenteditable="true"] > h2:first-child, [contenteditable="true"] > h3:first-child, [contenteditable="true"] > h4:first-child { margin-top: 0; }
 [contenteditable="true"] span[style*="font-family"]:not(:has(:is(br, div, p, li, ul, ol, blockquote, h1, h2, h3, h4))) { line-height: 0; }
 [contenteditable="true"][style*="Nanum Myeongjo"],
 [contenteditable="true"] [style*="Nanum Myeongjo"] {
@@ -30497,7 +30509,7 @@ function tbRedo() {
   historyRedo();
 }
 
-const BLOCK_TYPE_CSS = { h1:'font-size:24px;font-weight:bold', h2:'font-size:20px;font-weight:bold', h3:'font-size:16px;font-weight:bold', h4:'font-size:14px;font-weight:600' };
+const BLOCK_TYPE_CSS = { h1:'font-size:26px;font-weight:800;color:#111', h2:'font-size:21px;font-weight:700;color:#111', h3:'font-size:17px;font-weight:700;color:#222', h4:'font-size:14px;font-weight:700;color:#6b7280;letter-spacing:0.02em' }; /* 편집기 공통 h1~h4 CSS(#419)와 같은 크기·굵기·색 */
 // 제목으로 바꿀 때 안쪽에 박힌 inline font-size는 지운다.
 // 남겨두면 제목 크기보다 우선해서 제목 유형이 안 먹은 것처럼 보인다
 // (예전 execCommand 정렬이 span에 font-size:14px를 심어둔 경우).
