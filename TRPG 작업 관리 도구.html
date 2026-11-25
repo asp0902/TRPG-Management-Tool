@@ -19292,6 +19292,46 @@ function tbDeleteColWidth(widths, col) {
   if (w.length) w[w.length - 1] = tbRound2(100 - w.slice(0, -1).reduce((a, b) => a + b, 0));
   return w;
 }
+// 데이터에 맞추기(#387): targets(오름차순 열 번호)를 desired(%)로 맞추고, 늘고 준 만큼은 대상 오른쪽의 가장 가까운 비대상 열(없으면 왼쪽)이 받는다. 받는 열은 minPct 아래로 줄이지 않고, 모자라면 대상 변화량을 비례해 줄인다. 모든 열이 대상이면 합 100 으로 비례 조정
+function tbFitWidths(widths, targets, desired, minPct) {
+  const w = widths.slice(), set = new Set(targets), last = targets[targets.length - 1], first = targets[0];
+  let nb = -1;
+  for (let c = last + 1; c < w.length && nb < 0; c++) if (!set.has(c)) nb = c;
+  for (let c = first - 1; c >= 0 && nb < 0; c--) if (!set.has(c)) nb = c;
+  if (nb < 0) { const sum = desired.reduce((a, b) => a + b, 0) || 1, out = w.slice(); targets.forEach((c, i) => { out[c] = tbRound2(desired[i] * 100 / sum); }); out[out.length - 1] = tbRound2(100 - out.slice(0, -1).reduce((a, b) => a + b, 0)); return out; }
+  const delta = targets.reduce((a, c, i) => a + desired[i] - w[c], 0), room = Math.max(0, w[nb] - Math.min(minPct, w[nb])), k = delta > room ? room / delta : 1;
+  targets.forEach((c, i) => { w[c] = tbRound2(w[c] + (desired[i] - w[c]) * k); });
+  w[nb] = tbRound2(100 - w.filter((_, i) => i !== nb).reduce((a, b) => a + b, 0));
+  return w;
+}
+// 더블클릭한 경계의 왼쪽 열 col: 셀 범위 선택이 그 열을 덮고 여러 열이면 범위의 열 전부, 아니면 그 열만
+function tbFitTargetCols(rect, col) {
+  if (rect) { const c1 = Math.min(rect.c1, rect.c2), c2 = Math.max(rect.c1, rect.c2); if (c1 !== c2 && col >= c1 && col <= c2) return Array.from({ length: c2 - c1 + 1 }, (_, i) => c1 + i); }
+  return [col];
+}
+let tbResizeSel = null; // 경계 mousedown 이 셀 선택을 지우기 전의 선택({ table, rect, at }) — 더블클릭 때 선택된 열 전부를 맞추려고 잠깐 기억
+function tbFitColumns(table, col) { // 그 열(들)만 내용에 맞춤. 가로로 합쳐진 셀(cs>1)은 측정에서 제외
+  const { model, elems } = tbTableModel(table), size = table.getBoundingClientRect().width || 1;
+  const memo = tbResizeSel && tbResizeSel.table === table && Date.now() - tbResizeSel.at < 1500 ? tbResizeSel.rect : null;
+  const targets = tbFitTargetCols(tbCellSel && tbCellSel.table === table ? tbCellSel.rect : memo, col);
+  const widths = tbReadColWidths(table, model.cols) || tbEvenWidths(model.cols), minPct = Math.min(32 / size * 100, 100 / model.cols);
+  const probe = _dsMeasureEl(), desired = targets.map(c => {
+    let max = 0;
+    model.cells.forEach(cell => {
+      if (cell.col !== c || cell.cs !== 1) return;
+      const el = elems[cell.id];
+      if (!el.textContent.trim() && !el.querySelector('img')) return;
+      const cs = getComputedStyle(el);
+      probe.style.font = cs.font; probe.style.letterSpacing = cs.letterSpacing;
+      probe.innerHTML = el.innerHTML;
+      const w = probe.getBoundingClientRect().width + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) + 2;
+      probe.innerHTML = '';
+      if (w > max) max = w;
+    });
+    return max > 0 ? max / size * 100 : 100 / model.cols; // 내용이 없으면 균등 분배 폭
+  });
+  tbWriteColWidths(table, tbFitWidths(widths, targets, desired, minPct));
+}
 function tbReadColWidths(table, cols) { // 저장된 colgroup 의 % 너비. 열 수가 맞지 않거나 % 가 아니면 null(균등)
   const els = Array.from(table.children).filter(el => el.tagName === 'COLGROUP').flatMap(g => Array.from(g.children).filter(el => el.tagName === 'COL'));
   if (els.length !== cols) return null;
@@ -19349,6 +19389,7 @@ document.addEventListener('mousedown', e => {
   const table = tbResizeTableFromEvent(e), hit = table && tbResizeHit(table, e.clientX, e.clientY);
   if (!hit) return;
   e.preventDefault(); e.stopImmediatePropagation(); // 경계에서 시작한 드래그는 글자 선택·셀 범위 선택보다 우선
+  if (tbCellSel && tbCellSel.table === table) tbResizeSel = { table, rect: Object.assign({}, tbCellSel.rect), at: Date.now() };
   tbCellSelClear();
   const rect = table.getBoundingClientRect();
   tbResizeDrag = hit.kind === 'col'
@@ -19362,11 +19403,11 @@ document.addEventListener('mouseup', () => {
   tbResizeDrag = null; tbResizeSetCursor(null);
   if (d.changed) tbResizeChanged(d.table);
 }, true);
-document.addEventListener('dblclick', e => { // 경계 더블클릭: 열은 전부 균등으로(colgroup 제거), 행은 높이 지정 제거
+document.addEventListener('dblclick', e => { // 경계 더블클릭: 열은 그 열(선택된 열이면 선택 전부)만 내용에 맞춤(#387), 행은 높이 지정 제거
   const table = tbResizeTableFromEvent(e), hit = table && tbResizeHit(table, e.clientX, e.clientY);
   if (!hit) return;
   e.preventDefault(); e.stopImmediatePropagation();
-  if (hit.kind === 'col') tbWriteColWidths(table, null); else { const tr = table.rows[hit.index]; tr.style.removeProperty('height'); if (!tr.getAttribute('style')) tr.removeAttribute('style'); }
+  if (hit.kind === 'col') tbFitColumns(table, hit.index - 1); else { const tr = table.rows[hit.index]; tr.style.removeProperty('height'); if (!tr.getAttribute('style')) tr.removeAttribute('style'); }
   tbResizeChanged(table);
 }, true);
 let tbCellSel = null;   // { table, rect:{r1,c1,r2,c2}, anchor:{row,col} }
@@ -42330,7 +42371,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + picker('halign', '가로 맞춤', 'fa-align-left', halign)
     + picker('valign', '세로 맞춤', 'fa-arrow-up', valign)
     + picker('wrap', '텍스트 줄바꿈', 'fa-turn-down', wrap)
-    + '<div class="tb-lh-wrap"><select id="ds-lh-select" class="tb-select tb-select-lh" onchange="ds_applyCellLineHeight(this.value)" title="줄간격" aria-label="셀 줄간격"><option value="">줄간격</option>' + ['1', '1.2', '1.45', '1.6', '1.8', '2', '2.5'].map(function(v) { return '<option value="' + v + '">' + v + '</option>'; }).join('') + '</select><i class="fa-solid fa-chevron-down tb-control-chevron" aria-hidden="true"></i></div>'
+    + '<div class="tb-lh-wrap"><select id="ds-lh-select" class="tb-select tb-select-lh" onchange="ds_applyCellLineHeight(this.value)" title="줄간격" aria-label="셀 줄간격"><option value="">기본</option>' + ['1', '1.2', '1.45', '1.6', '1.8', '2', '2.5'].map(function(v) { return '<option value="' + v + '">' + v + '</option>'; }).join('') + '</select><i class="fa-solid fa-chevron-down tb-control-chevron" aria-hidden="true"></i></div>'
     + SEP
     + btn('ds-ruby-btn', 'ds_openRubyDialog()', '루비 문자 (편집 중 선택한 글자)', 'fa-language')
     + SEP
@@ -44483,8 +44524,8 @@ function ds_autoFitRow(e, rowIdx) {
   rowIdx = parseInt(rowIdx);
   var ds = findDataSheet(_dsEditId);
   if (!ds || isNaN(rowIdx) || !ds.rows[rowIdx]) return;
-  // 수동 높이 해제 → 내용에 맞춰 자동 높이로 복귀
-  ds.rows[rowIdx].height = null;
+  // 수동 높이 해제 → 내용에 맞춰 자동 높이로 복귀(여러 행을 선택한 상태면 선택한 행 전부, #387)
+  (_dsSelectedRowIdxs.length > 1 && _dsSelectedRowIdxs.indexOf(rowIdx) >= 0 ? _dsSelectedRowIdxs : [rowIdx]).forEach(function(i) { if (ds.rows[i]) ds.rows[i].height = null; });
   persist();
   var viewport = ds_captureEditorViewport();
   renderDataSheetEditor();
@@ -44514,25 +44555,47 @@ function _dsMeasureTextWidth(text, font) {
   }
   return max;
 }
+// 더블클릭한 열이 선택된 열 중 하나면 선택된 열 전부, 아니면 그 열만(#387)
+function ds_fitTargetCols(colId, selectedIds) { return selectedIds && selectedIds.length && selectedIds.indexOf(colId) >= 0 ? selectedIds.slice() : [colId]; }
+// 내용 폭(measured, 0 이면 빈 칸) → 열 너비: 내용 + 여백, 최소·최대로 제한, 내용이 없으면 기본 너비
+function ds_fitWidth(measured, o) { return measured > 0 ? Math.max(o.min, Math.min(o.max, Math.ceil(measured + o.pad))) : o.def; }
+function _dsMeasureHtmlWidth(html, cs) { // 셀에 적용된 글꼴로 줄바꿈 없이 그렸을 때의 실제 폭(DOM 실측). 여러 줄이면 가장 긴 줄
+  var el = _dsMeasureEl();
+  el.style.font = cs.font;
+  el.style.letterSpacing = cs.letterSpacing;
+  el.innerHTML = html;
+  var w = el.getBoundingClientRect().width;
+  el.innerHTML = '';
+  return w;
+}
+function ds_measureColumnContent(ds, colId) { // 데이터 행 셀들 중 가장 넓은 내용(서식·글자 일부 서식·루비 반영). 카테고리·메모 행은 제외
+  var max = 0;
+  (ds.rows || []).forEach(function(row, ri) {
+    if (!ds_isDataRow(row)) return;
+    var ta = ds_getCellTextarea(ri, colId);
+    if (!ta) return;
+    var val = row.cells && row.cells[colId] != null ? String(row.cells[colId]) : '';
+    var rich = ds_getCellRich(row, colId, val);
+    if (!rich && !val) return;
+    var w = _dsMeasureHtmlWidth(rich || esc(val), getComputedStyle(ta));
+    if (w > max) max = w;
+  });
+  return max;
+}
 function ds_autoFitColumn(colId) {
   var ds = findDataSheet(_dsEditId);
-  if (!ds) return;
-  var col = (ds.columns || []).find(function(c) { return c.id === colId; });
-  if (!col) return;
-  var sampleCell = document.querySelector('#ds-editor-body td[data-col-id] .ds-cell-input');
-  var cellFont = sampleCell ? getComputedStyle(sampleCell).font : '13px sans-serif';
-  var headerEl = document.querySelector('#ds-editor-body th[data-col-id="' + CSS.escape(colId) + '"] .ds-col-name-input, #ds-editor-body th[data-col-id="' + CSS.escape(colId) + '"] .ds-col-name-label');
-  var headerFont = headerEl ? getComputedStyle(headerEl).font : '700 12px sans-serif';
-  var maxW = _dsMeasureTextWidth(col.name || '', headerFont) + 56; // 헤더 좌우 패딩+삭제버튼 여유
-  (ds.rows || []).forEach(function(row) {
-    if (!ds_isDataRow(row)) return;
-    var v = row.cells ? row.cells[colId] : '';
-    var w = _dsMeasureTextWidth(v, cellFont) + 24; // 셀 좌우 패딩 여유
-    if (w > maxW) maxW = w;
+  if (!ds || !(ds.columns || []).some(function(c) { return c.id === colId; })) return;
+  var body = document.getElementById('ds-editor-body');
+  var opt = { min: 16, max: Math.max(200, (body ? body.clientWidth : 800) - ds_getRowHeaderWidth(ds) - 24), def: 160 };
+  ds_fitTargetCols(colId, _dsSelectedColIds).forEach(function(id) {
+    var col = ds.columns.find(function(c) { return c.id === id; });
+    if (!col) return;
+    var cellW = ds_measureColumnContent(ds, id), headEl = document.querySelector('#ds-editor-body th[data-col-id="' + CSS.escape(id) + '"] .ds-col-name-input, #ds-editor-body th[data-col-id="' + CSS.escape(id) + '"] .ds-col-name-label');
+    var nameW = col.name && headEl ? _dsMeasureHtmlWidth(esc(col.name), getComputedStyle(headEl)) : 0;
+    var w = nameW > 0 || cellW > 0 ? Math.max(cellW > 0 ? ds_fitWidth(cellW, { min: opt.min, max: opt.max, pad: 18 }) : 0, nameW > 0 ? ds_fitWidth(nameW, { min: opt.min, max: opt.max, pad: 28 }) : 0) : opt.def; // 셀 안쪽 여백 18(좌우 8+테두리), 열 이름은 입력칸·삭제 버튼 최소 여유 28
+    col.width = w;
   });
-  var finalW = Math.max(16, Math.ceil(maxW));
-  col.width = finalW;
-  persist();
+  persist(); // 한 번에 저장 → Ctrl+Z 한 번
   var viewport = ds_captureEditorViewport();
   renderDataSheetEditor();
   ds_restoreEditorViewport(viewport);
