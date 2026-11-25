@@ -23,7 +23,7 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
       addBlock('text');
       addBlock('branch');
     });
-    await page.waitForTimeout(120);
+    await page.waitForFunction(() => document.getElementById('body-title-block') && document.querySelectorAll('#blocks-container .block').length >= 2); // 블록 두 개가 그려질 때까지(#376)
 
     const titleState = () => page.evaluate(() => {
       const block = document.getElementById('body-title-block');
@@ -45,7 +45,7 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
     assert.equal(editing.subtitleDisplay, 'block');
 
     await page.locator('#panel-body > .panel-inner > .body-add-area').click({ position: { x: 5, y: 5 } });
-    await page.waitForTimeout(20);
+    await page.waitForFunction(() => !document.getElementById('body-title-block').className.includes('title-editing')); // 제목 편집 상태가 풀릴 때까지(#376)
     const idle = await titleState();
     await page.locator('#body-title-block').screenshot({ path: path.join(os.tmpdir(), 'trpg-title-idle.png') });
     assert.doesNotMatch(idle.classes, /title-editing/);

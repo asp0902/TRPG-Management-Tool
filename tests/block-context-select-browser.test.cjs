@@ -97,7 +97,7 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
 
     await other.click({ button: 'right' });
     await page.getByText('붙여넣기', { exact: true }).click();
-    await page.waitForTimeout(80);
+    await page.waitForFunction(() => cur().blocks.length === 4); // 붙여넣기 반영을 조건으로 기다림(고정 시간 대기 제거, #376)
     const pasted = await page.evaluate(async () => {
       await persistNow();
       const blocks = cur().blocks;

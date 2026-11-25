@@ -25,7 +25,11 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
 
     for (const width of [760, 600, 390]) {
       await page.setViewportSize({ width, height: 700 });
-      await page.waitForTimeout(80);
+      // 리사이즈 뒤 툴바 접힘 계산은 비동기라 고정 시간 대신 조건이 맞을 때까지 기다린다(#376). 끝내 안 맞으면 아래 단언이 원인을 보고한다.
+      await page.waitForFunction(w => {
+        const bar = document.querySelector('#format-bar .tb-bar'), button = document.querySelector('#format-bar #tb-overflow-btn');
+        return innerWidth === w && bar && button && bar.scrollWidth === bar.clientWidth && getComputedStyle(button).display !== 'none' && bar.getBoundingClientRect().height === 36;
+      }, width, { timeout: 5000 }).catch(() => {});
       const metrics = await page.locator('#format-bar').evaluate(el => {
         const bar = el.querySelector('.tb-bar');
         const button = el.querySelector('#tb-overflow-btn');
@@ -63,7 +67,7 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
     assert.match(await editable.innerHTML(), /font-weight:\s*bold|<b>|<strong>/i, '더보기 안 원본 버튼이 저장된 선택에 적용');
 
     await page.setViewportSize({ width: 1920, height: 900 });
-    await page.waitForTimeout(80);
+    await page.waitForFunction(() => innerWidth === 1920 && getComputedStyle(document.querySelector('#tb-overflow-btn')).display === 'none', null, { timeout: 5000 }).catch(() => {});
     assert.equal(await page.locator('#tb-overflow-btn').isVisible(), false, '넓은 화면 더보기 숨김');
     assert.equal(await page.locator('#tb-overflow-menu').locator(':scope > *').count(), 0, '모든 원본 도구 복귀');
 
@@ -78,7 +82,12 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
     });
     for (const width of [760, 600, 390]) {
       await page.setViewportSize({ width, height: 700 });
-      await page.waitForTimeout(80);
+      await page.waitForFunction(w => {
+        const el = document.querySelector('#rb-chapter-content'), body = el && el.querySelector('#rb-chapter-body');
+        if (innerWidth !== w || !body) return false;
+        const c = el.getBoundingClientRect(), b = body.getBoundingClientRect();
+        return b.left >= c.left && b.right <= c.right + 0.5;
+      }, width, { timeout: 5000 }).catch(() => {});
       const layout = await page.locator('#rb-chapter-content').evaluate(el => {
         const body = el.querySelector('#rb-chapter-body');
         const contentRect = el.getBoundingClientRect();
