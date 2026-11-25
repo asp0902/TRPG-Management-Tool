@@ -50,6 +50,12 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
       }
       throw new Error('title state did not settle: ' + JSON.stringify(last));
     };
+    // 블록 생성 직후 늦게 도는 자동 포커스(새 블록 입력칸)가 제목 포커스를 빼앗는 경쟁을 피하려고, activeElement 가 0.4초간 바뀌지 않을 때까지 기다린 뒤 제목에 포커스한다(#416: 앱 쪽 경로는 focusin→클래스 부여, focusout→setTimeout 재계산으로 결정적)
+    await page.waitForFunction(() => {
+      const w = window.__aeWatch || (window.__aeWatch = { el: null, t: 0 }), now = performance.now(), a = document.activeElement;
+      if (w.el !== a) { w.el = a; w.t = now; return false; }
+      return now - w.t > 400;
+    }, null, { polling: 100, timeout: 15000 });
     // focus() 가 부하 시 편집 상태를 못 거는 경우가 있어, 안 걸리면 click()·focus() 를 번갈아 다시 시도한다(#416)
     for (let attempt = 0; attempt < 4; attempt++) {
       if (attempt % 2 === 0) await page.locator('#body-display-title').focus(); else await page.locator('#body-display-title').click();

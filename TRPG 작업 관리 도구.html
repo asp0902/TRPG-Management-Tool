@@ -44522,6 +44522,7 @@ function ds_clearCellFormat() { // 선택 셀의 서식(cellStyles)·가로 맞�
   var targets = (ds_getTextAlignTargetCells(ds) || []).filter(ds_isStyleTarget);
   if (!targets.length) return;
   targets.forEach(function(cell) {
+    if (cell.colId !== DS_ROW_COL && cell.row.cellStyles && cell.row.cellStyles[cell.colId] && cell.row.cellStyles[cell.colId].bd) ds_removeNeighborBorders(ds, cell.rowIdx, cell.colId, ds_normalizeCellStyle(cell.row.cellStyles[cell.colId]).bd);
     if (cell.row.cellStyles) delete cell.row.cellStyles[cell.colId];
     if (cell.row.cellAligns) delete cell.row.cellAligns[cell.colId];
     _dsApplyCellStyleToDom(cell.rowIdx, cell.colId, {});
@@ -45722,6 +45723,24 @@ function ds_borderCss(bd) { // 셀 테두리 → td style 조각
   return parts.join(';');
 }
 var _dsBorderStyle = 'thin', _dsBorderColor = '#222222'; // 툴바 메뉴에서 고른 선 종류·색(다음 적용부터)
+function ds_borderNeighbor(ds, ri, colId, side) { // 맞닿은 이웃 칸(데이터 행·열만)
+  var ci = ds_getColumnIndex(ds, colId), nr = ri, nc = ci;
+  if (side === 't') nr = ri - 1; else if (side === 'b') nr = ri + 1; else if (side === 'l') nc = ci - 1; else nc = ci + 1;
+  var row = ds.rows[nr], col = ds.columns[nc];
+  return row && col && ds_isDataRow(row) ? { row: row, colId: col.id } : null;
+}
+function ds_removeNeighborBorders(ds, ri, colId, bd) { // 서식 지우기: 지운 칸의 테두리와 마주 보는 이웃 칸의 변도 함께 제거(가장자리에 선이 남지 않게)
+  var opp = { t: 'b', b: 't', l: 'r', r: 'l' };
+  Object.keys(bd || {}).forEach(function(side) {
+    var nb = ds_borderNeighbor(ds, ri, colId, side);
+    if (!nb || !nb.row.cellStyles || !nb.row.cellStyles[nb.colId]) return;
+    var st = ds_normalizeCellStyle(nb.row.cellStyles[nb.colId]);
+    if (!st.bd || !st.bd[opp[side]]) return;
+    delete st.bd[opp[side]];
+    if (!Object.keys(st.bd).length) delete st.bd;
+    if (ds_hasCellStyle(st)) nb.row.cellStyles[nb.colId] = st; else delete nb.row.cellStyles[nb.colId];
+  });
+}
 // 테두리 적용: 대상 범위의 칸 + 맞닿은 이웃 칸의 마주 보는 변을 같은 값으로 써서 겹침 충돌 없이 「나중에 적용한 것」이 이김. mode 'clear' 는 선 제거
 function ds_applyBorder(mode) {
   var ds = findDataSheet(_dsEditId);
@@ -45737,12 +45756,7 @@ function ds_applyBorder(mode) {
     if (Object.keys(bd).length) st.bd = bd; else delete st.bd;
     if (ds_hasCellStyle(st)) row.cellStyles[colId] = st; else delete row.cellStyles[colId];
   };
-  var neighbor = function(ri, colId, side) { // 맞닿은 이웃 칸(데이터 행·열만)
-    var ci = ds_getColumnIndex(ds, colId), nr = ri, nc = ci;
-    if (side === 't') nr = ri - 1; else if (side === 'b') nr = ri + 1; else if (side === 'l') nc = ci - 1; else nc = ci + 1;
-    var row = ds.rows[nr], col = ds.columns[nc];
-    return row && col && ds_isDataRow(row) ? { row: row, colId: col.id } : null;
-  };
+  var neighbor = function(ri, colId, side) { return ds_borderNeighbor(ds, ri, colId, side); };
   cells.rows.forEach(function(ri, i) {
     cells.cols.forEach(function(colId, j) {
       var row = ds.rows[ri], sides = mode === 'clear' ? ['t', 'r', 'b', 'l'] : ds_borderSides(mode, i, j, R, C);

@@ -12,4 +12,5 @@ ok(S('left', 0, 0, 2, 2) === 'l' && S('left', 0, 1, 2, 2) === '' && S('top', 0, 
 ok(F.ds_borderCss({ t: { w: 'thin', c: '#111111' }, l: { w: 'dash', c: '#ff0000' } }) === 'border-top:1px solid #111111;border-left:1px dashed #ff0000' && F.ds_borderCss(null) === '', 'CSS 변환(선 종류별)');
 ok(/if \(st\.bd && typeof st\.bd === 'object'/.test(html) && /st\.bd \|\| st\.b \|\|/.test(html) && /ds_normalizeCellStyle\(row\.cellStyles\[colId\]\)/.test(html), '정규화·스타일 보유 판정에 bd 포함(서식 지우기가 cellStyles 째 삭제해 함께 지워짐)');
 ok(/picker\('border'/.test(html) && /ds_applyBorder\(/.test(html) && /id="ds-border-style"/.test(html), '툴바 테두리 메뉴·선 종류·색');
+ok(/function ds_removeNeighborBorders/.test(html) && /ds_removeNeighborBorders\(ds, cell\.rowIdx, cell\.colId/.test(html), '서식 지우기: 이웃 칸의 마주 보는 변도 제거');
 process.exit(f ? 1 : 0);
