@@ -7136,6 +7136,18 @@ body.block-pointer-dragging {
 .ds-format-option-icon { width: 16px; text-align: center; flex-shrink: 0; }
 .ds-editor-tabs-bar { display: flex; align-items: center; padding: 0 18px; background: #fafafa; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; min-height: 32px; }
 .ds-statusbar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; width: 100%; font-size: 11px; color: #a0a0a0; }
+/* 찾기·바꾸기(#400) */
+#ds-find-panel { display: none; position: fixed; top: 96px; right: 28px; z-index: 9000; width: 400px; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 10px 12px; background: #fff; border: 1px solid #d5d5d5; border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); flex-direction: column; gap: 8px; }
+#ds-find-panel.open { display: flex; }
+#ds-find-panel .ds-find-row { display: flex; align-items: center; gap: 6px; }
+#ds-find-panel .link-insert-input { flex: 1; min-width: 0; }
+#ds-find-panel .link-insert-btn { flex: 0 0 auto; padding: 4px 10px; }
+#ds-find-panel .ds-find-count { flex: 0 0 auto; min-width: 54px; text-align: right; font-size: 12px; color: #666; }
+#ds-find-panel .ds-find-opts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: #444; align-items: center; }
+#ds-find-panel .ds-find-opts label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+#ds-find-panel .ds-find-opts select { height: 26px; font-size: 12px; padding: 0 22px 0 8px; line-height: 24px; }
+.ds-table td.ds-find-hit { box-shadow: inset 0 0 0 100px rgba(255, 224, 70, .45); }
+.ds-table td.ds-find-cur { box-shadow: inset 0 0 0 100px rgba(255, 150, 40, .55); }
 .ds-statusbar-stat { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; color: #444; font: inherit; font-size: 12px; font-weight: 700; padding: 1px 8px; cursor: pointer; }
 .ds-statusbar-stat:hover { background: #f3f4f6; border-color: #bbb; }
 .ds-statusbar-selection { color: #a0a0a0; font-weight: 600; }
@@ -8763,6 +8775,29 @@ select.sh-field-input,
     <div class="link-insert-actions">
       <button type="button" class="link-insert-btn primary" id="ds-size-submit">실행</button>
       <button type="button" class="link-insert-btn cancel" id="ds-size-cancel">취소</button>
+    </div>
+  </div>
+
+  <!-- 데이터 시트 찾기·바꾸기(#400): 창 뒤를 가리지 않는 작은 패널 -->
+  <div id="ds-find-panel" role="dialog" aria-label="찾기 및 바꾸기">
+    <div class="ds-find-row">
+      <input id="ds-find-q" class="link-insert-input" type="text" placeholder="찾기" aria-label="찾을 내용" autocomplete="off">
+      <span id="ds-find-count" class="ds-find-count"></span>
+      <button type="button" class="link-insert-btn cancel" id="ds-find-prev" title="이전 (Shift+Enter)">▲</button>
+      <button type="button" class="link-insert-btn cancel" id="ds-find-next" title="다음 (Enter)">▼</button>
+      <button type="button" class="link-insert-close" id="ds-find-close" aria-label="닫기">×</button>
+    </div>
+    <div class="ds-find-row" id="ds-find-row2" style="display:none;">
+      <input id="ds-find-r" class="link-insert-input" type="text" placeholder="바꿀 내용" aria-label="바꿀 내용" autocomplete="off">
+      <button type="button" class="link-insert-btn primary" id="ds-find-replace">바꾸기</button>
+      <button type="button" class="link-insert-btn cancel" id="ds-find-replace-all">모두 바꾸기</button>
+    </div>
+    <div class="ds-find-opts">
+      <label><input type="checkbox" id="ds-find-case"> 대소문자 구분</label>
+      <label><input type="checkbox" id="ds-find-whole"> 셀 전체 일치</label>
+      <label><input type="checkbox" id="ds-find-regex"> 정규식</label>
+      <label><input type="checkbox" id="ds-find-formula"> 수식 안 검색</label>
+      <select id="ds-find-scope" aria-label="범위"><option value="sheet">이 시트</option><option value="all">모든 시트</option></select>
     </div>
   </div>
 
@@ -42289,6 +42324,7 @@ function openDataSheetEditor(id) {
   switchPage('datasheet');
 }
 function closeDataSheetEditor() {
+  if (typeof ds_findClose === 'function') ds_findClose();
   _dsEditId = null;
   _dsActiveRowIdx = null;
   _dsActiveCellRowIdx = null;
@@ -42359,6 +42395,7 @@ function renderDataSheetEditor() {
   ds_updateDataSheetStatusbar(ds);
   ds_renderSheetTabs(ds);
   body.innerHTML = _dsRenderFlatTable(ds);
+  ds_findPaint(); // 찾기 강조 다시 칠하기(#400)
   // 초기 자동 높이
   requestAnimationFrame(function() {
     ds_autosizeVisibleCells();
@@ -42603,6 +42640,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + '<div class="ds-format-toolbar-group" role="toolbar" aria-label="셀 서식 도구">'
     + btn('ds-undo-btn', 'tbUndo()', '실행 취소 (Ctrl+Z)', 'fa-rotate-left')
     + btn('ds-redo-btn', 'tbRedo()', '다시 실행 (Ctrl+Shift+Z)', 'fa-rotate-right')
+    + btn('ds-find-btn', 'ds_findOpen(true)', '찾기·바꾸기 (Ctrl+F / Ctrl+H)', 'fa-magnifying-glass')
     + SEP
     + '<div class="tb-font-wrap">'
     + '<button type="button" id="ds-font-trigger" class="tb-select tb-select-font tb-font-trigger" title="글꼴" aria-label="셀 글꼴" aria-haspopup="listbox" aria-controls="ds-font-menu" aria-expanded="false"' + NOFOCUS + ' onclick="ds_toggleFontMenu(event)"><span class="tb-font-trigger-label" id="ds-font-trigger-label">글꼴</span><i class="fa-solid fa-chevron-down tb-control-chevron" aria-hidden="true"></i></button>'
@@ -45806,6 +45844,203 @@ function ds_filterMenuApply() {
 }
 document.addEventListener('mousedown', function(e) { if (_dsFilterMenuState && e.target && e.target.closest && !e.target.closest('#ds-filter-menu, .ds-filter-btn')) ds_closeFilterMenu(); }, true);
 document.addEventListener('keydown', function(e) { if (_dsFilterMenuState && e.key === 'Escape') { e.preventDefault(); ds_closeFilterMenu(); } }, true);
+// ── 시트 안 찾기·바꾸기(#400) ──
+// o = { matchCase, whole(셀 전체 일치), regex, formulas(수식 글자까지 검색) }. 빈 검색어·잘못된 정규식·빈 글자와 맞는 정규식은 null
+function ds_findRegex(q, o) {
+  q = String(q == null ? '' : q); o = o || {};
+  if (!q) return null;
+  var src = o.regex ? q : q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (o.whole) src = '^(?:' + src + ')$';
+  try { var re = new RegExp(src, 'g' + (o.matchCase ? '' : 'i')); return new RegExp(src, re.flags).test('') ? null : re; } catch (e) { return null; }
+}
+// 찾을 칸 목록(시트 → 행 → 열 순서) [{si, ri, ci, colId}]. 데이터 행만, 숨긴 행·열과 필터로 가려진 행은 제외. 수식 칸은 o.formulas 일 때만(수식 글자 기준)
+function ds_findCells(sheets, re, o) {
+  var out = [];
+  if (!re) return out;
+  o = o || {};
+  sheets.forEach(function(sh, si) {
+    if (o.sheetIdx !== undefined && o.sheetIdx !== null && o.sheetIdx !== si) return;
+    var vis = o.visible ? o.visible(sh, si) : null;
+    (sh.rows || []).forEach(function(row, ri) {
+      if (!ds_isDataRow(row) || row.hidden || (vis && vis[ri] === false)) return;
+      (sh.columns || []).forEach(function(col, ci) {
+        if (col.hidden) return;
+        var raw = row.cells && row.cells[col.id] != null ? String(row.cells[col.id]) : '';
+        if (!raw || (!o.formulas && /^\s*=/.test(raw) && raw.trim().length > 1)) return;
+        re.lastIndex = 0;
+        if (re.test(raw)) out.push({ si: si, ri: ri, ci: ci, colId: col.id });
+      });
+    });
+  });
+  return out;
+}
+function ds_findExpand(repl, m) { return repl.replace(/\$(\$|&|\d{1,2})/g, function(x, k) { if (k === '$') return '$'; if (k === '&') return m[0]; var v = m[+k]; return v == null ? '' : v; }); }
+// 글자 안의 모든 맞는 곳 → [{s, e, t(바꿀 글자)}]. 정규식 모드는 $1·$& 를 쓸 수 있다
+function ds_findMatches(text, re, repl, o) {
+  var out = [], m;
+  repl = String(repl == null ? '' : repl);
+  re.lastIndex = 0;
+  while ((m = re.exec(text))) {
+    if (!m[0]) { re.lastIndex++; continue; }
+    out.push({ s: m.index, e: m.index + m[0].length, t: o && o.regex ? ds_findExpand(repl, m) : repl });
+  }
+  return out;
+}
+function ds_findApply(text, matches) { // 뒤에서부터 바꿔 앞 위치가 어긋나지 않게
+  matches.slice().reverse().forEach(function(x) { text = text.slice(0, x.s) + x.t + text.slice(x.e); });
+  return text;
+}
+// 서식 HTML 의 글자 범위 [start, end) 를 text 로 바꾼다(바꾼 글자는 범위 첫 글자의 서식을 이어받음). 서식이 없으면 ''
+function ds_richReplaceRange(html, start, end, text) {
+  var segs = ds_richParse(html), out = [], pos = 0, done = false;
+  segs.forEach(function(seg) {
+    var a = pos, b = pos + seg.text.length, s0 = Math.max(start, a), e0 = Math.min(end, b);
+    pos = b;
+    if (s0 >= e0) { out.push(seg); return; }
+    if (s0 > a) out.push({ text: seg.text.slice(0, s0 - a), f: Object.assign({}, seg.f) });
+    if (!done) { done = true; if (text) out.push({ text: text, f: Object.assign({}, seg.f) }); }
+    if (e0 < b) out.push({ text: seg.text.slice(e0 - a), f: Object.assign({}, seg.f) });
+  });
+  var merged = [];
+  out.forEach(function(seg) { var last = merged[merged.length - 1]; if (last && ds_richSameFmt(last.f, seg.f)) last.text += seg.text; else merged.push(seg); });
+  return ds_richHasFormat(merged) ? ds_richSerialize(merged) : '';
+}
+function ds_findApplyRich(html, matches) { matches.slice().reverse().forEach(function(x) { html = ds_richReplaceRange(html, x.s, x.e, x.t); }); return html; }
+// 현재 칸(si, ri, ci) 이후(포함) 첫 번째 위치, 없으면 처음
+function ds_findPick(list, from) {
+  if (!list.length) return -1;
+  if (!from) return 0;
+  for (var i = 0; i < list.length; i++) {
+    var x = list[i];
+    if (x.si > from.si || (x.si === from.si && (x.ri > from.ri || (x.ri === from.ri && x.ci >= from.ci)))) return i;
+  }
+  return 0;
+}
+var _dsFind = { list: [], idx: -1 };
+function ds_findOpts() {
+  var g = function(id) { var el = document.getElementById(id); return !!(el && el.checked); };
+  var sc = document.getElementById('ds-find-scope');
+  return { matchCase: g('ds-find-case'), whole: g('ds-find-whole'), regex: g('ds-find-regex'), formulas: g('ds-find-formula'), scopeAll: !!(sc && sc.value === 'all') };
+}
+function ds_findCompute() { // 검색어·옵션으로 목록을 다시 만든다. 현재 위치는 활성 칸 이후 첫 번째
+  var ds = findDataSheet(_dsEditId), o = ds_findOpts(), q = document.getElementById('ds-find-q');
+  _dsFind.list = []; _dsFind.idx = -1;
+  if (!ds || !Array.isArray(ds.sheets) || !q) return;
+  var re = ds_findRegex(q.value, o), activeIdx = ds.sheets.indexOf(_dsActiveSheet(ds));
+  _dsFind.bad = !!(q.value && !re);
+  if (!re) return;
+  _dsFind.list = ds_findCells(ds.sheets, re, { formulas: o.formulas, sheetIdx: o.scopeAll ? null : activeIdx, visible: function(sh, si) { return si === activeIdx ? ds_visibleRows(ds) : null; } });
+  var ci = _dsActiveCellColId ? ds.columns.findIndex(function(c) { return c.id === _dsActiveCellColId; }) : -1;
+  _dsFind.idx = ds_findPick(_dsFind.list, _dsActiveCellRowIdx !== null && ci >= 0 ? { si: activeIdx, ri: _dsActiveCellRowIdx, ci: ci } : { si: activeIdx, ri: -1, ci: 0 });
+}
+function ds_findPaint() { // 보이는 시트의 맞는 칸을 강조(현재 칸은 더 진하게). 렌더 뒤마다 다시 칠함
+  document.querySelectorAll('#ds-editor-body td.ds-find-hit, #ds-editor-body td.ds-find-cur').forEach(function(td) { td.classList.remove('ds-find-hit', 'ds-find-cur'); });
+  var panel = document.getElementById('ds-find-panel'), ds = findDataSheet(_dsEditId);
+  var cnt = document.getElementById('ds-find-count');
+  if (cnt) { var n = _dsFind.list.length, q = document.getElementById('ds-find-q'); cnt.textContent = !q || !q.value ? '' : _dsFind.bad ? '정규식 오류' : n ? (_dsFind.idx + 1) + ' / ' + n : '없음'; }
+  if (!panel || !panel.classList.contains('open') || !ds) return;
+  var activeIdx = ds.sheets.indexOf(_dsActiveSheet(ds));
+  _dsFind.list.forEach(function(x, i) {
+    if (x.si !== activeIdx) return;
+    var ta = ds_getCellTextarea(x.ri, x.colId), td = ta && ta.closest('td');
+    if (td) td.classList.add(i === _dsFind.idx ? 'ds-find-cur' : 'ds-find-hit');
+  });
+}
+function ds_findGo(i) { // i 번째 맞는 칸으로(다른 시트면 시트를 바꾼다). 포커스는 찾기 창에 둔다
+  var ds = findDataSheet(_dsEditId), L = _dsFind.list;
+  if (!ds || !L.length) { ds_findPaint(); return; }
+  i = ((i % L.length) + L.length) % L.length;
+  _dsFind.idx = i;
+  var x = L[i], sh = ds.sheets[x.si];
+  if (sh && sh.id !== ds.activeSheetId) ds_switchSheet(sh.id);
+  var ds2 = findDataSheet(_dsEditId);
+  ds_setActiveCell(x.ri, x.colId);
+  ds_setSelectedCellRange(x.ri, x.colId, x.ri, x.colId);
+  var ta = ds_getCellTextarea(x.ri, x.colId), td = ta && ta.closest('td');
+  if (td && td.scrollIntoView) td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  ds_findPaint();
+}
+function ds_findStep(d) { if (!_dsFind.list.length) ds_findCompute(); if (_dsFind.list.length) ds_findGo(_dsFind.idx + d); else ds_findPaint(); }
+function ds_findReplaceCells(items) { // items: 목록 항목. 칸마다 한 번에 바꾸고 한 번만 저장(Ctrl+Z 한 번). 바꾼 칸 수 반환
+  var ds = findDataSheet(_dsEditId), o = ds_findOpts(), q = document.getElementById('ds-find-q'), r = document.getElementById('ds-find-r');
+  var re = ds ? ds_findRegex(q.value, o) : null, n = 0, viewport = ds_captureEditorViewport();
+  if (!re) return 0;
+  items.forEach(function(x) {
+    var sh = ds.sheets[x.si], row = sh && sh.rows[x.ri];
+    if (!row || !row.cells || row.cells[x.colId] == null) return;
+    var text = String(row.cells[x.colId]), ms = ds_findMatches(text, re, r.value, o);
+    if (!ms.length) return;
+    var rich = ds_getCellRich(row, x.colId, text);
+    row.cells[x.colId] = ds_findApply(text, ms);
+    if (rich) { var nr = ds_findApplyRich(rich, ms); if (nr) row.cellRich[x.colId] = nr; else delete row.cellRich[x.colId]; } else if (row.cellRich) delete row.cellRich[x.colId];
+    n++;
+  });
+  if (n) { _dsForceNextHistoryCommit = true; persist(); renderDataSheetEditor(); ds_restoreEditorViewport(viewport); }
+  return n;
+}
+function ds_findReplaceOne() { // 현재 칸의 맞는 곳을 모두 바꾸고 다음으로
+  if (!_dsFind.list.length) ds_findCompute();
+  var x = _dsFind.list[_dsFind.idx];
+  if (!x) return;
+  var from = { si: x.si, ri: x.ri, ci: x.ci };
+  if (!ds_findReplaceCells([x])) return;
+  ds_findCompute();
+  _dsFind.idx = ds_findPick(_dsFind.list, from);
+  if (_dsFind.list.length) ds_findGo(_dsFind.idx); else ds_findPaint();
+}
+function ds_findReplaceAll() {
+  ds_findCompute();
+  var n = ds_findReplaceCells(_dsFind.list.slice());
+  ds_findCompute();
+  ds_findPaint();
+  if (typeof rubyToast === 'function') rubyToast(n ? n + '개 칸을 바꿨습니다.' : '바꿀 칸이 없습니다.');
+}
+function ds_findOpen(replace) {
+  var panel = document.getElementById('ds-find-panel'), q = document.getElementById('ds-find-q');
+  if (!panel || !q) return;
+  var sel = (window.getSelection && String(window.getSelection())) || '';
+  panel.classList.add('open');
+  document.getElementById('ds-find-row2').style.display = replace ? '' : 'none';
+  var ta = document.activeElement; // 칸 편집 중 선택한 글자를 검색어로
+  if (ta && ta.tagName === 'TEXTAREA' && ta.selectionStart !== ta.selectionEnd) sel = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+  if (sel && sel.length < 80 && sel.indexOf('\n') < 0) q.value = sel;
+  ds_findCompute(); ds_findPaint();
+  q.focus(); q.select();
+}
+function ds_findClose() {
+  var panel = document.getElementById('ds-find-panel');
+  if (panel) panel.classList.remove('open');
+  _dsFind.list = []; _dsFind.idx = -1;
+  ds_findPaint();
+}
+(function() {
+  function bind() {
+    if (window.__dsFindBound) return;
+    window.__dsFindBound = true;
+    var on = function(id, ev, fn) { var el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+    on('ds-find-q', 'input', function() { ds_findCompute(); if (_dsFind.list.length) ds_findGo(_dsFind.idx); else ds_findPaint(); });
+    ['ds-find-case', 'ds-find-whole', 'ds-find-regex', 'ds-find-formula', 'ds-find-scope'].forEach(function(id) { on(id, 'change', function() { ds_findCompute(); if (_dsFind.list.length) ds_findGo(_dsFind.idx); else ds_findPaint(); }); });
+    on('ds-find-next', 'click', function() { ds_findStep(1); });
+    on('ds-find-prev', 'click', function() { ds_findStep(-1); });
+    on('ds-find-close', 'click', ds_findClose);
+    on('ds-find-replace', 'click', ds_findReplaceOne);
+    on('ds-find-replace-all', 'click', ds_findReplaceAll);
+    on('ds-find-panel', 'keydown', function(e) {
+      if (e.isComposing) return; // 한글 조합 중 Enter 는 조합 확정(#377)
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); ds_findClose(); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (e.target && e.target.id === 'ds-find-r') ds_findReplaceOne(); else ds_findStep(e.shiftKey ? -1 : 1); }
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind();
+})();
+// Ctrl+F 찾기, Ctrl+H 찾기·바꾸기(데이터 시트 편집기에서만. 본문 찾아 바꾸기는 Ctrl+Shift+F 라 겹치지 않음)
+document.addEventListener('keydown', function(e) {
+  if (currentPage !== 'datasheet' || !_dsEditId || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+  var k = String(e.key).toLowerCase();
+  if (k !== 'f' && k !== 'h') return;
+  e.preventDefault(); e.stopPropagation();
+  ds_findOpen(k === 'h');
+}, true);
 // ── 상태 표시줄 통계(#398): 선택한 칸의 원래 값(수식은 계산 결과)에서 숫자만 모아 합계·평균·최소·최대·개수·숫자 개수 ──
 var DS_STAT_KINDS = [['sum', '합계'], ['avg', '평균'], ['min', '최소'], ['max', '최대'], ['count', '개수'], ['countnum', '숫자 개수']];
 function ds_statsOf(values) { // values: 칸 값 배열(숫자·문자열·불리언·null)
