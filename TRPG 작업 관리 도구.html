@@ -7855,6 +7855,17 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .ar2e-sk-fold:hover { color: #2563eb; }
 .ar2e-sk-fold.open { transform: rotate(180deg); color: #2563eb; }
 .sh-repeat-section[data-template-key="arianrhod2e"][data-section-id="skills"] .sh-section-body { overflow-x: auto; }
+.sh-repeat-section[data-template-key="arianrhod2e"][data-section-id="weapons"] .sh-section-body { overflow-x: auto; }
+.sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="weapons"] { min-width: 1040px; table-layout: fixed; }
+.sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="weapons"] th { text-align: center; }
+.sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="weapons"] th:nth-child(n+4):nth-child(-n+12),
+.sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="weapons"] td:nth-child(n+4):nth-child(-n+12) { width: 64px; }
+.sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="weapons"] th:nth-child(13),
+.sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="weapons"] td:nth-child(13) { width: 44px; }
+.sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="weapons"] th:nth-child(1),
+.sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="weapons"] td:nth-child(1) { width: 130px; }
+.sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="weapons"] th:nth-child(2),
+.sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="weapons"] td:nth-child(2) { width: 84px; }
 .sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="skills"] { min-width: 1180px; table-layout: fixed; }
 .sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="skills"] th { text-align: center; }
 .sh-repeat-table[data-template-key="arianrhod2e"][data-section-id="skills"] th:nth-child(1),
@@ -9979,16 +9990,21 @@ const SHEET_TEMPLATES = {
         { id: 'effect', label: '효과', type: 'textarea' },
         { id: 'desc', label: '해설', type: 'textarea' },
       ]},
-      { id: 'combat', label: '전투 상태', columns: 4, fields: [
-        { id: 'phyDef', label: '물리방어', type: 'number' },
-        { id: 'magDef', label: '마법방어', type: 'number' },
-        { id: 'move', label: '이동력', type: 'number' },
-        { id: 'initiative', label: '행동치', type: 'number' },
+      { id: 'combatTotals', label: '전투 값 (자동 계산)', customType: 'arianrhod2e-combat-totals', fields: [
+        { id: 'hitDice', label: '명중 추가 다이스', type: 'number' },
+        { id: 'attackDice', label: '공격력 추가 다이스', type: 'number' },
+        { id: 'evasionDice', label: '회피 추가 다이스', type: 'number' },
       ]},
-      { id: 'modifiers', label: '전투 수정치', columns: 4, fields: [
-        { id: 'hitMod', label: '명중 수정', type: 'number' },
-        { id: 'evasionMod', label: '회피 수정', type: 'number' },
-        { id: 'attackPower', label: '공격력', type: 'number' },
+      { id: 'combat', label: '전투 상태 (보정)', columns: 4, fields: [
+        { id: 'phyDef', label: '물리방어 보정', type: 'number' },
+        { id: 'magDef', label: '마법방어 보정', type: 'number' },
+        { id: 'move', label: '이동력 보정', type: 'number' },
+        { id: 'initiative', label: '행동치 보정', type: 'number' },
+      ]},
+      { id: 'modifiers', label: '전투 수정치 (보정)', columns: 4, fields: [
+        { id: 'hitMod', label: '명중 보정', type: 'number' },
+        { id: 'evasionMod', label: '회피 보정', type: 'number' },
+        { id: 'attackPower', label: '공격력 보정', type: 'number' },
         { id: 'magicAttack', label: '마법 공격력', type: 'number' },
         { id: 'carryMod', label: '적재 수정', type: 'number' },
         { id: 'carryWeight', label: '적재 중량', type: 'number' },
@@ -10000,6 +10016,15 @@ const SHEET_TEMPLATES = {
         { id: 'part', label: '부위', type: 'select', options: ['한손', '양손', '연금총', '커스텀', '머리', '몸통', '보조', '장신구', '탈것'] },
         { id: 'type', label: '종별', type: 'text' },
         { id: 'weight', label: '중량', type: 'number' },
+        { id: 'hit', label: '명중수정', type: 'number' },
+        { id: 'attack', label: '공격력', type: 'number' },
+        { id: 'evasion', label: '회피수정', type: 'number' },
+        { id: 'phyDef', label: '물리방어', type: 'number' },
+        { id: 'magDef', label: '마법방어', type: 'number' },
+        { id: 'act', label: '행동수정', type: 'number' },
+        { id: 'move', label: '이동수정', type: 'number' },
+        { id: 'range', label: '사거리', type: 'text' },
+        { id: 'equipped', label: '장착', type: 'checkbox', defaultChecked: true },
         { id: 'price', label: '가격', type: 'text' },
         { id: 'effect', label: '효과', type: 'text' },
       ]},
@@ -45443,6 +45468,7 @@ function normalizeArianrhod2eSheetData(data) {
   if (!data.classes || typeof data.classes !== 'object' || Array.isArray(data.classes)) data.classes = {};
   if (!data.abilities || typeof data.abilities !== 'object' || Array.isArray(data.abilities)) data.abilities = {};
   if (!data.combat || typeof data.combat !== 'object' || Array.isArray(data.combat)) data.combat = {};
+  if (!data.combatTotals || typeof data.combatTotals !== 'object' || Array.isArray(data.combatTotals)) data.combatTotals = {};
   if (!data.personalLifepath || typeof data.personalLifepath !== 'object' || Array.isArray(data.personalLifepath)) data.personalLifepath = {};
   if (
     (data.classes.race === undefined || data.classes.race === null || data.classes.race === '')
@@ -47112,6 +47138,7 @@ function _ar2eApplyVitalDerivedValues(sheetData) {
 }
 
 function _ar2eRefreshVitalMaxInputs(sheetData) {
+  _ar2eRefreshCombatTotals(sheetData); // 능력치가 바뀌면 전투 값도 갱신(#369)
   var hpInput = document.querySelector('[data-ar2e-vital="hpMax"]');
   var mpInput = document.querySelector('[data-ar2e-vital="mpMax"]');
   if (hpInput) hpInput.value = String(_ar2eCalcVitalMax(sheetData, 'hp'));
@@ -47202,6 +47229,65 @@ function renderArianrhod2eClassField(chId, sheetId, fieldId, label, value) {
     }).join('');
   return '<div class="sh-field"><div class="sh-field-label">' + esc(label) + '</div>'
     + '<select class="sh-field-input" onchange="' + esc(handler) + '">' + opts + '</select></div>';
+}
+
+// ── 아리안로드 2E 전투 값 자동 계산(#369): 장착한 장비의 전투 수치 + 능력 수정치 + 보정. 계산은 DOM 과 분리한 순수 함수 ──
+function ar2eInt(v) { const m = String(v == null ? '' : v).trim().match(/-?\d+/); return m ? parseInt(m[0], 10) : 0; }
+function ar2eIsEquipped(row) { // 장착 칸이 없는 기존 행은 장착한 것으로 본다
+  const e = row.equipped;
+  if (e === undefined || e === null) return true;
+  return e === true || e === 1 || ['1', 'true', 'yes', 'on', 'checked'].includes(String(e).trim().toLowerCase());
+}
+function ar2eEquipSum(weapons, key) {
+  return (Array.isArray(weapons) ? weapons : []).reduce((sum, row) => row && typeof row === 'object' && ar2eIsEquipped(row) ? sum + ar2eInt(row[key]) : sum, 0);
+}
+// mods: 최종 능력 수정치 { str, dex, agi, int, sns, spr, luc }
+function ar2eCombatTotals(sheetData, mods) {
+  const d = sheetData || {}, w = d.weapons, c = d.combat || {}, m = d.modifiers || {}, t = d.combatTotals || {}, a = mods || {};
+  const dice = key => Math.max(0, ar2eInt(t[key]));
+  return {
+    hit: ar2eInt(a.dex) + ar2eEquipSum(w, 'hit') + ar2eInt(m.hitMod), hitDice: dice('hitDice'),
+    attack: ar2eEquipSum(w, 'attack') + ar2eInt(m.attackPower), attackDice: dice('attackDice'),
+    evasion: ar2eInt(a.agi) + ar2eEquipSum(w, 'evasion') + ar2eInt(m.evasionMod), evasionDice: dice('evasionDice'),
+    phyDef: ar2eEquipSum(w, 'phyDef') + ar2eInt(c.phyDef),
+    magDef: ar2eInt(a.spr) + ar2eEquipSum(w, 'magDef') + ar2eInt(c.magDef),
+    initiative: ar2eInt(a.agi) + ar2eInt(a.sns) + ar2eEquipSum(w, 'act') + ar2eInt(c.initiative),
+    move: ar2eInt(a.str) + 5 + ar2eEquipSum(w, 'move') + ar2eInt(c.move),
+  };
+}
+function ar2eDiceExpr(extraDice, bonus) { // 음수는 2D-1 (2D+-1 아님), 0 은 2D
+  return (2 + extraDice) + 'D' + (bonus > 0 ? '+' + bonus : bonus < 0 ? String(bonus) : '');
+}
+function _ar2eAbilityMods(sheetData) { // 능력치 섹션의 최종 수정치
+  const d = sheetData || {}, raceRecord = _ar2eGetRaceRecord(d.classes && d.classes.race), classMods = _ar2eGetSelectedClassModifierRecords(d), out = {};
+  _ARIANRHOD2E_ABILITIES.forEach(ability => { out[ability.key] = _ar2eCalcAbilityParts(d.abilities, raceRecord, ability.key, classMods).abilityMod; });
+  return out;
+}
+function _ar2eRefreshCombatTotals(sheetData) {
+  const t = ar2eCombatTotals(sheetData, _ar2eAbilityMods(sheetData));
+  const text = { hit: ar2eDiceExpr(t.hitDice, t.hit), attack: ar2eDiceExpr(t.attackDice, t.attack), evasion: ar2eDiceExpr(t.evasionDice, t.evasion), phyDef: t.phyDef, magDef: t.magDef, initiative: t.initiative, move: t.move };
+  Object.keys(text).forEach(key => { const el = document.querySelector('[data-ar2e-total="' + key + '"]'); if (el) el.value = String(text[key]); });
+}
+function renderArianrhod2eCombatTotalsSection(sec, sectionData, sheetData, chId, sheetId) {
+  const t = ar2eCombatTotals(sheetData, _ar2eAbilityMods(sheetData));
+  const rows = [
+    { key: 'hit', label: '명중 판정', dice: 'hitDice', text: ar2eDiceExpr(t.hitDice, t.hit) },
+    { key: 'attack', label: '공격력', dice: 'attackDice', text: ar2eDiceExpr(t.attackDice, t.attack) },
+    { key: 'evasion', label: '회피 판정', dice: 'evasionDice', text: ar2eDiceExpr(t.evasionDice, t.evasion) },
+    { key: 'phyDef', label: '물리방어력', text: String(t.phyDef) },
+    { key: 'magDef', label: '마법방어력', text: String(t.magDef) },
+    { key: 'initiative', label: '행동치', text: String(t.initiative) },
+    { key: 'move', label: '이동력', text: String(t.move) },
+  ];
+  const cards = rows.map(row => {
+    const diceHtml = row.dice
+      ? '<div class="sh-ar2-vital-field"><div class="sh-ar2-vital-label">추가 다이스(nD)</div><input class="sh-ar2-vital-input" type="number" min="0" value="' + esc(String(sectionData[row.dice] !== undefined ? sectionData[row.dice] : '')) + '" oninput="' + esc('saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + JSON.stringify(row.dice) + ',this.value)') + '" aria-label="' + esc(row.label + ' 추가 다이스') + '"></div>'
+      : '';
+    return '<div class="sh-ar2-vital"><div class="sh-ar2-vital-title">' + esc(row.label) + '</div><div class="sh-ar2-vital-fields">'
+      + '<div class="sh-ar2-vital-field"><div class="sh-ar2-vital-label">합계</div><input class="sh-ar2-vital-input" type="text" readonly tabindex="-1" data-ar2e-total="' + row.key + '" value="' + esc(row.text) + '" aria-label="' + esc(row.label + ' 합계') + '"></div>'
+      + diceHtml + '</div></div>';
+  }).join('');
+  return '<div class="sh-section"><div class="sh-section-hd" title="능력 수정치 + 장착한 장비 + 보정(전투 상태·전투 수정치 섹션)을 합친 값입니다.">' + esc(sec.label) + '</div><div class="sh-section-body"><div class="sh-ar2-vitals">' + cards + '</div></div></div>';
 }
 
 function _ar2eApplyAbilityDerivedValues(sheetData) {
@@ -47405,6 +47491,10 @@ function renderCharacterSheet(chId) {
       var sectionData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
       return renderDnd5ePersonalitySection(sec, sectionData, chId, sheetId);
     }
+    if (sec.customType === 'arianrhod2e-combat-totals') {
+      var sectionData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
+      return renderArianrhod2eCombatTotalsSection(sec, sectionData, sheetData, chId, sheetId);
+    }
     if (sec.customType === 'arianrhod2e-abilities') {
       var sectionData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
       return renderArianrhod2eAbilitiesSection(sec, sectionData, sheetData, chId, sheetId);
@@ -47448,7 +47538,7 @@ function renderCharacterSheet(chId) {
       var rowsHtml = rows.map(function(row, rowIdx) {
         var isCompletedCypherRow = tpl.key === 'cypher' && sec.id === 'cyphers' && isSheetCheckboxChecked(row.completed);
         var cells = visibleFields.map(function(f) {
-          var defaultVal = f.type === 'checkbox' ? false : ((f.type === 'select' && Array.isArray(f.options) && f.options.length) ? f.options[0] : '');
+          var defaultVal = f.type === 'checkbox' ? !!f.defaultChecked : ((f.type === 'select' && Array.isArray(f.options) && f.options.length) ? f.options[0] : '');
           var val = row[f.id] !== undefined ? row[f.id] : defaultVal;
           if (tpl.key === 'arianrhod2e' && sec.id === 'skills' && f.id === 'level' && (val === undefined || val === null || val === '') && row.sl !== undefined && row.sl !== null) {
             val = row.sl;
@@ -48828,14 +48918,12 @@ function generateArianrhod2eCocofoliaJSON(chId, sheetId) {
   var mpCur = hasVal(combat.mpCur) ? n(combat.mpCur) : mpMax;
   var fateMax = n(combat.fateMax);
   var fateCur = hasVal(combat.fateCur) ? n(combat.fateCur) : fateMax;
-  var phyDef = n(combat.phyDef);
-  var magDef = n(combat.magDef);
-  var move = hasVal(combat.move) ? n(combat.move) : (str + 5);
-  var initiative = hasVal(combat.initiative) ? n(combat.initiative) : (agi + sns);
+  var tot = ar2eCombatTotals(d, _ar2eAbilityMods(d)); // 능력 수정치 + 장착 장비 + 보정(#369)
+  var phyDef = tot.phyDef;
+  var magDef = tot.magDef;
+  var move = tot.move;
+  var initiative = tot.initiative;
 
-  var hitMod = n(mods.hitMod);
-  var evasionMod = n(mods.evasionMod);
-  var attackPower = n(mods.attackPower);
   var magicAttack = n(mods.magicAttack);
 
   var name = basic.charName || ch.name || '이름 없음';
@@ -48886,10 +48974,10 @@ function generateArianrhod2eCocofoliaJSON(chId, sheetId) {
   cmd.push('2D+{지력} 마술 판정');
   cmd.push('');
   cmd.push('──전투 판정──');
-  cmd.push('2D+' + hitMod + ' 명중 판정');
-  cmd.push('2D+' + attackPower + ' 공격력');
-  if (magicAttack) cmd.push('2D+' + magicAttack + ' 마법 공격력');
-  cmd.push('2D+' + evasionMod + ' 회피 판정');
+  cmd.push(ar2eDiceExpr(tot.hitDice, tot.hit) + ' 명중 판정');
+  cmd.push(ar2eDiceExpr(tot.attackDice, tot.attack) + ' 공격력');
+  if (magicAttack) cmd.push(ar2eDiceExpr(0, magicAttack) + ' 마법 공격력');
+  cmd.push(ar2eDiceExpr(tot.evasionDice, tot.evasion) + ' 회피 판정');
   cmd.push('2D 아이템 드롭');
 
   var skills = Array.isArray(d.skills) ? d.skills : [];
@@ -50910,6 +50998,7 @@ function saveSheetField(chId, sheetId, sectionId, fieldId, value) {
   }
   persist();
   if (sheet.templateKey === 'coc7e') refreshCoc7eDerivedUi(chId, sheetId);
+  if (sheet.templateKey === 'arianrhod2e') _ar2eRefreshCombatTotals(sheet.data);
 }
 
 function saveArianrhod2eVitalField(chId, sheetId, fieldId, value, inputEl) {
@@ -51108,6 +51197,7 @@ function saveSheetRepeatCell(chId, sheetId, sectionId, rowIdx, fieldId, value) {
   if (!sheet.data[sectionId][rowIdx]) sheet.data[sectionId][rowIdx] = {};
   sheet.data[sectionId][rowIdx][fieldId] = value;
   persist();
+  if (sheet.templateKey === 'arianrhod2e' && sectionId === 'weapons') _ar2eRefreshCombatTotals(sheet.data);
 }
 
 // 반복 섹션 행 추가
@@ -51122,7 +51212,7 @@ function addSheetRow(chId, sheetId, sectionId) {
   var sec = tpl ? (tpl.sections || []).find(function(s) { return s.id === sectionId; }) : null;
   var emptyRow = {};
   if (sec) sec.fields.forEach(function(f) {
-    if (f.type === 'checkbox') emptyRow[f.id] = false;
+    if (f.type === 'checkbox') emptyRow[f.id] = !!f.defaultChecked;
     else if (f.type === 'select' && Array.isArray(f.options) && f.options.length) emptyRow[f.id] = f.options[0];
     else emptyRow[f.id] = '';
   });
