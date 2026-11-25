@@ -3891,6 +3891,8 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 .tb-editor-table {
   width: 100%; max-width: 100%; margin: 6px 0; border-collapse: collapse; table-layout: fixed;
 }
+/* 오버플로우 셀(#374): 오른쪽 셀이 비어 있으면 글자가 그 위로 넘쳐 보이고, 내용이 있으면 그 셀이 위에 덮어 잘려 보인다 */
+.tb-editor-table td[style*="white-space: nowrap"]:not([style*="overflow: hidden"]) + td:not(:has(> br:only-child)) { position: relative; z-index: 1; background-color: #fff; }
 .tb-editor-table td {
   min-width: 0; padding: 6px 8px; border: 1px solid #bbb; vertical-align: top;
   overflow-wrap: anywhere; word-break: break-word;
@@ -7230,6 +7232,13 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .ds-cell-align-left { text-align: left; }
 .ds-cell-align-center { text-align: center; }
 .ds-cell-align-right { text-align: right; }
+.ds-cell-input.ds-cell-wrap-clip:not(.ds-cell-editing), .ds-cell-input.ds-cell-wrap-overflow:not(.ds-cell-editing) { white-space: pre; overflow: hidden; }
+.ds-cell-rich.ds-cell-wrap-clip { white-space: pre; overflow: hidden; }
+.ds-cell-rich.ds-cell-wrap-overflow { white-space: pre; overflow: visible; }
+.ds-cell-rich .ds-ov-inner { display: block; overflow: hidden; white-space: pre; }
+.ds-table td.ds-wrap-overflow:not(.ds-rich-editing):not(:has(textarea.ds-cell-editing)) textarea.ds-cell-input { position: absolute; inset: 0; width: 100%; height: 100% !important; opacity: 0; }
+.ds-table td.ds-wrap-overflow:not(.ds-rich-editing):not(:has(textarea.ds-cell-editing)) .ds-cell-rich { display: block; }
+.ds-wrap-option.active { background: #eef2ff; }
 .ds-table td.ds-has-rich textarea.ds-cell-input, .ds-table td.ds-rich-editing textarea.ds-cell-input { position: absolute; inset: 0; width: 100%; height: 100% !important; opacity: 0; }
 .ds-table td.ds-rich-editing textarea.ds-cell-input { pointer-events: none; }
 .ds-cell-rich { display: none; min-height: 30px; box-sizing: border-box; padding: 5px 8px; font-size: 13px; line-height: 1.45; color: #222; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; pointer-events: none; }
@@ -19139,6 +19148,24 @@ function tbOpenCellBackgroundPicker(cells) { // 패널을 열기 전에 대상 �
   cpTarget = { type: 'table-cell', cells: cells.slice(), originals: cells.map(td => td.style.backgroundColor), editable };
   cpOpenPanel('table-cell-bg', color, { centered: true });
 }
+// ── 본문 표 텍스트 줄바꿈(#374): 줄바꿈(기본, 저장 안 함) | 오버플로우(white-space:nowrap) | 자르기(white-space:nowrap + overflow:hidden). td inline style 만 쓴다 ──
+function tbCellWrapMode(td) {
+  if (td.style.whiteSpace !== 'nowrap') return 'wrap';
+  return td.style.overflow === 'hidden' ? 'clip' : 'overflow';
+}
+function tbApplyCellWrap(table, cells, mode) {
+  cells.forEach(function(td) {
+    if (mode === 'overflow' || mode === 'clip') {
+      td.style.whiteSpace = 'nowrap';
+      if (mode === 'clip') td.style.overflow = 'hidden'; else td.style.removeProperty('overflow');
+    } else {
+      td.style.removeProperty('white-space');
+      td.style.removeProperty('overflow');
+    }
+    if (!td.getAttribute('style')) td.removeAttribute('style');
+  });
+  tbTableChanged(table, null);
+}
 function tbTableEditItems(table, model, elems, id) {
   const cell = model.cells[id], delRow = tbDeleteRowPlan(model, cell.row), delCol = tbDeleteColPlan(model, cell.col), targets = tbCellBackgroundTargets(table, model, elems, id);
   return [
@@ -19152,6 +19179,7 @@ function tbTableEditItems(table, model, elems, id) {
     { sep: true },
     { icon: '🎨', label: '셀 배경색…', action: () => tbOpenCellBackgroundPicker(targets) },
     ...(targets.some(td => td.style.backgroundColor) ? [{ icon: '✕', label: '셀 배경색 지우기', action: () => { targets.forEach(td => tbSetCellBackground(td, '')); tbTableChanged(table, null); } }] : []),
+    { icon: '↵', label: '텍스트 줄바꿈', submenu: [['overflow', '오버플로우'], ['wrap', '줄바꿈'], ['clip', '자르기']].map(([mode, label]) => ({ icon: tbCellWrapMode(elems[id]) === mode ? '✓' : '', label, action: () => tbApplyCellWrap(table, targets, mode) })) },
     { sep: true },
     { icon: '🗑', label: '표 삭제', danger: true, action: () => tbDeleteWholeTable(table) },
   ];
@@ -40813,6 +40841,7 @@ function ds_normalizeCellStyle(st) {
   var size = Math.round(Number(st.size));
   if (st.size !== '' && st.size !== null && size >= 8 && size <= 72) out.size = size;
   if (typeof st.bg === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(st.bg.trim())) out.bg = st.bg.trim().toLowerCase();
+  if (st.wrap === 'overflow' || st.wrap === 'clip') out.wrap = st.wrap; // 텍스트 줄바꿈(#374): 줄바꿈이 기본이라 저장하지 않는다
   var lh = Math.round(Number(st.lh) * 100) / 100;
   if (st.lh !== '' && st.lh !== null && lh >= 1 && lh <= 3) out.lh = lh;
   return out;
@@ -40830,7 +40859,18 @@ function ds_getCellStyle(row, colId) {
   if (!row || row.isCategory || row.isMemo || !colId) return {};
   return ds_normalizeCellStyle(row.cellStyles && row.cellStyles[colId]);
 }
-function ds_hasCellStyle(st) { return !!(st && (st.b || st.i || st.s || st.u || st.color || st.font || st.size || st.bg || st.lh)); }
+// 오버플로우(#374): 글자가 오른쪽으로 이어진 빈 셀 위까지 보이고, 내용이 있는 셀에서 잘린다. 값은 셀 안쪽 여백(좌우 8px)을 뺀 폭(px)
+function ds_overflowWidthFor(cols, row, idx) {
+  var w = Number(cols[idx] && cols[idx].width) || 160;
+  for (var k = idx + 1; k < cols.length; k++) {
+    var v = row && row.cells ? row.cells[cols[k].id] : '';
+    if (v !== undefined && v !== null && String(v) !== '') break;
+    w += Number(cols[k].width) || 160;
+  }
+  return Math.max(0, w - 16);
+}
+function ds_viewInner(viewHtml, wrap, width) { return wrap === 'overflow' ? '<span class="ds-ov-inner" style="width:' + Math.round(width) + 'px;">' + viewHtml + '</span>' : viewHtml; }
+function ds_hasCellStyle(st) { return !!(st && (st.b || st.i || st.s || st.u || st.color || st.font || st.size || st.bg || st.lh || st.wrap)); }
 // ── 셀 글자 일부 서식(#375): row.cellRich[colId] 에 허용 태그만 담은 HTML. row.cells[colId] 는 항상 순수 텍스트(조회·검색·정렬·내보내기용)로 함께 갱신한다 ──
 // 허용: b/strong, i/em, u, s/strike/del, span[style: color·background-color·font-size(px)], br. 그 밖의 태그·속성(스크립트·이벤트 속성 포함)은 버리고 글자만 남긴다.
 // DOM 없이 동작하는 작은 파서라 편집기(contenteditable)가 만든 HTML 도 같은 규칙으로 정리한다.
@@ -41978,6 +42018,14 @@ function ds_renderFormatToolbar(toolbarEl, ds) {
     + '</div>'
     + '</div>'
     + '<select id="ds-lh-select" class="ds-format-select ds-lh-select" onchange="ds_applyCellLineHeight(this.value)" title="줄간격" aria-label="셀 줄간격"><option value="">줄간격</option>' + ['1', '1.2', '1.45', '1.6', '1.8', '2', '2.5'].map(function(v) { return '<option value="' + v + '">' + v + '</option>'; }).join('') + '</select>'
+    + '<div class="ds-format-dropdown-wrap">'
+    + '<button type="button" id="ds-wrap-btn" class="ds-format-btn ds-format-picker-btn" onmousedown="event.preventDefault()" onclick="ds_toggleFormatMenu(event,\'wrap\')" title="텍스트 줄바꿈" aria-label="텍스트 줄바꿈"><i id="ds-wrap-icon" class="fa-solid fa-turn-down"></i></button>'
+    + '<div class="ds-format-menu" id="ds-wrap-menu" role="menu" aria-label="텍스트 줄바꿈">'
+    + '<button type="button" class="ds-format-option ds-wrap-option" data-wrap="overflow" title="오버플로우" onmousedown="event.preventDefault()" onclick="ds_applyCellWrap(\'overflow\')"><i class="fa-solid fa-right-long ds-format-option-icon"></i><span>오버플로우</span></button>'
+    + '<button type="button" class="ds-format-option ds-wrap-option" data-wrap="wrap" title="줄바꿈" onmousedown="event.preventDefault()" onclick="ds_applyCellWrap(\'wrap\')"><i class="fa-solid fa-turn-down ds-format-option-icon"></i><span>줄바꿈</span></button>'
+    + '<button type="button" class="ds-format-option ds-wrap-option" data-wrap="clip" title="자르기" onmousedown="event.preventDefault()" onclick="ds_applyCellWrap(\'clip\')"><i class="fa-solid fa-scissors ds-format-option-icon"></i><span>자르기</span></button>'
+    + '</div>'
+    + '</div>'
     + '<button type="button" id="ds-clear-format-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_clearCellFormat()" title="서식 지우기" aria-label="서식 지우기"><i class="fa-solid fa-eraser"></i></button>'
     + '<button type="button" id="ds-header-axis-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_toggleHeaderEditMode()" title="행/열 이름 편집 전환" aria-label="행/열 이름 편집 전환"><i id="ds-header-axis-icon" class="fa-solid fa-right-left"></i></button>'
     + '</div>';
@@ -42113,7 +42161,7 @@ function ds_richDivOf(ta) { var td = ta && ta.closest ? ta.closest('td') : null;
 function ds_richRowOf(ta) { var ds = findDataSheet(_dsEditId); var row = ds && ds.rows ? ds.rows[parseInt(ta.dataset.rowIdx, 10)] : null; return row && !row.isCategory && !row.isMemo ? row : null; }
 function ds_richApplyStyle(ta, d) { // 셀 전체 서식(#373)을 편집 div 에도 반영
   ['color', 'fontFamily', 'fontSize', 'lineHeight'].forEach(function(p) { d.style[p] = ta.style[p] || ''; });
-  ['ds-cell-align-left', 'ds-cell-align-center', 'ds-cell-align-right', 'ds-cell-align-justify', 'ds-cell-b', 'ds-cell-i', 'ds-cell-s', 'ds-cell-u'].forEach(function(c) { d.classList.toggle(c, ta.classList.contains(c)); });
+  ['ds-cell-align-left', 'ds-cell-align-center', 'ds-cell-align-right', 'ds-cell-align-justify', 'ds-cell-b', 'ds-cell-i', 'ds-cell-s', 'ds-cell-u', 'ds-cell-wrap-overflow', 'ds-cell-wrap-clip'].forEach(function(c) { d.classList.toggle(c, ta.classList.contains(c)); });
 }
 function ds_richBind(d) {
   if (d._dsBound) return;
@@ -42159,11 +42207,15 @@ function ds_richRefresh(ta) { // 보기 상태: 서식이 있으면 div 로 표�
   var td = ta && ta.closest ? ta.closest('td') : null, row = ta ? ds_richRowOf(ta) : null;
   if (!td || !row || td.classList.contains('ds-rich-editing')) return;
   var rich = ds_getCellRich(row, ta.dataset.colId, ta.value), d = ds_richDivOf(ta);
+  var wrap = ds_getCellStyle(row, ta.dataset.colId).wrap, overflow = wrap === 'overflow';
+  var dsCur = findDataSheet(_dsEditId), cols = dsCur && dsCur.columns ? dsCur.columns : [];
+  var colIdx = cols.findIndex(function(c) { return c.id === ta.dataset.colId; });
   td.classList.toggle('ds-has-rich', !!rich);
-  if (rich) {
+  td.classList.toggle('ds-wrap-overflow', overflow);
+  if (rich || overflow) {
     if (!d) { d = document.createElement('div'); d.className = 'ds-cell-rich'; d.dataset.rowIdx = ta.dataset.rowIdx; d.dataset.colId = ta.dataset.colId; ta.parentNode.insertBefore(d, ta.nextSibling); }
     d.contentEditable = 'false';
-    d.innerHTML = rich;
+    d.innerHTML = ds_viewInner(rich || ds_richFromText(ta.value), wrap, colIdx >= 0 ? ds_overflowWidthFor(cols, row, colIdx) : 0);
     ds_richApplyStyle(ta, d);
   } else if (d) d.remove();
   ds_autosizeCell(ta);
@@ -42249,6 +42301,7 @@ function ds_applyCellEditModeUi() {
     ta.classList.toggle('ds-cell-editing', isEditing);
     if (isEditing) { var rowForRich = ds_richRowOf(ta); if (rowForRich && ds_getCellRich(rowForRich, ta.dataset.colId, ta.value)) ds_richOpen(ta); } // 서식이 있는 셀은 서식 편집 칸으로(#375)
     else ds_richClose(ta);
+    if (ta.classList.contains('ds-cell-wrap-overflow') || ta.classList.contains('ds-cell-wrap-clip')) ds_autosizeCell(ta);
   });
 }
 
@@ -42701,9 +42754,15 @@ function ds_updateFormatToolbarState(ds) {
     }
   }
   if (colorSwatch) colorSwatch.style.background = (hasStyleTargets && refStyle.color) ? refStyle.color : 'transparent';
+  var wrapNow = (hasStyleTargets && refStyle.wrap) || 'wrap';
+  var wrapIcon = document.getElementById('ds-wrap-icon');
+  if (wrapIcon) wrapIcon.className = 'fa-solid ' + ({ overflow: 'fa-right-long', wrap: 'fa-turn-down', clip: 'fa-scissors' }[wrapNow]);
+  document.querySelectorAll('#ds-wrap-menu .ds-wrap-option').forEach(function(opt) { opt.classList.toggle('active', opt.dataset.wrap === wrapNow); });
+  var wrapBtn = document.getElementById('ds-wrap-btn');
+  if (wrapBtn) wrapBtn.title = '텍스트 줄바꿈: ' + ({ overflow: '오버플로우', wrap: '줄바꿈', clip: '자르기' }[wrapNow]);
   var bgSwatch = document.getElementById('ds-bg-swatch');
   if (bgSwatch) bgSwatch.style.background = (hasStyleTargets && refStyle.bg) ? refStyle.bg : 'transparent';
-  ['ds-bg-btn', 'ds-font-select', 'ds-size-input', 'ds-size-dec-btn', 'ds-size-inc-btn', 'ds-lh-select', 'ds-clear-format-btn'].forEach(function(id) {
+  ['ds-bg-btn', 'ds-font-select', 'ds-size-input', 'ds-size-dec-btn', 'ds-size-inc-btn', 'ds-lh-select', 'ds-clear-format-btn', 'ds-wrap-btn'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.disabled = !hasStyleTargets;
   });
@@ -43510,6 +43569,8 @@ function _dsApplyCellStyleToDom(rowIdx, colId, st) {
   ta.classList.toggle('ds-cell-i', !!st.i);
   ta.classList.toggle('ds-cell-s', !!st.s);
   ta.classList.toggle('ds-cell-u', !!st.u);
+  ta.classList.toggle('ds-cell-wrap-overflow', st.wrap === 'overflow');
+  ta.classList.toggle('ds-cell-wrap-clip', st.wrap === 'clip');
   ta.style.color = st.color || '';
   ta.style.fontFamily = st.font || '';
   ta.style.fontSize = st.size ? st.size + 'px' : '';
@@ -43518,6 +43579,7 @@ function _dsApplyCellStyleToDom(rowIdx, colId, st) {
   if (td) td.style.backgroundColor = st.bg || '';
   var richView = ds_richDivOf(ta);
   if (richView) ds_richApplyStyle(ta, richView);
+  ds_richRefresh(ta); // 보기 칸(서식·오버플로우) 갱신
   ds_autosizeCell(ta); // 글자 크기·줄간격이 바뀌면 높이도 다시 계산
 }
 function _dsMutateCellStyles(mutator, explicitCells) {
@@ -43593,6 +43655,9 @@ function ds_stepCellSize(delta) {
 function ds_applyCellLineHeight(value) {
   var n = Number(value);
   _dsMutateCellStyles(function(cur) { if (value !== '' && n >= 1 && n <= 3) cur.lh = n; else delete cur.lh; });
+}
+function ds_applyCellWrap(mode) { // 텍스트 줄바꿈(#374): 'wrap'(기본, 저장 안 함) | 'overflow' | 'clip'
+  _dsMutateCellStyles(function(cur) { if (mode === 'overflow' || mode === 'clip') cur.wrap = mode; else delete cur.wrap; });
 }
 function ds_clearCellFormat() { // 선택 셀의 서식(cellStyles)·가로 맞춤(cellAligns) 제거. 세로 맞춤은 행 단위라 그대로
   var ds = findDataSheet(_dsEditId);
@@ -43696,7 +43761,7 @@ function _dsRenderFlatTable(ds) {
     var rowHeaderHtml = headerEditMode === 'rows'
       ? '<input class="ds-row-name-input" value="' + esc(row.rowName || '') + '" placeholder="' + (rowIdx + 1) + '" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" onfocus="ds_setActiveRow(' + rowIdx + ')" oninput="ds_renameRow(' + rowIdx + ', this.value)">'
       : (rowIdx + 1);
-    var cells = cols.map(function(c) {
+    var cells = cols.map(function(c, ci) {
       var val = (row.cells && row.cells[c.id] !== undefined && row.cells[c.id] !== null) ? String(row.cells[c.id]) : '';
       var textAlign = ds_getCellTextAlign(row, c.id);
       var cellClasses = [];
@@ -43705,16 +43770,18 @@ function _dsRenderFlatTable(ds) {
       if (_dsSelectedColIds.includes(c.id)) cellClasses.push('ds-selected-col');
       var richHtml = ds_getCellRich(row, c.id, val); // 글자 일부 서식(#375)
       if (richHtml) cellClasses.push('ds-has-rich');
+      var wrapMode = ds_getCellStyle(row, c.id).wrap; // 텍스트 줄바꿈(#374)
+      if (wrapMode === 'overflow') cellClasses.push('ds-wrap-overflow');
       var cellClassAttr = cellClasses.length ? ' class="' + cellClasses.join(' ') + '"' : '';
       var isEditingCell = ds_isCellInEditMode(rowIdx, c.id);
       var editClass = isEditingCell ? ' ds-cell-editing' : '';
       var cst = ds_getCellStyle(row, c.id);
-      var styleClass = (cst.b ? ' ds-cell-b' : '') + (cst.i ? ' ds-cell-i' : '') + (cst.s ? ' ds-cell-s' : '') + (cst.u ? ' ds-cell-u' : '');
+      var styleClass = (cst.b ? ' ds-cell-b' : '') + (cst.i ? ' ds-cell-i' : '') + (cst.s ? ' ds-cell-s' : '') + (cst.u ? ' ds-cell-u' : '') + (cst.wrap ? ' ds-cell-wrap-' + cst.wrap : '');
       var cssText = ds_cellStyleCss(cst);
       var styleAttr = cssText ? ' style="' + esc(cssText) + ';"' : '';
       return '<td' + cellClassAttr + (cst.bg ? ' style="background-color:' + esc(cst.bg) + ';"' : '') + ' data-col-id="' + esc(c.id) + '" oncontextmenu="ds_openRowMenu(event,' + rowIdx + ',\'' + esc(c.id) + '\')">'
         + '<textarea class="ds-cell-input ds-cell-align-' + textAlign + editClass + styleClass + '"' + styleAttr + ' rows="1" data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '" onmousedown="ds_handleCellMouseDown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" ondblclick="ds_enterCellEditMode(' + rowIdx + ',\'' + esc(c.id) + '\')" onkeydown="ds_handleCellKeydown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" onbeforeinput="ds_handleCellBeforeInput(event,this)" oncompositionstart="ds_handleCellCompositionStart(this)" onpaste="ds_handleCellPaste(event,this)" oninput="ds_handleCellInput(this)" onfocus="ds_handleCellFocus(this)" onblur="ds_autosizeCell(this)">' + esc(val) + '</textarea>'
-        + (richHtml ? '<div class="ds-cell-rich ds-cell-align-' + textAlign + styleClass + '"' + styleAttr + ' data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '">' + richHtml + '</div>' : '')
+        + ((richHtml || wrapMode === 'overflow') ? '<div class="ds-cell-rich ds-cell-align-' + textAlign + styleClass + '"' + styleAttr + ' data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '">' + ds_viewInner(richHtml || ds_richFromText(val), wrapMode, ds_overflowWidthFor(cols, row, ci)) + '</div>' : '')
         + '</td>';
     }).join('');
     return '<tr class="' + rowClass + _rhClass + '" data-row-idx="' + rowIdx + '"' + _rhStyle + ' onmousedown="ds_setActiveRow(' + rowIdx + ')">'
@@ -44330,13 +44397,24 @@ function ds_updateCell(textareaEl) {
   if (!row.cells) row.cells = {};
   row.cells[colId] = textareaEl.value;
   ds_richRefresh(textareaEl); // 편집 밖에서 텍스트가 바뀌면 어긋난 서식 표시를 정리(#375)
+  ds_overflowRefreshRow(rowIdx); // 옆 셀 내용이 바뀌면 오버플로우 폭도 다시(#374)
   ds_autosizeCell(textareaEl);
   persist();
 }
 
+function ds_overflowRefreshRow(rowIdx) {
+  var ds = findDataSheet(_dsEditId), row = ds && ds.rows ? ds.rows[rowIdx] : null, cols = ds && ds.columns ? ds.columns : [];
+  if (!row) return;
+  cols.forEach(function(c, idx) {
+    var ta = ds_getCellTextarea(rowIdx, c.id), td = ta && ta.closest('td'), inner = td && td.classList.contains('ds-wrap-overflow') ? td.querySelector('.ds-ov-inner') : null;
+    if (inner) inner.style.width = Math.round(ds_overflowWidthFor(cols, row, idx)) + 'px';
+  });
+}
 function ds_autosizeVisibleCells() {
   var body = document.getElementById('ds-editor-body');
   if (!body) return;
+  var dsAll = findDataSheet(_dsEditId);
+  if (dsAll && dsAll.rows) dsAll.rows.forEach(function(r, i) { if (ds_isDataRow(r)) ds_overflowRefreshRow(i); }); // 열 너비가 바뀐 뒤에도 폭 맞춤
   body.querySelectorAll('tbody tr:not(.ds-row-fixed-h) textarea.ds-cell-input, tbody tr:not(.ds-row-fixed-h) textarea.ds-memo-input').forEach(function(ta) {
     ds_autosizeCell(ta);
   });
@@ -44354,7 +44432,7 @@ function ds_scheduleAutosizeVisibleCells() {
 function ds_autosizeCell(textareaEl) {
   if (!textareaEl) return;
   var richTd = textareaEl.closest ? textareaEl.closest('td') : null;
-  if (richTd && (richTd.classList.contains('ds-has-rich') || richTd.classList.contains('ds-rich-editing'))) { textareaEl.style.height = ''; return; } // 서식 칸은 div 가 높이를 정한다(#375)
+  if (richTd && (richTd.classList.contains('ds-has-rich') || richTd.classList.contains('ds-rich-editing') || (richTd.classList.contains('ds-wrap-overflow') && !textareaEl.classList.contains('ds-cell-editing')))) { textareaEl.style.height = ''; return; } // 서식·오버플로우 보기 칸은 div 가 높이를 정한다(#375·#374)
   var tr = textareaEl.closest ? textareaEl.closest('tr') : null;
   if (tr && tr.classList.contains('ds-row-fixed-h')) { textareaEl.style.height = '100%'; return; }
   textareaEl.style.height = 'auto';
