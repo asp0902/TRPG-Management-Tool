@@ -1,0 +1,13 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const ctx = {}; vm.createContext(ctx);
+vm.runInContext(html.slice(html.indexOf('function rbFitSize'), html.indexOf('function rbShrinkImage')) + ';this.f={rbFitSize}', ctx);
+const F = ctx.f;
+ok(JSON.stringify(F.rbFitSize(1600, 1200, 512)) === '{"w":512,"h":384}' && JSON.stringify(F.rbFitSize(300, 200, 512)) === '{"w":300,"h":200}' && JSON.stringify(F.rbFitSize(100, 4000, 512)) === '{"w":13,"h":512}', '긴 변 512px 로 비율 유지 축소(작으면 그대로)');
+const modal = html.slice(html.indexOf('id="rb-modal-backdrop"'), html.indexOf('id="rb-modal-backdrop"') + 6000);
+ok(/<div class="rb-modal-label">이미지<\/div>/.test(modal) && modal.includes('id="rb-image"') && /id="rb-image-file" accept="image\/\*"/.test(modal) && modal.includes('image-block-source-btn') && modal.includes('image-block-paste-zone') && /onpaste="onRbImagePaste\(event\)"/.test(modal), '팝업에 URL·파일·클립보드 세 방식(이미지 블록 모달과 같은 클래스)');
+ok(modal.includes('id="rb-thumb-preview"') && modal.includes('rbClearImage()'), '미리보기·이미지 제거');
+ok(/const image = rbImageValue\(\);/.test(html) && /rbSetImageValue\(n\.image\)/.test(html), '저장·편집 열기 연결(기존 URL 그대로 열림)');
+ok(/rbSetImageFile\(getImageFileFromTransfer\(e\.dataTransfer\)\)/.test(html), '끌어다 놓기');
+process.exit(f ? 1 : 0);

@@ -9500,12 +9500,20 @@ select.sh-field-input,
         <input class="rb-modal-input" id="rb-title" placeholder="룰북 이름을 입력하세요" spellcheck="false">
       </div>
       <div class="rb-modal-field">
-        <div class="rb-modal-label">이미지 URL</div>
+        <div class="rb-modal-label">이미지</div>
         <div class="rb-modal-img-row">
-          <input class="rb-modal-img-input" id="rb-image" placeholder="https://..." spellcheck="false" oninput="updateRbThumbPreview()">
+          <input class="rb-modal-img-input" id="rb-image" placeholder="이미지 URL (https://...)" spellcheck="false" oninput="rbImageUrlInput()" onpaste="onRbImagePaste(event)">
         </div>
-        <div id="rb-thumb-preview" style="margin-top:6px;display:none;">
-          <img id="rb-thumb-img" src="" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #eee;" onerror="this.parentElement.style.display='none'">
+        <button type="button" class="image-block-source-btn" style="margin-top:6px;" onclick="document.getElementById('rb-image-file').click()">
+          <i class="fa-solid fa-folder-open"></i><span>파일 불러오기</span>
+        </button>
+        <input type="file" id="rb-image-file" accept="image/*" hidden onchange="onRbImageFile(event)">
+        <div id="rb-image-paste-zone" class="image-block-paste-zone" style="margin-top:6px;" tabindex="0" onpaste="onRbImagePaste(event)" ondragover="event.preventDefault()" ondrop="onRbImageDrop(event)">
+          <i class="fa-solid fa-paste"></i><span>클립보드에서 붙여넣기</span><kbd>Ctrl+V</kbd>
+        </div>
+        <div id="rb-thumb-preview" style="margin-top:6px;display:none;align-items:flex-end;gap:10px;">
+          <img id="rb-thumb-img" src="" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #eee;" onerror="document.getElementById('rb-thumb-preview').style.display='none'">
+          <button type="button" class="rb-modal-cancel" style="flex:0 0 auto;padding:6px 12px;" onclick="rbClearImage()">이미지 제거</button>
         </div>
       </div>
       <div class="rb-modal-field">
@@ -41763,7 +41771,7 @@ function openRulebookModal(id, parentId) {
     headingEl.textContent = n.parentId ? '서플리먼트 편집' : '룰북 편집';
     _rbParentId = n.parentId;
     document.getElementById('rb-title').value = n.title;
-    document.getElementById('rb-image').value = n.image;
+    rbSetImageValue(n.image);
     document.getElementById('rb-memo').value = n.memo;
     _rbTags = [...n.tags];
     deleteBtn.style.display = '';
@@ -41784,7 +41792,7 @@ function openRulebookModal(id, parentId) {
     populateRulebookSheetTemplateSelect('');
     headingEl.textContent = isSupple ? '서플리먼트 추가' : '룰북 추가';
     document.getElementById('rb-title').value = '';
-    document.getElementById('rb-image').value = '';
+    rbSetImageValue('');
     document.getElementById('rb-memo').value = '';
     _rbTags = [];
     deleteBtn.style.display = 'none';
@@ -41845,20 +41853,67 @@ function addRbNewTag() {
   renderRbModalTags();
 }
 
+// 룰북 이미지(#389): URL 입력 / 파일 선택 / 클립보드 붙여넣기. 파일·클립보드 이미지는 긴 변 512px 로 줄여 dataURL 로 _rbImageData 에 두고, URL 은 입력칸에 그대로 둔다
+let _rbImageData = '';
+function rbFitSize(w, h, max) { const k = Math.min(1, max / Math.max(w, h, 1)); return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) }; }
+function rbShrinkImage(dataUrl, max = 512) { // 작은 이미지는 그대로, 큰 이미지는 WebP(미지원이면 PNG)로 축소
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const size = rbFitSize(img.naturalWidth, img.naturalHeight, max);
+      if (size.w === img.naturalWidth && size.h === img.naturalHeight && dataUrl.length < 200000) { resolve(dataUrl); return; }
+      const canvas = document.createElement('canvas'); canvas.width = size.w; canvas.height = size.h;
+      canvas.getContext('2d').drawImage(img, 0, 0, size.w, size.h);
+      let out = '';
+      try { out = canvas.toDataURL('image/webp', 0.85); } catch (e) { out = ''; }
+      const shrunk = size.w !== img.naturalWidth || size.h !== img.naturalHeight; // 줄였으면 용량과 무관하게 줄인 쪽, 크기는 그대로인데 큰 파일이면 더 작을 때만
+      resolve(out && out.startsWith('data:image') && (shrunk || out.length < dataUrl.length) ? out : dataUrl);
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+function rbImageValue() { return _rbImageData || (document.getElementById('rb-image')?.value || '').trim(); }
+function rbSetImageValue(value) { // 저장된 값 → 입력칸/미리보기(dataURL 이면 입력칸은 비움)
+  value = String(value || '');
+  const input = document.getElementById('rb-image');
+  _rbImageData = value.startsWith('data:image/') ? value : '';
+  if (input) { input.value = _rbImageData ? '' : value; input.placeholder = _rbImageData ? '파일·클립보드 이미지 사용 중' : '이미지 URL (https://...)'; }
+  updateRbThumbPreview();
+}
+function rbImageUrlInput() { _rbImageData = ''; const input = document.getElementById('rb-image'); if (input) input.placeholder = '이미지 URL (https://...)'; updateRbThumbPreview(); }
+function rbClearImage() { rbSetImageValue(''); }
+function rbSetImageFile(file) {
+  if (!file || !/^image\//.test(file.type)) return;
+  const reader = new FileReader();
+  reader.onload = async e => { rbSetImageValue(await rbShrinkImage(String(e.target.result || ''))); };
+  reader.readAsDataURL(file);
+}
+function onRbImageFile(e) { const file = e.target.files?.[0]; e.target.value = ''; rbSetImageFile(file); }
+function onRbImageDrop(e) { e.preventDefault(); rbSetImageFile(getImageFileFromTransfer(e.dataTransfer)); }
+function onRbImagePaste(e) { // 붙여넣기 영역·URL 입력칸에서: 이미지면 그 이미지, 이미지 주소 글자면 URL 칸에
+  const file = getImageFileFromTransfer(e.clipboardData);
+  if (file) { e.preventDefault(); rbSetImageFile(file); return; }
+  if (e.target && e.target.id === 'rb-image') return; // 입력칸의 글자 붙여넣기는 기본 동작
+  const text = e.clipboardData?.getData('text/plain')?.trim() || '';
+  if (!isRenderableImageSrc(text)) return;
+  e.preventDefault();
+  rbSetImageValue(text);
+}
 function updateRbThumbPreview() {
-  const url = (document.getElementById('rb-image')?.value || '').trim();
+  const url = rbImageValue();
   const previewEl = document.getElementById('rb-thumb-preview');
   const imgEl = document.getElementById('rb-thumb-img');
   if (!previewEl || !imgEl) return;
-  if (url) { imgEl.src = url; previewEl.style.display = ''; }
-  else previewEl.style.display = 'none';
+  if (url) { imgEl.src = url; previewEl.style.display = 'flex'; }
+  else { imgEl.removeAttribute('src'); previewEl.style.display = 'none'; }
 }
 
 function saveRulebookModal() {
   const title = (document.getElementById('rb-title')?.value || '').trim();
   if (!title) { document.getElementById('rb-title')?.focus(); return; }
   const editId = _rbEditId;
-  const image = (document.getElementById('rb-image')?.value || '').trim();
+  const image = rbImageValue();
   const memo = document.getElementById('rb-memo')?.value || '';
   const inheritCheck = document.getElementById('rb-sheet-inherit');
   const sheetSelect = document.getElementById('rb-sheet-template-key');
