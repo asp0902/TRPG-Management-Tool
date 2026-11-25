@@ -65,7 +65,7 @@ const r5 = F.ds_richFormatRange('a<br>b', 1, 3, { bg: '#ffff00' });
 ok(F.ds_richPlain(r5) === 'a' + String.fromCharCode(10) + 'b' && r5.indexOf('background-color:#ffff00') > 0, '줄바꿈이 낀 범위 적용·텍스트 불변');
 // 소스 구조
 const ui = html.slice(html.indexOf('function ds_richDivOf'), html.indexOf('function ds_getActiveCellTextarea'));
-ok(/ta\.value = text;\s*ds_updateCell\(ta\);/.test(ui) && /delete row\.cellRich\[d\.dataset\.colId\]/.test(ui), '편집 시 cells(순수 텍스트)와 cellRich 를 함께 갱신, 서식 없으면 삭제');
+ok(/ta\.value = text;[\s\S]{0,260}else ds_updateCell\(ta\);/.test(ui) && /delete row\.cellRich\[d\.dataset\.colId\]/.test(ui), '편집 시 cells(순수 텍스트)와 cellRich 를 함께 갱신(메모 행은 memoText), 서식 없으면 삭제');
 ok(/execCommand\('insertText'/.test(ui) && /getData\('text\/plain'\)/.test(ui), '서식 편집 칸 붙여넣기는 일반 텍스트');
 ok(/function ds_toggleCellStyle[\s\S]{0,400}ds_richPartialTarget\(\)/.test(html) && /function ds_applyCellColor[\s\S]{0,500}ds_richPartialTarget\(\)/.test(html) && /function ds_stepCellSize[\s\S]{0,200}ds_richPartialTarget\(\)/.test(html), '툴바: 편집 중 선택이 있으면 선택한 글자에만, 아니면 셀 전체(#373)');
 ok(/ds_richDiscard\(rowIdx, colId\)/.test(html) && /if \(options\.replaceText !== undefined\) ds_richDiscard/.test(html), '글자를 바꿔 쓰기 시작하면 서식 폐기');

@@ -7263,6 +7263,11 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .ds-table td.ds-rich-editing textarea.ds-cell-input { pointer-events: none; }
 .ds-cell-rich { display: none; min-height: 30px; box-sizing: border-box; padding: 5px 8px; font-size: 13px; line-height: 1.45; color: #222; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; pointer-events: none; }
 .ds-table td.ds-has-rich .ds-cell-rich, .ds-table td.ds-rich-editing .ds-cell-rich { display: block; }
+/* 메모 행 글자 일부 서식(#415): 셀과 같은 방식(textarea 는 투명하게 겹쳐 두고 서식 div 가 보인다) */
+.ds-table td.ds-has-rich textarea.ds-memo-input, .ds-table td.ds-rich-editing textarea.ds-memo-input { position: absolute; inset: 0; width: 100%; height: 100% !important; opacity: 0; }
+.ds-table td.ds-rich-editing textarea.ds-memo-input { pointer-events: none; }
+.ds-memo-cell .ds-cell-rich { padding: 8px 12px; color: #78350f; font-style: italic; line-height: 1.5; min-height: 0; }
+.ds-memo-cell .ds-cell-rich:focus { background: #fff; box-shadow: inset 0 0 0 2px #fbbf24; }
 .ds-table td.ds-rich-editing .ds-cell-rich { pointer-events: auto; outline: none; cursor: text; }
 .ds-cell-align-justify { text-align: justify; }
 .ds-format-toolbar .tb-select-lh { width: 100%; appearance: none; -webkit-appearance: none; font-size: 10px; padding: 0 18px 0 8px; text-align: left; background-color: transparent; background-image: none; }
@@ -12505,7 +12510,7 @@ function getDataSheetHistoryPersistTarget() {
   if (!active || !active.closest) return { key: 'datasheet-action', force: true };
   const cell = active.closest('textarea.ds-cell-input');
   if (cell) return { key: 'datasheet-cell:' + sheetId + ':' + (cell.dataset.rowIdx || '') + ':' + (cell.dataset.colId || ''), force: false };
-  const memo = active.closest('textarea.ds-memo-input');
+  const memo = active.closest('textarea.ds-memo-input') || active.closest('.ds-cell-rich[data-col-id="__row"]');
   if (memo) {
     const row = memo.closest('tr[data-row-idx]');
     return { key: 'datasheet-memo:' + sheetId + ':' + (row?.dataset.rowIdx || ''), force: false };
@@ -40784,7 +40789,8 @@ function imeDeferEditorKey(e) {
     document.removeEventListener('compositionend', onEnd, true);
     if (!ta.isConnected || typeof ds_handleCellKeydown !== 'function') return;
     const fake = { key: rec.key, shiftKey: rec.shiftKey, altKey: false, ctrlKey: false, metaKey: false, isComposing: false, keyCode: 0, target: ta, preventDefault() {}, stopPropagation() {} };
-    ds_handleCellKeydown(fake, parseInt(ta.dataset.rowIdx, 10), ta.dataset.colId);
+    if (ta.dataset.colId === '__row') ds_handleMemoRichKeydown(fake, parseInt(ta.dataset.rowIdx, 10), ta); // 메모 행 서식 편집 칸(#415)
+    else ds_handleCellKeydown(fake, parseInt(ta.dataset.rowIdx, 10), ta.dataset.colId);
   };
   const onEnd = () => setTimeout(run, 0);
   document.addEventListener('compositionend', onEnd, true);
@@ -41427,9 +41433,9 @@ function normalizeDataSheetRow(r, columns) {
       if (ds_hasCellStyle(st)) cellStyles[k] = st;
     });
   }
-  var cellRich = {}; // 글자 일부 서식(#375): 텍스트와 어긋나면 서식을 버리고 텍스트 우선
+  var cellRich = {}; // 글자 일부 서식(#375): 텍스트와 어긋나면 서식을 버리고 텍스트 우선('__row' 는 메모 행(#415)이라 memoText 와 비교)
   if (r.cellRich && typeof r.cellRich === 'object' && !Array.isArray(r.cellRich)) {
-    Object.keys(r.cellRich).forEach(function(k) { var clean = ds_getCellRich({ cellRich: r.cellRich }, k, cells[k]); if (clean) cellRich[k] = clean; });
+    Object.keys(r.cellRich).forEach(function(k) { var clean = ds_getCellRich({ cellRich: r.cellRich }, k, k === '__row' ? r.memoText : cells[k]); if (clean) cellRich[k] = clean; });
   }
   return {
     id: r.id || mkId(),
@@ -42652,22 +42658,22 @@ function ds_getActiveCellContext(ds) {
 // ── 셀 글자 일부 서식 편집기(#375): 셀 안에 편집용 div(contenteditable)를 얹고, 텍스트 값은 기존 textarea 에 그대로 미러링한다 ──
 // textarea 는 셀의 값·선택·복붙·채우기 등 기존 동작을 그대로 맡고(편집 중엔 숨김), 서식이 있는 셀은 보기 상태에서도 이 div 로 서식을 보여 준다.
 function ds_richDivOf(ta) { var td = ta && ta.closest ? ta.closest('td') : null; return td ? td.querySelector('.ds-cell-rich') : null; }
-function ds_richRowOf(ta) { var ds = findDataSheet(_dsEditId); var row = ds && ds.rows ? ds.rows[parseInt(ta.dataset.rowIdx, 10)] : null; return row && !row.isCategory && !row.isMemo ? row : null; }
+function ds_richRowOf(ta) { var ds = findDataSheet(_dsEditId); var row = ds && ds.rows ? ds.rows[parseInt(ta.dataset.rowIdx, 10)] : null; if (row && row.isMemo && ta.classList.contains('ds-memo-input')) return row; return row && !row.isCategory && !row.isMemo ? row : null; }
 function ds_richApplyStyle(ta, d) { // 셀 전체 서식(#373)을 편집 div 에도 반영
-  ['color', 'fontFamily', 'fontSize', 'lineHeight'].forEach(function(p) { d.style[p] = ta.style[p] || ''; });
+  ['color', 'fontFamily', 'fontSize', 'lineHeight', 'fontStyle'].forEach(function(p) { d.style[p] = ta.style[p] || ''; });
   ['ds-cell-align-left', 'ds-cell-align-center', 'ds-cell-align-right', 'ds-cell-align-justify', 'ds-cell-b', 'ds-cell-i', 'ds-cell-s', 'ds-cell-u', 'ds-cell-wrap-overflow', 'ds-cell-wrap-clip'].forEach(function(c) { d.classList.toggle(c, ta.classList.contains(c)); });
 }
 function ds_richBind(d) {
   if (d._dsBound) return;
   d._dsBound = true;
-  d.addEventListener('keydown', function(e) { ds_handleCellKeydown(e, parseInt(d.dataset.rowIdx, 10), d.dataset.colId); });
+  d.addEventListener('keydown', function(e) { if (d.dataset.colId === DS_ROW_COL) ds_handleMemoRichKeydown(e, parseInt(d.dataset.rowIdx, 10), d); else ds_handleCellKeydown(e, parseInt(d.dataset.rowIdx, 10), d.dataset.colId); });
   d.addEventListener('input', function() { ds_richInput(d); });
   d.addEventListener('paste', function(e) { // 붙여넣기는 일반 텍스트만(줄바꿈은 <br>)
     e.preventDefault();
     var text = e.clipboardData && e.clipboardData.getData ? String(e.clipboardData.getData('text/plain') || '').replace(/\r\n?/g, '\n') : '';
     text.split('\n').forEach(function(line, i) { if (i > 0) document.execCommand('insertLineBreak'); if (line) document.execCommand('insertText', false, line); });
   });
-  d.addEventListener('mousedown', function(e) { e.stopPropagation(); ds_beginEditDragWatch(e, d.dataset.rowIdx, d.dataset.colId); }); // 편집 칸에서 시작한 드래그는 셀 경계를 넘으면 범위 선택으로(#383)
+  d.addEventListener('mousedown', function(e) { e.stopPropagation(); if (d.dataset.colId !== DS_ROW_COL) ds_beginEditDragWatch(e, d.dataset.rowIdx, d.dataset.colId); }); // 편집 칸에서 시작한 드래그는 셀 경계를 넘으면 범위 선택으로(#383)
 }
 function ds_richPos(root, offset) { // 순수 텍스트 offset → DOM 위치(줄바꿈 <br> 는 글자 1개)
   var n = 0, walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT), node;
@@ -42729,8 +42735,51 @@ function ds_richInput(d) { // 편집 div → cellRich(서식 HTML)·cells(순수
   if (!row.cellRich || typeof row.cellRich !== 'object' || Array.isArray(row.cellRich)) row.cellRich = {};
   if (ds_richHasFormat(segs)) row.cellRich[d.dataset.colId] = ds_richSerialize(segs); else delete row.cellRich[d.dataset.colId];
   ta.value = text;
-  ds_updateCell(ta);
+  if (ta.classList.contains('ds-memo-input')) ds_updateMemoRow(parseInt(d.dataset.rowIdx, 10), ta); // memoText 는 항상 순수 텍스트(#415)
+  else ds_updateCell(ta);
 }
+// ── 메모 행 글자 일부 서식(#415): 셀과 같은 편집 칸(.ds-cell-rich)·cellRich 를 가상 열 '__row' 로 재사용 ──
+function ds_activeMemoTa() { // 활성 행이 메모 행이면 그 textarea
+  var ds = findDataSheet(_dsEditId), row = ds && _dsActiveRowIdx !== null ? ds.rows[_dsActiveRowIdx] : null;
+  return row && row.isMemo && _dsActiveCellRowIdx === null ? ds_getCellTextarea(_dsActiveRowIdx, DS_ROW_COL) : null;
+}
+function ds_memoSelection() { // 메모 행에서 글자를 선택한 상태면 { ta, start, end }
+  var ta = ds_activeMemoTa();
+  if (!ta) return null;
+  var td = ta.closest('td'), d = ds_richDivOf(ta);
+  if (td && td.classList.contains('ds-rich-editing') && d) {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed || !d.contains(sel.getRangeAt(0).commonAncestorContainer)) return null;
+    var rg = sel.getRangeAt(0), a = ds_richOffsetIn(d, rg.startContainer, rg.startOffset), b = ds_richOffsetIn(d, rg.endContainer, rg.endOffset);
+    return b > a ? { ta: ta, start: a, end: b } : null;
+  }
+  return document.activeElement === ta && ta.selectionStart !== ta.selectionEnd ? { ta: ta, start: ta.selectionStart, end: ta.selectionEnd } : null;
+}
+function ds_memoFocus(rowIdx, ta) { // 서식이 있는 메모는 포커스하면 바로 서식 편집 칸으로
+  ds_setActiveRow(rowIdx);
+  var ds = findDataSheet(_dsEditId), row = ds && ds.rows[rowIdx], td = ta.closest('td');
+  if (row && td && !td.classList.contains('ds-rich-editing') && ds_getCellRich(row, DS_ROW_COL, ta.value)) ds_richOpen(ta, { selStart: ta.selectionStart, selEnd: ta.selectionEnd });
+}
+function ds_memoRichCloseAll() {
+  document.querySelectorAll('#ds-editor-body td.ds-memo-cell.ds-rich-editing').forEach(function(td) { var ta = td.querySelector('textarea.ds-memo-input'); if (ta) ds_richClose(ta); });
+}
+function ds_handleMemoRichKeydown(e, rowIdx, d) { // 서식 편집 중인 메모: Ctrl+B/I/U, Shift+Enter 줄바꿈, Enter·Esc 편집 종료
+  if (!e || e.isComposing || e.keyCode === 229) return;
+  var key = String(e.key || '');
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && key.length === 1 && 'biu'.indexOf(key.toLowerCase()) >= 0) {
+    e.preventDefault(); if (e.stopPropagation) e.stopPropagation();
+    ds_toggleCellStyle(key.toLowerCase());
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (key === 'Enter' && e.shiftKey) { e.preventDefault(); if (e.stopPropagation) e.stopPropagation(); document.execCommand('insertLineBreak'); return; }
+  if (key === 'Enter' || key === 'Escape') { e.preventDefault(); if (e.stopPropagation) e.stopPropagation(); ds_memoRichCloseAll(); }
+}
+document.addEventListener('mousedown', function(e) { // 메모 서식 편집 중 다른 곳을 누르면 편집 종료(서식 도구·색상 패널·대화상자는 제외)
+  if (!document.querySelector('#ds-editor-body td.ds-memo-cell.ds-rich-editing')) return;
+  if (e.target && e.target.closest && e.target.closest('td.ds-memo-cell.ds-rich-editing, #ds-format-toolbar, #cp-panel, #cp-backdrop, #ds-ctx-menu, .link-insert-dialog, .link-insert-backdrop, .tb-font-menu')) return;
+  ds_memoRichCloseAll();
+}, true);
 function ds_richDiscard(rowIdx, colId) { // 텍스트를 통째로 바꾸는 입력은 서식을 버린다
   var ds = findDataSheet(_dsEditId), row = ds && ds.rows ? ds.rows[rowIdx] : null;
   if (row && row.cellRich) delete row.cellRich[colId];
@@ -42751,6 +42800,8 @@ function ds_richOffsetIn(d, container, offset) {
 }
 let _dsRichPending = null; // 서식 도구 막대를 누르기 직전의 선택
 function ds_richSaveSelection() {
+  var memoSel = ds_memoSelection();
+  if (memoSel) return memoSel;
   if (!_dsCellEditMode) return null;
   var ta = ds_getCellTextarea(_dsActiveCellRowIdx, _dsActiveCellColId);
   if (!ta) return null;
@@ -42767,7 +42818,7 @@ function ds_richSelection() { // 지금 선택, 없으면 도구 막대를 누�
   var live = ds_richSaveSelection();
   if (live) return live;
   var p = _dsRichPending;
-  return (p && p.ta.isConnected && ds_isCellInEditMode(p.ta.dataset.rowIdx, p.ta.dataset.colId)) ? p : null;
+  return (p && p.ta.isConnected && (p.ta.classList.contains('ds-memo-input') ? ds_activeMemoTa() === p.ta : ds_isCellInEditMode(p.ta.dataset.rowIdx, p.ta.dataset.colId))) ? p : null;
 }
 document.addEventListener('mousedown', function(e) {
   if (!e.target || !e.target.closest) return;
@@ -42789,6 +42840,8 @@ function ds_richApplyPatch(sel, patch) { // 선택 글자에만 서식 적용(�
 }
 // 툴바·단축키: 편집 모드에서 글자를 선택했으면 선택한 글자에만, 아니면 셀 전체 서식(#373)
 function ds_richPartialTarget() {
+  var memoSel = ds_memoSelection();
+  if (memoSel) return ds_richOpen(memoSel.ta, { selStart: memoSel.start, selEnd: memoSel.end });
   if (!_dsCellEditMode) return null;
   var ta = ds_getCellTextarea(_dsActiveCellRowIdx, _dsActiveCellColId);
   if (!ta) return null;
@@ -42833,7 +42886,7 @@ function ds_getActiveCellTextarea() {
   return null;
 }
 function ds_getCellTextarea(rowIdx, colId) {
-  var areas = document.querySelectorAll('#ds-editor-body textarea.ds-cell-input');
+  var areas = document.querySelectorAll('#ds-editor-body textarea.ds-cell-input, #ds-editor-body textarea.ds-memo-input[data-col-id]'); // 메모 행 textarea 는 가상 열 '__row'(#415)
   for (var i = 0; i < areas.length; i++) {
     if (parseInt(areas[i].dataset.rowIdx) === rowIdx && areas[i].dataset.colId === colId) return areas[i];
   }
@@ -44226,7 +44279,7 @@ function ds_applyRowStyleDom(rowIdx, st) { // 메모·카테고리 행 전체 �
   el.classList.add('ds-cell-align-' + align);
   var td = el.closest('td');
   if (td) { if (st.bg) td.style.setProperty('background-color', st.bg, 'important'); else td.style.removeProperty('background-color'); }
-  if (el.tagName === 'TEXTAREA') ds_autosizeCell(el);
+  if (el.tagName === 'TEXTAREA') { var rd = ds_richDivOf(el); if (rd) ds_richApplyStyle(el, rd); ds_autosizeCell(el); }
 }
 function _dsApplyCellStyleToDom(rowIdx, colId, st) {
   if (colId === DS_ROW_COL) { ds_applyRowStyleDom(rowIdx, st); return; }
@@ -44434,8 +44487,9 @@ function _dsRenderFlatTable(ds) {
         + '<td class="ds-row-num" onmousedown="ds_rowDragMouseDown(event,' + rowIdx + ')">'
         + _rowResizeHandle
         + '</td>'
-        + '<td colspan="' + (cols.length + 1) + '" class="ds-memo-cell"' + rowStyleAttrs(row).td + '>'
-        + '<textarea class="ds-memo-input' + rowStyleAttrs(row).cls + '"' + rowStyleAttrs(row).style + ' rows="1" placeholder="메모를 입력하세요" onfocus="ds_setActiveRow(' + rowIdx + ')" onkeydown="ds_handleMemoRowKeydown(event,' + rowIdx + ',this)" oninput="ds_updateMemoRow(' + rowIdx + ', this)">' + esc(row.memoText || '') + '</textarea>'
+        + '<td colspan="' + (cols.length + 1) + '" class="ds-memo-cell' + (ds_getCellRich(row, DS_ROW_COL, row.memoText || '') ? ' ds-has-rich' : '') + '"' + rowStyleAttrs(row).td + '>'
+        + '<textarea class="ds-memo-input' + rowStyleAttrs(row).cls + '"' + rowStyleAttrs(row).style + ' rows="1" data-row-idx="' + rowIdx + '" data-col-id="' + DS_ROW_COL + '" placeholder="메모를 입력하세요" onfocus="ds_memoFocus(' + rowIdx + ',this)" onkeydown="ds_handleMemoRowKeydown(event,' + rowIdx + ',this)" oninput="ds_updateMemoRow(' + rowIdx + ', this)">' + esc(row.memoText || '') + '</textarea>'
+        + (ds_getCellRich(row, DS_ROW_COL, row.memoText || '') ? '<div class="ds-cell-rich' + rowStyleAttrs(row).cls + '"' + rowStyleAttrs(row).style + ' data-row-idx="' + rowIdx + '" data-col-id="' + DS_ROW_COL + '">' + ds_getCellRich(row, DS_ROW_COL, row.memoText || '') + '</div>' : '')
         + '</td>'
         + '</tr>';
     }
