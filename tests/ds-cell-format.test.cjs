@@ -26,5 +26,5 @@ ok(!/\.cells\[[^\]]+\]\s*=/.test(block) && !/\.cells\s*=/.test(block), '서식 �
 ok(/function ds_clearCellFormat/.test(block) && /delete cell\.row\.cellStyles\[cell\.colId\]/.test(block) && /delete cell\.row\.cellAligns\[cell\.colId\]/.test(block), '서식 지우기: cellStyles·cellAligns 제거');
 ok(/cpTarget = \{ type: 'ds-cell'/.test(block) && /cpTarget\.type === 'ds-cell'/.test(html) && /cpTarget\?\.type === 'ds-cell' && !apply/.test(html), '본문 색상 패널 연동(미리보기·취소 복귀)');
 ok(/ds_autosizeCell\(ta\)/.test(block), '글자 크기·줄간격 변경 시 높이 재계산');
-ok(['ds-font-select', 'ds-size-input', 'ds-bg-btn', 'ds-lh-select', 'ds-clear-format-btn'].every(id => html.includes('id="' + id + '"')) && /data-align="justify"/.test(html), '툴바: 글꼴·크기·배경·줄간격·서식 지우기·양쪽');
+ok(['ds-font-select', 'ds-size-input', 'ds-lh-select'].every(id => html.includes('id="' + id + '"')) && ['ds-bg-btn', 'ds-clear-format-btn'].every(id => html.includes("'" + id + "'")) && /\['justify', '양쪽'\]/.test(html), '툴바: 글꼴·크기·배경·줄간격·서식 지우기·양쪽');
 process.exit(f ? 1 : 0);

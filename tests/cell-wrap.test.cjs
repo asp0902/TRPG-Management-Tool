@@ -19,7 +19,7 @@ ok(F.ds_overflowWidthFor(cols, { cells: { a: 'x', b: '', c: 'Z' } }, 0) === 384,
 ok(F.ds_overflowWidthFor(cols, { cells: {} }, 2) === 144 && F.ds_overflowWidthFor(cols, null, 0) === 544, '마지막 열·행 없음 처리');
 ok(F.ds_viewInner('텍스트', 'overflow', 144.4) === '<span class="ds-ov-inner" style="width:144px;">텍스트</span>' && F.ds_viewInner('텍스트', 'clip', 144) === '텍스트', '오버플로우만 폭 지정 span 으로 감쌈');
 // 구조: 툴바·렌더·CSS·본문 표
-ok(/id="ds-wrap-btn"/.test(html) && /data-wrap="overflow"/.test(html) && /data-wrap="wrap"/.test(html) && /data-wrap="clip"/.test(html), '데이터 시트 툴바 드롭다운 3항목');
+ok(/picker\('wrap'/.test(html) && ['overflow', 'wrap', 'clip'].every(m => html.includes("['" + m + "', '")), '데이터 시트 툴바 드롭다운 3항목');
 ok(/function ds_applyCellWrap\(mode\) \{[^}]*cur\.wrap = mode; else delete cur\.wrap/.test(html), '범위 선택 일괄 적용(_dsMutateCellStyles), 줄바꿈은 저장하지 않음');
 ok(/\.ds-cell-input\.ds-cell-wrap-clip:not\(\.ds-cell-editing\)[^{]*\{ white-space: pre; overflow: hidden; \}/.test(html), '자르기: 편집 밖에서 한 줄·잘림(편집 중엔 줄바꿈으로 표시)');
 ok(/whiteSpace = 'nowrap'/.test(html.slice(html.indexOf('function tbApplyCellWrap'), html.indexOf('function tbTableEditItems'))) && /td\.style\.overflow = 'hidden'/.test(html), '본문 표: nowrap / nowrap+hidden inline style');

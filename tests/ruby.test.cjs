@@ -35,7 +35,7 @@ ok(F.rubyHtmlToInlineText('<ruby>漢字<rt>かんじ</rt></ruby>를').replace(/<
 // 소스 구조
 ok(/function extractBlockPlainText[\s\S]{0,400}querySelectorAll\('rt, rp'\)\.forEach\(node => node\.remove\(\)\)/.test(html), '목차·검색·제목 순수 텍스트 추출은 루비 읽기 제외(extractBlockPlainText)');
 ok(/querySelector\('span,b,i,u,s,strong,em,font,ruby'\)/.test(html), '토글 제목 서식 저장 판정에 ruby 포함, 제목 텍스트는 본문만');
-ok(/id="tb-ruby-btn"/.test(html) && /id="ds-ruby-btn"/.test(html), '본문 툴바·데이터 시트 툴바 루비 버튼');
+ok(/id="tb-ruby-btn"/.test(html) && /btn\('ds-ruby-btn'/.test(html), '본문 툴바·데이터 시트 툴바 루비 버튼');
 const dlg = html.slice(html.indexOf('id="ruby-insert-dialog"'), html.indexOf('<!-- 링크 삽입 팝업 -->'));
 ok(dlg.indexOf('id="ruby-insert-submit"') < dlg.indexOf('id="ruby-insert-cancel"') && dlg.indexOf('id="ruby-insert-remove"') < dlg.indexOf('id="ruby-insert-submit"'), '팝업 버튼 [루비 제거] … [적용] [취소] (#372 순서)');
 ok(/function tbOpenRubyDialog\(\) \{[^}]*isCE\(\)/.test(html) && /이 입력칸은 루비 문자를 지원하지 않습니다/.test(html), 'HTML 이 아닌 입력칸(CSS 매크로 textarea·한 줄 input)은 지원하지 않는다고 안내');

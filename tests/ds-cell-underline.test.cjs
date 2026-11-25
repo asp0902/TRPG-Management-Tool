@@ -4,7 +4,7 @@ let fails = 0; const ok = (c, m) => { if (!c) { fails++; console.log('FAIL', m);
 ok(html.includes('if (st.u) out.u = true;'), 'normalize u');
 ok(html.includes('st.s || st.u || st.color'), 'ds_hasCellStyle u');
 ok(html.includes("prop !== 's' && prop !== 'u') return;"), 'toggle 허용 u');
-ok(html.includes('id="ds-underline-btn"') && html.includes('fa-underline'), '밑줄 버튼');
+ok(html.includes("'ds-underline-btn'") && html.includes('fa-underline'), '밑줄 버튼');
 ok(html.includes("['ds-underline-btn', 'u']"), '활성 표시');
 ok(html.includes("classList.toggle('ds-cell-u', !!st.u)") && html.includes("(cst.u ? ' ds-cell-u' : '')"), '셀 클래스 두 곳');
 ok(html.includes('.ds-cell-u { text-decoration: underline; }') && html.includes('text-decoration: underline line-through;'), 'CSS 밑줄·취소선 동시');

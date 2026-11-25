@@ -7104,19 +7104,19 @@ body.block-pointer-dragging {
 .ds-editor-action { border: 1px solid #d8d8d8; background: #fff; color: #444; border-radius: 6px; padding: 5px 11px; font-size: 12px; cursor: pointer; font-family: inherit; }
 .ds-editor-action:hover { border-color: #111; color: #111; }
 .ds-editor-action.danger:hover { border-color: #ef4444; color: #ef4444; background: #fef2f2; }
-.ds-format-toolbar { display: flex; align-items: center; justify-content: flex-start; gap: 6px; padding: 8px 18px; background: #fff; border-bottom: 1px solid #e6e6e6; flex-shrink: 0; min-height: 38px; box-sizing: border-box; }
-.ds-format-toolbar-left, .ds-format-toolbar-group { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ds-format-toolbar { display: flex; align-items: center; justify-content: flex-start; gap: 1px; padding: 0 10px; height: 37px; min-height: 37px; background: #fff; border-bottom: 1px solid var(--border); flex-shrink: 0; box-sizing: border-box; } /* 본문 #format-bar/.tb-bar 와 같은 높이·여백(#385) */
+.ds-format-toolbar-left, .ds-format-toolbar-group { display: flex; align-items: center; gap: 1px; min-width: 0; }
 .ds-format-dropdown-wrap { position: relative; display: inline-flex; }
-.ds-format-btn { width: 40px; height: 30px; border: 1px solid #d8d8d8; border-radius: 7px; background: #fff; color: #555; cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-family: inherit; }
-.ds-format-btn:hover:not(:disabled) { background: #f2f2f2; color: #111; }
-.ds-format-btn.active, .ds-format-btn.open { background: #111; border-color: #111; color: #fff; }
-.ds-format-btn:disabled { color: #cfcfcf; cursor: not-allowed; background: #fafafa; }
-.ds-format-caret { font-size: 8px; opacity: 0.72; margin-right: 2px; }
-.ds-format-menu { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 10520; min-width: 128px; padding: 5px; background: #fff; border: 1px solid #d8d8d8; border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,0.16); }
-.ds-format-menu.open { display: flex; flex-direction: column; gap: 2px; }
-.ds-format-option { border: none; background: transparent; color: #333; border-radius: 6px; min-height: 30px; padding: 6px 9px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-family: inherit; text-align: left; }
-.ds-format-option:hover:not(:disabled) { background: #f2f2f2; color: #111; }
-.ds-format-option.active { background: #111; color: #fff; }
+.ds-format-btn.open { background: #e0e0e0; color: #000; }
+.ds-format-toolbar :disabled { opacity: .4; cursor: not-allowed; }
+.ds-format-toolbar .tb-btn:disabled:hover, .ds-format-toolbar .tb-color-btn:disabled:hover { background: none; }
+.ds-format-picker-btn { gap: 3px; }
+.ds-format-caret { font-size: 8px; color: inherit; opacity: .6; }
+.ds-format-menu { display: none; position: absolute; left: 0; top: calc(100% + 2px); z-index: 10520; min-width: 128px; padding: 3px 0; background: #fff; border: 1px solid #bbb; border-radius: 4px; box-shadow: 0 5px 16px rgba(0,0,0,0.16); } /* 본문 .tb-font-menu 와 같은 테두리·그림자 */
+.ds-format-menu.open { display: flex; flex-direction: column; }
+.ds-format-option { border: none; background: #fff; color: #222; border-radius: 0; min-height: 30px; padding: 5px 10px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-family: inherit; text-align: left; }
+.ds-format-option:hover:not(:disabled), .ds-format-option:focus { background: #e9e9e9; outline: none; }
+.ds-format-option.active { background: #e9e9e9; }
 .ds-format-option:disabled { color: #cfcfcf; cursor: not-allowed; }
 .ds-format-option-icon { width: 16px; text-align: center; flex-shrink: 0; }
 .ds-editor-tabs-bar { display: flex; align-items: center; padding: 0 18px; background: #fafafa; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; min-height: 32px; }
@@ -7252,23 +7252,13 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .ds-table td.ds-has-rich .ds-cell-rich, .ds-table td.ds-rich-editing .ds-cell-rich { display: block; }
 .ds-table td.ds-rich-editing .ds-cell-rich { pointer-events: auto; outline: none; cursor: text; }
 .ds-cell-align-justify { text-align: justify; }
-.ds-format-select { height: 26px; max-width: 120px; border: 1px solid #d8d8d8; border-radius: 6px; background: #fff; color: #444; font: inherit; font-size: 12px; padding: 0 4px; }
-.ds-format-select:disabled, .ds-size-input:disabled { opacity: .45; }
-.ds-lh-select { max-width: 74px; }
-.ds-size-input { width: 42px; height: 26px; box-sizing: border-box; border: 1px solid #d8d8d8; border-radius: 6px; text-align: center; font: inherit; font-size: 12px; padding: 0 2px; }
+.ds-format-toolbar .tb-select-lh { width: 100%; appearance: none; -webkit-appearance: none; font-size: 10px; padding: 0 18px 0 8px; text-align: left; background-color: transparent; background-image: none; }
 .ds-cell-b { font-weight: 700; }
 .ds-cell-i { font-style: italic; }
 .ds-cell-s { text-decoration: line-through; }
 .ds-cell-i.ds-cell-s { text-decoration: line-through; }
 .ds-cell-u { text-decoration: underline; }
 .ds-cell-s.ds-cell-u, .ds-cell-i.ds-cell-s.ds-cell-u { text-decoration: underline line-through; }
-.ds-color-swatch { width: 12px; height: 4px; border-radius: 2px; background: transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18); }
-.ds-color-menu { min-width: 168px; padding: 8px; }
-.ds-color-swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 6px; }
-.ds-color-cell { width: 22px; height: 22px; border: 1px solid rgba(0,0,0,0.15); border-radius: 5px; cursor: pointer; padding: 0; }
-.ds-color-cell:hover { transform: scale(1.08); }
-.ds-color-custom { position: relative; }
-.ds-color-custom input[type=color] { margin-left: auto; width: 24px; height: 22px; border: 1px solid #d8d8d8; border-radius: 4px; background: #fff; padding: 0; cursor: pointer; }
 .ds-cell-input:focus { background: transparent; box-shadow: none; }
 .ds-row-add-row { padding: 8px 12px; background: #fafafa; border-top: 1px solid #ececec; }
 .ds-row-add-btn { border: 1px dashed #cfcfcf; background: #fff; border-radius: 6px; padding: 6px 14px; font-size: 12px; color: #666; cursor: pointer; font-family: inherit; }
@@ -8332,7 +8322,6 @@ select.sh-field-input,
   .ds-editor-header { padding: 8px 10px; }
   .ds-editor-title-input { min-width: 140px; }
   .ds-editor-sub { display: none; }
-  .ds-format-toolbar { padding: 7px 10px; }
   .ds-format-toolbar-left,
   .ds-format-toolbar-group { flex-shrink: 0; }
   .ds-editor-body { padding: 12px 10px 40px; }
@@ -42272,72 +42261,97 @@ function ds_updateDataSheetStatusbar(ds) {
     + '</div>';
 }
 
-function ds_renderFormatToolbar(toolbarEl, ds) {
+function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도구(#format-bar .tb-bar)와 같은 클래스·순서(#385). id·동작 함수는 그대로
   if (!toolbarEl) return;
+  var NOFOCUS = ' onmousedown="event.preventDefault()"';
+  var btn = function(id, click, title, icon) { return '<button type="button" id="' + id + '" class="tb-btn ds-format-btn"' + NOFOCUS + ' onclick="' + click + '" title="' + title + '" aria-label="' + title + '"><i class="fa-solid ' + icon + '"></i></button>'; };
+  var colorBtn = function(id, barId, prop, title, icon) { return '<div class="tb-color-wrap"><button type="button" id="' + id + '" class="tb-color-btn ds-format-btn"' + NOFOCUS + ' onclick="ds_openCellColorPanel(\'' + prop + '\')" title="' + title + '" aria-label="' + title + '"><i class="fa-solid ' + icon + '" style="font-size:11px"></i><div class="tb-color-bar" id="' + barId + '"></div></button></div>'; };
+  var picker = function(name, title, icon, opts) { // 가로·세로 맞춤, 줄바꿈 드롭다운
+    return '<div class="ds-format-dropdown-wrap">'
+      + '<button type="button" id="ds-' + name + '-btn" class="tb-btn ds-format-btn ds-format-picker-btn"' + NOFOCUS + ' onclick="ds_toggleFormatMenu(event,\'' + name + '\')" title="' + title + '" aria-label="' + title + '"><i id="ds-' + name + '-icon" class="fa-solid ' + icon + '"></i><i class="fa-solid fa-chevron-down tb-control-chevron ds-format-caret" aria-hidden="true"></i></button>'
+      + '<div class="ds-format-menu" id="ds-' + name + '-menu" role="menu" aria-label="' + title + '">' + opts + '</div></div>';
+  };
+  var opt = function(cls, attr, click, icon, label) { return '<button type="button" class="ds-format-option ' + cls + '" ' + attr + NOFOCUS + ' onclick="' + click + '"><i class="fa-solid ' + icon + ' ds-format-option-icon"></i><span>' + label + '</span></button>'; };
+  var SEP = '<div class="tb-sep"></div>';
+  var halign = [['left', '왼쪽'], ['center', '가운데'], ['right', '오른쪽'], ['justify', '양쪽']].map(function(a) { return opt('ds-halign-option', 'data-align="' + a[0] + '"', 'ds_applyCellTextAlign(\'' + a[0] + '\')', 'fa-align-' + a[0], a[1]); }).join('');
+  var valign = [['top', '위쪽', 'fa-arrow-up'], ['middle', '가운데', 'fa-bars'], ['bottom', '아래쪽', 'fa-arrow-down']].map(function(a) { return opt('ds-valign-option', 'data-align="' + a[0] + '"', 'ds_applyRowVerticalAlign(\'' + a[0] + '\')', a[2], a[1]); }).join('');
+  var wrap = [['overflow', '오버플로우', 'fa-right-long'], ['wrap', '줄바꿈', 'fa-turn-down'], ['clip', '자르기', 'fa-scissors']].map(function(a) { return opt('ds-wrap-option', 'data-wrap="' + a[0] + '" title="' + a[1] + '"', 'ds_applyCellWrap(\'' + a[0] + '\')', a[2], a[1]); }).join('');
   toolbarEl.innerHTML = ''
-    + '<div class="ds-format-toolbar-group" aria-label="셀 서식 도구">'
-    + '<button type="button" id="ds-undo-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="tbUndo()" title="실행 취소 (Ctrl+Z)" aria-label="실행 취소"><i class="fa-solid fa-rotate-left"></i></button>'
-    + '<button type="button" id="ds-redo-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="tbRedo()" title="다시 실행 (Ctrl+Shift+Z)" aria-label="다시 실행"><i class="fa-solid fa-rotate-right"></i></button>'
-    + '<div class="ds-format-dropdown-wrap">'
-    + '<button type="button" id="ds-halign-btn" class="ds-format-btn ds-format-picker-btn" onmousedown="event.preventDefault()" onclick="ds_toggleFormatMenu(event,\'halign\')" title="가로 맞춤" aria-label="가로 맞춤"><i id="ds-halign-icon" class="fa-solid fa-align-left"></i><i class="fa-solid fa-caret-down ds-format-caret"></i></button>'
-    + '<div class="ds-format-menu" id="ds-halign-menu" role="menu" aria-label="가로 맞춤">'
-    + '<button type="button" class="ds-format-option ds-halign-option" data-align="left" onmousedown="event.preventDefault()" onclick="ds_applyCellTextAlign(\'left\')"><i class="fa-solid fa-align-left ds-format-option-icon"></i><span>왼쪽</span></button>'
-    + '<button type="button" class="ds-format-option ds-halign-option" data-align="center" onmousedown="event.preventDefault()" onclick="ds_applyCellTextAlign(\'center\')"><i class="fa-solid fa-align-center ds-format-option-icon"></i><span>가운데</span></button>'
-    + '<button type="button" class="ds-format-option ds-halign-option" data-align="right" onmousedown="event.preventDefault()" onclick="ds_applyCellTextAlign(\'right\')"><i class="fa-solid fa-align-right ds-format-option-icon"></i><span>오른쪽</span></button>'
-    + '<button type="button" class="ds-format-option ds-halign-option" data-align="justify" onmousedown="event.preventDefault()" onclick="ds_applyCellTextAlign(\'justify\')"><i class="fa-solid fa-align-justify ds-format-option-icon"></i><span>양쪽</span></button>'
+    + '<div class="ds-format-toolbar-group" role="toolbar" aria-label="셀 서식 도구">'
+    + btn('ds-undo-btn', 'tbUndo()', '실행 취소 (Ctrl+Z)', 'fa-rotate-left')
+    + btn('ds-redo-btn', 'tbRedo()', '다시 실행 (Ctrl+Shift+Z)', 'fa-rotate-right')
+    + SEP
+    + '<div class="tb-font-wrap">'
+    + '<button type="button" id="ds-font-trigger" class="tb-select tb-select-font tb-font-trigger" title="글꼴" aria-label="셀 글꼴" aria-haspopup="listbox" aria-controls="ds-font-menu" aria-expanded="false"' + NOFOCUS + ' onclick="ds_toggleFontMenu(event)"><span class="tb-font-trigger-label" id="ds-font-trigger-label">글꼴</span><i class="fa-solid fa-chevron-down tb-control-chevron" aria-hidden="true"></i></button>'
+    + '<select id="ds-font-select" hidden aria-hidden="true" tabindex="-1"><option value="">기본 글꼴</option>' + getAllFontOptions().map(function(font) { return '<option value="' + esc(font.val) + '">' + esc(font.name) + '</option>'; }).join('') + '</select>'
+    + '<div class="tb-font-menu" id="ds-font-menu" role="listbox" aria-label="글꼴" onmousedown="if(event.target.closest(\'.tb-font-option\'))event.preventDefault()" onclick="ds_chooseFont(event.target.closest(\'.tb-font-option\')?.dataset.value)"></div>'
     + '</div>'
+    + SEP
+    + '<div class="tb-size-stepper">'
+    + btn('ds-size-dec-btn', 'ds_stepCellSize(-1)', '글자 크기 줄이기', 'fa-minus')
+    + '<input type="number" id="ds-size-input" class="tb-size-inp ds-size-input" min="8" max="72" placeholder="13" title="셀 글자 크기(px)" aria-label="셀 글자 크기" onchange="ds_applyCellSize(this.value)">'
+    + btn('ds-size-inc-btn', 'ds_stepCellSize(1)', '글자 크기 키우기', 'fa-plus')
     + '</div>'
-    + '<div class="ds-format-dropdown-wrap">'
-    + '<button type="button" id="ds-valign-btn" class="ds-format-btn ds-format-picker-btn" onmousedown="event.preventDefault()" onclick="ds_toggleFormatMenu(event,\'valign\')" title="세로 맞춤" aria-label="세로 맞춤"><i id="ds-valign-icon" class="fa-solid fa-arrow-up"></i><i class="fa-solid fa-caret-down ds-format-caret"></i></button>'
-    + '<div class="ds-format-menu" id="ds-valign-menu" role="menu" aria-label="세로 맞춤">'
-    + '<button type="button" class="ds-format-option ds-valign-option" data-align="top" onmousedown="event.preventDefault()" onclick="ds_applyRowVerticalAlign(\'top\')"><i class="fa-solid fa-arrow-up ds-format-option-icon"></i><span>위쪽</span></button>'
-    + '<button type="button" class="ds-format-option ds-valign-option" data-align="middle" onmousedown="event.preventDefault()" onclick="ds_applyRowVerticalAlign(\'middle\')"><i class="fa-solid fa-bars ds-format-option-icon"></i><span>가운데</span></button>'
-    + '<button type="button" class="ds-format-option ds-valign-option" data-align="bottom" onmousedown="event.preventDefault()" onclick="ds_applyRowVerticalAlign(\'bottom\')"><i class="fa-solid fa-arrow-down ds-format-option-icon"></i><span>아래쪽</span></button>'
-    + '</div>'
-    + '</div>'
-    + '<button type="button" id="ds-bold-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_toggleCellStyle(\'b\')" title="굵게" aria-label="굵게"><i class="fa-solid fa-bold"></i></button>'
-    + '<button type="button" id="ds-italic-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_toggleCellStyle(\'i\')" title="기울임" aria-label="기울임"><i class="fa-solid fa-italic"></i></button>'
-    + '<button type="button" id="ds-strike-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_toggleCellStyle(\'s\')" title="취소선" aria-label="취소선"><i class="fa-solid fa-strikethrough"></i></button>'
-    + '<button type="button" id="ds-underline-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_toggleCellStyle(\'u\')" title="밑줄" aria-label="밑줄"><i class="fa-solid fa-underline"></i></button>'
-    + '<div class="ds-format-dropdown-wrap">'
-    + '<button type="button" id="ds-color-btn" class="ds-format-btn ds-format-picker-btn" onmousedown="event.preventDefault()" onclick="ds_toggleFormatMenu(event,\'color\')" title="텍스트 색상" aria-label="텍스트 색상"><i class="fa-solid fa-palette"></i><span id="ds-color-swatch" class="ds-color-swatch"></span><i class="fa-solid fa-caret-down ds-format-caret"></i></button>'
-    + '<div class="ds-format-menu ds-color-menu" id="ds-color-menu" role="menu" aria-label="텍스트 색상">'
-    + '<div class="ds-color-swatches">'
-    + ['#111111','#ef4444','#f97316','#eab308','#22c55e','#2563eb','#7c3aed','#db2777','#6b7280','#ffffff'].map(function(c){ return '<button type="button" class="ds-color-cell" style="background:' + c + ';" data-color="' + c + '" onmousedown="event.preventDefault()" onclick="ds_applyCellColor(\'' + c + '\')" title="' + c + '"></button>'; }).join('')
-    + '</div>'
-    + '<label class="ds-format-option ds-color-custom" onmousedown="event.stopPropagation()"><i class="fa-solid fa-eye-dropper ds-format-option-icon"></i><span>사용자 지정</span><input type="color" value="#111111" oninput="ds_applyCellColor(this.value)"></label>'
-    + '<button type="button" class="ds-format-option" onmousedown="event.preventDefault()" onclick="ds_openCellColorPanel(\'color\')"><i class="fa-solid fa-palette ds-format-option-icon"></i><span>색상 패널…</span></button>'
-    + '<button type="button" class="ds-format-option" onmousedown="event.preventDefault()" onclick="ds_applyCellColor(\'\')"><i class="fa-solid fa-ban ds-format-option-icon"></i><span>색 없음</span></button>'
-    + '</div>'
-    + '</div>'
-    + '<select id="ds-font-select" class="ds-format-select" onchange="ds_applyCellFont(this.value)" title="글꼴" aria-label="셀 글꼴"><option value="">기본 글꼴</option>' + getAllFontOptions().map(function(font) { return '<option value="' + esc(font.val) + '">' + esc(font.name) + '</option>'; }).join('') + '</select>'
-    + '<button type="button" id="ds-size-dec-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_stepCellSize(-1)" title="글자 크기 줄이기" aria-label="글자 크기 줄이기"><i class="fa-solid fa-minus"></i></button>'
-    + '<input type="number" id="ds-size-input" class="ds-size-input" min="8" max="72" placeholder="13" title="셀 글자 크기(px)" aria-label="셀 글자 크기" onchange="ds_applyCellSize(this.value)">'
-    + '<button type="button" id="ds-size-inc-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_stepCellSize(1)" title="글자 크기 키우기" aria-label="글자 크기 키우기"><i class="fa-solid fa-plus"></i></button>'
-    + '<div class="ds-format-dropdown-wrap">'
-    + '<button type="button" id="ds-bg-btn" class="ds-format-btn ds-format-picker-btn" onmousedown="event.preventDefault()" onclick="ds_toggleFormatMenu(event,\'bg\')" title="셀 배경색" aria-label="셀 배경색"><i class="fa-solid fa-fill-drip"></i><span id="ds-bg-swatch" class="ds-color-swatch"></span></button>'
-    + '<div class="ds-format-menu ds-color-menu" id="ds-bg-menu" role="menu" aria-label="셀 배경색">'
-    + '<div class="ds-color-swatches">'
-    + ['#fef08a','#fecaca','#fed7aa','#bbf7d0','#bfdbfe','#ddd6fe','#fbcfe8','#e5e7eb','#9ca3af','#111111'].map(function(c){ return '<button type="button" class="ds-color-cell" style="background:' + c + ';" data-color="' + c + '" onmousedown="event.preventDefault()" onclick="ds_applyCellBg(\'' + c + '\')" title="' + c + '"></button>'; }).join('')
-    + '</div>'
-    + '<button type="button" class="ds-format-option" onmousedown="event.preventDefault()" onclick="ds_openCellColorPanel(\'bg\')"><i class="fa-solid fa-palette ds-format-option-icon"></i><span>색상 패널…</span></button>'
-    + '<button type="button" class="ds-format-option" onmousedown="event.preventDefault()" onclick="ds_applyCellBg(\'\')"><i class="fa-solid fa-ban ds-format-option-icon"></i><span>색 없음</span></button>'
-    + '</div>'
-    + '</div>'
-    + '<select id="ds-lh-select" class="ds-format-select ds-lh-select" onchange="ds_applyCellLineHeight(this.value)" title="줄간격" aria-label="셀 줄간격"><option value="">줄간격</option>' + ['1', '1.2', '1.45', '1.6', '1.8', '2', '2.5'].map(function(v) { return '<option value="' + v + '">' + v + '</option>'; }).join('') + '</select>'
-    + '<div class="ds-format-dropdown-wrap">'
-    + '<button type="button" id="ds-wrap-btn" class="ds-format-btn ds-format-picker-btn" onmousedown="event.preventDefault()" onclick="ds_toggleFormatMenu(event,\'wrap\')" title="텍스트 줄바꿈" aria-label="텍스트 줄바꿈"><i id="ds-wrap-icon" class="fa-solid fa-turn-down"></i></button>'
-    + '<div class="ds-format-menu" id="ds-wrap-menu" role="menu" aria-label="텍스트 줄바꿈">'
-    + '<button type="button" class="ds-format-option ds-wrap-option" data-wrap="overflow" title="오버플로우" onmousedown="event.preventDefault()" onclick="ds_applyCellWrap(\'overflow\')"><i class="fa-solid fa-right-long ds-format-option-icon"></i><span>오버플로우</span></button>'
-    + '<button type="button" class="ds-format-option ds-wrap-option" data-wrap="wrap" title="줄바꿈" onmousedown="event.preventDefault()" onclick="ds_applyCellWrap(\'wrap\')"><i class="fa-solid fa-turn-down ds-format-option-icon"></i><span>줄바꿈</span></button>'
-    + '<button type="button" class="ds-format-option ds-wrap-option" data-wrap="clip" title="자르기" onmousedown="event.preventDefault()" onclick="ds_applyCellWrap(\'clip\')"><i class="fa-solid fa-scissors ds-format-option-icon"></i><span>자르기</span></button>'
-    + '</div>'
-    + '</div>'
-    + '<button type="button" id="ds-ruby-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_openRubyDialog()" title="루비 문자 (편집 중 선택한 글자)" aria-label="루비 문자"><i class="fa-solid fa-language"></i></button>'
-    + '<button type="button" id="ds-clear-format-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_clearCellFormat()" title="서식 지우기" aria-label="서식 지우기"><i class="fa-solid fa-eraser"></i></button>'
-    + '<button type="button" id="ds-header-axis-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_toggleHeaderEditMode()" title="행/열 이름 편집 전환" aria-label="행/열 이름 편집 전환"><i id="ds-header-axis-icon" class="fa-solid fa-right-left"></i></button>'
+    + SEP
+    + btn('ds-bold-btn', 'ds_toggleCellStyle(\'b\')', '굵게', 'fa-bold')
+    + btn('ds-italic-btn', 'ds_toggleCellStyle(\'i\')', '기울임', 'fa-italic')
+    + btn('ds-underline-btn', 'ds_toggleCellStyle(\'u\')', '밑줄', 'fa-underline')
+    + btn('ds-strike-btn', 'ds_toggleCellStyle(\'s\')', '취소선', 'fa-strikethrough')
+    + btn('ds-clear-format-btn', 'ds_clearCellFormat()', '서식 지우기', 'fa-eraser')
+    + SEP
+    + colorBtn('ds-color-btn', 'ds-color-swatch', 'color', '텍스트 색상', 'fa-font')
+    + colorBtn('ds-bg-btn', 'ds-bg-swatch', 'bg', '셀 배경색', 'fa-fill-drip')
+    + SEP
+    + picker('halign', '가로 맞춤', 'fa-align-left', halign)
+    + picker('valign', '세로 맞춤', 'fa-arrow-up', valign)
+    + picker('wrap', '텍스트 줄바꿈', 'fa-turn-down', wrap)
+    + '<div class="tb-lh-wrap"><select id="ds-lh-select" class="tb-select tb-select-lh" onchange="ds_applyCellLineHeight(this.value)" title="줄간격" aria-label="셀 줄간격"><option value="">줄간격</option>' + ['1', '1.2', '1.45', '1.6', '1.8', '2', '2.5'].map(function(v) { return '<option value="' + v + '">' + v + '</option>'; }).join('') + '</select><i class="fa-solid fa-chevron-down tb-control-chevron" aria-hidden="true"></i></div>'
+    + SEP
+    + btn('ds-ruby-btn', 'ds_openRubyDialog()', '루비 문자 (편집 중 선택한 글자)', 'fa-language')
+    + SEP
+    + btn('ds-header-axis-btn', 'ds_toggleHeaderEditMode()', '행/열 이름 편집 전환', 'fa-right-left').replace('fa-right-left"', 'fa-right-left" id="ds-header-axis-icon"')
     + '</div>';
   ds_updateFormatToolbarState(ds);
+}
+// 글꼴 드롭다운(본문 .tb-font-trigger/.tb-font-menu 와 같은 모양): 숨은 select(#ds-font-select)가 값을 들고, 이 함수들이 라벨·목록만 맡는다
+function ds_syncFontTrigger() {
+  var sel = document.getElementById('ds-font-select'), label = document.getElementById('ds-font-trigger-label'), trigger = document.getElementById('ds-font-trigger');
+  if (!sel || !label || !trigger) return;
+  var o = sel.options[sel.selectedIndex];
+  label.textContent = sel.value && o ? o.textContent : '글꼴';
+  trigger.style.fontFamily = sel.value || '';
+  trigger.disabled = sel.disabled;
+}
+function ds_closeFontMenu() {
+  var menu = document.getElementById('ds-font-menu'), trigger = document.getElementById('ds-font-trigger');
+  if (menu) menu.classList.remove('open');
+  if (trigger) trigger.setAttribute('aria-expanded', 'false');
+}
+function ds_toggleFontMenu(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  var menu = document.getElementById('ds-font-menu'), trigger = document.getElementById('ds-font-trigger'), sel = document.getElementById('ds-font-select');
+  if (!menu || !trigger || !sel || trigger.disabled) return;
+  if (menu.classList.contains('open')) { ds_closeFontMenu(); return; }
+  _dsHideContextMenu();
+  _dsHideFormatMenus();
+  var cur = normalizeFontNameForCompare(sel.value);
+  menu.innerHTML = [['', '기본 글꼴']].concat(getAllFontOptions().map(function(f) { return [f.val, f.name]; })).map(function(f) {
+    var active = normalizeFontNameForCompare(f[0]) === cur;
+    return '<button type="button" role="option" aria-selected="' + active + '" data-value="' + esc(f[0]) + '" class="tb-font-option' + (active ? ' active' : '') + '"' + (f[0] ? ' style="font-family:' + esc(f[0]) + '"' : '') + '><span class="tb-font-option-label">' + esc(f[1]) + '</span>' + (active ? '<i class="fa-solid fa-check tb-font-option-check" aria-hidden="true"></i>' : '') + '</button>';
+  }).join('');
+  menu.classList.add('open');
+  trigger.setAttribute('aria-expanded', 'true');
+  var r = trigger.getBoundingClientRect(), h = Math.min(menu.scrollHeight, 420);
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+  menu.style.top = (r.bottom + h < window.innerHeight ? r.bottom + 2 : Math.max(8, r.top - h - 2)) + 'px';
+}
+function ds_chooseFont(value) {
+  if (value === undefined) return;
+  var sel = document.getElementById('ds-font-select');
+  ds_closeFontMenu();
+  if (sel) sel.value = value;
+  ds_applyCellFont(value);
+  ds_syncFontTrigger();
 }
 
 function ds_textAlignLabel(align) {
@@ -43027,6 +43041,7 @@ function ds_toggleFormatMenu(e, menuName) {
   }
 }
 function _dsHideFormatMenus() {
+  ds_closeFontMenu();
   document.querySelectorAll('#ds-format-toolbar .ds-format-menu.open').forEach(function(menu) {
     menu.classList.remove('open');
   });
@@ -43110,7 +43125,6 @@ function ds_updateFormatToolbarState(ds) {
     colorBtn.title = (hasStyleTargets && refStyle.color) ? '텍스트 색상: ' + refStyle.color : '텍스트 색상';
     if (!hasStyleTargets) {
       colorBtn.classList.remove('open');
-      document.getElementById('ds-color-menu')?.classList.remove('open');
     }
   }
   if (colorSwatch) colorSwatch.style.background = (hasStyleTargets && refStyle.color) ? refStyle.color : 'transparent';
@@ -43126,9 +43140,9 @@ function ds_updateFormatToolbarState(ds) {
     var el = document.getElementById(id);
     if (el) el.disabled = !hasStyleTargets;
   });
-  if (!hasStyleTargets) { document.getElementById('ds-bg-btn')?.classList.remove('open'); document.getElementById('ds-bg-menu')?.classList.remove('open'); }
+  if (!hasStyleTargets) document.getElementById('ds-bg-btn')?.classList.remove('open');
   var fontSel = document.getElementById('ds-font-select');
-  if (fontSel) fontSel.value = (hasStyleTargets && refStyle.font) ? refStyle.font : '';
+  if (fontSel) { fontSel.value = (hasStyleTargets && refStyle.font) ? refStyle.font : ''; ds_syncFontTrigger(); }
   var sizeInp = document.getElementById('ds-size-input');
   if (sizeInp && document.activeElement !== sizeInp) sizeInp.value = (hasStyleTargets && refStyle.size) ? String(refStyle.size) : '';
   var lhSel = document.getElementById('ds-lh-select');
