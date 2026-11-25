@@ -6536,6 +6536,8 @@ body.block-pointer-dragging {
   line-height: 22px;
   align-self: center;
 }
+.toggle-title-ce { outline: none; min-width: 0; white-space: nowrap; overflow: hidden; cursor: text; }
+.toggle-title-ce:empty::before, .toggle-title-ce:has(> br:only-child)::before { content: attr(data-ph); color: #bbb; font-weight: 400; }
 .toggle-content-wrap {
   background: #f9f9f9; border-radius: 4px; padding: 6px 8px; margin-top: 6px;
 }
@@ -20664,15 +20666,16 @@ function mkBlockEl(b, cid, ctx = {}) {
       bodyHtml = getBranchBlockHtml(b, cid);
       break;
     case 'toggle':
+      if (!b.titleHtml && /\[[^\]]*\]\(#"style=/.test(String(b.title || ''))) { b.titleHtml = tbToggleTitleHtml(b); b.title = tbStripTitleMacros(b.title); } // 옛 매크로 문법 제목 변환(#370)
       const toggleCollapsed = !!b.collapsed;
       bodyHtml = `
         <div class="toggle-block-head ${toggleCollapsed ? '' : 'open'}" onclick="toggleScriptToggleBlock('${b.id}',this,'${cid}',event)">
           <button type="button" class="toggle-block-btn" aria-label="토글 접기/펼치기" aria-expanded="${toggleCollapsed ? 'false' : 'true'}">
             <span class="toggle-block-icon">▶</span>
           </button>
-          <input class="block-inp toggle-title-inp" placeholder="토글 제목" value="${esc(b.title||'')}"
+          <div class="toggle-title-inp toggle-title-ce" contenteditable="true" spellcheck="false" data-ph="토글 제목" role="textbox" aria-label="토글 제목"
             onmousedown="event.stopPropagation()" onclick="event.stopPropagation()"
-            oninput="upd('${b.id}','title',this.value,'${cid}')">
+            oninput="updToggleTitle('${b.id}',this,'${cid}')" onkeydown="if(event.key==='Enter'){event.preventDefault()}" onpaste="pasteToggleTitlePlain(event)">${tbToggleTitleHtml(b)}</div>
         </div>
         <div class="toggle-content-wrap ${toggleCollapsed ? 'collapsed' : ''}"></div>`;
       break;
@@ -29996,8 +29999,33 @@ function tbAlignCE(value) {
 }
 
 // ─── 선택 텍스트를 Roll20 CSS 매크로로 감싸기 ───
+// ── 토글 제목 서식(#370): b.title 은 순수 텍스트(목차·검색·내보내기 호환), 서식은 b.titleHtml 에 따로 저장 ──
+const TB_TITLE_MACRO_RE = /\[([^\]]*)\]\(#"style=\s*(.*?)\s*;*\s*\)/g;
+function tbTitleEscape(text) { return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function tbStripTitleMacros(text) { return String(text == null ? '' : text).replace(TB_TITLE_MACRO_RE, '$1'); } // 옛 `[텍스트](#"style=…;)` 는 텍스트만 남긴다
+function tbToggleTitleHtml(block) { // 표시용 HTML: 저장된 titleHtml 우선, 없으면 title(옛 매크로 문법은 해당 서식 span 으로 변환)
+  if (block && typeof block.titleHtml === 'string' && block.titleHtml) return block.titleHtml;
+  const src = String(block && block.title != null ? block.title : '');
+  const re = new RegExp(TB_TITLE_MACRO_RE.source, 'g');
+  let out = '', last = 0, m;
+  while ((m = re.exec(src))) {
+    out += tbTitleEscape(src.slice(last, m.index)) + '<span style="' + m[2].replace(/["<>]/g, '') + ';">' + tbTitleEscape(m[1]) + '</span>';
+    last = re.lastIndex;
+  }
+  return out + tbTitleEscape(src.slice(last));
+}
+function updToggleTitle(id, el, cid) { // 글자 서식이 있으면 titleHtml 에 HTML, title 에는 항상 순수 텍스트
+  upd(id, 'titleHtml', el.querySelector('span,b,i,u,s,strong,em,font') ? el.innerHTML : '', cid, { skipHistory: true });
+  upd(id, 'title', el.textContent, cid);
+}
+function pasteToggleTitlePlain(event) { // 붙여넣기는 한 줄 일반 텍스트
+  event.preventDefault();
+  const text = String((event.clipboardData || window.clipboardData).getData('text/plain') || '').replace(/[\r\n]+/g, ' ');
+  document.execCommand('insertText', false, text);
+}
 function tbWrap(css) {
   const ta = lastFocusedTA; if (!ta) return;
+  if (ta.tagName === 'INPUT') return; // 한 줄 일반 입력칸(콜아웃·핸드아웃 제목 등)은 서식을 지원하지 않으므로 매크로 문법을 넣지 않는다(#370)
   ta.focus();
   const start = ta.selectionStart, end = ta.selectionEnd;
   const sel = ta.value.substring(start, end);
