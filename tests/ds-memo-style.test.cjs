@@ -1,0 +1,17 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const code = html.slice(html.indexOf('function ds_isDataRow'), html.indexOf('// ── 셀 글자 일부 서식(#375)')) + html.slice(html.indexOf('function ds_getCellStyle'), html.indexOf('function ds_cellStyleCss'));
+const ctx = {}; vm.createContext(ctx);
+vm.runInContext('function ds_normalizeTextAlign(a){return a==="center"||a==="right"||a==="justify"?a:"left";}' + html.slice(html.indexOf('function ds_isDataRow'), html.indexOf('function ds_normalizeCellStyle')) + html.slice(html.indexOf('function ds_normalizeCellStyle'), html.indexOf('function ds_hasCellStyle')) + html.slice(html.indexOf('function ds_hasCellStyle'), html.indexOf('function ds_hasCellStyle') + 200).split('\n')[0] + html.slice(html.indexOf('function ds_getCellStyle'), html.indexOf('function ds_cellStyleCss')) + ';this.f={ds_getCellStyle,ds_normalizeCellStyle,ds_hasCellStyle,ds_isStyleTarget,ds_isRowStyleCell}', ctx);
+const F = ctx.f;
+const memo = { isMemo: true, memoText: 'x' }, cat = { isCategory: true }, data = { cells: {} };
+ok(F.ds_getCellStyle(memo, '__row').i === true, '메모 행은 서식이 없으면 기울임이 기본으로 켜진 상태');
+ok(F.ds_getCellStyle({ isMemo: true, cellStyles: { __row: { i: false, b: true } } }, '__row').i === false, '기울임을 끄면 그 값이 우선');
+ok(F.ds_hasCellStyle(F.ds_normalizeCellStyle({ i: false })), 'i:false 도 저장되는 서식(기본 기울임 해제)');
+ok(F.ds_getCellStyle(cat, '__row').i === undefined && F.ds_getCellStyle({ isCategory: true, cellStyles: { __row: { b: true, color: '#2563EB' } } }, '__row').color === '#2563eb', '카테고리 행은 기본값 없음, 색 정규화');
+ok(F.ds_isStyleTarget({ colId: '__row', row: memo }) && F.ds_isStyleTarget({ colId: '__row', row: cat }) && F.ds_isStyleTarget({ colId: 'a', row: data }) && !F.ds_isStyleTarget({ colId: 'a', row: memo }), '서식 대상: 데이터 셀·메모/카테고리 행(가상 열 __row)만');
+ok(F.ds_getCellStyle(data, 'a').b === undefined && F.ds_getCellStyle(memo, 'a').b === undefined, '옛 데이터·일반 셀 동작 유지');
+ok(/function ds_handleMemoRowKeydown[\s\S]{0,400}'biu'/.test(html), '메모 행 Ctrl+B/I/U 단축키');
+ok(/ds_applyRowStyleDom/.test(html) && /rowStyleAttrs\(row\)\.cls/.test(html), '렌더·즉시 반영에 행 서식 연결');
+process.exit(f ? 1 : 0);
