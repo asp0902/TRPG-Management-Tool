@@ -3031,6 +3031,11 @@ body.file-dragging iframe { pointer-events: none; } /* 파일을 끄는 동안 i
 }
 .cp-backdrop.open { display: block; }
 /* ─── 링크 삽입 모달: Postype 참고 디자인 ─── */
+/* 루비 문자(#382): 읽기 글자는 본문의 절반 크기, 줄 높이를 크게 밀지 않게 */
+ruby { ruby-align: center; ruby-position: over; }
+ruby > rt { font-size: 0.5em; line-height: 1; font-weight: 400; }
+.ruby-insert-base { margin: 0 0 8px; font-size: 13px; color: #555; word-break: break-all; }
+.ruby-insert-base:empty { display: none; }
 .link-insert-backdrop {
   position: fixed;
   inset: 0;
@@ -8547,6 +8552,7 @@ select.sh-field-input,
       <button class="tb-btn" id="tb-quote-btn" onmousedown="tbCaptureFormatTarget()" onclick="tbInsertQuote()" title="인용/해제"><i class="fa-solid fa-quote-left"></i></button>
       <button class="tb-btn" id="tb-divider-btn" onmousedown="event.preventDefault();tbCaptureFormatTarget()" onclick="tbOpenDividerMenu(this)" title="구분선 (Ctrl+Shift+H)" aria-label="구분선" aria-haspopup="menu"><span class="tb-divider-icon" aria-hidden="true"><span></span><span></span><span></span></span></button>
       <button class="tb-btn" id="tb-table-btn" onmousedown="event.preventDefault();tbCaptureFormatTarget()" onclick="tbOpenTableMenu(this)" title="표 만들기" aria-label="표 만들기" aria-haspopup="menu"><i class="fa-solid fa-table-cells"></i></button>
+      <button class="tb-btn" id="tb-ruby-btn" onmousedown="event.preventDefault();tbCaptureFormatTarget()" onclick="tbOpenRubyDialog()" title="루비 문자" aria-label="루비 문자"><i class="fa-solid fa-language"></i></button>
       <div class="tb-sep"></div>
       <!-- 찾아 바꾸기 -->
       <button class="tb-btn" onclick="openFindReplace()" title="찾아 바꾸기 (Ctrl+Shift+F)"><i class="fa-solid fa-magnifying-glass"></i></button>
@@ -8648,6 +8654,28 @@ select.sh-field-input,
           onclick="submitImageBlockModal()" disabled>추가</button>
         <button type="button" class="rb-modal-cancel" onclick="closeImageBlockModal()">취소</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 루비 문자 팝업(#382): 링크 삽입 팝업과 같은 모양, [적용] [취소] 순서 -->
+  <div id="ruby-insert-backdrop" class="link-insert-backdrop"></div>
+  <div id="ruby-insert-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ruby-insert-title">
+    <div class="link-insert-head">
+      <h2 id="ruby-insert-title" class="link-insert-title">루비 문자</h2>
+      <div class="link-insert-head-actions"><button type="button" class="link-insert-close" id="ruby-insert-close" aria-label="닫기">×</button></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-body">
+      <div id="ruby-insert-base" class="ruby-insert-base"></div>
+      <div class="link-insert-input-wrap">
+        <input id="ruby-insert-text" class="link-insert-input" type="text" maxlength="40" placeholder="루비 텍스트 (예: かんじ)" aria-label="루비 텍스트">
+      </div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-actions">
+      <button type="button" class="link-insert-btn" id="ruby-insert-remove" hidden style="margin-right:auto;">루비 제거</button>
+      <button type="button" class="link-insert-btn primary" id="ruby-insert-submit">적용</button>
+      <button type="button" class="link-insert-btn cancel" id="ruby-insert-cancel">취소</button>
     </div>
   </div>
 
@@ -19572,6 +19600,7 @@ function extractBlockPlainText(value, fallback = '') {
   if (value.includes('<')) {
     const tmp = document.createElement('div');
     tmp.innerHTML = value;
+    tmp.querySelectorAll('rt, rp').forEach(node => node.remove()); // 루비 읽기 글자는 목차·검색·제목 등 순수 텍스트에서 제외(#382)
     const text = (tmp.innerText || tmp.textContent || '').replace(/\u00a0/g, ' ').trim();
     return text || fallback;
   }
@@ -30128,8 +30157,8 @@ function tbToggleTitleHtml(block) { // 표시용 HTML: 저장된 titleHtml 우�
   return out + tbTitleEscape(src.slice(last));
 }
 function updToggleTitle(id, el, cid) { // 글자 서식이 있으면 titleHtml 에 HTML, title 에는 항상 순수 텍스트
-  upd(id, 'titleHtml', el.querySelector('span,b,i,u,s,strong,em,font') ? el.innerHTML : '', cid, { skipHistory: true });
-  upd(id, 'title', el.textContent, cid);
+  upd(id, 'titleHtml', el.querySelector('span,b,i,u,s,strong,em,font,ruby') ? el.innerHTML : '', cid, { skipHistory: true });
+  upd(id, 'title', el.querySelector('rt,rp') ? (() => { const c = el.cloneNode(true); c.querySelectorAll('rt,rp').forEach(n => n.remove()); return c.textContent; })() : el.textContent, cid); // 제목 텍스트는 본문 글자만(#382)
 }
 function pasteToggleTitlePlain(event) { // 붙여넣기는 한 줄 일반 텍스트
   event.preventDefault();
@@ -30486,7 +30515,7 @@ function tbIsTextField(el) {
   return ['text','number','search',''].includes(el.type || '');
 }
 function tbIsFormatUtility(el) {
-  return !!el?.closest?.('#format-bar,#cp-panel,.tb-ctx-menu,#font-picker-backdrop,#link-insert-backdrop,#link-insert-dialog');
+  return !!el?.closest?.('#format-bar,#cp-panel,.tb-ctx-menu,#font-picker-backdrop,#link-insert-backdrop,#link-insert-dialog,#ruby-insert-backdrop,#ruby-insert-dialog');
 }
 function tbSelectionRangeForText(el) {
   const len = typeof el?.value === 'string' ? el.value.length : 0;
@@ -32549,6 +32578,124 @@ window.addEventListener('resize', () => {
 window.addEventListener('scroll', () => {
   positionLinkInsertDialog();
 }, true);
+
+
+// ── 루비 문자(#382): 선택한 글자 위에 읽기를 붙인다. 본문 편집기(CE)는 <ruby>글자<rt>읽기</rt></ruby>, 데이터 시트 셀 글자 서식(cellRich)은 f.ruby 조각 ──
+const RUBY_MAX_LENGTH = 40;
+let rubyDialogState = null;
+function rubyNormalizeText(value) { return String(value == null ? '' : value).replace(/\s+/g, ' ').trim().slice(0, RUBY_MAX_LENGTH); }
+function rubyToast(message) { try { if (typeof showToast === 'function') showToast(message); else console.log(message); } catch (_) {} }
+function rubyElementAt(editable, range) { // 선택·커서가 이미 루비 안에 있으면 그 ruby 요소
+  const node = range && range.startContainer;
+  const el = node && (node.nodeType === 1 ? node : node.parentElement);
+  const ruby = el && el.closest ? el.closest('ruby') : null;
+  return ruby && editable.contains(ruby) ? ruby : null;
+}
+function rubyUnwrap(ruby) { // 읽기를 지우고 본문 글자만 남긴다
+  Array.from(ruby.querySelectorAll('rt, rp')).forEach(n => n.remove());
+  while (ruby.firstChild) ruby.parentNode.insertBefore(ruby.firstChild, ruby);
+  ruby.remove();
+}
+function openRubyDialog(state) {
+  const backdrop = document.getElementById('ruby-insert-backdrop'), dialog = document.getElementById('ruby-insert-dialog'), input = document.getElementById('ruby-insert-text');
+  if (!backdrop || !dialog || !input) return;
+  rubyDialogState = state;
+  document.getElementById('ruby-insert-base').textContent = state.baseText ? '「' + state.baseText + '」' : '';
+  document.getElementById('ruby-insert-remove').hidden = !state.existing;
+  input.value = state.initial || '';
+  backdrop.classList.add('open'); dialog.classList.add('open');
+  positionRubyDialog();
+  input.focus(); // 열리자마자 바로 입력해도 편집기가 아니라 이 칸으로 들어가게 동기로 포커스
+  setTimeout(() => { input.focus(); input.select(); }, 0);
+}
+function positionRubyDialog() {
+  const dialog = document.getElementById('ruby-insert-dialog');
+  if (!dialog || !dialog.classList.contains('open')) return;
+  const base = getEditorCenterRect(), r = dialog.getBoundingClientRect(), margin = 16;
+  dialog.style.left = Math.min(Math.max(margin, base.left + (base.width - r.width) / 2), Math.max(margin, window.innerWidth - r.width - margin)) + 'px';
+  dialog.style.top = Math.min(Math.max(margin, base.top + (base.height - r.height) / 2), Math.max(margin, window.innerHeight - r.height - margin)) + 'px';
+}
+function closeRubyDialog(restoreFocus = true) {
+  const state = rubyDialogState;
+  document.getElementById('ruby-insert-backdrop')?.classList.remove('open');
+  document.getElementById('ruby-insert-dialog')?.classList.remove('open');
+  const input = document.getElementById('ruby-insert-text');
+  if (input) input.value = '';
+  rubyDialogState = null;
+  if (restoreFocus && state && state.editable && state.editable.isConnected) {
+    focusWithoutScroll(state.editable);
+    if (state.range && tbRangeInsideRoot(state.range, state.editable)) { const sel = window.getSelection(); if (sel) { sel.removeAllRanges(); sel.addRange(state.range); } }
+  }
+}
+function tbOpenRubyDialog() { // 본문 툴바 「루비 문자」
+  if (!isCE()) { rubyToast('이 입력칸은 루비 문자를 지원하지 않습니다.'); return; }
+  const editable = lastFocusedTA, range = getCurrentLinkRange(editable);
+  if (!editable || !range) { rubyToast('루비를 붙일 글자를 선택하세요.'); return; }
+  const existing = rubyElementAt(editable, range);
+  if (!existing && range.collapsed) { rubyToast('루비를 붙일 글자를 선택하세요.'); return; }
+  const baseText = existing ? rubyHtmlToBaseText(existing.innerHTML).replace(/<[^>]*>/g, '') : range.toString();
+  openRubyDialog({ kind: 'ce', editable, range, existing, baseText, initial: existing ? (existing.querySelector('rt')?.textContent || '') : '' });
+}
+function ds_openRubyDialog() { // 데이터 시트 도구 막대: 편집 중 선택한 글자(없으면 안내)
+  const sel = ds_richSelection();
+  if (!sel) { rubyToast('셀을 편집 중에 루비를 붙일 글자를 선택하세요.'); return; }
+  const row = ds_richRowOf(sel.ta), html = row ? ds_getCellRich(row, sel.ta.dataset.colId, sel.ta.value) : '', current = ds_richRubyAt(html, sel.start, sel.end);
+  openRubyDialog({ kind: 'ds', sel, baseText: sel.ta.value.slice(sel.start, sel.end), existing: !!current, initial: current });
+}
+function applyRubyDialog() {
+  const state = rubyDialogState, input = document.getElementById('ruby-insert-text');
+  if (!state || !input) return;
+  const text = rubyNormalizeText(input.value);
+  if (!text) { if (state.existing) { removeRubyDialog(); return; } input.focus(); return; }
+  if (state.kind === 'ds') { closeRubyDialog(false); ds_richApplyPatch(state.sel, { ruby: text }); return; }
+  const editable = state.editable;
+  if (!editable || !editable.isConnected) { closeRubyDialog(false); return; }
+  focusWithoutScroll(editable);
+  if (state.existing && state.existing.isConnected) { // 기존 루비 수정
+    let rt = state.existing.querySelector('rt');
+    if (!rt) { rt = document.createElement('rt'); state.existing.appendChild(rt); }
+    rt.textContent = text;
+  } else {
+    const range = state.range;
+    if (!range || !tbRangeInsideRoot(range, editable) || range.collapsed) { closeRubyDialog(false); return; }
+    const frag = range.extractContents();
+    Array.from(frag.querySelectorAll('ruby')).forEach(rubyUnwrap); // 겹친 루비는 풀고 새로 붙인다
+    const block = frag.querySelector('div,p,li,ul,ol,table,blockquote,br');
+    const ruby = document.createElement('ruby');
+    if (block) ruby.appendChild(document.createTextNode(frag.textContent)); else ruby.appendChild(frag); // 여러 줄에 걸친 선택은 글자만 루비로
+    const rt = document.createElement('rt'); rt.textContent = text; ruby.appendChild(rt);
+    range.insertNode(ruby);
+    const after = document.createRange(); after.setStartAfter(ruby); after.collapse(true);
+    const sel = window.getSelection(); if (sel) { sel.removeAllRanges(); sel.addRange(after); }
+  }
+  editable.dispatchEvent(new Event('input', { bubbles: true })); // 저장·실행 취소 경로
+  closeRubyDialog(false);
+}
+function removeRubyDialog() {
+  const state = rubyDialogState;
+  if (!state) return;
+  if (state.kind === 'ds') { closeRubyDialog(false); ds_richApplyPatch(state.sel, { ruby: '' }); return; }
+  if (state.existing && state.existing.isConnected && state.editable) {
+    focusWithoutScroll(state.editable);
+    rubyUnwrap(state.existing);
+    state.editable.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  closeRubyDialog(false);
+}
+function initRubyDialogEvents() {
+  if (window.__rubyDialogEventsBound) return;
+  window.__rubyDialogEventsBound = true;
+  document.getElementById('ruby-insert-submit')?.addEventListener('click', applyRubyDialog);
+  document.getElementById('ruby-insert-cancel')?.addEventListener('click', () => closeRubyDialog());
+  document.getElementById('ruby-insert-close')?.addEventListener('click', () => closeRubyDialog());
+  document.getElementById('ruby-insert-remove')?.addEventListener('click', removeRubyDialog);
+  document.getElementById('ruby-insert-backdrop')?.addEventListener('click', () => closeRubyDialog());
+  document.getElementById('ruby-insert-text')?.addEventListener('keydown', e => { // 조합 중 키는 전역 IME 보호(#164)가 막아 조합이 끝난 뒤 Enter 로 적용된다
+    if (e.key === 'Enter') { e.preventDefault(); applyRubyDialog(); } else if (e.key === 'Escape') { e.preventDefault(); closeRubyDialog(); }
+  });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initRubyDialogEvents); else initRubyDialogEvents();
+window.addEventListener('resize', positionRubyDialog);
 
 function tbSearch() {
   const term = prompt('검색어를 입력하세요:'); if (!term) return;
@@ -41000,8 +41147,10 @@ function ds_richApplyStyleText(css, f) { // style 속성 문자열 → 서식(f)
     else if (k === 'text-decoration' || k === 'text-decoration-line') { if (v.indexOf('underline') >= 0) f.u = true; if (v.indexOf('line-through') >= 0) f.s = true; }
   });
 }
+// 루비 문자(#382): <ruby>본문<rt>읽기</rt></ruby>. 읽기 글자는 서식 조각의 f.ruby 로만 두고 순수 텍스트(cells)에는 본문 글자만 들어간다
+function ds_richRubyText(s) { return ds_richDecode(String(s == null ? '' : s).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '').replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim().slice(0, 40); }
 function ds_richSameFmt(a, b) {
-  return !!a.b === !!b.b && !!a.i === !!b.i && !!a.u === !!b.u && !!a.s === !!b.s && (a.color || '') === (b.color || '') && (a.bg || '') === (b.bg || '') && (a.size || 0) === (b.size || 0) && (a.font || '') === (b.font || '');
+  return (a.ruby || '') === (b.ruby || '') && !!a.b === !!b.b && !!a.i === !!b.i && !!a.u === !!b.u && !!a.s === !!b.s && (a.color || '') === (b.color || '') && (a.bg || '') === (b.bg || '') && (a.size || 0) === (b.size || 0) && (a.font || '') === (b.font || '');
 }
 function ds_richParse(html) { // → [{ text, f:{b,i,u,s,color,bg,size} }]
   html = String(html == null ? '' : html);
@@ -41021,6 +41170,17 @@ function ds_richParse(html) { // → [{ text, f:{b,i,u,s,color,bg,size} }]
     if ((tag === 'script' || tag === 'style') && !closing) { // 안쪽 내용까지 버린다
       var end = html.toLowerCase().indexOf('</' + tag, re.lastIndex);
       re.lastIndex = end < 0 ? html.length : end;
+      continue;
+    }
+    if ((tag === 'rt' || tag === 'rp') && !closing) { // 읽기·괄호 글자는 본문에 넣지 않는다
+      var rend = html.toLowerCase().indexOf('</' + tag, re.lastIndex);
+      re.lastIndex = rend < 0 ? html.length : rend;
+      continue;
+    }
+    if (tag === 'ruby' && !closing) { // 읽기(rt)는 ruby 블록에서 미리 읽어 두고, 안쪽 본문은 그대로 이어서 해석
+      var yend = html.toLowerCase().indexOf('</ruby', re.lastIndex), yblock = html.slice(re.lastIndex, yend < 0 ? html.length : yend), ym = /<rt(?:\s[^>]*)?>([\s\S]*?)<\/rt>/i.exec(yblock), yf = Object.assign({}, stack[stack.length - 1].f), yrt = ym ? ds_richRubyText(ym[1]) : '';
+      if (yrt) yf.ruby = yrt;
+      stack.push({ tag: 'ruby', f: yf });
       continue;
     }
     if (tag === 'div' || tag === 'p') { if (!closing && segs.length && !atLineStart) push('\n'); continue; } // 블록은 줄바꿈으로
@@ -41043,11 +41203,11 @@ function ds_richParse(html) { // → [{ text, f:{b,i,u,s,color,bg,size} }]
   }
   return segs;
 }
-function ds_richHasFormat(segs) { return segs.some(function(s) { return !!(s.f.b || s.f.i || s.f.u || s.f.s || s.f.color || s.f.bg || s.f.size || s.f.font); }); }
+function ds_richHasFormat(segs) { return segs.some(function(s) { return !!(s.f.b || s.f.i || s.f.u || s.f.s || s.f.color || s.f.bg || s.f.size || s.f.font || s.f.ruby); }); }
 function ds_richSerialize(segs) {
   var out = '', plain = '';
   segs.forEach(function(seg) {
-    var f = seg.f || {}, inner = ds_richEsc(seg.text).replace(/\n/g, '<br>');
+    var f = seg.f || {}, inner = seg.text.split('\n').map(function(line) { var h = ds_richEsc(line); return (f.ruby && line) ? '<ruby>' + h + '<rt>' + ds_richEsc(f.ruby) + '</rt></ruby>' : h; }).join('<br>');
     if (f.s) inner = '<s>' + inner + '</s>';
     if (f.u) inner = '<u>' + inner + '</u>';
     if (f.i) inner = '<i>' + inner + '</i>';
@@ -41082,6 +41242,21 @@ function ds_richFormatRange(html, start, end, patch) {
   out.forEach(function(seg) { var last = merged[merged.length - 1]; if (last && ds_richSameFmt(last.f, seg.f)) last.text += seg.text; else merged.push(seg); });
   return ds_richHasFormat(merged) ? ds_richSerialize(merged) : '';
 }
+// 글자 범위 [start, end) 가 모두 같은 루비 읽기를 가지면 그 값(수정 팝업 채우기용), 아니면 ''
+function ds_richRubyAt(html, start, end) {
+  var pos = 0, found = null, mixed = false;
+  ds_richParse(html).forEach(function(seg) {
+    var a = pos, b = pos + seg.text.length;
+    pos = b;
+    if (Math.max(start, a) >= Math.min(end, b)) return;
+    var r = seg.f.ruby || '';
+    if (found === null) found = r; else if (found !== r) mixed = true;
+  });
+  return mixed || !found ? '' : found;
+}
+// 루비 HTML → 문자열(CE 본문용). base: 읽기 글자 제외(목차·검색·제목), inline: 본문(읽기) 형태(HTML 을 못 쓰는 출력용)
+function rubyHtmlToBaseText(html) { return String(html == null ? '' : html).replace(/<rt(?:\s[^>]*)?>[\s\S]*?<\/rt>/gi, '').replace(/<rp(?:\s[^>]*)?>[\s\S]*?<\/rp>/gi, ''); }
+function rubyHtmlToInlineText(html) { return String(html == null ? '' : html).replace(/<rp(?:\s[^>]*)?>[\s\S]*?<\/rp>/gi, '').replace(/<rt(?:\s[^>]*)?>([\s\S]*?)<\/rt>/gi, function(m, t) { return '(' + t.replace(/<[^>]*>/g, '') + ')'; }); }
 function ds_richPlain(html) { return ds_richParse(html).map(function(s) { return s.text; }).join(''); }
 function ds_richSanitize(html) { var segs = ds_richParse(html); return ds_richHasFormat(segs) ? ds_richSerialize(segs) : ''; } // 서식이 없으면 ''
 function ds_richFromText(text) { // 순수 텍스트 → 편집기용 HTML
@@ -42139,6 +42314,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) {
     + '<button type="button" class="ds-format-option ds-wrap-option" data-wrap="clip" title="자르기" onmousedown="event.preventDefault()" onclick="ds_applyCellWrap(\'clip\')"><i class="fa-solid fa-scissors ds-format-option-icon"></i><span>자르기</span></button>'
     + '</div>'
     + '</div>'
+    + '<button type="button" id="ds-ruby-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_openRubyDialog()" title="루비 문자 (편집 중 선택한 글자)" aria-label="루비 문자"><i class="fa-solid fa-language"></i></button>'
     + '<button type="button" id="ds-clear-format-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_clearCellFormat()" title="서식 지우기" aria-label="서식 지우기"><i class="fa-solid fa-eraser"></i></button>'
     + '<button type="button" id="ds-header-axis-btn" class="ds-format-btn" onmousedown="event.preventDefault()" onclick="ds_toggleHeaderEditMode()" title="행/열 이름 편집 전환" aria-label="행/열 이름 편집 전환"><i id="ds-header-axis-icon" class="fa-solid fa-right-left"></i></button>'
     + '</div>';

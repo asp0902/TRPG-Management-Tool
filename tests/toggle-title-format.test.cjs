@@ -16,6 +16,6 @@ ok(F.tbToggleTitleHtml({ title: '[x](#"style=a"onload="x;)' }).indexOf('"onload'
 ok(/function tbWrap\(css\) \{\n  const ta = lastFocusedTA; if \(!ta\) return;\n  if \(ta\.tagName === 'INPUT'\) return;/.test(html), 'tbWrap: 일반 input 에는 매크로 문법 미삽입');
 // 토글 제목은 한 줄 contenteditable, Enter 막기, 붙여넣기 일반 텍스트
 ok(/class="toggle-title-inp toggle-title-ce" contenteditable="true"/.test(html) && /event\.key==='Enter'\)\{event\.preventDefault\(\)\}/.test(html) && /onpaste="pasteToggleTitlePlain\(event\)"/.test(html) && /oninput="updToggleTitle\(/.test(html), '토글 제목 contenteditable·Enter 차단·일반 텍스트 붙여넣기');
-ok(/upd\(id, 'title', el\.textContent, cid\)/.test(html), 'b.title 은 항상 순수 텍스트');
+ok(/upd\(id, 'title', el\.querySelector\('rt,rp'\) \? \(\(\) => \{ const c = el\.cloneNode\(true\); c\.querySelectorAll\('rt,rp'\)\.forEach\(n => n\.remove\(\)\); return c\.textContent; \}\)\(\) : el\.textContent, cid\)/.test(html), 'b.title 은 항상 순수 텍스트(루비 읽기 제외, #382)');
 ok(/\.toggle-title-inp \{[^}]*min-height: 22px;[^}]*line-height: 22px;/s.test(html), '토글 제목 기본 스타일 유지');
 process.exit(f ? 1 : 0);
