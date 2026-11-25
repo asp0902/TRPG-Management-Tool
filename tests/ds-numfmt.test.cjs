@@ -1,0 +1,15 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const ctx = {}; vm.createContext(ctx);
+vm.runInContext(html.slice(html.indexOf('function ds_parseNumber'), html.indexOf('function ds_sortValue')) + html.slice(html.indexOf('function ds_numFmtDecimals'), html.indexOf('// 숫자 형식 적용(툴바)')) + ';this.f={ds_formatNumber}', ctx);
+const F = ctx.f.ds_formatNumber;
+ok(F('1234567.891', { t: 'num' }) === '1,234,567.89' && F('1000', { t: 'num', d: 0 }) === '1,000' && F('1000', { t: 'num', d: 0, th: false }) === '1000', '일반 숫자(기본 소수 2자리·천 단위 구분 켜고 끄기)');
+ok(F('0.256', { t: 'pct' }) === '26%' && F('0.256', { t: 'pct', d: 1 }) === '25.6%' && F('-0.5', { t: 'pct' }) === '-50%', '백분율(값×100)');
+ok(F('1234.5', { t: 'cur', c: '₩' }) === '₩1,235' && F('1234.5', { t: 'cur', c: '$' }) === '$1,234.50' && F('-3', { t: 'cur', c: '$' }) === '-$3.00', '통화 ₩(0자리)·$(2자리)');
+ok(F('1,000', { t: 'num', d: 0 }) === '1,000' && F('+5', { t: 'num', d: 1 }) === '5.0', '입력 파서 공용(1,000·+5)');
+ok(F('abc', { t: 'num' }) === null && F('', { t: 'num' }) === null && F('12', null) === null, '숫자가 아니거나 형식 없음 → null(원래 값 표시)');
+ok(F('2024-1-5', { t: 'date' }) === '2024-01-05' && F('2024/12/31', { t: 'date' }) === '2024-12-31' && F('2024-02-30', { t: 'date' }) === null && F('hello', { t: 'date' }) === null, '날짜 YYYY-MM-DD(잘못된 날짜는 null)');
+ok(F('-0.001', { t: 'num', d: 2 }) === '0.00', '반올림해 0 이 되면 음수 부호 없음');
+ok(/DS_NUMFMT_TYPES/.test(html) && /st\.nf \|\| st\.bd/.test(html) && /ds-has-fmt/.test(html) && /picker\('numfmt'/.test(html), '정규화·표시·툴바 연결');
+process.exit(f ? 1 : 0);

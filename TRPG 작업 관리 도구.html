@@ -7184,6 +7184,9 @@ body.block-pointer-dragging {
 
 /* 우클릭 시 cell hover 인디케이터 */
 .ds-table td { position: relative; }
+/* 숫자 형식(#396): 형식이 적용된 칸은 보기 상태에서 서식 div 가 보이고, 편집 중에는 원래 값(textarea)이 보인다 */
+.ds-table td.ds-has-fmt:not(:has(textarea.ds-cell-editing)) textarea.ds-cell-input { position: absolute; inset: 0; width: 100%; height: 100% !important; opacity: 0; }
+.ds-table td.ds-has-fmt:not(:has(textarea.ds-cell-editing)) .ds-cell-rich { display: block; }
 /* 테두리(#394) */
 .ds-border-ctl { display: flex; gap: 6px; align-items: center; padding: 6px 10px 4px; border-top: 1px solid #e5e5e5; margin-top: 3px; }
 .ds-border-ctl select { flex: 1; border: 1px solid #ccc; border-radius: 4px; padding: 2px 4px; font-size: 12px; }
@@ -41309,6 +41312,7 @@ function ds_isDataRow(row) { return !!(row && !row.isCategory && !row.isMemo); }
 var DS_ROW_COL = '__row';
 function ds_isRowStyleCell(c) { return !!(c && c.colId === DS_ROW_COL && c.row && (c.row.isMemo || c.row.isCategory)); }
 function ds_isStyleTarget(c) { return !!(c && c.colId && (ds_isDataRow(c.row) || ds_isRowStyleCell(c))); } // 서식 도구 대상(데이터 셀 또는 메모·카테고리 행 전체)
+var DS_NUMFMT_TYPES = ['num', 'pct', 'cur', 'date'];
 var DS_BORDER_STYLES = ['thin', 'med', 'thick', 'dot', 'dash', 'double'];
 var DS_BORDER_CSS = { thin: '1px solid', med: '2px solid', thick: '3px solid', dot: '1px dotted', dash: '1px dashed', double: '3px double' };
 function ds_normalizeCellStyle(st) {
@@ -41329,6 +41333,13 @@ function ds_normalizeCellStyle(st) {
   if (st.wrap === 'overflow' || st.wrap === 'clip') out.wrap = st.wrap; // 텍스트 줄바꿈(#374): 줄바꿈이 기본이라 저장하지 않는다
   var lh = Math.round(Number(st.lh) * 100) / 100;
   if (st.lh !== '' && st.lh !== null && lh >= 1 && lh <= 3) out.lh = lh;
+  if (st.nf && typeof st.nf === 'object' && DS_NUMFMT_TYPES.indexOf(st.nf.t) >= 0) { // 숫자 형식(#396): 표시만 바꾸고 셀 값은 그대로
+    var nf = { t: st.nf.t }, dd = Math.round(Number(st.nf.d));
+    if (st.nf.d !== undefined && st.nf.d !== null && st.nf.d !== '' && dd >= 0 && dd <= 10) nf.d = dd;
+    if (st.nf.th === false) nf.th = false;
+    if (nf.t === 'cur') nf.c = st.nf.c === '$' ? '$' : '₩';
+    out.nf = nf;
+  }
   if (st.bd && typeof st.bd === 'object') { // 테두리(#394): 변별 { w: 선 종류, c: 색 }
     var bd = {};
     ['t', 'r', 'b', 'l'].forEach(function(k) { var e = st.bd[k]; if (e && DS_BORDER_STYLES.indexOf(e.w) >= 0 && /^#[0-9a-fA-F]{6}$/.test(e.c || '')) bd[k] = { w: e.w, c: e.c.toLowerCase() }; });
@@ -41366,7 +41377,7 @@ function ds_overflowWidthFor(cols, row, idx) {
   return Math.max(0, w - 16);
 }
 function ds_viewInner(viewHtml, wrap, width) { return wrap === 'overflow' ? '<span class="ds-ov-inner" style="width:' + Math.round(width) + 'px;">' + viewHtml + '</span>' : viewHtml; }
-function ds_hasCellStyle(st) { return !!(st && (st.bd || st.b || st.i || st.i === false || st.s || st.u || st.color || st.font || st.size || st.bg || st.lh || st.wrap)); }
+function ds_hasCellStyle(st) { return !!(st && (st.nf || st.bd || st.b || st.i || st.i === false || st.s || st.u || st.color || st.font || st.size || st.bg || st.lh || st.wrap)); }
 // ── 셀 글자 일부 서식(#375): row.cellRich[colId] 에 허용 태그만 담은 HTML. row.cells[colId] 는 항상 순수 텍스트(조회·검색·정렬·내보내기용)로 함께 갱신한다 ──
 // 허용: b/strong, i/em, u, s/strike/del, span[style: color·background-color·font-size(px)], br. 그 밖의 태그·속성(스크립트·이벤트 속성 포함)은 버리고 글자만 남긴다.
 // DOM 없이 동작하는 작은 파서라 편집기(contenteditable)가 만든 HTML 도 같은 규칙으로 정리한다.
@@ -42575,6 +42586,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
   };
   var opt = function(cls, attr, click, icon, label) { return '<button type="button" class="ds-format-option ' + cls + '" ' + attr + NOFOCUS + ' onclick="' + click + '"><i class="fa-solid ' + icon + ' ds-format-option-icon"></i><span>' + label + '</span></button>'; };
   var SEP = '<div class="tb-sep"></div>';
+  var numFmtMenu = [['auto', '자동(서식 없음)', 'fa-ban'], ['num', '일반 숫자 1,000.12', 'fa-hashtag'], ['pct', '백분율 %', 'fa-percent'], ['cur-w', '통화 ₩', 'fa-won-sign'], ['cur-d', '통화 $', 'fa-dollar-sign'], ['date', '날짜 YYYY-MM-DD', 'fa-calendar-days'], ['dec+', '소수 자리 늘리기 .00', 'fa-arrow-right'], ['dec-', '소수 자리 줄이기 .0', 'fa-arrow-left'], ['th', '천 단위 구분 켜기/끄기', 'fa-ellipsis']].map(function(a) { return opt('ds-numfmt-option', '', 'ds_applyNumFmt(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('');
   var mergeMenu = [['all', '모두 병합', 'fa-object-group'], ['horiz', '가로로 병합', 'fa-arrows-left-right'], ['vert', '세로로 병합', 'fa-arrows-up-down'], ['none', '병합 해제', 'fa-object-ungroup']].map(function(a) { return opt('ds-merge-option', '', 'ds_mergeCells(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('');
   var borderMenu = [['all', '모두', 'fa-border-all'], ['inner', '안쪽', 'fa-border-none'], ['hinner', '가로 안쪽', 'fa-grip-lines'], ['vinner', '세로 안쪽', 'fa-grip-lines-vertical'], ['outer', '바깥쪽', 'fa-square'], ['left', '왼쪽', 'fa-arrow-left'], ['top', '위쪽', 'fa-arrow-up'], ['right', '오른쪽', 'fa-arrow-right'], ['bottom', '아래쪽', 'fa-arrow-down'], ['clear', '테두리 지우기', 'fa-ban']].map(function(a) { return opt('ds-border-option', '', 'ds_applyBorder(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('')
     + '<div class="ds-border-ctl" onmousedown="event.stopPropagation()"><select id="ds-border-style" onchange="_dsBorderStyle=this.value" title="선 종류" aria-label="선 종류">' + [['thin', '얇게'], ['med', '보통'], ['thick', '굵게'], ['dot', '점선'], ['dash', '파선'], ['double', '이중선']].map(function(a) { return '<option value="' + a[0] + '"' + (a[0] === _dsBorderStyle ? ' selected' : '') + '>' + a[1] + '</option>'; }).join('') + '</select><input type="color" id="ds-border-color" value="' + _dsBorderColor + '" oninput="_dsBorderColor=this.value" title="선 색" aria-label="선 색"></div>';
@@ -42610,6 +42622,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + colorBtn('ds-bg-btn', 'ds-bg-swatch', 'bg', '셀 배경색', 'fa-fill-drip')
     + picker('border', '테두리', 'fa-border-all', borderMenu)
     + picker('merge', '셀 병합', 'fa-object-group', mergeMenu)
+    + picker('numfmt', '숫자 형식', 'fa-hashtag', numFmtMenu)
     + SEP
     + picker('halign', '가로 맞춤', 'fa-align-left', halign)
     + picker('valign', '세로 맞춤', 'fa-arrow-up', valign)
@@ -42846,12 +42859,14 @@ function ds_richRefresh(ta) { // 보기 상태: 서식이 있으면 div 로 표�
   var wrap = ds_getCellStyle(row, ta.dataset.colId).wrap, overflow = wrap === 'overflow';
   var dsCur = findDataSheet(_dsEditId), cols = dsCur && dsCur.columns ? dsCur.columns : [];
   var colIdx = cols.findIndex(function(c) { return c.id === ta.dataset.colId; });
+  var fmtNow = rich ? null : ds_formatNumber(ta.value, ds_getCellStyle(row, ta.dataset.colId).nf);
   td.classList.toggle('ds-has-rich', !!rich);
+  td.classList.toggle('ds-has-fmt', fmtNow !== null);
   td.classList.toggle('ds-wrap-overflow', overflow);
-  if (rich || overflow) {
+  if (rich || overflow || fmtNow !== null) {
     if (!d) { d = document.createElement('div'); d.className = 'ds-cell-rich'; d.dataset.rowIdx = ta.dataset.rowIdx; d.dataset.colId = ta.dataset.colId; ta.parentNode.insertBefore(d, ta.nextSibling); }
     d.contentEditable = 'false';
-    d.innerHTML = ds_viewInner(rich || ds_richFromText(ta.value), wrap, colIdx >= 0 ? ds_overflowWidthFor(cols, row, colIdx) : 0);
+    d.innerHTML = ds_viewInner(rich || (fmtNow !== null ? esc(fmtNow) : ds_richFromText(ta.value)), wrap, colIdx >= 0 ? ds_overflowWidthFor(cols, row, colIdx) : 0);
     ds_richApplyStyle(ta, d);
   } else if (d) d.remove();
   ds_autosizeCell(ta);
@@ -43499,7 +43514,7 @@ function ds_updateFormatToolbarState(ds) {
   if (wrapBtn) wrapBtn.title = '텍스트 줄바꿈: ' + ({ overflow: '오버플로우', wrap: '줄바꿈', clip: '자르기' }[wrapNow]);
   var bgSwatch = document.getElementById('ds-bg-swatch');
   if (bgSwatch) bgSwatch.style.background = (hasStyleTargets && refStyle.bg) ? refStyle.bg : 'transparent';
-  ['ds-bg-btn', 'ds-border-btn', 'ds-merge-btn', 'ds-font-select', 'ds-size-input', 'ds-size-dec-btn', 'ds-size-inc-btn', 'ds-lh-select', 'ds-clear-format-btn', 'ds-wrap-btn'].forEach(function(id) {
+  ['ds-bg-btn', 'ds-border-btn', 'ds-merge-btn', 'ds-numfmt-btn', 'ds-font-select', 'ds-size-input', 'ds-size-dec-btn', 'ds-size-inc-btn', 'ds-lh-select', 'ds-clear-format-btn', 'ds-wrap-btn'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.disabled = !hasStyleTargets;
   });
@@ -44685,6 +44700,8 @@ function _dsRenderFlatTable(ds) {
       if (_dsSelectedColIds.includes(c.id)) cellClasses.push('ds-selected-col');
       var richHtml = ds_getCellRich(row, c.id, val); // 글자 일부 서식(#375)
       if (richHtml) cellClasses.push('ds-has-rich');
+      var fmtText = richHtml ? null : ds_formatNumber(val, ds_getCellStyle(row, c.id).nf); // 숫자 형식(#396): 보기에서만 형식 적용
+      if (fmtText !== null) cellClasses.push('ds-has-fmt');
       var wrapMode = ds_getCellStyle(row, c.id).wrap; // 텍스트 줄바꿈(#374)
       if (wrapMode === 'overflow') cellClasses.push('ds-wrap-overflow');
       var rule = ds_ruleOf(row, c.id), ruleHtml = '';
@@ -44709,7 +44726,7 @@ function _dsRenderFlatTable(ds) {
       var tdCss = (cst.bg ? 'background-color:' + esc(cst.bg) + ';' : '') + (cst.bd ? esc(ds_borderCss(cst.bd)) + ';' : '');
       return '<td' + cellClassAttr + (mspan ? ' rowspan="' + mspan.rs + '" colspan="' + mspan.cs + '"' : '') + (tdCss ? ' style="' + tdCss + '"' : '') + ' data-col-id="' + esc(c.id) + '" oncontextmenu="ds_openRowMenu(event,' + rowIdx + ',\'' + esc(c.id) + '\')">'
         + '<textarea class="ds-cell-input ds-cell-align-' + textAlign + editClass + styleClass + '"' + styleAttr + ' rows="1" data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '" onmousedown="ds_handleCellMouseDown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" ondblclick="ds_enterCellEditMode(' + rowIdx + ',\'' + esc(c.id) + '\')" onkeydown="ds_handleCellKeydown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" onbeforeinput="ds_handleCellBeforeInput(event,this)" oncompositionstart="ds_handleCellCompositionStart(this)" onpaste="ds_handleCellPaste(event,this)" oninput="ds_handleCellInput(this)" onfocus="ds_handleCellFocus(this)" onblur="ds_autosizeCell(this)">' + esc(val) + '</textarea>'
-        + ((richHtml || wrapMode === 'overflow') ? '<div class="ds-cell-rich ds-cell-align-' + textAlign + styleClass + '"' + styleAttr + ' data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '">' + ds_viewInner(richHtml || ds_richFromText(val), wrapMode, ds_overflowWidthFor(cols, row, ci)) + '</div>' : '')
+        + ((richHtml || fmtText !== null || wrapMode === 'overflow') ? '<div class="ds-cell-rich ds-cell-align-' + textAlign + styleClass + '"' + styleAttr + ' data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '">' + ds_viewInner(richHtml || (fmtText !== null ? esc(fmtText) : ds_richFromText(val)), wrapMode, ds_overflowWidthFor(cols, row, ci)) + '</div>' : '')
         + ruleHtml
         + '</td>';
     }).join('');
@@ -45724,6 +45741,46 @@ function ds_filterMenuApply() {
 }
 document.addEventListener('mousedown', function(e) { if (_dsFilterMenuState && e.target && e.target.closest && !e.target.closest('#ds-filter-menu, .ds-filter-btn')) ds_closeFilterMenu(); }, true);
 document.addEventListener('keydown', function(e) { if (_dsFilterMenuState && e.key === 'Escape') { e.preventDefault(); ds_closeFilterMenu(); } }, true);
+// ── 숫자 형식(#396) ──
+// nf = { t: 'num'|'pct'|'cur'|'date', d?: 소수 자리, th?: false(천 단위 구분 끔), c?: '₩'|'$' }. 값이 숫자(날짜)로 읽히지 않으면 null(원래 값을 그대로 표시)
+function ds_numFmtDecimals(nf) { return nf.d !== undefined ? nf.d : (nf.t === 'pct' ? 0 : nf.t === 'cur' ? (nf.c === '$' ? 2 : 0) : 2); }
+function ds_formatNumber(v, nf) {
+  if (!nf || !nf.t) return null;
+  v = v == null ? '' : String(v);
+  if (nf.t === 'date') {
+    var m = /^\s*(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\s*$/.exec(v);
+    if (!m) return null;
+    var y = +m[1], mo = +m[2], da = +m[3], dt = new Date(y, mo - 1, da);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== da) return null;
+    return y + '-' + (mo < 10 ? '0' : '') + mo + '-' + (da < 10 ? '0' : '') + da;
+  }
+  var n = ds_parseNumber(v);
+  if (isNaN(n)) return null;
+  if (nf.t === 'pct') n = n * 100;
+  var fixed = Math.abs(n).toFixed(ds_numFmtDecimals(nf)), parts = fixed.split('.');
+  if (nf.th !== false) parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  var body = parts.join('.'), neg = n < 0 && /[1-9]/.test(fixed);
+  if (nf.t === 'pct') return (neg ? '-' : '') + body + '%';
+  if (nf.t === 'cur') return (neg ? '-' : '') + (nf.c === '$' ? '$' : '₩') + body;
+  return (neg ? '-' : '') + body;
+}
+// 숫자 형식 적용(툴바): kind = auto(해제)/num/pct/cur-w/cur-d/date/dec+/dec-/th
+function ds_applyNumFmt(kind) {
+  _dsMutateCellStyles(function(cur) {
+    var nf = cur.nf ? Object.assign({}, cur.nf) : null;
+    if (kind === 'auto') { delete cur.nf; return; }
+    if (kind === 'num' || kind === 'pct' || kind === 'date') { cur.nf = { t: kind }; return; }
+    if (kind === 'cur-w') { cur.nf = { t: 'cur', c: '₩' }; return; }
+    if (kind === 'cur-d') { cur.nf = { t: 'cur', c: '$' }; return; }
+    if (kind === 'dec+' || kind === 'dec-') {
+      if (!nf || nf.t === 'date') nf = { t: 'num' };
+      var d = ds_numFmtDecimals(nf) + (kind === 'dec+' ? 1 : -1);
+      nf.d = Math.max(0, Math.min(10, d));
+      cur.nf = nf; return;
+    }
+    if (kind === 'th') { if (!nf || nf.t === 'date') nf = { t: 'num' }; if (nf.th === false) delete nf.th; else nf.th = false; cur.nf = nf; }
+  });
+}
 // ── 셀 병합(#395, 1차): 병합은 행·열 id 목록으로 저장해 행/열 삽입·삭제·이동에도 어긋나지 않는다. 표시할 때 현재 순서에서 id 가 이어진 만큼만 병합으로 인정한다 ──
 function ds_normMerges(list, rows, columns) {
   if (!Array.isArray(list)) return [];
