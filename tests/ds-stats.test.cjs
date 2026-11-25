@@ -1,0 +1,12 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const ctx = {}; vm.createContext(ctx);
+vm.runInContext(html.slice(html.indexOf('function ds_parseNumber'), html.indexOf('function ds_sortValue')) + html.slice(html.indexOf('var DS_STAT_KINDS'), html.indexOf('function ds_statKind')) + ';this.f={ds_statsOf,ds_statText}', ctx);
+const F = ctx.f, st = F.ds_statsOf(['10', 5, '1,000', '글자', '', null, true, '20%']);
+ok(st.sum === 1015.2 && st.countnum === 4 && st.count === 6 && st.min === 0.2 && st.max === 1000 && Math.abs(st.avg - 253.8) < 1e-9, '통계: 숫자만 합산(쉼표·% 인식, 글자·빈 칸·불리언 제외), 개수=비지 않은 칸');
+const empty = F.ds_statsOf(['a', 'b']);
+ok(empty.sum === 0 && empty.avg === null && empty.min === null && empty.countnum === 0 && empty.count === 2 && F.ds_statText(empty, 'avg') === '', '숫자가 없으면 평균·최소·최대는 빈 값');
+ok(F.ds_statText(st, 'sum') === '1,015.2' && F.ds_statText(F.ds_statsOf(['0.1', '0.2']), 'sum') === '0.3' && F.ds_statText(F.ds_statsOf([1234567]), 'sum') === '1,234,567', '표시: 천 단위 쉼표·부동소수 오차 제거');
+ok(/ds-statusbar-stat/.test(html) && /ds-status-stat/.test(html) && /ds_openStatMenu/.test(html) && /ds_formulaValue\(raw, env\)/.test(html), '상태 표시줄 버튼·선택 기억(localStorage)·수식 결과 사용 연결');
+process.exit(f ? 1 : 0);

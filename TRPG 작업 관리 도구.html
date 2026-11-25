@@ -7136,6 +7136,8 @@ body.block-pointer-dragging {
 .ds-format-option-icon { width: 16px; text-align: center; flex-shrink: 0; }
 .ds-editor-tabs-bar { display: flex; align-items: center; padding: 0 18px; background: #fafafa; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; min-height: 32px; }
 .ds-statusbar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; width: 100%; font-size: 11px; color: #a0a0a0; }
+.ds-statusbar-stat { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; color: #444; font: inherit; font-size: 12px; font-weight: 700; padding: 1px 8px; cursor: pointer; }
+.ds-statusbar-stat:hover { background: #f3f4f6; border-color: #bbb; }
 .ds-statusbar-selection { color: #a0a0a0; font-weight: 600; }
 .ds-statusbar-info { font-weight: 600; color: #909090; }
 .ds-sheet-tabs { display: flex; align-items: stretch; gap: 2px; padding: 0 10px; background: #f1f1f1; border-top: 1px solid #dcdcdc; flex-shrink: 0; min-height: 34px; overflow-x: auto; }
@@ -42570,6 +42572,7 @@ function ds_updateDataSheetStatusbar(ds) {
   var colCount = (ds.columns || []).length;
   var selectionText = ds_getSelectionStatusText(ds);
   tabsBar.innerHTML = '<div class="ds-statusbar">'
+    + (function() { var vals = ds_selectionValues(ds); if (!vals) return ''; var st = ds_statsOf(vals); if (!st.count) return ''; var kind = ds_statKind(); var label = DS_STAT_KINDS.filter(function(k) { return k[0] === kind; })[0][1]; return '<button type="button" class="ds-statusbar-stat" onmousedown="event.preventDefault()" onclick="ds_openStatMenu(event)" title="통계 종류 선택">' + label + ': ' + esc(ds_statText(st, kind) || '-') + '</button>'; })()
     + '<span class="ds-statusbar-selection">' + esc(selectionText) + '</span>'
     + '<span class="ds-statusbar-info">' + colCount + '열 · ' + (ds_activeFilter(ds) && Object.keys(ds_activeFilter(ds).cols).length ? ds_visibleRows(ds).filter(function(v, i) { return v && ds_isDataRow(ds.rows[i]); }).length + '/' + dataCount + '행 표시' : dataCount + '행') + ' · 카테고리 ' + catCount + '개</span>'
     + '</div>';
@@ -45744,6 +45747,42 @@ function ds_filterMenuApply() {
 }
 document.addEventListener('mousedown', function(e) { if (_dsFilterMenuState && e.target && e.target.closest && !e.target.closest('#ds-filter-menu, .ds-filter-btn')) ds_closeFilterMenu(); }, true);
 document.addEventListener('keydown', function(e) { if (_dsFilterMenuState && e.key === 'Escape') { e.preventDefault(); ds_closeFilterMenu(); } }, true);
+// ── 상태 표시줄 통계(#398): 선택한 칸의 원래 값(수식은 계산 결과)에서 숫자만 모아 합계·평균·최소·최대·개수·숫자 개수 ──
+var DS_STAT_KINDS = [['sum', '합계'], ['avg', '평균'], ['min', '최소'], ['max', '최대'], ['count', '개수'], ['countnum', '숫자 개수']];
+function ds_statsOf(values) { // values: 칸 값 배열(숫자·문자열·불리언·null)
+  var nums = [], nonEmpty = 0;
+  values.forEach(function(v) {
+    if (v === null || v === undefined || v === '') return;
+    nonEmpty++;
+    if (typeof v === 'number') nums.push(v);
+    else if (typeof v === 'string') { var n = ds_parseNumber(v); if (!isNaN(n)) nums.push(n); }
+  });
+  var sum = nums.reduce(function(a, b) { return a + b; }, 0);
+  return { sum: sum, avg: nums.length ? sum / nums.length : null, min: nums.length ? Math.min.apply(null, nums) : null, max: nums.length ? Math.max.apply(null, nums) : null, count: nonEmpty, countnum: nums.length };
+}
+function ds_statText(st, kind) { // 표시 문자열(숫자가 없으면 평균·최소·최대는 빈 값)
+  var v = st[kind];
+  return v === null || v === undefined ? '' : (Math.round(v * 1e6) / 1e6).toLocaleString('en-US', { maximumFractionDigits: 6 });
+}
+function ds_statKind() { try { var k = localStorage.getItem('ds-status-stat'); return DS_STAT_KINDS.some(function(x) { return x[0] === k; }) ? k : 'sum'; } catch (e) { return 'sum'; } }
+function ds_selectionValues(ds) { // 선택 범위의 칸 값(수식은 결과). 숨긴 행·열은 범위 정보가 이미 제외
+  var cells = (ds_getTextAlignTargetCells(ds) || []).filter(function(c) { return ds_isDataRow(c.row) && c.colId && c.colId !== DS_ROW_COL; });
+  if (cells.length < 2) return null;
+  var env = ds_formulaEnv(ds.rows, ds.columns);
+  return cells.map(function(c) {
+    var raw = c.row.cells && c.row.cells[c.colId] != null ? String(c.row.cells[c.colId]) : '';
+    if (/^\s*=/.test(raw) && raw.trim().length > 1) { var r = ds_formulaValue(raw, env); return r.err ? null : r.v; }
+    return raw;
+  });
+}
+function ds_openStatMenu(e) {
+  var ds = findDataSheet(_dsEditId), vals = ds ? ds_selectionValues(ds) : null;
+  if (!vals) return;
+  var st = ds_statsOf(vals), cur = ds_statKind(), r = e.currentTarget.getBoundingClientRect();
+  _dsShowContextMenu(r.left, Math.max(8, r.top - DS_STAT_KINDS.length * 30 - 14), DS_STAT_KINDS.map(function(k) {
+    return { label: (k[0] === cur ? '✓ ' : '') + k[1] + ': ' + (ds_statText(st, k[0]) || '-'), action: function() { try { localStorage.setItem('ds-status-stat', k[0]); } catch (er) {} ds_updateDataSheetStatusbar(ds); } };
+  }));
+}
 // ── 간단한 수식(#397): `=` 로 시작하는 값. 숫자·문자열·TRUE/FALSE·셀 참조(A1, $A$1)·범위(A1:B3)·+ - * / % & 비교·괄호, 함수 SUM AVERAGE MIN MAX COUNT COUNTA IF ROUND ABS CONCAT LEN. 같은 시트만 ──
 function ds_colLetters(i) { var s0 = ''; i = i + 1; while (i > 0) { var r = (i - 1) % 26; s0 = String.fromCharCode(65 + r) + s0; i = Math.floor((i - 1) / 26); } return s0; }
 function ds_colFromLetters(l) { var n = 0; l = l.toUpperCase(); for (var k = 0; k < l.length; k++) n = n * 26 + (l.charCodeAt(k) - 64); return n - 1; }
