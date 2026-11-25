@@ -50,7 +50,12 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
       }
       throw new Error('title state did not settle: ' + JSON.stringify(last));
     };
-    await page.locator('#body-display-title').focus();
+    // focus() 가 부하 시 편집 상태를 못 거는 경우가 있어, 안 걸리면 click()·focus() 를 번갈아 다시 시도한다(#416)
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (attempt % 2 === 0) await page.locator('#body-display-title').focus(); else await page.locator('#body-display-title').click();
+      const ok = await page.waitForFunction(() => document.getElementById('body-title-block').className.includes('title-editing'), null, { timeout: 2500 }).then(() => true, () => false);
+      if (ok) break;
+    }
     // 편집 상태는 포커스에 묶여 부하 시 짧게 풀릴 수 있어, 조건을 만족한 바로 그 순간의 값을 같은 evaluate 안에서 읽는다(#416)
     const editingHandle = await page.waitForFunction(() => {
       const block = document.getElementById('body-title-block');

@@ -45314,7 +45314,9 @@ function ds_normRule(r) {
   if (r.t === 'number' || r.t === 'length') {
     if (DS_RULE_OPS.indexOf(r.op) < 0) return null;
     out.op = r.op; out.a = String(r.a == null ? '' : r.a).slice(0, 30); out.b = String(r.b == null ? '' : r.b).slice(0, 30); out.reject = reject;
-    return isNaN(ds_parseNumber(out.a)) ? null : out;
+    if (out.op !== 'between') out.b = ''; // 「사이」가 아니면 두 번째 값은 쓰지 않음
+    if (isNaN(ds_parseNumber(out.a)) || (out.op === 'between' && isNaN(ds_parseNumber(out.b)))) return null; // 「사이」는 두 값이 모두 숫자여야 함
+    return out;
   }
   return null;
 }
@@ -45456,7 +45458,10 @@ function ds_rejectInvalidActive() { // 편집을 끝낼 때: 입력 거부 규�
   if (ds_ruleValid(rule, cur)) return;
   row.cells[o.colId] = o.v;
   ds_richDiscard(o.rowIdx, o.colId);
+  var rta = ds_getCellTextarea(o.rowIdx, o.colId); // 화면 값도 바로 되돌림(데이터·표시 일치)
+  if (rta) { rta.value = o.v; ds_richRefresh(rta); ds_autosizeCell(rta); }
   persist();
+  if (typeof rubyToast === 'function') rubyToast('규칙에 맞지 않는 값이라 이전 값으로 되돌렸습니다.');
   setTimeout(function() { var viewport = ds_captureEditorViewport(); renderDataSheetEditor(); ds_restoreEditorViewport(viewport); }, 0);
 }
 (function() {

@@ -18,4 +18,6 @@ ok(F.ds_ruleValid(len, '가나다') && !F.ds_ruleValid(len, '가나다라'), '�
 ok(F.ds_ruleOf({ cellRules: { a: list } }, 'a') === list && F.ds_ruleOf({}, 'a') === null, '규칙 조회');
 ok(/row\.cellRules/.test(html) && /cellRules: \(function/.test(html) && /delete r\.cellRules\[colId\]/.test(html) && /ru: r\.cellRules/.test(html) && /dstRow\.cellRules\[dstColId\]/.test(html), '정규화·열 삭제·범위 정렬·채우기 복사에 규칙 연동');
 ok(/id="ds-val-submit">실행<\/button>\s*<button[^>]*id="ds-val-cancel">취소/.test(html) && /id="ds-val-remove"[^>]*margin-right:auto/.test(html), '대화상자: 규칙 삭제 맨 왼쪽, [실행][취소]');
+ok(F.ds_normRule({ t: 'number', op: 'between', a: '1', b: '' }) === null && F.ds_normRule({ t: 'number', op: 'between', a: '1', b: 'x' }) === null && F.ds_normRule({ t: 'number', op: 'gte', a: '1', b: 'zzz' }).b === '', '「사이」는 두 값이 모두 숫자여야 규칙(비면 null), 다른 연산은 두 번째 값 무시');
+ok(/rta\.value = o\.v/.test(html) && /되돌렸습니다/.test(html), '입력 거부 시 화면 값 복원·안내 토스트');
 process.exit(f ? 1 : 0);
