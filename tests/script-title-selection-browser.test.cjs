@@ -51,8 +51,14 @@ const { chromium } = require('C:/Users/asp92/.cache/codex-runtimes/codex-primary
       throw new Error('title state did not settle: ' + JSON.stringify(last));
     };
     await page.locator('#body-display-title').focus();
-    await page.waitForFunction(() => document.getElementById('body-title-block').className.includes('title-editing')); // 포커스로 편집 상태가 걸릴 때까지(#416) — 이 상태는 포커스에 묶여 있어 안정 대기 없이 바로 읽는다
-    const editing = await titleState();
+    // 편집 상태는 포커스에 묶여 부하 시 짧게 풀릴 수 있어, 조건을 만족한 바로 그 순간의 값을 같은 evaluate 안에서 읽는다(#416)
+    const editingHandle = await page.waitForFunction(() => {
+      const block = document.getElementById('body-title-block');
+      if (!block || !block.className.includes('title-editing')) return false;
+      const title = document.getElementById('body-display-title');
+      return { classes: block.className, offset: title.getBoundingClientRect().top - block.getBoundingClientRect().top, subtitleDisplay: getComputedStyle(document.getElementById('body-display-subtitle')).display };
+    });
+    const editing = await editingHandle.jsonValue();
     await page.locator('#body-title-block').screenshot({ path: path.join(os.tmpdir(), 'trpg-title-editing.png') });
     assert.match(editing.classes, /title-editing/);
     assert.equal(editing.subtitleDisplay, 'block');

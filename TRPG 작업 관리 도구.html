@@ -7169,6 +7169,25 @@ body.block-pointer-dragging {
 
 /* 우클릭 시 cell hover 인디케이터 */
 .ds-table td { position: relative; }
+/* 필터(#391) */
+.ds-table tbody tr.ds-row-filtered { display: none; }
+.ds-filter-btn { flex: 0 0 auto; border: none; background: none; color: #999; cursor: pointer; font-size: 11px; padding: 2px 4px; border-radius: 4px; }
+.ds-filter-btn:hover { background: #e9e9e9; color: #333; }
+.ds-filter-btn.active { color: #1a73e8; background: #e8f0fe; }
+.ds-filter-menu { position: fixed; display: none; z-index: 10530; width: 260px; max-height: 80vh; overflow: auto; padding: 8px; background: #fff; border: 1px solid #bbb; border-radius: 4px; box-shadow: 0 5px 16px rgba(0,0,0,0.16); font-size: 12px; color: #222; box-sizing: border-box; }
+.ds-filter-menu.open { display: block; }
+.ds-filter-sort { display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid #e5e5e5; }
+.ds-filter-sort button { border: none; background: none; text-align: left; padding: 5px 6px; cursor: pointer; font-size: 12px; border-radius: 3px; }
+.ds-filter-sort button:hover { background: #e9e9e9; }
+.ds-filter-sec { padding: 8px 0; border-bottom: 1px solid #e5e5e5; display: flex; flex-direction: column; gap: 6px; }
+.ds-filter-title { font-weight: 700; color: #555; }
+.ds-filter-menu select, .ds-filter-menu input[type=text] { width: 100%; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; padding: 4px 6px; font-size: 12px; }
+.ds-filter-links a { color: #1a73e8; text-decoration: none; }
+.ds-filter-list { max-height: 180px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.ds-filter-list label { display: flex; align-items: center; gap: 6px; padding: 2px 2px; cursor: pointer; }
+.ds-filter-list label span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-filter-list label em { color: #999; font-style: normal; }
+.ds-filter-actions { display: flex; gap: 8px; padding-top: 8px; justify-content: flex-start; }
 /* 고정(#386): 열 머리글·행 번호 열은 항상 sticky, 고정한 위 n행·왼쪽 n열은 JS(ds_applyFreeze)가 top/left 를 정한다. 접힌 테두리는 sticky 에서 따라 움직이지 않아 box-shadow 로 대신 그린다 */
 .ds-table thead tr th { position: sticky; top: 0; z-index: 7; box-shadow: inset 0 -1px 0 #e0e0e0; }
 .ds-table thead th.ds-select-all-corner { left: 0; z-index: 9; }
@@ -9472,6 +9491,7 @@ select.sh-field-input,
     <div class="ds-editor-body" id="ds-editor-body"></div>
     <div class="ds-sheet-tabs" id="ds-sheet-tabs"></div>
     <div id="ds-ctx-menu" class="ds-ctx-menu"></div>
+    <div id="ds-filter-menu" class="ds-filter-menu"></div>
   </div>
 
   <!-- + 버튼 선택 모달 (서플리먼트 vs 데이터 시트) -->
@@ -41189,6 +41209,7 @@ function normalizeDataSheetSheet(sheet) {
     rows: rows,
     frozenRows: ds_normFreeze(sheet.frozenRows, rows.length),
     frozenCols: ds_normFreeze(sheet.frozenCols, columns.length),
+    filter: ds_normFilter(sheet.filter, columns),
   };
 }
 function normalizeDataSheetColumn(col) {
@@ -42454,7 +42475,7 @@ function ds_updateDataSheetStatusbar(ds) {
   var selectionText = ds_getSelectionStatusText(ds);
   tabsBar.innerHTML = '<div class="ds-statusbar">'
     + '<span class="ds-statusbar-selection">' + esc(selectionText) + '</span>'
-    + '<span class="ds-statusbar-info">' + colCount + '열 · ' + dataCount + '행 · 카테고리 ' + catCount + '개</span>'
+    + '<span class="ds-statusbar-info">' + colCount + '열 · ' + (ds_activeFilter(ds) && Object.keys(ds_activeFilter(ds).cols).length ? ds_visibleRows(ds).filter(function(v, i) { return v && ds_isDataRow(ds.rows[i]); }).length + '/' + dataCount + '행 표시' : dataCount + '행') + ' · 카테고리 ' + catCount + '개</span>'
     + '</div>';
 }
 
@@ -42507,6 +42528,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + '<div class="tb-lh-wrap"><select id="ds-lh-select" class="tb-select tb-select-lh" onchange="ds_applyCellLineHeight(this.value)" title="줄간격" aria-label="셀 줄간격"><option value="">기본</option>' + ['1', '1.2', '1.45', '1.6', '1.8', '2', '2.5'].map(function(v) { return '<option value="' + v + '">' + v + '</option>'; }).join('') + '</select><i class="fa-solid fa-chevron-down tb-control-chevron" aria-hidden="true"></i></div>'
     + SEP
     + btn('ds-ruby-btn', 'ds_openRubyDialog()', '루비 문자 (편집 중 선택한 글자)', 'fa-language')
+    + btn('ds-filter-toggle-btn', 'ds_toggleFilter()', '필터 만들기', 'fa-filter')
     + SEP
     + picker('freeze', '고정', 'fa-thumbtack', freeze)
     + btn('ds-header-axis-btn', 'ds_toggleHeaderEditMode()', '행/열 이름 편집 전환', 'fa-right-left').replace('fa-right-left"', 'fa-right-left" id="ds-header-axis-icon"')
@@ -42627,8 +42649,9 @@ function ds_getSelectedCellRangeInfo(ds) {
   var colFrom = Math.min(colStart, colEnd);
   var colTo = Math.max(colStart, colEnd);
   var rowIdxs = [];
+  var fv = ds_visibleRows(ds); // 필터로 숨긴 행은 범위·복사·지우기·서식에서 건너뜀(#391)
   for (var r = rowFrom; r <= rowTo; r++) {
-    if (ds_isDataRow(ds.rows[r])) rowIdxs.push(r);
+    if (ds_isDataRow(ds.rows[r]) && fv[r]) rowIdxs.push(r);
   }
   var colIds = ds.columns.slice(colFrom, colTo + 1).map(function(c) { return c.id; });
   if (!rowIdxs.length || !colIds.length) return null;
@@ -43398,6 +43421,8 @@ function ds_updateFormatToolbarState(ds) {
   var lhSel = document.getElementById('ds-lh-select');
   if (lhSel) lhSel.value = (hasStyleTargets && refStyle.lh) ? String(refStyle.lh) : '';
   ds_updateFreezeMenu(ds);
+  var fbtn2 = document.getElementById('ds-filter-toggle-btn');
+  if (fbtn2) { var fsh = _dsActiveSheet(ds); fbtn2.classList.toggle('active', !!(fsh && fsh.filter)); fbtn2.title = fsh && fsh.filter ? '필터 끄기' : '필터 만들기'; }
   ds_positionFillHandle();
   ds_updateDataSheetStatusbar(ds);
 }
@@ -43923,9 +43948,9 @@ function ds_focusCell(rowIdx, colId, options) {
 
 function ds_findNextDataRowIdx(ds, rowIdx, delta) {
   if (!ds || !Array.isArray(ds.rows)) return null;
-  var idx = rowIdx + delta;
+  var idx = rowIdx + delta, fv = ds_visibleRows(ds);
   while (idx >= 0 && idx < ds.rows.length) {
-    if (ds_isDataRow(ds.rows[idx])) return idx;
+    if (ds_isDataRow(ds.rows[idx]) && fv[idx]) return idx;
     idx += delta;
   }
   return null;
@@ -44452,6 +44477,7 @@ function ds_toggleHeaderEditMode() {
 function _dsRenderFlatTable(ds) {
   var cols = ds.columns || [];
   var rows = ds.rows || [];
+  var flt = ds_activeFilter(ds), fltVis = ds_filterVisible(rows, flt); // 필터(#391): 숨길 행은 class 로(행 번호·데이터는 그대로)
   var headerEditMode = ds_getHeaderEditMode(ds);
   var rowHeaderWidth = ds_getRowHeaderWidth(ds);
   var tableWidth = ds_getTablePixelWidth(ds);
@@ -44482,6 +44508,7 @@ function _dsRenderFlatTable(ds) {
       return '<th' + colClass + ' data-col-id="' + esc(c.id) + '" onmousedown="ds_colDragMouseDown(event,\'' + esc(c.id) + '\')" oncontextmenu="ds_openColumnMenu(event,\'' + esc(c.id) + '\')">'
         + '<div class="ds-th-inner">'
         + colNameHtml
+        + (flt ? '<button type="button" class="ds-filter-btn' + (flt.cols[c.id] ? ' active' : '') + '" onmousedown="event.stopPropagation()" onclick="ds_openFilterMenu(event,\'' + esc(c.id) + '\')" title="필터"><i class="fa-solid fa-filter"></i></button>' : '')
         + '</div>'
         + '<div class="ds-col-resize" onmousedown="ds_startColResize(event,\'' + esc(c.id) + '\')" ondblclick="event.preventDefault();event.stopPropagation();ds_autoFitColumn(\'' + esc(c.id) + '\')" title="열 너비 조절 (더블클릭: 내용에 맞춤)"></div>'
         + '</th>';
@@ -44494,7 +44521,7 @@ function _dsRenderFlatTable(ds) {
     var _rhClass = _rh ? ' ds-row-fixed-h' : '';
     var _rowResizeHandle = '<div class="ds-row-resize" onmousedown="ds_startRowResize(event,' + rowIdx + ')" ondblclick="ds_autoFitRow(event,' + rowIdx + ')" title="행 높이 조절 (더블클릭: 내용에 맞춤)"></div>';
     if (row.isCategory) {
-      var catClass = 'ds-cat-row' + (_dsActiveRowIdx === rowIdx && _dsActiveCellRowIdx === null ? ' ds-active-row' : '') + (_dsSelectedRowIdxs.includes(rowIdx) ? ' ds-selected-row' : '');
+      var catClass = 'ds-cat-row' + (fltVis[rowIdx] ? '' : ' ds-row-filtered') + (_dsActiveRowIdx === rowIdx && _dsActiveCellRowIdx === null ? ' ds-active-row' : '') + (_dsSelectedRowIdxs.includes(rowIdx) ? ' ds-selected-row' : '');
       return '<tr class="' + catClass + _rhClass + '" data-row-idx="' + rowIdx + '"' + _rhStyle + ' onmousedown="ds_setActiveRow(' + rowIdx + ')" oncontextmenu="ds_openRowMenu(event,' + rowIdx + ',null)">'
         + '<td class="ds-row-num" onmousedown="ds_rowDragMouseDown(event,' + rowIdx + ')">'
         + _rowResizeHandle
@@ -44505,7 +44532,7 @@ function _dsRenderFlatTable(ds) {
         + '</tr>';
     }
     if (row.isMemo) {
-      var memoClass = 'ds-memo-row' + (_dsActiveRowIdx === rowIdx && _dsActiveCellRowIdx === null ? ' ds-active-row' : '') + (_dsSelectedRowIdxs.includes(rowIdx) ? ' ds-selected-row' : '');
+      var memoClass = 'ds-memo-row' + (fltVis[rowIdx] ? '' : ' ds-row-filtered') + (_dsActiveRowIdx === rowIdx && _dsActiveCellRowIdx === null ? ' ds-active-row' : '') + (_dsSelectedRowIdxs.includes(rowIdx) ? ' ds-selected-row' : '');
       return '<tr class="' + memoClass + _rhClass + '" data-row-idx="' + rowIdx + '"' + _rhStyle + ' onmousedown="ds_setActiveRow(' + rowIdx + ')" oncontextmenu="ds_openRowMenu(event,' + rowIdx + ',null)">'
         + '<td class="ds-row-num" onmousedown="ds_rowDragMouseDown(event,' + rowIdx + ')">'
         + _rowResizeHandle
@@ -44517,7 +44544,7 @@ function _dsRenderFlatTable(ds) {
         + '</tr>';
     }
     var rowAlign = ds_normalizeVerticalAlign(row.verticalAlign);
-    var rowClass = 'ds-data-row ds-row-valign-' + rowAlign + (_dsActiveRowIdx === rowIdx && _dsActiveCellRowIdx === null ? ' ds-active-row' : '') + (_dsSelectedRowIdxs.includes(rowIdx) ? ' ds-selected-row' : '');
+    var rowClass = 'ds-data-row ds-row-valign-' + rowAlign + (fltVis[rowIdx] ? '' : ' ds-row-filtered') + (_dsActiveRowIdx === rowIdx && _dsActiveCellRowIdx === null ? ' ds-active-row' : '') + (_dsSelectedRowIdxs.includes(rowIdx) ? ' ds-selected-row' : '');
     var rowHeaderHtml = headerEditMode === 'rows'
       ? '<input class="ds-row-name-input" value="' + esc(row.rowName || '') + '" placeholder="' + (rowIdx + 1) + '" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" onfocus="ds_setActiveRow(' + rowIdx + ')" oninput="ds_renameRow(' + rowIdx + ', this.value)">'
       : (rowIdx + 1);
@@ -45215,12 +45242,144 @@ function ds_insertRowAt(rowIdx, after, asCategory) {
   renderDataSheetEditor();
   ds_restoreEditorViewport(viewport);
 }
+// ── 필터(#391): sheet.filter = { cols: { [colId]: { hide: [숨길 값], cond: { type, a, b } } } } (객체가 있으면 필터 켜짐) ──
+var DS_FILTER_CONDS = ['empty', 'notempty', 'contains', 'equals', 'gt', 'lt', 'eq', 'between'];
+function ds_normFilter(f, columns) {
+  if (!f || typeof f !== 'object' || Array.isArray(f)) return null;
+  var ids = {}, out = { cols: {} };
+  (columns || []).forEach(function(c) { ids[c.id] = true; });
+  var src = f.cols && typeof f.cols === 'object' ? f.cols : {};
+  Object.keys(src).forEach(function(id) {
+    if (!ids[id] || !src[id] || typeof src[id] !== 'object') return;
+    var spec = {}, hide = Array.isArray(src[id].hide) ? src[id].hide.filter(function(v) { return typeof v === 'string'; }).slice(0, 5000) : [];
+    if (hide.length) spec.hide = hide;
+    var cd = src[id].cond;
+    if (cd && DS_FILTER_CONDS.indexOf(cd.type) >= 0) spec.cond = { type: cd.type, a: String(cd.a == null ? '' : cd.a).slice(0, 200), b: String(cd.b == null ? '' : cd.b).slice(0, 200) };
+    if (spec.hide || spec.cond) out.cols[id] = spec;
+  });
+  return out;
+}
+function ds_filterCondMatch(v, cond) {
+  v = v == null ? '' : String(v);
+  var n = ds_parseNumber(v), a = ds_parseNumber(cond.a), b = ds_parseNumber(cond.b);
+  switch (cond.type) {
+    case 'empty': return !v.trim();
+    case 'notempty': return !!v.trim();
+    case 'contains': return v.toLowerCase().indexOf(String(cond.a).toLowerCase()) >= 0;
+    case 'equals': return v.trim().toLowerCase() === String(cond.a).trim().toLowerCase();
+    case 'gt': return !isNaN(n) && !isNaN(a) && n > a;
+    case 'lt': return !isNaN(n) && !isNaN(a) && n < a;
+    case 'eq': return !isNaN(n) && !isNaN(a) && n === a;
+    case 'between': return !isNaN(n) && !isNaN(a) && !isNaN(b) && n >= Math.min(a, b) && n <= Math.max(a, b);
+  }
+  return true;
+}
+function ds_filterMatch(v, spec) { // 값이 열 필터(숨길 값 목록·조건)를 통과하는가
+  v = v == null ? '' : String(v);
+  if (spec.hide && spec.hide.indexOf(v) >= 0) return false;
+  return spec.cond ? ds_filterCondMatch(v, spec.cond) : true;
+}
+// 표시할 행(boolean 배열). 데이터 행은 모든 열 필터를 통과해야 표시. 카테고리 행·메모 행은 같은 구간(다음 카테고리 행 전까지)에 보이는 데이터 행이 있으면 표시(데이터 행이 없는 구간이면 표시)
+function ds_filterVisible(rows, filter) {
+  var vis = rows.map(function() { return true; }), ids = filter && filter.cols ? Object.keys(filter.cols) : [];
+  if (!ids.length) return vis;
+  var segStart = 0;
+  function flush(end) {
+    var any = false, hasData = false, k;
+    for (k = segStart; k < end; k++) if (!rows[k].isCategory && !rows[k].isMemo) { hasData = true; if (vis[k]) any = true; }
+    if (hasData && !any) for (k = segStart; k < end; k++) if (rows[k].isCategory || rows[k].isMemo) vis[k] = false;
+  }
+  rows.forEach(function(r, i) {
+    if (r.isCategory) { flush(i + 1 > segStart ? i : segStart); segStart = i; return; }
+    if (!r.isMemo) vis[i] = ids.every(function(id) { return ds_filterMatch(r.cells && r.cells[id], filter.cols[id]); });
+  });
+  flush(rows.length);
+  return vis;
+}
+function ds_activeFilter(ds) { var sh = _dsActiveSheet(ds); return sh && sh.filter ? sh.filter : null; }
+function ds_visibleRows(ds) { var f = ds_activeFilter(ds); return ds_filterVisible(ds.rows || [], f); }
+function ds_toggleFilter() { // 툴바 「필터 만들기」: 켜고 끄기(끄면 모든 열 필터 해제)
+  var ds = findDataSheet(_dsEditId), sheet = _dsActiveSheet(ds);
+  if (!sheet) return;
+  sheet.filter = sheet.filter ? null : { cols: {} };
+  var viewport = ds_captureEditorViewport();
+  persist();
+  renderDataSheetEditor();
+  ds_restoreEditorViewport(viewport);
+}
+// 열 필터 메뉴
+var _dsFilterMenuState = null; // { colId, checked: Set<string>, values: [{ key, count }] }
+function ds_closeFilterMenu() { var m = document.getElementById('ds-filter-menu'); if (m) m.classList.remove('open'); _dsFilterMenuState = null; }
+function ds_openFilterMenu(e, colId) {
+  e.preventDefault(); e.stopPropagation();
+  var ds = findDataSheet(_dsEditId), sheet = _dsActiveSheet(ds), menu = document.getElementById('ds-filter-menu');
+  if (!ds || !sheet || !sheet.filter || !menu) return;
+  _dsHideContextMenu(); _dsHideFormatMenus();
+  var spec = sheet.filter.cols[colId] || {}, counts = {}, order = [];
+  ds.rows.forEach(function(r) { if (!ds_isDataRow(r)) return; var v = r.cells && r.cells[colId] != null ? String(r.cells[colId]) : ''; if (counts[v] === undefined) { counts[v] = 0; order.push(v); } counts[v]++; });
+  order.sort(function(a, b) { return ds_sortCompare(a, b, false); });
+  var hide = spec.hide || [], checked = new Set(order.filter(function(v) { return hide.indexOf(v) < 0; }));
+  _dsFilterMenuState = { colId: colId, checked: checked, values: order.map(function(v) { return { key: v, count: counts[v] }; }) };
+  var cond = spec.cond || { type: '', a: '', b: '' };
+  var condOpts = [['', '(조건 없음)'], ['empty', '비어 있음'], ['notempty', '비어 있지 않음'], ['contains', '텍스트 포함'], ['equals', '텍스트 같음'], ['gt', '숫자 초과 >'], ['lt', '숫자 미만 <'], ['eq', '숫자 같음 ='], ['between', '숫자 사이']];
+  menu.innerHTML = '<div class="ds-filter-sort"><button type="button" onclick="ds_sortSheet(\'' + esc(colId) + '\',false);ds_closeFilterMenu()">시트 정렬 A→Z</button><button type="button" onclick="ds_sortSheet(\'' + esc(colId) + '\',true);ds_closeFilterMenu()">시트 정렬 Z→A</button></div>'
+    + '<div class="ds-filter-sec"><div class="ds-filter-title">조건으로 필터</div>'
+    + '<select id="ds-filter-cond">' + condOpts.map(function(o) { return '<option value="' + o[0] + '"' + (o[0] === cond.type ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>'
+    + '<input id="ds-filter-a" type="text" value="' + esc(cond.a) + '" placeholder="값"><input id="ds-filter-b" type="text" value="' + esc(cond.b) + '" placeholder="~ 값"></div>'
+    + '<div class="ds-filter-sec"><div class="ds-filter-title">값으로 필터</div>'
+    + '<input id="ds-filter-search" type="text" placeholder="검색" oninput="ds_filterMenuRenderList()">'
+    + '<div class="ds-filter-links"><a href="#" onclick="ds_filterMenuAll(true);return false">모두 선택</a> · <a href="#" onclick="ds_filterMenuAll(false);return false">모두 해제</a></div>'
+    + '<div id="ds-filter-list" class="ds-filter-list"></div></div>'
+    + '<div class="ds-filter-actions"><button type="button" class="link-insert-btn primary" onclick="ds_filterMenuApply()">적용</button><button type="button" class="link-insert-btn cancel" onclick="ds_closeFilterMenu()">취소</button></div>';
+  ds_filterMenuRenderList();
+  menu.classList.add('open');
+  var r = e.currentTarget.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+  menu.style.top = Math.max(8, Math.min(r.bottom + 4, window.innerHeight - menu.offsetHeight - 8)) + 'px';
+}
+function ds_filterMenuRenderList() {
+  var st = _dsFilterMenuState, list = document.getElementById('ds-filter-list');
+  if (!st || !list) return;
+  var q = (document.getElementById('ds-filter-search').value || '').toLowerCase();
+  list.innerHTML = st.values.filter(function(v) { return !q || (v.key || '(빈 값)').toLowerCase().indexOf(q) >= 0; }).map(function(v, i) {
+    return '<label><input type="checkbox" data-key="' + esc(v.key) + '"' + (st.checked.has(v.key) ? ' checked' : '') + ' onchange="ds_filterMenuToggle(this)"> <span>' + (v.key === '' ? '(빈 값)' : esc(v.key)) + '</span> <em>' + v.count + '</em></label>';
+  }).join('');
+}
+function ds_filterMenuToggle(cb) { var st = _dsFilterMenuState; if (!st) return; if (cb.checked) st.checked.add(cb.dataset.key); else st.checked.delete(cb.dataset.key); }
+function ds_filterMenuAll(on) {
+  var st = _dsFilterMenuState, q = (document.getElementById('ds-filter-search').value || '').toLowerCase();
+  if (!st) return;
+  st.values.forEach(function(v) { if (q && (v.key || '(빈 값)').toLowerCase().indexOf(q) < 0) return; if (on) st.checked.add(v.key); else st.checked.delete(v.key); });
+  ds_filterMenuRenderList();
+}
+function ds_filterMenuApply() {
+  var st = _dsFilterMenuState, ds = findDataSheet(_dsEditId), sheet = _dsActiveSheet(ds);
+  if (!st || !sheet || !sheet.filter) return;
+  var spec = {}, hide = st.values.filter(function(v) { return !st.checked.has(v.key); }).map(function(v) { return v.key; });
+  if (hide.length) spec.hide = hide;
+  var type = document.getElementById('ds-filter-cond').value;
+  if (type) spec.cond = { type: type, a: document.getElementById('ds-filter-a').value, b: document.getElementById('ds-filter-b').value };
+  if (spec.hide || spec.cond) sheet.filter.cols[st.colId] = spec; else delete sheet.filter.cols[st.colId];
+  sheet.filter = ds_normFilter(sheet.filter, ds.columns);
+  ds_closeFilterMenu();
+  var viewport = ds_captureEditorViewport();
+  persist(); // 한 번에 저장 → Ctrl+Z 한 번
+  renderDataSheetEditor();
+  ds_restoreEditorViewport(viewport);
+}
+document.addEventListener('mousedown', function(e) { if (_dsFilterMenuState && e.target && e.target.closest && !e.target.closest('#ds-filter-menu, .ds-filter-btn')) ds_closeFilterMenu(); }, true);
+document.addEventListener('keydown', function(e) { if (_dsFilterMenuState && e.key === 'Escape') { e.preventDefault(); ds_closeFilterMenu(); } }, true);
 // ── 정렬(#390) ──
 // 비교: 숫자는 숫자끼리 크기순, 숫자는 글자보다 앞, 글자는 한국어 사전순(numeric), 빈 칸은 오름·내림 모두 항상 맨 뒤
+function ds_parseNumber(v) { // 숫자로 읽히면 숫자, 아니면 NaN: 12 · -3.5 · +5 · 1,000
+  v = v == null ? '' : String(v);
+  return /^\s*[+-]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?\s*$/.test(v) ? parseFloat(v.replace(/,/g, '')) : NaN;
+}
 function ds_sortValue(v) {
   v = v == null ? '' : String(v);
   if (!v.trim()) return { empty: true };
-  if (/^\s*-?\d+(\.\d+)?\s*$/.test(v)) return { num: parseFloat(v) };
+  var n = ds_parseNumber(v);
+  if (!isNaN(n)) return { num: n };
   return { text: v };
 }
 function ds_sortCompare(a, b, desc) {

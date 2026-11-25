@@ -2,7 +2,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
 let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
 const ctx = {}; vm.createContext(ctx);
-vm.runInContext(html.slice(html.indexOf('function ds_sortValue'), html.indexOf('// 정렬 적용: colIds')) + ';this.f={ds_sortCompare,ds_sortPlan}', ctx);
+vm.runInContext(html.slice(html.indexOf('function ds_parseNumber'), html.indexOf('// 정렬 적용: colIds')) + ';this.f={ds_sortCompare,ds_sortPlan}', ctx);
 const F = ctx.f;
 const sorted = (arr, desc) => arr.slice().sort((a, b) => F.ds_sortCompare(a, b, desc));
 ok(sorted(['10', '9', '2']).join() === '2,9,10', '숫자는 숫자 크기순');
@@ -20,4 +20,5 @@ rows = [{ cells: { a: '1', b: 'y' } }, { cells: { a: '1', b: 'x' } }, { cells: {
 ok(F.ds_sortPlan(rows, [{ colId: 'a' }, { colId: 'b' }], 0, 2).join() === '2,1,0', '다중 기준(두 번째 열)');
 ok(F.ds_sortPlan([row('1'), row('1')], [{ colId: 'a' }], 0, 1).join() === '0,1', '안정 정렬(같으면 옛 순서)');
 ok(/시트 정렬 A→Z/.test(html) && /시트 정렬 Z→A/.test(html) && /범위 정렬…/.test(html) && /id="ds-sort-submit">실행<\/button>\s*<button[^>]*id="ds-sort-cancel">취소/.test(html), '메뉴·대화상자(버튼 순서 [실행][취소])');
+ok(sorted(['1,000', '+5', '20']).join() === '+5,20,1,000'.replace('1,000', '1,000') || sorted(['1,000', '+5', '20']).join('|') === '+5|20|1,000', '숫자 인식: 1,000 · +5 도 숫자 크기순');
 process.exit(f ? 1 : 0);
