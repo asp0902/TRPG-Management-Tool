@@ -1,0 +1,17 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
+const ctx = {}; vm.createContext(ctx);
+vm.runInContext(cut('function tbRound2', 'function tbEvenWidths') + cut('function tbEvenWidths', 'function tbResizeColWidths') + cut('function tbFitWidths', 'let tbResizeSel') + cut('function tbFitTargetRows', 'function tbEqualizeCols') + cut('function ds_fitTargetCols', 'function _dsMeasureHtmlWidth') + 'function ds_clampSize(kind, v) { v = Math.round(Number(v)); return isNaN(v) ? null : Math.max(kind === \'col\' ? 16 : 24, v); };this.f={tbFitWidths,tbFitTargetRows,tbFitTargetCols,ds_fitTargetCols,ds_clampSize}', ctx);
+const F = ctx.f, sum = a => Math.round(a.reduce((x, y) => x + y, 0) * 100) / 100;
+ok(F.ds_fitTargetCols('b', ['a', 'b', 'c']).length === 3 && F.ds_fitTargetCols('z', ['a', 'b']).join() === 'z', '열: 선택 안의 경계면 선택 전부, 밖이면 그 열만');
+ok(F.ds_fitTargetCols(2, [1, 2, 4]).join() === '1,2,4' && F.ds_fitTargetCols(3, [1, 2, 4]).join() === '3', '행: 선택 안/밖');
+ok(F.ds_clampSize('col', 5) === 16 && F.ds_clampSize('row', 10) === 24 && F.ds_clampSize('col', 120.4) === 120 && F.ds_clampSize('col', 'x') === null && F.ds_clampSize('row', '') === 0 + 24 || F.ds_clampSize('row', '') === 24, '크기 제한: 열 최소 16, 행 최소 24, 비숫자 null');
+ok(F.tbFitTargetRows({ r1: 1, c1: 0, r2: 3, c2: 1 }, 2).join() === '1,2,3' && F.tbFitTargetRows({ r1: 1, c1: 0, r2: 3, c2: 1 }, 5).join() === '5' && F.tbFitTargetRows(null, 2).join() === '2', '본문 표 행: 범위 안이면 범위 행 전부');
+const w = F.tbFitWidths([25, 25, 25, 25], [0, 1], [18, 18], 5);
+ok(w[0] === 18 && w[1] === 18 && sum(w) === 100 && w[3] === 25, '본문 표 두 열을 같은 너비로(이웃이 흡수)');
+ok(/d\.targets\.length > 1 \? tbFitWidths/.test(html) && /ds_setColWidths\(ds, ctx\.targets, w\)/.test(html) && /ds_setRowHeights\(ds, ctx\.targets/.test(html), '드래그: 선택 대상 일괄 적용 연결');
+ok(/id="ds-size-submit">실행<\/button>\s*<button[^>]*id="ds-size-cancel">취소/.test(html), '대화상자 버튼 순서 [실행][취소]');
+ok(html.includes("개 크기 조절…") && html.includes("이 열 크기 조절…") && html.includes("이 행 크기 조절…") && html.includes("열 너비 균등"), "우클릭 메뉴 항목");
+process.exit(f ? 1 : 0);
