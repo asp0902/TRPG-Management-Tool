@@ -7230,6 +7230,11 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
 .ds-cell-align-left { text-align: left; }
 .ds-cell-align-center { text-align: center; }
 .ds-cell-align-right { text-align: right; }
+.ds-table td.ds-has-rich textarea.ds-cell-input, .ds-table td.ds-rich-editing textarea.ds-cell-input { position: absolute; inset: 0; width: 100%; height: 100% !important; opacity: 0; }
+.ds-table td.ds-rich-editing textarea.ds-cell-input { pointer-events: none; }
+.ds-cell-rich { display: none; min-height: 30px; box-sizing: border-box; padding: 5px 8px; font-size: 13px; line-height: 1.45; color: #222; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; pointer-events: none; }
+.ds-table td.ds-has-rich .ds-cell-rich, .ds-table td.ds-rich-editing .ds-cell-rich { display: block; }
+.ds-table td.ds-rich-editing .ds-cell-rich { pointer-events: auto; outline: none; cursor: text; }
 .ds-cell-align-justify { text-align: justify; }
 .ds-format-select { height: 26px; max-width: 120px; border: 1px solid #d8d8d8; border-radius: 6px; background: #fff; color: #444; font: inherit; font-size: 12px; padding: 0 4px; }
 .ds-format-select:disabled, .ds-size-input:disabled { opacity: .45; }
@@ -30147,6 +30152,7 @@ function shouldUseNativeHistoryShortcut(e) {
   const target = e.target;
   if (!target?.closest) return false;
   if (target.closest('#ch-sheet-body')) return true;
+  if (target.closest('.ds-cell-rich[contenteditable="true"]')) return true; // 데이터 시트 셀 서식 편집 칸은 브라우저 기본 실행 취소(#375)
   const recordModal = document.getElementById('record-form-modal');
   if (recordModal?.classList.contains('open') && target.closest('#record-form-modal')) return true;
   if (target.classList?.contains('btcp-textarea') || target.classList?.contains('btcp-macro-ta')) return true;
@@ -40394,7 +40400,7 @@ document.addEventListener('input', () => { lastTypingAt = Date.now(); }, true);
 // compositionend 가 이미 지났거나(Safari 는 compositionend 직후 Enter keydown) 오지 않으면 다음 틱/0.4초 안전장치로 처리. 한 번 처리되면 같은 키를 다시 처리하지 않는다.
 let imeDeferredEditorKey = null;
 function imeDeferEditorKey(e) {
-  const ta = e.target && e.target.closest ? e.target.closest('textarea.ds-cell-input.ds-cell-editing') : null;
+  const ta = e.target && e.target.closest ? e.target.closest('textarea.ds-cell-input.ds-cell-editing, .ds-cell-rich[contenteditable="true"]') : null;
   if (!ta || !['Enter', 'Tab', 'Escape'].includes(e.key) || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key !== 'Escape') e.preventDefault(); // Enter 줄바꿈·Tab 포커스 이동 기본 동작 차단
   if (imeDeferredEditorKey) return;
@@ -40825,6 +40831,118 @@ function ds_getCellStyle(row, colId) {
   return ds_normalizeCellStyle(row.cellStyles && row.cellStyles[colId]);
 }
 function ds_hasCellStyle(st) { return !!(st && (st.b || st.i || st.s || st.u || st.color || st.font || st.size || st.bg || st.lh)); }
+// ── 셀 글자 일부 서식(#375): row.cellRich[colId] 에 허용 태그만 담은 HTML. row.cells[colId] 는 항상 순수 텍스트(조회·검색·정렬·내보내기용)로 함께 갱신한다 ──
+// 허용: b/strong, i/em, u, s/strike/del, span[style: color·background-color·font-size(px)], br. 그 밖의 태그·속성(스크립트·이벤트 속성 포함)은 버리고 글자만 남긴다.
+// DOM 없이 동작하는 작은 파서라 편집기(contenteditable)가 만든 HTML 도 같은 규칙으로 정리한다.
+var DS_RICH_ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+function ds_richDecode(s) {
+  return String(s).replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, function(m, g) {
+    if (g.charAt(0) === '#') {
+      var n = (g.charAt(1) === 'x' || g.charAt(1) === 'X') ? parseInt(g.slice(2), 16) : parseInt(g.slice(1), 10);
+      return (n > 0 && n < 0x110000) ? String.fromCodePoint(n) : '';
+    }
+    return Object.prototype.hasOwnProperty.call(DS_RICH_ENT, g) ? DS_RICH_ENT[g] : m;
+  });
+}
+function ds_richEsc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function ds_richColor(v) { // #hex / rgb() → #rrggbb, 그 밖은 ''
+  v = String(v == null ? '' : v).trim().toLowerCase();
+  var m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/.exec(v);
+  if (m) return m[1].length === 3 ? '#' + m[1].split('').map(function(c) { return c + c; }).join('') : v;
+  m = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*(?:,\s*([\d.]+)\s*)?\)$/.exec(v);
+  if (m && (m[4] === undefined || parseFloat(m[4]) > 0)) return '#' + [m[1], m[2], m[3]].map(function(n) { return ('0' + Math.min(255, parseInt(n, 10)).toString(16)).slice(-2); }).join('');
+  return '';
+}
+function ds_richApplyStyleText(css, f) { // style 속성 문자열 → 서식(f)
+  String(css || '').split(';').forEach(function(decl) {
+    var i = decl.indexOf(':');
+    if (i < 0) return;
+    var k = decl.slice(0, i).trim().toLowerCase(), v = decl.slice(i + 1).trim().toLowerCase();
+    if (k === 'color') { var c = ds_richColor(v); if (c) f.color = c; }
+    else if (k === 'background-color' || k === 'background') { var b = ds_richColor(v); if (b) f.bg = b; else delete f.bg; }
+    else if (k === 'font-size') { var m = /^(\d+(?:\.\d+)?)px$/.exec(v); var n = m ? Math.round(parseFloat(m[1])) : 0; if (n >= 8 && n <= 72) f.size = n; }
+    else if (k === 'font-weight') { if (v === 'bold' || parseInt(v, 10) >= 600) f.b = true; }
+    else if (k === 'font-style') { if (v.indexOf('italic') >= 0) f.i = true; }
+    else if (k === 'text-decoration' || k === 'text-decoration-line') { if (v.indexOf('underline') >= 0) f.u = true; if (v.indexOf('line-through') >= 0) f.s = true; }
+  });
+}
+function ds_richSameFmt(a, b) {
+  return !!a.b === !!b.b && !!a.i === !!b.i && !!a.u === !!b.u && !!a.s === !!b.s && (a.color || '') === (b.color || '') && (a.bg || '') === (b.bg || '') && (a.size || 0) === (b.size || 0);
+}
+function ds_richParse(html) { // → [{ text, f:{b,i,u,s,color,bg,size} }]
+  html = String(html == null ? '' : html);
+  var re = /<(\/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*)>|([^<]+)|</g, m, segs = [], stack = [{ tag: '', f: {} }], atLineStart = true, lastWasBr = false;
+  function push(text) {
+    if (!text) return;
+    var f = stack[stack.length - 1].f, last = segs[segs.length - 1];
+    if (last && ds_richSameFmt(last.f, f)) last.text += text; else segs.push({ text: text, f: Object.assign({}, f) });
+    atLineStart = text.slice(-1) === '\n';
+  }
+  while ((m = re.exec(html))) {
+    if (m[4] !== undefined) { push(ds_richDecode(m[4])); lastWasBr = false; continue; }
+    if (m[2] === undefined) { push('<'); lastWasBr = false; continue; }
+    var closing = m[1] === '/', tag = m[2].toLowerCase(), attrs = m[3] || '';
+    if (tag === 'br') { if (!closing) { push('\n'); lastWasBr = true; } continue; }
+    lastWasBr = false;
+    if ((tag === 'script' || tag === 'style') && !closing) { // 안쪽 내용까지 버린다
+      var end = html.toLowerCase().indexOf('</' + tag, re.lastIndex);
+      re.lastIndex = end < 0 ? html.length : end;
+      continue;
+    }
+    if (tag === 'div' || tag === 'p') { if (!closing && segs.length && !atLineStart) push('\n'); continue; } // 블록은 줄바꿈으로
+    if (closing) { for (var i = stack.length - 1; i > 0; i--) { if (stack[i].tag === tag) { stack.length = i; break; } } continue; }
+    var f = Object.assign({}, stack[stack.length - 1].f);
+    if (tag === 'b' || tag === 'strong') f.b = true;
+    else if (tag === 'i' || tag === 'em') f.i = true;
+    else if (tag === 'u') f.u = true;
+    else if (tag === 's' || tag === 'strike' || tag === 'del') f.s = true;
+    else if (tag === 'span' || tag === 'font') {
+      var sm = /style\s*=\s*"([^"]*)"|style\s*=\s*'([^']*)'/i.exec(attrs);
+      if (sm) ds_richApplyStyleText(sm[1] !== undefined ? sm[1] : sm[2], f);
+      if (tag === 'font') { var cm = /color\s*=\s*"([^"]*)"|color\s*=\s*'([^']*)'/i.exec(attrs); if (cm) { var fc = ds_richColor(cm[1] !== undefined ? cm[1] : cm[2]); if (fc) f.color = fc; } }
+    }
+    stack.push({ tag: tag, f: f }); // 허용하지 않는 태그는 서식 없이 안쪽 글자만 유지
+  }
+  if (lastWasBr && segs.length) { // 편집기가 줄 끝에 붙이는 자리표시자 <br> 하나는 버린다
+    var tail = segs[segs.length - 1];
+    if (tail.text.slice(-1) === '\n') { tail.text = tail.text.slice(0, -1); if (!tail.text) segs.pop(); }
+  }
+  return segs;
+}
+function ds_richHasFormat(segs) { return segs.some(function(s) { return !!(s.f.b || s.f.i || s.f.u || s.f.s || s.f.color || s.f.bg || s.f.size); }); }
+function ds_richSerialize(segs) {
+  var out = '', plain = '';
+  segs.forEach(function(seg) {
+    var f = seg.f || {}, inner = ds_richEsc(seg.text).replace(/\n/g, '<br>');
+    if (f.s) inner = '<s>' + inner + '</s>';
+    if (f.u) inner = '<u>' + inner + '</u>';
+    if (f.i) inner = '<i>' + inner + '</i>';
+    if (f.b) inner = '<b>' + inner + '</b>';
+    var st = [];
+    if (f.color) st.push('color:' + f.color);
+    if (f.bg) st.push('background-color:' + f.bg);
+    if (f.size) st.push('font-size:' + f.size + 'px');
+    if (st.length) inner = '<span style="' + st.join(';') + ';">' + inner + '</span>';
+    out += inner;
+    plain += seg.text;
+  });
+  if (plain.slice(-1) === '\n') out += '<br>'; // 끝 줄바꿈은 자리표시자 <br> 를 하나 더(편집기와 같은 규칙)
+  return out;
+}
+function ds_richPlain(html) { return ds_richParse(html).map(function(s) { return s.text; }).join(''); }
+function ds_richSanitize(html) { var segs = ds_richParse(html); return ds_richHasFormat(segs) ? ds_richSerialize(segs) : ''; } // 서식이 없으면 ''
+function ds_richFromText(text) { // 순수 텍스트 → 편집기용 HTML
+  text = String(text == null ? '' : text);
+  return ds_richEsc(text).replace(/\n/g, '<br>') + (text.slice(-1) === '\n' ? '<br>' : '');
+}
+// 셀의 서식 HTML. 텍스트가 서식 없이 바뀌어 어긋났으면 서식을 버리고 텍스트를 우선한다
+function ds_getCellRich(row, colId, text) {
+  var raw = row && row.cellRich && typeof row.cellRich === 'object' ? row.cellRich[colId] : '';
+  if (typeof raw !== 'string' || !raw) return '';
+  var clean = ds_richSanitize(raw);
+  if (!clean || ds_richPlain(clean) !== String(text == null ? '' : text)) return '';
+  return clean;
+}
 function normalizeDataSheetRow(r, columns) {
   r = (r && typeof r === 'object' && !Array.isArray(r)) ? r : {};
   var isCategory = !!r.isCategory;
@@ -40852,6 +40970,10 @@ function normalizeDataSheetRow(r, columns) {
       if (ds_hasCellStyle(st)) cellStyles[k] = st;
     });
   }
+  var cellRich = {}; // 글자 일부 서식(#375): 텍스트와 어긋나면 서식을 버리고 텍스트 우선
+  if (r.cellRich && typeof r.cellRich === 'object' && !Array.isArray(r.cellRich)) {
+    Object.keys(r.cellRich).forEach(function(k) { var clean = ds_getCellRich({ cellRich: r.cellRich }, k, cells[k]); if (clean) cellRich[k] = clean; });
+  }
   return {
     id: r.id || mkId(),
     isCategory: isCategory,
@@ -40863,6 +40985,7 @@ function normalizeDataSheetRow(r, columns) {
     height: (function() { var h = parseInt(r.height, 10); return (!isNaN(h) && h >= 24) ? h : null; })(),
     cellAligns: cellAligns,
     cellStyles: cellStyles,
+    cellRich: cellRich,
     cells: cells,
   };
 }
@@ -41709,6 +41832,11 @@ function ds_duplicateSheet(sheetId) {
       Object.keys(r.cellAligns).forEach(function(k) { na[colIdMap[k] || k] = r.cellAligns[k]; });
       r.cellAligns = na;
     }
+    if (r.cellRich && typeof r.cellRich === 'object') {
+      var nr = {};
+      Object.keys(r.cellRich).forEach(function(k) { nr[colIdMap[k] || k] = r.cellRich[k]; });
+      r.cellRich = nr;
+    }
     if (r.cellStyles && typeof r.cellStyles === 'object') {
       var ns = {};
       Object.keys(r.cellStyles).forEach(function(k) { ns[colIdMap[k] || k] = r.cellStyles[k]; });
@@ -41979,6 +42107,125 @@ function ds_getActiveCellContext(ds) {
     textAlign: ds_getCellTextAlign(row, _dsActiveCellColId),
   };
 }
+// ── 셀 글자 일부 서식 편집기(#375): 셀 안에 편집용 div(contenteditable)를 얹고, 텍스트 값은 기존 textarea 에 그대로 미러링한다 ──
+// textarea 는 셀의 값·선택·복붙·채우기 등 기존 동작을 그대로 맡고(편집 중엔 숨김), 서식이 있는 셀은 보기 상태에서도 이 div 로 서식을 보여 준다.
+function ds_richDivOf(ta) { var td = ta && ta.closest ? ta.closest('td') : null; return td ? td.querySelector('.ds-cell-rich') : null; }
+function ds_richRowOf(ta) { var ds = findDataSheet(_dsEditId); var row = ds && ds.rows ? ds.rows[parseInt(ta.dataset.rowIdx, 10)] : null; return row && !row.isCategory && !row.isMemo ? row : null; }
+function ds_richApplyStyle(ta, d) { // 셀 전체 서식(#373)을 편집 div 에도 반영
+  ['color', 'fontFamily', 'fontSize', 'lineHeight'].forEach(function(p) { d.style[p] = ta.style[p] || ''; });
+  ['ds-cell-align-left', 'ds-cell-align-center', 'ds-cell-align-right', 'ds-cell-align-justify', 'ds-cell-b', 'ds-cell-i', 'ds-cell-s', 'ds-cell-u'].forEach(function(c) { d.classList.toggle(c, ta.classList.contains(c)); });
+}
+function ds_richBind(d) {
+  if (d._dsBound) return;
+  d._dsBound = true;
+  d.addEventListener('keydown', function(e) { ds_handleCellKeydown(e, parseInt(d.dataset.rowIdx, 10), d.dataset.colId); });
+  d.addEventListener('input', function() { ds_richInput(d); });
+  d.addEventListener('paste', function(e) { // 붙여넣기는 일반 텍스트만(줄바꿈은 <br>)
+    e.preventDefault();
+    var text = e.clipboardData && e.clipboardData.getData ? String(e.clipboardData.getData('text/plain') || '').replace(/\r\n?/g, '\n') : '';
+    text.split('\n').forEach(function(line, i) { if (i > 0) document.execCommand('insertLineBreak'); if (line) document.execCommand('insertText', false, line); });
+  });
+  d.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+}
+function ds_richPos(root, offset) { // 순수 텍스트 offset → DOM 위치(줄바꿈 <br> 는 글자 1개)
+  var n = 0, walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT), node;
+  while ((node = walker.nextNode())) {
+    if (node.nodeType === 3) { var len = node.nodeValue.length; if (offset <= n + len) return { node: node, off: offset - n }; n += len; }
+    else if (node.nodeName === 'BR') { if (offset <= n) return { node: node.parentNode, off: Array.prototype.indexOf.call(node.parentNode.childNodes, node) }; n += 1; }
+  }
+  return { node: root, off: root.childNodes.length };
+}
+function ds_richSelect(d, start, end) {
+  var a = ds_richPos(d, start), b = ds_richPos(d, end === undefined ? start : end), range = document.createRange(), sel = window.getSelection();
+  range.setStart(a.node, a.off); range.setEnd(b.node, b.off);
+  sel.removeAllRanges(); sel.addRange(range);
+}
+function ds_richOpen(ta, opt) { // 셀 편집을 서식 편집 div 로 전환(이미 열려 있으면 그대로)
+  var td = ta.closest('td'), row = ds_richRowOf(ta);
+  if (!td || !row) return null;
+  var d = ds_richDivOf(ta);
+  if (td.classList.contains('ds-rich-editing') && d) return d;
+  if (!d) { d = document.createElement('div'); d.className = 'ds-cell-rich'; d.dataset.rowIdx = ta.dataset.rowIdx; d.dataset.colId = ta.dataset.colId; ta.parentNode.insertBefore(d, ta.nextSibling); }
+  ds_richBind(d);
+  d.innerHTML = ds_getCellRich(row, ta.dataset.colId, ta.value) || ds_richFromText(ta.value);
+  ds_richApplyStyle(ta, d);
+  d.contentEditable = 'true';
+  td.classList.add('ds-rich-editing');
+  d.focus();
+  if (opt && opt.selStart !== undefined) ds_richSelect(d, opt.selStart, opt.selEnd); else ds_richSelect(d, ta.value.length);
+  return d;
+}
+function ds_richRefresh(ta) { // 보기 상태: 서식이 있으면 div 로 표시, 없으면 div 제거
+  var td = ta && ta.closest ? ta.closest('td') : null, row = ta ? ds_richRowOf(ta) : null;
+  if (!td || !row || td.classList.contains('ds-rich-editing')) return;
+  var rich = ds_getCellRich(row, ta.dataset.colId, ta.value), d = ds_richDivOf(ta);
+  td.classList.toggle('ds-has-rich', !!rich);
+  if (rich) {
+    if (!d) { d = document.createElement('div'); d.className = 'ds-cell-rich'; d.dataset.rowIdx = ta.dataset.rowIdx; d.dataset.colId = ta.dataset.colId; ta.parentNode.insertBefore(d, ta.nextSibling); }
+    d.contentEditable = 'false';
+    d.innerHTML = rich;
+    ds_richApplyStyle(ta, d);
+  } else if (d) d.remove();
+  ds_autosizeCell(ta);
+}
+function ds_richClose(ta) {
+  var td = ta.closest('td');
+  if (!td || !td.classList.contains('ds-rich-editing')) return;
+  var d = ds_richDivOf(ta);
+  td.classList.remove('ds-rich-editing');
+  if (d) d.contentEditable = 'false';
+  ds_richRefresh(ta);
+}
+function ds_richInput(d) { // 편집 div → cellRich(서식 HTML)·cells(순수 텍스트) 동시 갱신
+  var ta = ds_getCellTextarea(parseInt(d.dataset.rowIdx, 10), d.dataset.colId), row = ta ? ds_richRowOf(ta) : null;
+  if (!ta || !row) return;
+  var segs = ds_richParse(d.innerHTML), text = segs.map(function(s) { return s.text; }).join('');
+  if (!row.cellRich || typeof row.cellRich !== 'object' || Array.isArray(row.cellRich)) row.cellRich = {};
+  if (ds_richHasFormat(segs)) row.cellRich[d.dataset.colId] = ds_richSerialize(segs); else delete row.cellRich[d.dataset.colId];
+  ta.value = text;
+  ds_updateCell(ta);
+}
+function ds_richDiscard(rowIdx, colId) { // 텍스트를 통째로 바꾸는 입력은 서식을 버린다
+  var ds = findDataSheet(_dsEditId), row = ds && ds.rows ? ds.rows[rowIdx] : null;
+  if (row && row.cellRich) delete row.cellRich[colId];
+}
+// 툴바·단축키: 편집 모드에서 글자를 선택했으면 선택한 글자에만, 아니면 셀 전체 서식(#373)
+function ds_richPartialTarget() {
+  if (!_dsCellEditMode) return null;
+  var ta = ds_getCellTextarea(_dsActiveCellRowIdx, _dsActiveCellColId);
+  if (!ta) return null;
+  var td = ta.closest('td'), d = ds_richDivOf(ta);
+  if (td && td.classList.contains('ds-rich-editing') && d) {
+    var sel = window.getSelection();
+    return (sel && sel.rangeCount && !sel.isCollapsed && d.contains(sel.getRangeAt(0).commonAncestorContainer)) ? d : null;
+  }
+  if (document.activeElement === ta && ta.selectionStart !== ta.selectionEnd) return ds_richOpen(ta, { selStart: ta.selectionStart, selEnd: ta.selectionEnd });
+  return null;
+}
+function ds_richExec(d, cmd, value, css) {
+  document.execCommand('styleWithCSS', false, !!css);
+  document.execCommand(cmd, false, value);
+  ds_richInput(d);
+  _dsHideFormatMenus();
+  ds_updateFormatToolbarState();
+}
+function ds_richSetSize(d, px) { // execCommand fontSize(1~7)를 px 지정 span 으로 바꾼다
+  document.execCommand('styleWithCSS', false, false);
+  document.execCommand('fontSize', false, '7');
+  d.querySelectorAll('font[size="7"]').forEach(function(f) {
+    var sp = document.createElement('span');
+    sp.style.fontSize = px + 'px';
+    while (f.firstChild) sp.appendChild(f.firstChild);
+    f.replaceWith(sp);
+  });
+  ds_richInput(d);
+  ds_updateFormatToolbarState();
+}
+function ds_richSelectionSize(d) {
+  var sel = window.getSelection(), node = sel && sel.rangeCount ? sel.getRangeAt(0).startContainer : null, el = node && (node.nodeType === 1 ? node : node.parentElement);
+  var px = el ? parseFloat(getComputedStyle(el).fontSize) : 13;
+  return Math.round(px) || 13;
+}
 function ds_getActiveCellTextarea() {
   if (_dsActiveCellRowIdx === null || !_dsActiveCellColId) return null;
   var areas = document.querySelectorAll('#ds-editor-body textarea.ds-cell-input');
@@ -42000,6 +42247,8 @@ function ds_applyCellEditModeUi() {
     var isEditing = !!(isActive && _dsCellEditMode);
     ta.readOnly = false;
     ta.classList.toggle('ds-cell-editing', isEditing);
+    if (isEditing) { var rowForRich = ds_richRowOf(ta); if (rowForRich && ds_getCellRich(rowForRich, ta.dataset.colId, ta.value)) ds_richOpen(ta); } // 서식이 있는 셀은 서식 편집 칸으로(#375)
+    else ds_richClose(ta);
   });
 }
 
@@ -42836,6 +43085,9 @@ function ds_fillEnd(e) {
     var st = ds_getCellStyle(srcRow, srcColId);
     if (ds_hasCellStyle(st)) { if (!dstRow.cellStyles || typeof dstRow.cellStyles !== 'object') dstRow.cellStyles = {}; dstRow.cellStyles[dstColId] = Object.assign({}, st); }
     else if (dstRow.cellStyles) delete dstRow.cellStyles[dstColId];
+    var rc = srcRow.cellRich && srcRow.cellRich[srcColId]; // 글자 일부 서식도 따라간다(텍스트가 다르면 렌더에서 버려짐)
+    if (rc) { if (!dstRow.cellRich || typeof dstRow.cellRich !== 'object') dstRow.cellRich = {}; dstRow.cellRich[dstColId] = rc; }
+    else if (dstRow.cellRich) delete dstRow.cellRich[dstColId];
   }
   if (tgt.axis === 'v') {
     seed.colIds.forEach(function(colId) {
@@ -42886,6 +43138,8 @@ function ds_focusCell(rowIdx, colId, options) {
   if (!textarea) return false;
   ds_setActiveCell(rowIdx, colId, { edit: !!options.edit });
   ds_applyCellEditModeUi();
+  var richDiv = textarea.closest('td') && textarea.closest('td').classList.contains('ds-rich-editing') ? ds_richDivOf(textarea) : null;
+  if (richDiv) { richDiv.focus(); ds_richSelect(richDiv, textarea.value.length); ds_autosizeCell(textarea); return true; }
   textarea.focus();
   var len = textarea.value.length;
   if (typeof textarea.setSelectionRange === 'function') {
@@ -42934,6 +43188,7 @@ function ds_enterCellEditMode(rowIdx, colId, options) {
   options = options || {};
   var textarea = ds_getCellTextarea(rowIdx, colId);
   if (!textarea) return false;
+  if (options.replaceText !== undefined) ds_richDiscard(rowIdx, colId); // 글자를 바꿔 쓰기 시작하면 글자 일부 서식은 버린다(#375)
   ds_focusCell(rowIdx, colId, { edit: true });
   if (options.replaceText !== undefined) {
     textarea.value = options.replaceText;
@@ -43040,6 +43295,9 @@ function ds_handleCellKeydown(e, rowIdx, colId) {
     if (e.key === 'Enter' && e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) { // Shift+Enter 셀 안 줄바꿈(#266)
       e.preventDefault();
       e.stopPropagation();
+      var richEd = ds_getCellTextarea(rowIdx, colId);
+      richEd = richEd && richEd.closest('td').classList.contains('ds-rich-editing') ? ds_richDivOf(richEd) : null;
+      if (richEd) { document.execCommand('insertLineBreak'); ds_richInput(richEd); return; }
       ds_insertTextAtCellCursor(ds_getCellTextarea(rowIdx, colId), '\n');
       return;
     }
@@ -43237,6 +43495,8 @@ function ds_applyCellTextAlign(align) {
     if (textarea) {
       textarea.classList.remove('ds-cell-align-left', 'ds-cell-align-center', 'ds-cell-align-right', 'ds-cell-align-justify');
       textarea.classList.add('ds-cell-align-' + align);
+      var alignView = ds_richDivOf(textarea);
+      if (alignView) ds_richApplyStyle(textarea, alignView);
     }
   });
   _dsHideFormatMenus();
@@ -43256,6 +43516,8 @@ function _dsApplyCellStyleToDom(rowIdx, colId, st) {
   ta.style.lineHeight = st.lh ? String(st.lh) : '';
   var td = ta.closest ? ta.closest('td') : null;
   if (td) td.style.backgroundColor = st.bg || '';
+  var richView = ds_richDivOf(ta);
+  if (richView) ds_richApplyStyle(ta, richView);
   ds_autosizeCell(ta); // 글자 크기·줄간격이 바뀌면 높이도 다시 계산
 }
 function _dsMutateCellStyles(mutator, explicitCells) {
@@ -43278,6 +43540,8 @@ function _dsMutateCellStyles(mutator, explicitCells) {
 }
 function ds_toggleCellStyle(prop) {
   if (prop !== 'b' && prop !== 'i' && prop !== 's' && prop !== 'u') return;
+  var richTarget = ds_richPartialTarget(); // 편집 중 글자 선택이 있으면 그 글자에만(#375)
+  if (richTarget) { ds_richExec(richTarget, { b: 'bold', i: 'italic', u: 'underline', s: 'strikeThrough' }[prop]); return; }
   var ds = findDataSheet(_dsEditId);
   if (!ds) return;
   var targetCells = (ds_getTextAlignTargetCells(ds) || []).filter(function(c) { return ds_isDataRow(c.row) && c.colId; });
@@ -43294,6 +43558,8 @@ function ds_toggleCellStyle(prop) {
 function ds_applyCellColor(color, explicitCells) {
   color = (typeof color === 'string') ? color.trim() : '';
   if (color && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color)) return;
+  var richTarget = explicitCells ? null : ds_richPartialTarget();
+  if (richTarget) { ds_richExec(richTarget, 'foreColor', color || '#222222', true); return; }
   _dsMutateCellStyles(function(cur) {
     if (color) cur.color = color.toLowerCase();
     else delete cur.color;
@@ -43303,6 +43569,8 @@ function ds_applyCellColor(color, explicitCells) {
 function ds_applyCellBg(color, explicitCells) {
   color = (typeof color === 'string') ? color.trim() : '';
   if (color && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color)) return;
+  var richTarget = explicitCells ? null : ds_richPartialTarget();
+  if (richTarget) { ds_richExec(richTarget, 'hiliteColor', color || 'transparent', true); return; }
   _dsMutateCellStyles(function(cur) { if (color) cur.bg = color.toLowerCase(); else delete cur.bg; }, explicitCells);
 }
 function ds_applyCellFont(font) {
@@ -43314,6 +43582,8 @@ function ds_applyCellSize(size) {
   _dsMutateCellStyles(function(cur) { if (size !== '' && n >= 8 && n <= 72) cur.size = n; else delete cur.size; });
 }
 function ds_stepCellSize(delta) {
+  var richTarget = ds_richPartialTarget();
+  if (richTarget) { ds_richSetSize(richTarget, Math.min(72, Math.max(8, ds_richSelectionSize(richTarget) + delta))); return; }
   var ds = findDataSheet(_dsEditId);
   var targets = (ds_getTextAlignTargetCells(ds) || []).filter(function(c) { return ds_isDataRow(c.row) && c.colId; });
   if (!targets.length) return;
@@ -43433,6 +43703,8 @@ function _dsRenderFlatTable(ds) {
       if (_dsActiveCellRowIdx === rowIdx && _dsActiveCellColId === c.id) cellClasses.push('ds-active-cell');
       if (ds_isCellRangeSelected(ds, rowIdx, c.id)) cellClasses.push('ds-selected-cell');
       if (_dsSelectedColIds.includes(c.id)) cellClasses.push('ds-selected-col');
+      var richHtml = ds_getCellRich(row, c.id, val); // 글자 일부 서식(#375)
+      if (richHtml) cellClasses.push('ds-has-rich');
       var cellClassAttr = cellClasses.length ? ' class="' + cellClasses.join(' ') + '"' : '';
       var isEditingCell = ds_isCellInEditMode(rowIdx, c.id);
       var editClass = isEditingCell ? ' ds-cell-editing' : '';
@@ -43442,6 +43714,7 @@ function _dsRenderFlatTable(ds) {
       var styleAttr = cssText ? ' style="' + esc(cssText) + ';"' : '';
       return '<td' + cellClassAttr + (cst.bg ? ' style="background-color:' + esc(cst.bg) + ';"' : '') + ' data-col-id="' + esc(c.id) + '" oncontextmenu="ds_openRowMenu(event,' + rowIdx + ',\'' + esc(c.id) + '\')">'
         + '<textarea class="ds-cell-input ds-cell-align-' + textAlign + editClass + styleClass + '"' + styleAttr + ' rows="1" data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '" onmousedown="ds_handleCellMouseDown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" ondblclick="ds_enterCellEditMode(' + rowIdx + ',\'' + esc(c.id) + '\')" onkeydown="ds_handleCellKeydown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" onbeforeinput="ds_handleCellBeforeInput(event,this)" oncompositionstart="ds_handleCellCompositionStart(this)" onpaste="ds_handleCellPaste(event,this)" oninput="ds_handleCellInput(this)" onfocus="ds_handleCellFocus(this)" onblur="ds_autosizeCell(this)">' + esc(val) + '</textarea>'
+        + (richHtml ? '<div class="ds-cell-rich ds-cell-align-' + textAlign + styleClass + '"' + styleAttr + ' data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '">' + richHtml + '</div>' : '')
         + '</td>';
     }).join('');
     return '<tr class="' + rowClass + _rhClass + '" data-row-idx="' + rowIdx + '"' + _rhStyle + ' onmousedown="ds_setActiveRow(' + rowIdx + ')">'
@@ -44056,6 +44329,7 @@ function ds_updateCell(textareaEl) {
   if (!row || row.isCategory || row.isMemo) return;
   if (!row.cells) row.cells = {};
   row.cells[colId] = textareaEl.value;
+  ds_richRefresh(textareaEl); // 편집 밖에서 텍스트가 바뀌면 어긋난 서식 표시를 정리(#375)
   ds_autosizeCell(textareaEl);
   persist();
 }
@@ -44079,6 +44353,8 @@ function ds_scheduleAutosizeVisibleCells() {
 
 function ds_autosizeCell(textareaEl) {
   if (!textareaEl) return;
+  var richTd = textareaEl.closest ? textareaEl.closest('td') : null;
+  if (richTd && (richTd.classList.contains('ds-has-rich') || richTd.classList.contains('ds-rich-editing'))) { textareaEl.style.height = ''; return; } // 서식 칸은 div 가 높이를 정한다(#375)
   var tr = textareaEl.closest ? textareaEl.closest('tr') : null;
   if (tr && tr.classList.contains('ds-row-fixed-h')) { textareaEl.style.height = '100%'; return; }
   textareaEl.style.height = 'auto';

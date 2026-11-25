@@ -2,6 +2,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
 let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
 const code = html.slice(html.indexOf('let imeDeferredEditorKey'), html.indexOf("document.addEventListener('keydown', e => {\n  if (isImeComposing(e)) { imeDeferEditorKey(e);"));
+const SEL = 'textarea.ds-cell-input.ds-cell-editing, .ds-cell-rich[contenteditable="true"]'; // #375: 서식 편집 칸(contenteditable)까지
 (async () => {
   const listeners = [], calls = [];
   const ctx = {
@@ -12,7 +13,7 @@ const code = html.slice(html.indexOf('let imeDeferredEditorKey'), html.indexOf("
   vm.createContext(ctx);
   vm.runInContext(code + ';this.defer = imeDeferEditorKey;', ctx);
   const ta = { isConnected: true, dataset: { rowIdx: '1', colId: 'cA' } };
-  const mk = (key, o = {}) => { const e = { key, shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, target: { closest: sel => (sel === 'textarea.ds-cell-input.ds-cell-editing' ? (o.other ? null : ta) : null) }, prevented: false, preventDefault() { this.prevented = true; }, ...o }; return e; };
+  const mk = (key, o = {}) => { const e = { key, shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, target: { closest: sel => (sel === SEL ? (o.other ? null : ta) : null) }, prevented: false, preventDefault() { this.prevented = true; }, ...o }; return e; };
   const fireEnd = () => listeners.filter(l => l[0] === 'compositionend').forEach(l => l[1]());
   const wait = ms => new Promise(r => setTimeout(r, ms));
   // 조합 중 Enter: 기본 동작(줄바꿈) 차단, 조합 확정 전에는 처리하지 않음, 확정 후 정확히 한 번 처리
@@ -40,6 +41,6 @@ const code = html.slice(html.indexOf('let imeDeferredEditorKey'), html.indexOf("
   // 소스 구조
   ok(/if \(isImeComposing\(e\)\) \{ imeDeferEditorKey\(e\); e\.stopImmediatePropagation\(\); \}/.test(html), '전역 keydown 캡처에서 조합 키를 셀 핸들러로 넘긴 뒤 차단');
   ok(/if \(e\.key === 'Enter' && e\.shiftKey && !e\.altKey && !e\.ctrlKey && !e\.metaKey\) \{ \/\/ Shift\+Enter 셀 안 줄바꿈\(#266\)/.test(html), 'Shift+Enter 셀 안 줄바꿈(#266) 유지');
-  ok(/textarea\.ds-cell-input\.ds-cell-editing/.test(code), '편집 중인 셀 textarea 만 대상(#375 contenteditable 전환 시 이 선택자를 함께 확장)');
+  ok(code.includes(SEL), '편집 중인 셀 textarea 와 서식 편집 칸(contenteditable) 모두 대상(#375)');
   process.exit(f ? 1 : 0);
 })();
