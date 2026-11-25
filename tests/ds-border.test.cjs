@@ -1,0 +1,15 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const ctx = {}; vm.createContext(ctx);
+vm.runInContext(html.slice(html.indexOf('var DS_BORDER_STYLES'), html.indexOf('function ds_normalizeCellStyle')) + html.slice(html.indexOf('function ds_borderSides'), html.indexOf('var _dsBorderStyle')) + ';this.f={ds_borderSides,ds_borderCss}', ctx);
+const F = ctx.f, S = (m, i, j, R, C) => F.ds_borderSides(m, i, j, R, C).join('');
+ok(S('all', 0, 0, 2, 2) === 'trbl', '모두: 네 변');
+ok(S('outer', 0, 0, 3, 3) === 'tl' && S('outer', 1, 1, 3, 3) === '' && S('outer', 2, 2, 3, 3) === 'br' && S('outer', 0, 1, 3, 3) === 't', '바깥쪽: 가장자리 칸의 바깥 변만');
+ok(S('inner', 0, 0, 2, 2) === 'br' && S('inner', 1, 1, 2, 2) === 'tl' && S('inner', 0, 0, 1, 1) === '', '안쪽: 칸 사이 경계만(1칸이면 없음)');
+ok(S('hinner', 0, 0, 3, 2) === 'b' && S('hinner', 1, 0, 3, 2) === 'tb' && S('vinner', 0, 0, 2, 3) === 'r' && S('vinner', 0, 1, 2, 3) === 'lr', '가로·세로 안쪽');
+ok(S('left', 0, 0, 2, 2) === 'l' && S('left', 0, 1, 2, 2) === '' && S('top', 0, 1, 2, 2) === 't' && S('right', 1, 1, 2, 2) === 'r' && S('bottom', 1, 0, 2, 2) === 'b' && S('bottom', 0, 0, 2, 2) === '', '왼·위·오른·아래는 해당 가장자리 칸만');
+ok(F.ds_borderCss({ t: { w: 'thin', c: '#111111' }, l: { w: 'dash', c: '#ff0000' } }) === 'border-top:1px solid #111111;border-left:1px dashed #ff0000' && F.ds_borderCss(null) === '', 'CSS 변환(선 종류별)');
+ok(/if \(st\.bd && typeof st\.bd === 'object'/.test(html) && /st\.bd \|\| st\.b \|\|/.test(html) && /ds_normalizeCellStyle\(row\.cellStyles\[colId\]\)/.test(html), '정규화·스타일 보유 판정에 bd 포함(서식 지우기가 cellStyles 째 삭제해 함께 지워짐)');
+ok(/picker\('border'/.test(html) && /ds_applyBorder\(/.test(html) && /id="ds-border-style"/.test(html), '툴바 테두리 메뉴·선 종류·색');
+process.exit(f ? 1 : 0);
