@@ -29,6 +29,6 @@ ok(/Math\.abs\(x - r\.right\) <= 4/.test(html) && /Math\.abs\(y - r\.bottom\) <=
 ok(/col-resize/.test(html) && /row-resize/.test(html) && /documentElement\.style\.cursor/.test(html), '커서는 문서 루트(편집 영역 안 손잡이 없음)');
 ok(/e\.stopImmediatePropagation\(\); \/\/ 경계에서 시작한 드래그/.test(html) && html.indexOf('let tbResizeDrag') < html.indexOf('let tbCellSel = null;'), '크기 조절 mousedown 이 셀 범위 선택(#362)보다 먼저');
 ok(/addEventListener\('dblclick'/.test(html) && /tbWriteColWidths\(table, null\)/.test(html) && /removeProperty\('height'\)/.test(html), '경계 더블클릭 초기화');
-ok(/tbWriteColWidths\(table, tbInsertColWidth\(widths, plan\.at\)\)/.test(html) && /tbWriteColWidths\(table, tbDeleteColWidth\(widths, plan\.col\)\)/.test(html), '열 추가·삭제 시 colgroup 맞춤');
+ok(/tbWriteColWidths\(table, tbInsertColWidth\(widths, plan\.at\)\)/.test(html) && /tbDeleteColWidth\(w, c\)/.test(html), '열 추가·삭제 시 colgroup 맞춤');
 ok(/tbReadColWidths\(table, tbTableModel\(table\)\.model\.cols\) === null\) tbWriteColWidths\(table, null\)/.test(html), '열 수 어긋난 colgroup 제거');
 process.exit(f ? 1 : 0);

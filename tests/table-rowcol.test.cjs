@@ -43,7 +43,7 @@ e = F.tbDeleteColPlan(hm, 1); ok(e.shrink.join() === '0' && e.remove.join() === 
 e = F.tbDeleteColPlan(hm, 0); ok(e.shrink.join() === '0' && e.remove.join() === '1', '합침 셀의 시작 열 삭제: colspan 만 줄고 셀은 그대로, 그 열의 다른 셀 제거');
 ok(F.tbDeleteRowPlan(m3, 5) === null && F.tbDeleteColPlan(m3, -1) === null, '범위 밖은 null');
 // 메뉴 구조
-ok(['위에 행 추가', '아래에 행 추가', '왼쪽에 열 추가', '오른쪽에 열 추가', '행 삭제', '열 삭제', '표 삭제'].every(l => html.includes("label: '" + l + "'")), '메뉴 항목 7개');
+ok(['위에 행 추가', '아래에 행 추가', '왼쪽에 열 추가', '오른쪽에 열 추가', '표 삭제'].every(l => html.includes("label: '" + l + "'")) && html.includes("'행 삭제'") && html.includes("'열 삭제'"), '메뉴 항목 7개');
 ok(/items\.push\(\{ sep: true \}, \.\.\.tbTableEditItems\(table, model, elems, id\)\)/.test(html), '합치기 항목 뒤에 구분선으로 묶어 같은 메뉴에 추가');
 ok(/disabled: !delRow/.test(html) && /disabled: !delCol/.test(html), '마지막 1행·1열 삭제 비활성');
 ok(/return \[\{ icon: '▦', label: '표', submenu: items \}\]/.test(html), '본 메뉴에는 「표 ▶」 한 줄만, 항목은 하위 메뉴(#365)');

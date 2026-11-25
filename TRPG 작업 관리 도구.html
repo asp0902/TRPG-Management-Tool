@@ -19084,30 +19084,46 @@ function tbInsertColPlan(model, at) {
   const skip = new Set(extend.flatMap(id => { const cell = model.cells[id]; return Array.from({ length: cell.rs }, (_, k) => cell.row + k); }));
   return { at, extend, newRows: newRows.filter(item => !skip.has(item.row)) };
 }
-// 행 삭제: 그 행에서만 존재하는 셀은 제거, 여러 행에 걸친 셀은 rowspan 을 줄이고(시작 칸이 삭제되는 행이면 다음 행으로 옮김). 행이 하나뿐이면 null
-function tbDeleteRowPlan(model, row) {
-  if (model.rows <= 1 || row < 0 || row >= model.rows) return null;
+// 행 r1..r2 삭제(#384): 범위 안에서만 존재하는 셀은 제거, 범위 밖으로 걸친 셀은 rowspan 을 겹친 행 수만큼 줄이고(시작 칸이 지워지는 행이면 r2+1 행으로 옮김). 모든 행이면 null
+function tbDeleteRowsPlan(model, r1, r2) {
+  if (r1 > r2) { const t = r1; r1 = r2; r2 = t; }
+  if (r1 < 0 || r2 >= model.rows || (r1 <= 0 && r2 >= model.rows - 1)) return null;
   const remove = [], shrink = [], move = [];
   model.cells.forEach(cell => {
-    if (cell.row > row || cell.row + cell.rs - 1 < row) return;
-    if (cell.rs === 1) { remove.push(cell.id); return; }
-    shrink.push(cell.id);
-    if (cell.row === row) {
-      const before = model.cells.filter(other => other.domRow === row + 1 && other.col > cell.col).sort((x, y) => x.col - y.col)[0];
-      move.push({ id: cell.id, toRow: row + 1, beforeId: before ? before.id : null });
-    }
+    const end = cell.row + cell.rs - 1;
+    if (cell.row > r2 || end < r1) return;
+    if (cell.row >= r1 && end <= r2) { remove.push(cell.id); return; }
+    shrink.push({ id: cell.id, by: Math.min(end, r2) - Math.max(cell.row, r1) + 1 });
+    if (cell.row >= r1) move.push({ id: cell.id, col: cell.col, toRow: r2 + 1 });
   });
-  return { row, remove, shrink, move };
+  move.sort((x, y) => x.col - y.col); // 같은 줄로 모이는 셀은 열 순서대로 끼워 넣는다
+  move.forEach(item => {
+    const before = model.cells.filter(other => other.domRow === r2 + 1 && other.col > item.col).sort((x, y) => x.col - y.col)[0];
+    item.beforeId = before ? before.id : null; delete item.col;
+  });
+  return { r1, r2, remove, shrink, move };
 }
-// 열 삭제: 그 열에서만 존재하는 셀은 제거, 가로로 걸친 셀은 colspan 을 줄인다. 열이 하나뿐이면 null
-function tbDeleteColPlan(model, col) {
-  if (model.cols <= 1 || col < 0 || col >= model.cols) return null;
+// 행 하나 삭제(기존 모양: shrink 는 셀 id 목록)
+function tbDeleteRowPlan(model, row) {
+  const p = tbDeleteRowsPlan(model, row, row);
+  return p && { row, remove: p.remove, shrink: p.shrink.map(x => x.id), move: p.move };
+}
+// 열 c1..c2 삭제(#384): 범위 안에만 있는 셀은 제거, 걸친 셀은 colspan 을 겹친 열 수만큼 줄인다. 모든 열이면 null
+function tbDeleteColsPlan(model, c1, c2) {
+  if (c1 > c2) { const t = c1; c1 = c2; c2 = t; }
+  if (c1 < 0 || c2 >= model.cols || (c1 <= 0 && c2 >= model.cols - 1)) return null;
   const remove = [], shrink = [];
   model.cells.forEach(cell => {
-    if (cell.col > col || cell.col + cell.cs - 1 < col) return;
-    (cell.cs === 1 ? remove : shrink).push(cell.id);
+    const end = cell.col + cell.cs - 1;
+    if (cell.col > c2 || end < c1) return;
+    if (cell.col >= c1 && end <= c2) remove.push(cell.id);
+    else shrink.push({ id: cell.id, by: Math.min(end, c2) - Math.max(cell.col, c1) + 1 });
   });
-  return { col, remove, shrink };
+  return { c1, c2, remove, shrink };
+}
+function tbDeleteColPlan(model, col) {
+  const p = tbDeleteColsPlan(model, col, col);
+  return p && { col, remove: p.remove, shrink: p.shrink.map(x => x.id) };
 }
 function tbNewCell() { const td = document.createElement('td'); td.appendChild(document.createElement('br')); return td; }
 function tbCellAtGrid(table, row, col) { // 편집 뒤 표에서 (row, col) 을 덮는 셀
@@ -19135,22 +19151,22 @@ function tbInsertTableCol(table, model, elems, plan, caretRow) {
   if (widths) tbWriteColWidths(table, tbInsertColWidth(widths, plan.at));
   tbTableChanged(table, caret || tbCellAtGrid(table, caretRow, plan.at));
 }
-function tbDeleteTableRow(table, model, elems, plan, caretCol) {
-  plan.move.forEach(item => { // 시작 칸이 지워지는 행의 합쳐진 셀: 내용째 다음 행으로
+function tbDeleteTableRow(table, model, elems, plan, caretCol) { // plan: tbDeleteRowsPlan 결과(여러 행도 input 한 번 = Ctrl+Z 한 번)
+  plan.move.forEach(item => { // 시작 칸이 지워지는 행의 합쳐진 셀: 내용째 범위 다음 행으로
     const row = table.rows[item.toRow], ref = item.beforeId === null ? null : elems[item.beforeId];
     if (ref && ref.parentNode === row) row.insertBefore(elems[item.id], ref); else row.appendChild(elems[item.id]);
   });
-  plan.shrink.forEach(id => { const cell = model.cells[id]; tbSetSpan(elems[id], cell.cs, cell.rs - 1); });
+  plan.shrink.forEach(x => { const cell = model.cells[x.id]; tbSetSpan(elems[x.id], cell.cs, cell.rs - x.by); });
   plan.remove.forEach(id => elems[id].remove());
-  table.rows[plan.row].remove();
-  tbTableChanged(table, tbCellAtGrid(table, plan.row, caretCol));
+  for (let r = plan.r2; r >= plan.r1; r--) table.rows[r].remove();
+  tbTableChanged(table, tbCellAtGrid(table, plan.r1, caretCol));
 }
 function tbDeleteTableCol(table, model, elems, plan, caretRow) {
   const widths = tbReadColWidths(table, model.cols); // 열 너비 조절(#363)
-  plan.shrink.forEach(id => { const cell = model.cells[id]; tbSetSpan(elems[id], cell.cs - 1, cell.rs); });
+  plan.shrink.forEach(x => { const cell = model.cells[x.id]; tbSetSpan(elems[x.id], cell.cs - x.by, cell.rs); });
   plan.remove.forEach(id => elems[id].remove());
-  if (widths) tbWriteColWidths(table, tbDeleteColWidth(widths, plan.col));
-  tbTableChanged(table, tbCellAtGrid(table, caretRow, plan.col));
+  if (widths) { let w = widths; for (let c = plan.c2; c >= plan.c1; c--) w = tbDeleteColWidth(w, c); tbWriteColWidths(table, w); }
+  tbTableChanged(table, tbCellAtGrid(table, caretRow, plan.c1));
 }
 function tbDeleteWholeTable(table) {
   const root = table.closest('[contenteditable="true"]');
@@ -19223,15 +19239,18 @@ function tbApplyCellWrap(table, cells, mode) {
   tbTableChanged(table, null);
 }
 function tbTableEditItems(table, model, elems, id) {
-  const cell = model.cells[id], delRow = tbDeleteRowPlan(model, cell.row), delCol = tbDeleteColPlan(model, cell.col), targets = tbCellBackgroundTargets(table, model, elems, id);
+  const cell = model.cells[id], targets = tbCellBackgroundTargets(table, model, elems, id);
+  const rg = tbCellSel && tbCellSel.table === table && tbCellInSel(elems[id]) ? tbCellSel.rect : null; // 셀 범위 안 우클릭이면 그 범위의 행·열(#384)
+  const rowFrom = rg ? Math.min(rg.r1, rg.r2) : cell.row, rowTo = rg ? Math.max(rg.r1, rg.r2) : cell.row, colFrom = rg ? Math.min(rg.c1, rg.c2) : cell.col, colTo = rg ? Math.max(rg.c1, rg.c2) : cell.col;
+  const delRow = tbDeleteRowsPlan(model, rowFrom, rowTo), delCol = tbDeleteColsPlan(model, colFrom, colTo), nRow = rowTo - rowFrom + 1, nCol = colTo - colFrom + 1;
   return [
     { icon: '↑', label: '위에 행 추가', action: () => tbInsertTableRow(table, model, elems, tbInsertRowPlan(model, cell.row), cell.col) },
     { icon: '↓', label: '아래에 행 추가', action: () => tbInsertTableRow(table, model, elems, tbInsertRowPlan(model, cell.row + cell.rs), cell.col) },
     { icon: '←', label: '왼쪽에 열 추가', action: () => tbInsertTableCol(table, model, elems, tbInsertColPlan(model, cell.col), cell.row) },
     { icon: '→', label: '오른쪽에 열 추가', action: () => tbInsertTableCol(table, model, elems, tbInsertColPlan(model, cell.col + cell.cs), cell.row) },
     { sep: true },
-    { icon: '✕', label: '행 삭제', disabled: !delRow, action: () => delRow && tbDeleteTableRow(table, model, elems, delRow, cell.col) },
-    { icon: '✕', label: '열 삭제', disabled: !delCol, action: () => delCol && tbDeleteTableCol(table, model, elems, delCol, cell.row) },
+    { icon: '✕', label: nRow > 1 ? '행 ' + nRow + '개 삭제' : '행 삭제', disabled: !delRow, action: () => delRow && tbDeleteTableRow(table, model, elems, delRow, cell.col) },
+    { icon: '✕', label: nCol > 1 ? '열 ' + nCol + '개 삭제' : '열 삭제', disabled: !delCol, action: () => delCol && tbDeleteTableCol(table, model, elems, delCol, cell.row) },
     { sep: true },
     { icon: '🎨', label: '셀 배경색…', action: () => tbOpenCellBackgroundPicker(targets) },
     ...(targets.some(td => td.style.backgroundColor) ? [{ icon: '✕', label: '셀 배경색 지우기', action: () => { targets.forEach(td => tbSetCellBackground(td, '')); tbTableChanged(table, null); } }] : []),
@@ -43380,6 +43399,7 @@ function ds_handleCellMouseDown(e, rowIdx, colId) {
     e.stopPropagation();
     if (!isSameEditingCell) e.preventDefault();
   }
+  if (e && e.button === 2 && ds_isCellRangeSelected(findDataSheet(_dsEditId), parseInt(rowIdx), colId)) return; // 셀 범위 안 우클릭: 범위 유지(#384)
   if (isSameEditingCell) { ds_setActiveCell(rowIdx, colId, { keepEdit: true }); ds_beginEditDragWatch(e, rowIdx, colId); }
   else {
     ds_focusCell(rowIdx, colId, { edit: false });
@@ -44795,29 +44815,43 @@ function ds_insertRowAt(rowIdx, after, asCategory) {
   renderDataSheetEditor();
   ds_restoreEditorViewport(viewport);
 }
-function ds_removeRow(rowIdx) {
+// 삭제할 행 번호 목록(#384): 행 머리글로 여러 행을 골랐으면 그 행들, 셀 범위가 여러 행이고 눌린 행이 그 안이면 범위의 데이터 행들, 아니면 눌린 행 하나
+function ds_planRowDelete(rowIdx, selectedRows, rangeRows) {
+  if (selectedRows && selectedRows.length > 1 && selectedRows.indexOf(rowIdx) >= 0) return selectedRows.slice().sort(function(a, b) { return a - b; });
+  if (rangeRows && rangeRows.length > 1 && rangeRows.indexOf(rowIdx) >= 0) return rangeRows.slice().sort(function(a, b) { return a - b; });
+  return [rowIdx];
+}
+function ds_rowShift(idx, removed) { // removed(정렬된 삭제 행)를 뺀 뒤의 번호. 지워진 행이면 null
+  var n = 0;
+  for (var i = 0; i < removed.length; i++) {
+    if (removed[i] === idx) return null;
+    if (removed[i] < idx) n++;
+  }
+  return idx - n;
+}
+function ds_removeRows(idxs) { // 한 번에 지우고 persist() 도 한 번 → Ctrl+Z 한 번에 복원
   var ds = findDataSheet(_dsEditId);
-  if (!ds || !ds.rows[rowIdx]) return;
+  if (!ds) return;
+  var removed = Array.from(new Set(idxs)).filter(function(i) { return ds.rows[i]; }).sort(function(a, b) { return a - b; });
+  if (!removed.length) return;
   var viewport = ds_captureEditorViewport();
-  ds.rows.splice(rowIdx, 1);
-  if (_dsActiveRowIdx === rowIdx) _dsActiveRowIdx = null;
-  else if (_dsActiveRowIdx !== null && _dsActiveRowIdx > rowIdx) _dsActiveRowIdx -= 1;
-  _dsSelectedRowIdxs = _dsSelectedRowIdxs.map(function(idx) {
-    if (idx === rowIdx) return null;
-    return idx > rowIdx ? idx - 1 : idx;
-  }).filter(function(idx) { return idx !== null; });
-  if (_dsRowSelectionAnchorIdx === rowIdx) _dsRowSelectionAnchorIdx = _dsSelectedRowIdxs[0] ?? null;
-  else if (_dsRowSelectionAnchorIdx !== null && _dsRowSelectionAnchorIdx > rowIdx) _dsRowSelectionAnchorIdx -= 1;
-  if (_dsActiveCellRowIdx === rowIdx) {
-    _dsActiveCellRowIdx = null;
-    _dsActiveCellColId = null;
-    _dsCellEditMode = false;
-  } else if (_dsActiveCellRowIdx !== null && _dsActiveCellRowIdx > rowIdx) {
-    _dsActiveCellRowIdx -= 1;
+  for (var k = removed.length - 1; k >= 0; k--) ds.rows.splice(removed[k], 1);
+  _dsActiveRowIdx = _dsActiveRowIdx === null ? null : ds_rowShift(_dsActiveRowIdx, removed);
+  _dsSelectedRowIdxs = _dsSelectedRowIdxs.map(function(i) { return ds_rowShift(i, removed); }).filter(function(i) { return i !== null; });
+  _dsRowSelectionAnchorIdx = _dsRowSelectionAnchorIdx === null ? null : (ds_rowShift(_dsRowSelectionAnchorIdx, removed) ?? _dsSelectedRowIdxs[0] ?? null);
+  _dsSelectedCellRange = null;
+  if (_dsActiveCellRowIdx !== null) {
+    var ar = ds_rowShift(_dsActiveCellRowIdx, removed);
+    _dsActiveCellRowIdx = ar;
+    if (ar === null) { _dsActiveCellColId = null; _dsCellEditMode = false; }
   }
   persist();
   renderDataSheetEditor();
   ds_restoreEditorViewport(viewport);
+}
+function ds_removeRow(rowIdx) { ds_removeRows([rowIdx]); }
+function ds_rowDeleteItem(rowIdx, plan) { // 우클릭 메뉴의 삭제 항목(여러 행이면 「선택한 행 n개 삭제」)
+  return { label: plan.length > 1 ? '선택한 행 ' + plan.length + '개 삭제' : '이 행 삭제', danger: true, action: function() { ds_removeRows(plan); } };
 }
 function ds_updateCell(textareaEl) {
   if (!textareaEl) return;
@@ -44928,8 +44962,12 @@ function ds_openRowMenu(e, rowIdx, colId) {
   if (!ds) return;
   var row = ds.rows[rowIdx];
   if (!row) return;
-  if (!row.isCategory && colId) {
+  var rangeInfo = ds_getSelectedCellRangeInfo(ds);
+  var keepRange = !!(rangeInfo && colId && rangeInfo.rowCount > 1 && rangeInfo.rowIdxs.indexOf(rowIdx) >= 0 && rangeInfo.colIds.indexOf(colId) >= 0); // 여러 행에 걸친 셀 범위 안 우클릭: 범위 유지(#384)
+  if (!row.isCategory && colId && !keepRange) {
     ds_setActiveCell(rowIdx, colId);
+  } else if (keepRange) {
+    // 범위 그대로
   } else if (_dsSelectedRowIdxs.includes(rowIdx)) {
     _dsActiveRowIdx = rowIdx;
     _dsActiveCellRowIdx = null;
@@ -44940,6 +44978,7 @@ function ds_openRowMenu(e, rowIdx, colId) {
   } else {
     ds_handleRowHeaderMouseDown(null, rowIdx);
   }
+  var delPlan = ds_planRowDelete(rowIdx, _dsSelectedRowIdxs, keepRange ? rangeInfo.rowIdxs : null), delItem = ds_rowDeleteItem(rowIdx, delPlan);
   var items;
   if (row.isCategory) {
     items = [
@@ -44950,14 +44989,14 @@ function ds_openRowMenu(e, rowIdx, colId) {
       { label: '위에 카테고리 행 삽입', action: function() { ds_insertRowAt(rowIdx, false, true); } },
       { label: '아래에 카테고리 행 삽입', action: function() { ds_insertRowAt(rowIdx, true, true); } },
       { sep: true },
-      { label: '이 행 삭제', danger: true, action: function() { ds_removeRow(rowIdx); } },
+      delItem,
     ];
   } else if (row.isMemo) {
     items = [
       { label: '위에 행 삽입', action: function() { ds_insertRowAt(rowIdx, false, false); } },
       { label: '아래에 행 삽입', action: function() { ds_insertRowAt(rowIdx, true, false); } },
       { sep: true },
-      { label: '이 행 삭제', danger: true, action: function() { ds_removeRow(rowIdx); } },
+      delItem,
     ];
   } else {
     items = [
@@ -44968,7 +45007,7 @@ function ds_openRowMenu(e, rowIdx, colId) {
       { label: '위에 카테고리 행 삽입', action: function() { ds_insertRowAt(rowIdx, false, true); } },
       { label: '아래에 카테고리 행 삽입', action: function() { ds_insertRowAt(rowIdx, true, true); } },
       { sep: true },
-      { label: '이 행 삭제', danger: true, action: function() { ds_removeRow(rowIdx); } },
+      delItem,
     ];
     if (colId) {
       items.push({ sep: true });
