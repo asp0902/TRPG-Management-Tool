@@ -1,0 +1,11 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const ctx = {}; vm.createContext(ctx);
+vm.runInContext(html.slice(html.indexOf('function ds_pasteSource'), html.indexOf('// mode: all(값+서식+규칙)')) + ';this.f={ds_pasteSource,ds_pasteDims}', ctx);
+const F = ctx.f;
+ok(F.ds_pasteDims(2, 3, false).rows === 2 && F.ds_pasteDims(2, 3, false).cols === 3 && F.ds_pasteDims(2, 3, true).rows === 3 && F.ds_pasteDims(2, 3, true).cols === 2, '전치하면 목표 크기의 행·열이 바뀜');
+ok(F.ds_pasteSource(0, 1, false).r === 0 && F.ds_pasteSource(0, 1, false).c === 1 && F.ds_pasteSource(0, 1, true).r === 1 && F.ds_pasteSource(0, 1, true).c === 0 && F.ds_pasteSource(2, 0, true).c === 2, '목표 (i,j) 가 가져올 원본 위치(전치 시 (j,i))');
+ok(/_dsInternalClip && _dsInternalClip\.text === text && ds_pasteInternal\('all', false\)/.test(html) && /_dsPasteValuesOnly/.test(html) && /ds_snapshotClip\(ds, text\)/.test(html), '내부 복사 보관·같은 글자일 때 값+서식 붙여넣기·Ctrl+Shift+V 값만');
+ok(/선택하여 붙여넣기 · 값만/.test(html) && /선택하여 붙여넣기 · 서식만/.test(html) && /선택하여 붙여넣기 · 데이터 확인 규칙만/.test(html) && /선택하여 붙여넣기 · 행\/열 바꿈/.test(html), '우클릭 메뉴 4항목');
+process.exit(f ? 1 : 0);

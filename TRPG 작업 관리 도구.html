@@ -43261,6 +43261,62 @@ function ds_buildClipboardText(ds) {
     }).join('\t');
   }).join('\n');
 }
+// ── 붙여넣기 옵션(#399): 앱 안에서 복사하면 값과 함께 서식·글자 서식·가로 맞춤·데이터 확인 규칙을 내부 보관함에 두고, 클립보드 글자와 같을 때만 쓴다 ──
+var _dsInternalClip = null; // { text, matrix: [[{ v, st, al, rc, ru }]] }
+var _dsPasteValuesOnly = false; // Ctrl+Shift+V
+function ds_snapshotClip(ds, text) {
+  var m = ds_getClipboardSelectionMatrix(ds);
+  if (!m) { _dsInternalClip = null; return; }
+  var clone = function(x) { return x == null ? null : JSON.parse(JSON.stringify(x)); };
+  _dsInternalClip = { text: text, matrix: m.rowIdxs.map(function(ri) {
+    var row = ds.rows[ri];
+    return m.colIds.map(function(cid) { return { v: row && row.cells && row.cells[cid] != null ? String(row.cells[cid]) : '', st: clone(row && row.cellStyles && row.cellStyles[cid]), al: row && row.cellAligns ? row.cellAligns[cid] || null : null, rc: row && row.cellRich ? row.cellRich[cid] || null : null, ru: clone(ds_ruleOf(row, cid)) }; });
+  }) };
+}
+// 순수 함수: 붙여넣기 원본(R×C)과 전치 여부로 목표 칸 (i,j) 가 가져올 원본 위치. 전치면 행·열이 바뀐다
+function ds_pasteSource(i, j, transpose) { return transpose ? { r: j, c: i } : { r: i, c: j }; }
+function ds_pasteDims(R, C, transpose) { return transpose ? { rows: C, cols: R } : { rows: R, cols: C }; }
+// mode: all(값+서식+규칙) / values / format(서식·맞춤만) / rules(데이터 확인 규칙만). transpose 는 행/열 바꿈
+function ds_pasteInternal(mode, transpose) {
+  var ds = findDataSheet(_dsEditId), clip = _dsInternalClip;
+  if (!ds || !clip || !clip.matrix.length) return false;
+  var sel = ds_getClipboardSelectionMatrix(ds);
+  var anchorRowIdx = sel ? sel.rowIdxs[0] : _dsActiveCellRowIdx, anchorColIdx = ds_getColumnIndex(ds, sel ? sel.colIds[0] : _dsActiveCellColId);
+  if (anchorRowIdx === null || anchorRowIdx === undefined || anchorColIdx < 0) return false;
+  var R = clip.matrix.length, C = clip.matrix[0].length, dims = ds_pasteDims(R, C, !!transpose);
+  var selCount = sel ? sel.rowIdxs.length * sel.colIds.length : 0, fillSel = R === 1 && C === 1 && selCount > 1;
+  var viewport = ds_captureEditorViewport();
+  var rowIdxs = fillSel ? sel.rowIdxs : ds_collectPasteRowIdxs(ds, anchorRowIdx, dims.rows);
+  var colIds = fillSel ? sel.colIds : ds_collectPasteColIds(ds, anchorColIdx, dims.cols);
+  var cl = function(x) { return x == null ? null : JSON.parse(JSON.stringify(x)); };
+  rowIdxs.forEach(function(ri, i) {
+    colIds.forEach(function(cid, j) {
+      var src = fillSel ? { r: 0, c: 0 } : ds_pasteSource(i, j, !!transpose), cell = clip.matrix[src.r] && clip.matrix[src.r][src.c], row = ds.rows[ri];
+      if (!cell || !ds_isDataRow(row)) return;
+      if (!row.cells) row.cells = {}; if (!row.cellStyles) row.cellStyles = {}; if (!row.cellAligns) row.cellAligns = {}; if (!row.cellRich) row.cellRich = {}; if (!row.cellRules) row.cellRules = {};
+      if (mode === 'all' || mode === 'values') { row.cells[cid] = cell.v; if (mode === 'values') delete row.cellRich[cid]; }
+      if (mode === 'all' || mode === 'format') { if (cell.st) row.cellStyles[cid] = cl(cell.st); else delete row.cellStyles[cid]; if (cell.al) row.cellAligns[cid] = cell.al; else delete row.cellAligns[cid]; }
+      if (mode === 'all') { if (cell.rc) row.cellRich[cid] = cell.rc; else delete row.cellRich[cid]; }
+      if (mode === 'all' || mode === 'rules') { if (cell.ru) row.cellRules[cid] = cl(cell.ru); else delete row.cellRules[cid]; }
+    });
+  });
+  _dsActiveRowIdx = rowIdxs[0]; _dsActiveCellRowIdx = rowIdxs[0]; _dsActiveCellColId = colIds[0]; _dsCellEditMode = false;
+  ds_setSelectedCellRange(rowIdxs[0], colIds[0], rowIdxs[rowIdxs.length - 1], colIds[colIds.length - 1]);
+  _dsForceNextHistoryCommit = true;
+  persist();
+  renderDataSheetEditor();
+  ds_restoreEditorViewport(viewport);
+  return true;
+}
+function ds_pasteSpecial(kind) { // 우클릭 「선택하여 붙여넣기」
+  if (kind === 'values' && !_dsInternalClip) { // 앱 밖에서 복사한 글자는 클립보드를 직접 읽어 값으로
+    if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(function(t) { ds_pasteClipboardText(t); }, function() { if (typeof rubyToast === 'function') rubyToast('클립보드를 읽을 수 없습니다. Ctrl+Shift+V 를 사용하세요.'); });
+    return;
+  }
+  if (!_dsInternalClip) { if (typeof rubyToast === 'function') rubyToast('먼저 데이터 시트에서 칸을 복사하세요(Ctrl+C).'); return; }
+  if (kind === 'transpose') ds_pasteInternal('all', true); else ds_pasteInternal(kind, false);
+}
+document.addEventListener('keydown', function(e) { _dsPasteValuesOnly = !!(currentPage === 'datasheet' && (e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && String(e.key).toLowerCase() === 'v'); }, true);
 function ds_parseClipboardTable(text) {
   text = String(text == null ? '' : text).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   var rows = [];
@@ -43398,11 +43454,14 @@ function ds_handleDocumentCopy(e) {
   e.preventDefault();
   e.stopImmediatePropagation?.();
   e.clipboardData.setData('text/plain', text);
+  ds_snapshotClip(ds, text); // 서식·규칙은 앱 내부 보관함에(#399)
 }
 function ds_handleDocumentPaste(e) {
   if (currentPage !== 'datasheet' || ds_shouldUseNativeClipboard(e)) return;
   var text = e.clipboardData && typeof e.clipboardData.getData === 'function' ? e.clipboardData.getData('text/plain') : null;
   if (text == null) return;
+  var pasteValuesOnly = _dsPasteValuesOnly; _dsPasteValuesOnly = false;
+  if (!pasteValuesOnly && _dsInternalClip && _dsInternalClip.text === text && ds_pasteInternal('all', false)) { e.preventDefault(); e.stopImmediatePropagation?.(); return; } // 앱 안에서 복사했으면 값+서식+규칙(구글 시트와 같음)
   if (!ds_pasteClipboardText(text)) return;
   e.preventDefault();
   e.stopImmediatePropagation?.();
@@ -46538,6 +46597,7 @@ function ds_openRowMenu(e, rowIdx, colId) {
       items.push({ label: '이 열 삭제', danger: true, action: function() { ds_removeColumn(colId); } });
     }
   }
+  if (colId && ds_isDataRow(row)) fzItems = fzItems.concat([{ sep: true }, { label: '선택하여 붙여넣기 · 값만', action: function() { ds_pasteSpecial('values'); } }, { label: '선택하여 붙여넣기 · 서식만', disabled: !_dsInternalClip, action: function() { ds_pasteSpecial('format'); } }, { label: '선택하여 붙여넣기 · 데이터 확인 규칙만', disabled: !_dsInternalClip, action: function() { ds_pasteSpecial('rules'); } }, { label: '선택하여 붙여넣기 · 행/열 바꿈', disabled: !_dsInternalClip, action: function() { ds_pasteSpecial('transpose'); } }]);
   _dsShowContextMenu(e.clientX, e.clientY, items.concat(fzItems));
 }
 function ds_openColumnMenu(e, colId) {
