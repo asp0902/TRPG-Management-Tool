@@ -8707,6 +8707,29 @@ select.sh-field-input,
     </div>
   </div>
 
+  <!-- 데이터 시트 범위 정렬 팝업(#390): [실행] [취소] 순서 -->
+  <div id="ds-sort-backdrop" class="link-insert-backdrop"></div>
+  <div id="ds-sort-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-sort-title">
+    <div class="link-insert-head">
+      <h2 id="ds-sort-title" class="link-insert-title">범위 정렬</h2>
+      <div class="link-insert-head-actions"><button type="button" class="link-insert-close" id="ds-sort-close" aria-label="닫기">×</button></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-body">
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;"><input type="checkbox" id="ds-sort-header"> 데이터에 머리글 행 있음</label>
+      <div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:13px;">
+        <span>정렬 기준</span><select id="ds-sort-col-1" class="link-insert-input"></select><select id="ds-sort-dir-1" class="link-insert-input"><option value="asc">오름차순</option><option value="desc">내림차순</option></select>
+        <span>다음 기준</span><select id="ds-sort-col-2" class="link-insert-input"></select><select id="ds-sort-dir-2" class="link-insert-input"><option value="asc">오름차순</option><option value="desc">내림차순</option></select>
+        <span>다음 기준</span><select id="ds-sort-col-3" class="link-insert-input"></select><select id="ds-sort-dir-3" class="link-insert-input"><option value="asc">오름차순</option><option value="desc">내림차순</option></select>
+      </div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-actions">
+      <button type="button" class="link-insert-btn primary" id="ds-sort-submit">실행</button>
+      <button type="button" class="link-insert-btn cancel" id="ds-sort-cancel">취소</button>
+    </div>
+  </div>
+
   <!-- 링크 삽입 팝업 -->
   <div id="link-insert-backdrop" class="link-insert-backdrop"></div>
   <div
@@ -45192,6 +45215,128 @@ function ds_insertRowAt(rowIdx, after, asCategory) {
   renderDataSheetEditor();
   ds_restoreEditorViewport(viewport);
 }
+// ── 정렬(#390) ──
+// 비교: 숫자는 숫자끼리 크기순, 숫자는 글자보다 앞, 글자는 한국어 사전순(numeric), 빈 칸은 오름·내림 모두 항상 맨 뒤
+function ds_sortValue(v) {
+  v = v == null ? '' : String(v);
+  if (!v.trim()) return { empty: true };
+  if (/^\s*-?\d+(\.\d+)?\s*$/.test(v)) return { num: parseFloat(v) };
+  return { text: v };
+}
+function ds_sortCompare(a, b, desc) {
+  var x = ds_sortValue(a), y = ds_sortValue(b);
+  if (x.empty || y.empty) return x.empty && y.empty ? 0 : (x.empty ? 1 : -1); // 빈 칸은 방향과 무관하게 뒤
+  var r;
+  if (x.num !== undefined && y.num !== undefined) r = x.num - y.num;
+  else if (x.num !== undefined) r = -1;
+  else if (y.num !== undefined) r = 1;
+  else r = x.text.localeCompare(y.text, 'ko', { numeric: true });
+  return desc ? -r : r;
+}
+// 정렬 계획: rows 의 [from, to] 범위를 keys([{colId, desc}])로 정렬한 새 순서. perm[i] = 새 i 번 자리에 올 옛 행 번호.
+// 카테고리 행은 구간을 나누고, 카테고리·메모 행은 제자리, 데이터 행끼리만 같은 구간의 데이터 행 자리를 바꿔 갖는다. 안정 정렬(같으면 옛 순서)
+function ds_sortPlan(rows, keys, from, to) {
+  var perm = rows.map(function(_, i) { return i; });
+  var segStart = from, i;
+  function flush(end) { // [segStart, end) 구간의 데이터 행을 정렬
+    var slots = [];
+    for (var k = segStart; k < end; k++) if (rows[k] && !rows[k].isCategory && !rows[k].isMemo) slots.push(k);
+    var sorted = slots.slice().sort(function(p, q) {
+      for (var j = 0; j < keys.length; j++) {
+        var c = ds_sortCompare(rows[p].cells && rows[p].cells[keys[j].colId], rows[q].cells && rows[q].cells[keys[j].colId], keys[j].desc);
+        if (c) return c;
+      }
+      return p - q;
+    });
+    slots.forEach(function(slot, n) { perm[slot] = sorted[n]; });
+  }
+  for (i = from; i <= to && i < rows.length; i++) {
+    if (rows[i].isCategory) { flush(i); segStart = i + 1; }
+  }
+  flush(Math.min(to, rows.length - 1) + 1);
+  return perm;
+}
+// 정렬 적용: colIds 가 null 이면 행 통째로 이동(시트 정렬), 아니면 그 열들의 셀(값·서식·글자 서식·맞춤)만 이동(범위 정렬)
+function ds_sortApply(keys, from, to, colIds) {
+  var ds = findDataSheet(_dsEditId);
+  if (!ds || !keys.length || to <= from) return;
+  var perm = ds_sortPlan(ds.rows, keys, from, to), moved = perm.some(function(src, i) { return src !== i; });
+  if (!moved) return;
+  var viewport = ds_captureEditorViewport();
+  if (!colIds) ds.rows = _dsActiveSheet(ds).rows = perm.map(function(src) { return ds.rows[src]; });
+  else {
+    var snap = ds.rows.map(function(r) { return colIds.map(function(id) { return { v: r.cells && r.cells[id], st: r.cellStyles && r.cellStyles[id], rc: r.cellRich && r.cellRich[id], al: r.cellAligns && r.cellAligns[id] }; }); });
+    perm.forEach(function(src, i) {
+      if (src === i) return;
+      var row = ds.rows[i];
+      colIds.forEach(function(id, ci) {
+        var d = snap[src][ci];
+        row.cells = row.cells || {}; row.cellStyles = row.cellStyles || {}; row.cellRich = row.cellRich || {}; row.cellAligns = row.cellAligns || {};
+        if (d.v === undefined) delete row.cells[id]; else row.cells[id] = d.v;
+        if (d.st) row.cellStyles[id] = d.st; else delete row.cellStyles[id];
+        if (d.rc) row.cellRich[id] = d.rc; else delete row.cellRich[id];
+        if (d.al) row.cellAligns[id] = d.al; else delete row.cellAligns[id];
+      });
+    });
+  }
+  _dsActiveCellRowIdx = null; _dsActiveCellColId = null; _dsCellEditMode = false;
+  persist(); // 한 번에 저장 → Ctrl+Z 한 번
+  renderDataSheetEditor();
+  ds_restoreEditorViewport(viewport);
+}
+function ds_sortSheet(colId, desc) { // 열 우클릭 「시트 정렬」: 고정 행(#386) 제외 전체 행
+  var ds = findDataSheet(_dsEditId), sheet = _dsActiveSheet(ds);
+  if (!ds || !sheet) return;
+  ds_sortApply([{ colId: colId, desc: !!desc }], ds_normFreeze(sheet.frozenRows, ds.rows.length), ds.rows.length - 1, null);
+}
+// 「범위 정렬…」 대화상자(#390): 기준 열 최대 3개, 오름/내림, 「데이터에 머리글 행 있음」
+var _dsSortDialog = null; // { from, to, colIds }
+function ds_openSortDialog() {
+  var ds = findDataSheet(_dsEditId), info = ds && ds_getSelectedCellRangeInfo(ds), dlg = document.getElementById('ds-sort-dialog');
+  if (!info || !dlg || info.rowFrom === info.rowTo) return;
+  _dsSortDialog = { from: info.rowFrom, to: info.rowTo, colIds: info.colIds.slice() };
+  var opts = info.colIds.map(function(id) { return '<option value="' + esc(id) + '">' + esc(ds_columnLabel(ds, ds_getColumnIndex(ds, id))) + ' 열</option>'; }).join('');
+  [1, 2, 3].forEach(function(n) {
+    var sel = document.getElementById('ds-sort-col-' + n);
+    sel.innerHTML = (n > 1 ? '<option value="">(없음)</option>' : '') + opts;
+    sel.value = n === 1 ? info.colIds[0] : '';
+    document.getElementById('ds-sort-dir-' + n).value = 'asc';
+  });
+  document.getElementById('ds-sort-header').checked = false;
+  document.getElementById('ds-sort-backdrop').classList.add('open'); dlg.classList.add('open');
+  var base = getEditorCenterRect(), r = dlg.getBoundingClientRect();
+  dlg.style.left = Math.max(16, base.left + (base.width - r.width) / 2) + 'px';
+  dlg.style.top = Math.max(16, base.top + (base.height - r.height) / 2) + 'px';
+  document.getElementById('ds-sort-col-1').focus();
+}
+function ds_closeSortDialog() {
+  document.getElementById('ds-sort-backdrop')?.classList.remove('open');
+  document.getElementById('ds-sort-dialog')?.classList.remove('open');
+  _dsSortDialog = null;
+}
+function ds_applySortDialog() {
+  var st = _dsSortDialog;
+  if (!st) return;
+  var keys = [1, 2, 3].map(function(n) { return { colId: document.getElementById('ds-sort-col-' + n).value, desc: document.getElementById('ds-sort-dir-' + n).value === 'desc' }; }).filter(function(k) { return k.colId; });
+  var from = st.from + (document.getElementById('ds-sort-header').checked ? 1 : 0);
+  var ds = findDataSheet(_dsEditId), allCols = ds && st.colIds.length === ds.columns.length;
+  ds_closeSortDialog();
+  ds_sortApply(keys, from, st.to, allCols ? null : st.colIds); // 모든 열을 덮으면 행 통째로(행 높이·이름 포함)
+}
+(function() {
+  function bind() {
+    if (window.__dsSortDialogBound) return;
+    window.__dsSortDialogBound = true;
+    document.getElementById('ds-sort-submit')?.addEventListener('click', ds_applySortDialog);
+    document.getElementById('ds-sort-cancel')?.addEventListener('click', ds_closeSortDialog);
+    document.getElementById('ds-sort-close')?.addEventListener('click', ds_closeSortDialog);
+    document.getElementById('ds-sort-backdrop')?.addEventListener('click', ds_closeSortDialog);
+    document.getElementById('ds-sort-dialog')?.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); ds_applySortDialog(); } else if (e.key === 'Escape') { e.preventDefault(); ds_closeSortDialog(); }
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind();
+})();
 // 삭제할 행 번호 목록(#384): 행 머리글로 여러 행을 골랐으면 그 행들, 셀 범위가 여러 행이고 눌린 행이 그 안이면 범위의 데이터 행들, 아니면 눌린 행 하나
 function ds_planRowDelete(rowIdx, selectedRows, rangeRows) {
   if (selectedRows && selectedRows.length > 1 && selectedRows.indexOf(rowIdx) >= 0) return selectedRows.slice().sort(function(a, b) { return a - b; });
@@ -45420,7 +45565,7 @@ function ds_openRowMenu(e, rowIdx, colId) {
     ds_handleRowHeaderMouseDown(null, rowIdx);
   }
   var szRows = ds_fitTargetCols(rowIdx, _dsSelectedRowIdxs); // 셀 범위만 있을 때는 이 행만(구글 시트와 같음)
-  var fzSheet = _dsActiveSheet(ds), fzItems = [{ sep: true }, { label: szRows.length > 1 ? '행 ' + szRows.length + '개 크기 조절…' : '이 행 크기 조절…', action: function() { ds_openSizeDialog('row', szRows); } }, { label: '이 행까지 고정', action: function() { ds_setFreeze('rows', rowIdx + 1); } }];
+  var fzSheet = _dsActiveSheet(ds), fzItems = [{ sep: true }].concat(keepRange && rangeInfo.cellCount > 1 ? [{ label: '범위 정렬…', action: function() { ds_openSortDialog(); } }] : []).concat([{ label: szRows.length > 1 ? '행 ' + szRows.length + '개 크기 조절…' : '이 행 크기 조절…', action: function() { ds_openSizeDialog('row', szRows); } }, { label: '이 행까지 고정', action: function() { ds_setFreeze('rows', rowIdx + 1); } }]);
   if (fzSheet && (fzSheet.frozenRows || 0) > 0) fzItems.push({ label: '행 고정 해제', action: function() { ds_setFreeze('rows', 0); } });
   var delPlan = ds_planRowDelete(rowIdx, _dsSelectedRowIdxs, keepRange ? rangeInfo.rowIdxs : null), delItem = ds_rowDeleteItem(rowIdx, delPlan);
   var items;
@@ -45470,6 +45615,9 @@ function ds_openColumnMenu(e, colId) {
   var items = [
     { label: '왼쪽에 열 삽입', action: function() { ds_insertColumnAt(colId, false); } },
     { label: '오른쪽에 열 삽입', action: function() { ds_insertColumnAt(colId, true); } },
+    { sep: true },
+    { label: '시트 정렬 A→Z', action: function() { ds_sortSheet(colId, false); } },
+    { label: '시트 정렬 Z→A', action: function() { ds_sortSheet(colId, true); } },
     { sep: true },
     { label: '이 열 삭제', danger: true, action: function() { ds_removeColumn(colId); } },
     { sep: true },
