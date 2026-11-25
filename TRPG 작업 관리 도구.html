@@ -7184,6 +7184,7 @@ body.block-pointer-dragging {
 
 /* 우클릭 시 cell hover 인디케이터 */
 .ds-table td { position: relative; }
+.ds-table td.ds-formula-err .ds-cell-rich { color: #dc2626; }
 /* 숫자 형식(#396): 형식이 적용된 칸은 보기 상태에서 서식 div 가 보이고, 편집 중에는 원래 값(textarea)이 보인다 */
 .ds-table td.ds-has-fmt:not(:has(textarea.ds-cell-editing)) textarea.ds-cell-input { position: absolute; inset: 0; width: 100%; height: 100% !important; opacity: 0; }
 .ds-table td.ds-has-fmt:not(:has(textarea.ds-cell-editing)) .ds-cell-rich { display: block; }
@@ -42859,9 +42860,10 @@ function ds_richRefresh(ta) { // 보기 상태: 서식이 있으면 div 로 표�
   var wrap = ds_getCellStyle(row, ta.dataset.colId).wrap, overflow = wrap === 'overflow';
   var dsCur = findDataSheet(_dsEditId), cols = dsCur && dsCur.columns ? dsCur.columns : [];
   var colIdx = cols.findIndex(function(c) { return c.id === ta.dataset.colId; });
-  var fmtNow = rich ? null : ds_formatNumber(ta.value, ds_getCellStyle(row, ta.dataset.colId).nf);
+  var dispNow = rich ? null : ds_cellDisplay(ta.value, ds_getCellStyle(row, ta.dataset.colId).nf, ds_formulaEnv(dsCur ? dsCur.rows : [], cols)), fmtNow = dispNow ? dispNow.text : null;
   td.classList.toggle('ds-has-rich', !!rich);
   td.classList.toggle('ds-has-fmt', fmtNow !== null);
+  td.classList.toggle('ds-formula-err', !!(dispNow && dispNow.err));
   td.classList.toggle('ds-wrap-overflow', overflow);
   if (rich || overflow || fmtNow !== null) {
     if (!d) { d = document.createElement('div'); d.className = 'ds-cell-rich'; d.dataset.rowIdx = ta.dataset.rowIdx; d.dataset.colId = ta.dataset.colId; ta.parentNode.insertBefore(d, ta.nextSibling); }
@@ -44601,6 +44603,7 @@ function _dsRenderFlatTable(ds) {
   var cols = ds.columns || [];
   var rows = ds.rows || [];
   var mergeMap = ds_mergeMap(rows, cols, ds_activeMerges(ds)); // 셀 병합(#395)
+  var fenv = ds_formulaEnv(rows, cols); // 수식(#397): 렌더마다 전체 재계산(칸별 캐시)
   var flt = ds_activeFilter(ds), fltVis = ds_visibleRows(ds); // 필터(#391)·행 숨기기(#393)
   var lastVisCol = -1, lastVisRow = -1;
   cols.forEach(function(c, i) { if (!c.hidden) lastVisCol = i; });
@@ -44700,8 +44703,8 @@ function _dsRenderFlatTable(ds) {
       if (_dsSelectedColIds.includes(c.id)) cellClasses.push('ds-selected-col');
       var richHtml = ds_getCellRich(row, c.id, val); // 글자 일부 서식(#375)
       if (richHtml) cellClasses.push('ds-has-rich');
-      var fmtText = richHtml ? null : ds_formatNumber(val, ds_getCellStyle(row, c.id).nf); // 숫자 형식(#396): 보기에서만 형식 적용
-      if (fmtText !== null) cellClasses.push('ds-has-fmt');
+      var cdisp = richHtml ? null : ds_cellDisplay(val, ds_getCellStyle(row, c.id).nf, fenv), fmtText = cdisp ? cdisp.text : null; // 숫자 형식(#396)·수식(#397): 보기에서만 형식·결과 표시
+      if (fmtText !== null) cellClasses.push('ds-has-fmt' + (cdisp.err ? ' ds-formula-err' : ''));
       var wrapMode = ds_getCellStyle(row, c.id).wrap; // 텍스트 줄바꿈(#374)
       if (wrapMode === 'overflow') cellClasses.push('ds-wrap-overflow');
       var rule = ds_ruleOf(row, c.id), ruleHtml = '';
@@ -45741,6 +45744,151 @@ function ds_filterMenuApply() {
 }
 document.addEventListener('mousedown', function(e) { if (_dsFilterMenuState && e.target && e.target.closest && !e.target.closest('#ds-filter-menu, .ds-filter-btn')) ds_closeFilterMenu(); }, true);
 document.addEventListener('keydown', function(e) { if (_dsFilterMenuState && e.key === 'Escape') { e.preventDefault(); ds_closeFilterMenu(); } }, true);
+// ── 간단한 수식(#397): `=` 로 시작하는 값. 숫자·문자열·TRUE/FALSE·셀 참조(A1, $A$1)·범위(A1:B3)·+ - * / % & 비교·괄호, 함수 SUM AVERAGE MIN MAX COUNT COUNTA IF ROUND ABS CONCAT LEN. 같은 시트만 ──
+function ds_colLetters(i) { var s0 = ''; i = i + 1; while (i > 0) { var r = (i - 1) % 26; s0 = String.fromCharCode(65 + r) + s0; i = Math.floor((i - 1) / 26); } return s0; }
+function ds_colFromLetters(l) { var n = 0; l = l.toUpperCase(); for (var k = 0; k < l.length; k++) n = n * 26 + (l.charCodeAt(k) - 64); return n - 1; }
+function ds_fmlTokens(src) {
+  var re = /\s*(?:(\d+(?:\.\d+)?)|"((?:[^"]|"")*)"|(\$?[A-Za-z]{1,3}\$?\d+)|([A-Za-z_][A-Za-z0-9_]*)|(<>|<=|>=|[-+*\/&=<>(),:%]))/y, out = [], m;
+  src = String(src);
+  re.lastIndex = 0;
+  while (re.lastIndex < src.length) {
+    var start = re.lastIndex;
+    m = re.exec(src);
+    if (!m) { if (/^\s*$/.test(src.slice(start))) break; throw { err: '#ERROR!' }; }
+    if (m[1] !== undefined) out.push({ t: 'num', v: parseFloat(m[1]) });
+    else if (m[2] !== undefined) out.push({ t: 'str', v: m[2].replace(/""/g, '"') });
+    else if (m[3] !== undefined) out.push({ t: 'ref', v: m[3] });
+    else if (m[4] !== undefined) out.push({ t: 'id', v: m[4].toUpperCase() });
+    else out.push({ t: 'op', v: m[5] });
+  }
+  return out;
+}
+function ds_fmlParse(src) { // 수식(= 뒤) → AST. 문법 오류는 { err: '#ERROR!' } 를 던진다
+  var toks = ds_fmlTokens(src), pos = 0;
+  var peek = function() { return toks[pos]; }, take = function() { return toks[pos++]; };
+  var isOp = function(v) { var t = peek(); return t && t.t === 'op' && t.v === v; };
+  function expect(v) { if (!isOp(v)) throw { err: '#ERROR!' }; pos++; }
+  function parseCompare() {
+    var l = parseConcat();
+    while (peek() && peek().t === 'op' && ['=', '<>', '<', '>', '<=', '>='].indexOf(peek().v) >= 0) { var op = take().v; l = { k: 'bin', op: op, l: l, r: parseConcat() }; }
+    return l;
+  }
+  function parseConcat() { var l = parseAdd(); while (isOp('&')) { take(); l = { k: 'bin', op: '&', l: l, r: parseAdd() }; } return l; }
+  function parseAdd() { var l = parseMul(); while (isOp('+') || isOp('-')) { var op = take().v; l = { k: 'bin', op: op, l: l, r: parseMul() }; } return l; }
+  function parseMul() { var l = parseUnary(); while (isOp('*') || isOp('/')) { var op = take().v; l = { k: 'bin', op: op, l: l, r: parseUnary() }; } return l; }
+  function parseUnary() { if (isOp('-') || isOp('+')) { var op = take().v; return { k: 'un', op: op, a: parseUnary() }; } return parsePostfix(); }
+  function parsePostfix() { var a = parsePrimary(); while (isOp('%')) { take(); a = { k: 'pct', a: a }; } return a; }
+  function parsePrimary() {
+    var t = take();
+    if (!t) throw { err: '#ERROR!' };
+    if (t.t === 'num') return { k: 'num', v: t.v };
+    if (t.t === 'str') return { k: 'str', v: t.v };
+    if (t.t === 'ref') { if (isOp(':')) { take(); var t2 = take(); if (!t2 || t2.t !== 'ref') throw { err: '#ERROR!' }; return { k: 'range', a: t.v, b: t2.v }; } return { k: 'ref', v: t.v }; }
+    if (t.t === 'id') {
+      if (isOp('(')) { take(); var args = []; if (!isOp(')')) { args.push(parseCompare()); while (isOp(',')) { take(); args.push(parseCompare()); } } expect(')'); return { k: 'fn', name: t.v, args: args }; }
+      if (t.v === 'TRUE') return { k: 'bool', v: true };
+      if (t.v === 'FALSE') return { k: 'bool', v: false };
+      throw { err: '#NAME?' };
+    }
+    if (t.t === 'op' && t.v === '(') { var e = parseCompare(); expect(')'); return e; }
+    throw { err: '#ERROR!' };
+  }
+  var ast = parseCompare();
+  if (pos < toks.length) throw { err: '#ERROR!' };
+  return ast;
+}
+function ds_fmlRef(text) { var m = /^\$?([A-Za-z]{1,3})\$?(\d+)$/.exec(text); return { j: ds_colFromLetters(m[1]), i: parseInt(m[2], 10) - 1 }; }
+// 환경: cell(i, j) → 값(null=빈 칸, 숫자, 문자열, 불리언)을 돌려주고, 수식 칸은 재귀로 계산(순환 참조는 #REF!). 결과는 칸별로 캐시
+function ds_formulaEnv(rows, columns) {
+  var cache = {}, stack = {}, env = {};
+  env.cell = function(i, j) {
+    var row = rows[i], col = columns[j];
+    if (!row || !col || i < 0 || j < 0) throw { err: '#REF!' };
+    var key = i + ':' + j, hit = cache[key];
+    if (hit) { if (hit.err) throw { err: hit.err }; return hit.v; }
+    var raw = row.cells && row.cells[col.id] != null ? String(row.cells[col.id]) : '', res;
+    if (/^\s*=/.test(raw)) {
+      if (stack[key]) throw { err: '#REF!' };
+      stack[key] = 1;
+      try { res = { v: ds_fmlEval(ds_fmlParse(raw.replace(/^\s*=/, '')), env) }; } catch (e) { res = { err: (e && e.err) || '#ERROR!' }; } finally { delete stack[key]; }
+    } else if (raw === '') res = { v: null };
+    else { var n = ds_parseNumber(raw); res = { v: isNaN(n) ? raw : n }; }
+    cache[key] = res;
+    if (res.err) throw { err: res.err };
+    return res.v;
+  };
+  return env;
+}
+function ds_fmlNum(v) { // 산술 피연산자: 빈 칸=0, 숫자 문자열은 숫자, 그 밖의 글자는 #VALUE!
+  if (v === null || v === undefined || v === '') return 0;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'boolean') return v ? 1 : 0;
+  var n = ds_parseNumber(v);
+  if (isNaN(n)) throw { err: '#VALUE!' };
+  return n;
+}
+function ds_fmlText(v) { return v === null || v === undefined ? '' : typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : typeof v === 'number' ? String(parseFloat(v.toPrecision(12))) : String(v); }
+function ds_fmlRange(a, b, env) { // 범위 → 값 배열(행 우선)
+  var A = ds_fmlRef(a), B = ds_fmlRef(b), out = [], i, j;
+  for (i = Math.min(A.i, B.i); i <= Math.max(A.i, B.i); i++) for (j = Math.min(A.j, B.j); j <= Math.max(A.j, B.j); j++) out.push(env.cell(i, j));
+  return out;
+}
+function ds_fmlEval(n, env) {
+  var flat = function(args) { var out = []; args.forEach(function(a) { if (a.k === 'range') out = out.concat(ds_fmlRange(a.a, a.b, env)); else out.push(ds_fmlEval(a, env)); }); return out; };
+  var nums = function(args) { return flat(args).filter(function(v) { return typeof v === 'number'; }); };
+  switch (n.k) {
+    case 'num': case 'str': case 'bool': return n.v;
+    case 'ref': var r = ds_fmlRef(n.v); return env.cell(r.i, r.j);
+    case 'range': throw { err: '#VALUE!' };
+    case 'pct': return ds_fmlNum(ds_fmlEval(n.a, env)) / 100;
+    case 'un': return n.op === '-' ? -ds_fmlNum(ds_fmlEval(n.a, env)) : ds_fmlNum(ds_fmlEval(n.a, env));
+    case 'bin':
+      var l = ds_fmlEval(n.l, env), rr = ds_fmlEval(n.r, env);
+      if (n.op === '&') return ds_fmlText(l) + ds_fmlText(rr);
+      if (['=', '<>', '<', '>', '<=', '>='].indexOf(n.op) >= 0) {
+        var cmp;
+        if (typeof l === 'number' && typeof rr === 'number') cmp = l - rr;
+        else cmp = String(ds_fmlText(l)).toLowerCase() < String(ds_fmlText(rr)).toLowerCase() ? -1 : String(ds_fmlText(l)).toLowerCase() > String(ds_fmlText(rr)).toLowerCase() ? 1 : 0;
+        return n.op === '=' ? cmp === 0 : n.op === '<>' ? cmp !== 0 : n.op === '<' ? cmp < 0 : n.op === '>' ? cmp > 0 : n.op === '<=' ? cmp <= 0 : cmp >= 0;
+      }
+      var a = ds_fmlNum(l), b = ds_fmlNum(rr);
+      if (n.op === '+') return a + b; if (n.op === '-') return a - b; if (n.op === '*') return a * b;
+      if (b === 0) throw { err: '#DIV/0!' };
+      return a / b;
+    case 'fn':
+      switch (n.name) {
+        case 'SUM': return nums(n.args).reduce(function(x, y) { return x + y; }, 0);
+        case 'AVERAGE': var v = nums(n.args); if (!v.length) throw { err: '#DIV/0!' }; return v.reduce(function(x, y) { return x + y; }, 0) / v.length;
+        case 'MIN': var mn = nums(n.args); return mn.length ? Math.min.apply(null, mn) : 0;
+        case 'MAX': var mx = nums(n.args); return mx.length ? Math.max.apply(null, mx) : 0;
+        case 'COUNT': return nums(n.args).length;
+        case 'COUNTA': return flat(n.args).filter(function(x) { return x !== null && x !== ''; }).length;
+        case 'IF': if (n.args.length < 2) throw { err: '#N/A' }; var cond = ds_fmlEval(n.args[0], env); return (cond === true || (typeof cond === 'number' && cond !== 0)) ? ds_fmlEval(n.args[1], env) : (n.args[2] ? ds_fmlEval(n.args[2], env) : false);
+        case 'ROUND': if (!n.args.length) throw { err: '#N/A' }; var x = ds_fmlNum(ds_fmlEval(n.args[0], env)), d = n.args[1] ? Math.round(ds_fmlNum(ds_fmlEval(n.args[1], env))) : 0, f = Math.pow(10, d); return Math.round(x * f + (x < 0 ? -1e-9 : 1e-9)) / f;
+        case 'ABS': if (!n.args.length) throw { err: '#N/A' }; return Math.abs(ds_fmlNum(ds_fmlEval(n.args[0], env)));
+        case 'CONCAT': return flat(n.args).map(ds_fmlText).join('');
+        case 'LEN': if (!n.args.length) throw { err: '#N/A' }; return ds_fmlText(ds_fmlEval(n.args[0], env)).length;
+      }
+      throw { err: '#NAME?' };
+  }
+  throw { err: '#ERROR!' };
+}
+// 수식 값(= 로 시작하는 칸 내용) → { v } 또는 { err }
+function ds_formulaValue(raw, env) {
+  try { return { v: ds_fmlEval(ds_fmlParse(String(raw).replace(/^\s*=/, '')), env) }; } catch (e) { return { err: (e && e.err) || '#ERROR!' }; }
+}
+// 칸 표시 문자열(수식이면 결과·오류, 아니면 숫자 형식 적용 결과 또는 null). nf 가 있으면 숫자 결과에 형식 적용
+function ds_cellDisplay(raw, nf, env) {
+  raw = raw == null ? '' : String(raw);
+  if (/^\s*=/.test(raw) && raw.trim().length > 1) {
+    var res = ds_formulaValue(raw, env);
+    if (res.err) return { text: res.err, err: true };
+    if (typeof res.v === 'number' && nf) { var f = ds_formatNumber(String(res.v), nf); if (f !== null) return { text: f }; }
+    return { text: ds_fmlText(res.v) };
+  }
+  var t = ds_formatNumber(raw, nf);
+  return t === null ? null : { text: t };
+}
 // ── 숫자 형식(#396) ──
 // nf = { t: 'num'|'pct'|'cur'|'date', d?: 소수 자리, th?: false(천 단위 구분 끔), c?: '₩'|'$' }. 값이 숫자(날짜)로 읽히지 않으면 null(원래 값을 그대로 표시)
 function ds_numFmtDecimals(nf) { return nf.d !== undefined ? nf.d : (nf.t === 'pct' ? 0 : nf.t === 'cur' ? (nf.c === '$' ? 2 : 0) : 2); }
@@ -45941,9 +46089,10 @@ function ds_applyBorder(mode) {
 }
 // ── 정렬(#390) ──
 // 비교: 숫자는 숫자끼리 크기순, 숫자는 글자보다 앞, 글자는 한국어 사전순(numeric), 빈 칸은 오름·내림 모두 항상 맨 뒤
-function ds_parseNumber(v) { // 숫자로 읽히면 숫자, 아니면 NaN: 12 · -3.5 · +5 · 1,000
+function ds_parseNumber(v) { // 숫자로 읽히면 숫자, 아니면 NaN: 12 · -3.5 · +5 · 1,000 · 10%(=0.1)
   v = v == null ? '' : String(v);
-  return /^\s*[+-]?(\d{1,3}(,\d{3})+|\d+)(\.\d+)?\s*$/.test(v) ? parseFloat(v.replace(/,/g, '')) : NaN;
+  var m = /^\s*([+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)(%?)\s*$/.exec(v);
+  return m ? parseFloat(m[1].replace(/,/g, '')) / (m[2] ? 100 : 1) : NaN;
 }
 function ds_sortValue(v) {
   v = v == null ? '' : String(v);
@@ -46113,6 +46262,14 @@ function ds_removeRow(rowIdx) { ds_removeRows([rowIdx]); }
 function ds_rowDeleteItem(rowIdx, plan) { // 우클릭 메뉴의 삭제 항목(여러 행이면 「선택한 행 n개 삭제」)
   return { label: plan.length > 1 ? '선택한 행 ' + plan.length + '개 삭제' : '이 행 삭제', danger: true, action: function() { ds_removeRows(plan); } };
 }
+function ds_refreshFormulaCells(except) { // 수식 칸(값이 = 로 시작)의 표시를 다시 계산. 편집 중인 칸은 건드리지 않음
+  var ds = findDataSheet(_dsEditId);
+  if (!ds) return;
+  document.querySelectorAll('#ds-editor-body textarea.ds-cell-input').forEach(function(ta) {
+    if (ta === except || ta.classList.contains('ds-cell-editing') || !/^\s*=/.test(ta.value)) return;
+    ds_richRefresh(ta);
+  });
+}
 function ds_updateCell(textareaEl) {
   if (!textareaEl) return;
   var ds = findDataSheet(_dsEditId);
@@ -46125,6 +46282,7 @@ function ds_updateCell(textareaEl) {
   if (!row.cells) row.cells = {};
   row.cells[colId] = textareaEl.value;
   ds_richRefresh(textareaEl); // 편집 밖에서 텍스트가 바뀌면 어긋난 서식 표시를 정리(#375)
+  ds_refreshFormulaCells(textareaEl); // 다른 칸의 수식이 이 칸을 참조할 수 있어 수식 칸을 다시 계산(#397)
   ds_overflowRefreshRow(rowIdx); // 옆 셀 내용이 바뀌면 오버플로우 폭도 다시(#374)
   ds_autosizeCell(textareaEl);
   persist();
