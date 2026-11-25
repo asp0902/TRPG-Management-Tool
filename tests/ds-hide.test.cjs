@@ -1,0 +1,13 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const ctx = {}; vm.createContext(ctx);
+vm.runInContext(html.slice(html.indexOf('function ds_anyHidden'), html.indexOf('function ds_afterHideChange')) + ';this.f={ds_anyHidden,ds_hiddenRunBefore}', ctx);
+const F = ctx.f, a = (...h) => h.map(x => ({ hidden: !!x }));
+ok(F.ds_hiddenRunBefore(a(0, 1, 1, 0), 3).join() === '1,2' && F.ds_hiddenRunBefore(a(1, 1, 0), 2).join() === '0,1' && F.ds_hiddenRunBefore(a(0, 0, 0), 2) === null && F.ds_hiddenRunBefore(a(0, 1, 0), 0) === null, '보이는 칸 바로 앞에 이어진 숨김 구간 계산');
+ok(F.ds_anyHidden({ rows: a(0, 1), columns: a(0) }) && F.ds_anyHidden({ rows: a(0), columns: a(0, 1) }) && !F.ds_anyHidden({ rows: a(0), columns: a(0) }), '숨김 여부');
+ok(/hidden: !!col\.hidden/.test(html) && /hidden: !!r\.hidden/.test(html), '열·행 hidden 정규화(옛 데이터는 false)');
+ok(/if \(r\.hidden\) vis\[i\] = false/.test(html) && /visibility:collapse/.test(html) && /!c\.hidden \? ds_getDataColumnWidth|c\.hidden \? 0 : ds_getDataColumnWidth/.test(html), '숨긴 행은 표시 계산에서 제외, 숨긴 열은 col 접기·표 너비 제외');
+ok(/filter\(function\(c\) \{ return !c\.hidden; \}\)\.map\(function\(c\) \{ return c\.id; \}\)/.test(html) && /while \(nextCol && nextCol\.hidden\)/.test(html), '범위·키보드 이동에서 숨긴 열 건너뜀');
+ok(/열 숨기기/.test(html) && /행 숨기기/.test(html) && /모두 숨기기 해제/.test(html) && /ds_unhideCols/.test(html) && /ds_unhideRows/.test(html), '메뉴·다시 보이기 버튼');
+process.exit(f ? 1 : 0);
