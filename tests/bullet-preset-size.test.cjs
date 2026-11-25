@@ -1,7 +1,10 @@
 const fs = require('fs'), path = require('path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
 let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
-ok(/\.tb-bullet-presets \{ display: grid; grid-template-columns: repeat\(4, minmax\(0, 1fr\)\); gap: 5px; max-height: 145px; overflow-y: auto;/.test(html), '글머리 기호 4열·gap 5px·max-height 145px·스크롤');
-ok(/\.tb-bullet-preset \{ height: 32px;/.test(html), '기호 칸 높이 32px');
+ok(/\.tb-bullet-presets \{ display: grid; grid-template-columns: repeat\(6, minmax\(0, 1fr\)\); gap: 4px; max-height: 110px; overflow-y: auto;/.test(html), '글머리 기호 6열·gap 4px·max-height 110px·스크롤(#418)');
+ok(/\.tb-bullet-preset \{ height: 24px;/.test(html), '기호 칸 높이 24px');
 ok(/\.tb-bullet-menu \{ width: 204px;/.test(html), '메뉴 폭 204px 유지');
+ok(/\.tb-bullet-img-icon \{ display: inline-block; width: 14px; height: 14px;/.test(html) && /\.tb-bullet-symbol \{[^}]*font-size: 13px;/.test(html), '이미지 아이콘 14px·기호 글자 13px(메뉴 미리보기만)');
+ok(/글머리 추가<\/div><div class="tb-bullet-img-btns"><button type="button" data-act="file">이미지 선택<\/button><button type="button" data-act="paste">클립보드 붙여넣기<\/button>/.test(html) && !/파일 선택 또는 Ctrl\+V/.test(html) && !/이미지 글머리 추가/.test(html), '「글머리 추가」 두 버튼, 옛 안내 문구·이름 삭제');
+ok(/navigator\.clipboard\.read\(\)/.test(html) && /Ctrl\+V로 붙여넣기/.test(html) && /\.tb-bullet-img-add button\.waiting/.test(html), '클립보드 읽기 시도, 권한 거부 시 Ctrl+V 대기 상태');
 process.exit(f ? 1 : 0);
