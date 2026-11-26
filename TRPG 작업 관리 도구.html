@@ -7175,6 +7175,8 @@ body.block-pointer-dragging {
 .ds-cf-item.active .ds-cf-name { border-color: #000; font-weight: 700; }
 .ds-cf-item button:disabled { opacity: .35; cursor: default; }
 .ds-band-preset { width: 40px; height: 34px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; padding: 0; }
+.ds-painting table.ds-table td, .ds-painting table.ds-table td textarea { cursor: copy; }
+#ds-paint-btn.active { background: #111; color: #fff; }
 .ds-statusbar-stat { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; color: #444; font: inherit; font-size: 12px; font-weight: 700; padding: 1px 8px; cursor: pointer; }
 .ds-statusbar-stat:hover { background: #f3f4f6; border-color: #bbb; }
 .ds-statusbar-selection { color: #a0a0a0; font-weight: 600; }
@@ -42507,6 +42509,7 @@ function openDataSheetEditor(id) {
 }
 function closeDataSheetEditor() {
   if (typeof ds_findClose === 'function') ds_findClose();
+  if (typeof ds_paintStop === 'function') ds_paintStop();
   _dsEditId = null;
   _dsActiveRowIdx = null;
   _dsActiveCellRowIdx = null;
@@ -42579,6 +42582,7 @@ function renderDataSheetEditor() {
   body.innerHTML = _dsRenderFlatTable(ds);
   ds_cfPaint(ds); // 조건부 서식·교차 색상(#401)
   ds_findPaint(); // 찾기 강조 다시 칠하기(#400)
+  ds_paintUi(); // 서식 복사 상태(#402)
   // 초기 자동 높이
   requestAnimationFrame(function() {
     ds_autosizeVisibleCells();
@@ -42812,6 +42816,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + btn('ds-undo-btn', 'tbUndo()', '실행 취소 (Ctrl+Z)', 'fa-rotate-left')
     + btn('ds-redo-btn', 'tbRedo()', '다시 실행 (Ctrl+Shift+Z)', 'fa-rotate-right')
     + btn('ds-find-btn', 'ds_findOpen(true)', '찾기·바꾸기 (Ctrl+F / Ctrl+H)', 'fa-magnifying-glass')
+    + btn('ds-paint-btn', 'ds_paintClick(event)', '서식 복사 (두 번 누르면 계속, Esc 종료)', 'fa-paintbrush')
     + SEP
     + '<div class="tb-font-wrap">'
     + '<button type="button" id="ds-font-trigger" class="tb-select tb-select-font tb-font-trigger" title="글꼴" aria-label="셀 글꼴" aria-haspopup="listbox" aria-controls="ds-font-menu" aria-expanded="false"' + NOFOCUS + ' onclick="ds_toggleFontMenu(event)"><span class="tb-font-trigger-label" id="ds-font-trigger-label">글꼴</span><i class="fa-solid fa-chevron-down tb-control-chevron" aria-hidden="true"></i></button>'
@@ -46299,6 +46304,74 @@ function ds_applyBandDialog(remove) {
     [['ds-cf-color', 'ds-cf-color-on'], ['ds-cf-bg', 'ds-cf-bg-on'], ['ds-cf-mid', 'ds-cf-mid-on'], ['ds-band-header', 'ds-band-header-on'], ['ds-band-footer', 'ds-band-footer-on']].forEach(function(x) { on(x[0], 'input', function() { document.getElementById(x[1]).checked = true; }); });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind();
+})();
+// ── 서식 복사(#402): 칸 서식(cellStyles)·가로 맞춤(cellAligns)만 옮긴다. 값·글자 일부 서식(cellRich)·데이터 확인은 그대로 ──
+var _dsPaint = null; // { matrix: [[{ st, al }]], keep: 계속 적용 }
+// 순수 함수: 원본(R×C)을 대상에 바둑판처럼 반복. 대상이 한 칸이면 원본 크기만큼 오른쪽·아래로(rows/cols 는 보이는 행 번호·열 번호 목록 안에서만)
+function ds_paintPlan(R, C, tgtRows, tgtCols, allRows, allCols) {
+  var rows = tgtRows, cols = tgtCols, out = [];
+  if (rows.length === 1 && cols.length === 1) {
+    rows = allRows.slice(allRows.indexOf(rows[0]), allRows.indexOf(rows[0]) + R);
+    cols = allCols.slice(allCols.indexOf(cols[0]), allCols.indexOf(cols[0]) + C);
+  }
+  rows.forEach(function(r, i) { cols.forEach(function(c, j) { out.push({ r: r, c: c, sr: i % R, sc: j % C }); }); });
+  return out;
+}
+function ds_paintSelection(ds) { // 선택 → 보이는 데이터 행 번호·보이는 열 번호
+  var vis = ds_visibleRows(ds), rows = [], cols = [];
+  (ds_getTextAlignTargetCells(ds) || []).forEach(function(c) {
+    if (!ds_isDataRow(c.row) || !vis[c.rowIdx]) return;
+    var j = ds.columns.findIndex(function(x) { return x.id === c.colId; });
+    if (j < 0 || ds.columns[j].hidden) return;
+    if (rows.indexOf(c.rowIdx) < 0) rows.push(c.rowIdx);
+    if (cols.indexOf(j) < 0) cols.push(j);
+  });
+  var num = function(a, b) { return a - b; };
+  return rows.length && cols.length ? { rows: rows.sort(num), cols: cols.sort(num) } : null;
+}
+function ds_paintUi() {
+  var b = document.getElementById('ds-paint-btn');
+  if (b) { b.classList.toggle('active', !!_dsPaint); b.setAttribute('aria-pressed', _dsPaint ? 'true' : 'false'); }
+  var body = document.getElementById('ds-editor-body');
+  if (body) body.classList.toggle('ds-painting', !!_dsPaint);
+}
+function ds_paintStop() { _dsPaint = null; ds_paintUi(); }
+function ds_paintClick(e) { // 한 번 누르면 한 번 적용, 두 번 누르면 Esc(또는 다시 누름)까지 계속
+  if (e && e.detail >= 2 && _dsPaint) { _dsPaint.keep = true; return; }
+  if (_dsPaint) { ds_paintStop(); return; }
+  var ds = findDataSheet(_dsEditId), sel = ds && ds_paintSelection(ds);
+  if (!sel) { if (typeof rubyToast === 'function') rubyToast('서식을 가져올 칸을 먼저 선택하세요.'); return; }
+  _dsPaint = { keep: false, matrix: sel.rows.map(function(i) {
+    return sel.cols.map(function(j) {
+      var row = ds.rows[i], id = ds.columns[j].id, st = row.cellStyles && row.cellStyles[id];
+      return { st: st ? JSON.parse(JSON.stringify(st)) : null, al: (row.cellAligns && row.cellAligns[id]) || null };
+    });
+  }) };
+  ds_paintUi();
+}
+function ds_paintApply() {
+  var ds = findDataSheet(_dsEditId), sel = _dsPaint && ds && ds_paintSelection(ds);
+  if (!sel) return;
+  var vis = ds_visibleRows(ds), allRows = [], allCols = [];
+  ds.rows.forEach(function(r, i) { if (ds_isDataRow(r) && vis[i]) allRows.push(i); });
+  ds.columns.forEach(function(c, j) { if (!c.hidden) allCols.push(j); });
+  var m = _dsPaint.matrix, plan = ds_paintPlan(m.length, m[0].length, sel.rows, sel.cols, allRows, allCols), viewport = ds_captureEditorViewport();
+  plan.forEach(function(x) {
+    var row = ds.rows[x.r], id = ds.columns[x.c].id, src = m[x.sr][x.sc];
+    if (!row.cellStyles) row.cellStyles = {}; if (!row.cellAligns) row.cellAligns = {};
+    if (src.st) row.cellStyles[id] = JSON.parse(JSON.stringify(src.st)); else delete row.cellStyles[id];
+    if (src.al) row.cellAligns[id] = src.al; else delete row.cellAligns[id];
+  });
+  if (!_dsPaint.keep) _dsPaint = null;
+  var last = plan[plan.length - 1];
+  ds_setSelectedCellRange(plan[0].r, ds.columns[plan[0].c].id, last.r, ds.columns[last.c].id);
+  _dsForceNextHistoryCommit = true; persist(); renderDataSheetEditor(); ds_restoreEditorViewport(viewport);
+}
+(function() {
+  var armed = false;
+  document.addEventListener('mousedown', function(e) { armed = !!(_dsPaint && e.button === 0 && currentPage === 'datasheet' && e.target.closest && e.target.closest('#ds-editor-body table.ds-table')); }, true);
+  document.addEventListener('mouseup', function() { if (!armed) return; armed = false; setTimeout(ds_paintApply, 30); }, true); // 드래그 선택이 끝난 뒤에 적용
+  document.addEventListener('keydown', function(e) { if (_dsPaint && e.key === 'Escape' && !e.isComposing) { e.preventDefault(); e.stopPropagation(); ds_paintStop(); } }, true);
 })();
 // ── 시트 안 찾기·바꾸기(#400) ──
 // o = { matchCase, whole(셀 전체 일치), regex, formulas(수식 글자까지 검색) }. 빈 검색어·잘못된 정규식·빈 글자와 맞는 정규식은 null
