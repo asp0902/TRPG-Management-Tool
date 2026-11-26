@@ -7246,6 +7246,13 @@ body.block-pointer-dragging {
 .ds-slicer-list label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .ds-slicer-list span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ds-slicer-list small { color: #999; }
+/* 수식 참조 표시(#421) */
+.ds-table td[data-ref-color] { outline: 2px dashed #1a73e8; outline-offset: -2px; }
+.ds-table td[data-ref-color="1"] { outline-color: #ea4335; }
+.ds-table td[data-ref-color="2"] { outline-color: #9334e6; }
+.ds-table td[data-ref-color="3"] { outline-color: #188038; }
+.ds-table td[data-ref-color="4"] { outline-color: #e8710a; }
+.ds-table td[data-ref-color="5"] { outline-color: #d01884; }
 .ds-statusbar-stat { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; color: #444; font: inherit; font-size: 12px; font-weight: 700; padding: 1px 8px; cursor: pointer; }
 .ds-statusbar-stat:hover { background: #f3f4f6; border-color: #bbb; }
 .ds-statusbar-selection { color: #a0a0a0; font-weight: 600; }
@@ -43750,9 +43757,10 @@ function ds_snapshotClip(ds, text) {
   var clone = function(x) { return x == null ? null : JSON.parse(JSON.stringify(x)); };
   var clipMap = ds_mergeMap(ds.rows, ds.columns, ds_activeMerges(ds)), clipMerges = []; // 복사한 범위 안의 병합(상대 위치, #420)
   Object.keys(clipMap.anchors).forEach(function(k) { var at = k.split(':'), a = clipMap.anchors[k], i = m.rowIdxs.indexOf(+at[0]), j = m.colIds.indexOf((ds.columns[+at[1]] || {}).id); if (i >= 0 && j >= 0 && i + a.rs <= m.rowIdxs.length && j + a.cs <= m.colIds.length) clipMerges.push({ r: i, c: j, rs: a.rs, cs: a.cs }); });
+  var clipEnv = ds_formulaEnv(ds.rows, ds.columns), shownOf = function(v) { if (!ds_isFormula(v)) return v; var res = ds_formulaValue(v, clipEnv); return res.err ? res.err : ds_fmlText(res.v); };
   _dsInternalClip = { text: text, merges: clipMerges, matrix: m.rowIdxs.map(function(ri) {
     var row = ds.rows[ri];
-    return m.colIds.map(function(cid) { return { v: row && row.cells && row.cells[cid] != null ? String(row.cells[cid]) : '', st: clone(row && row.cellStyles && row.cellStyles[cid]), al: row && row.cellAligns ? row.cellAligns[cid] || null : null, rc: row && row.cellRich ? row.cellRich[cid] || null : null, ru: clone(ds_ruleOf(row, cid)) }; });
+    return m.colIds.map(function(cid) { return { i: ri, j: ds_getColumnIndex(ds, cid), shown: shownOf(row && row.cells && row.cells[cid] != null ? String(row.cells[cid]) : ''), v: row && row.cells && row.cells[cid] != null ? String(row.cells[cid]) : '', st: clone(row && row.cellStyles && row.cellStyles[cid]), al: row && row.cellAligns ? row.cellAligns[cid] || null : null, rc: row && row.cellRich ? row.cellRich[cid] || null : null, ru: clone(ds_ruleOf(row, cid)) }; });
   }) };
 }
 // 순수 함수: 붙여넣기 원본(R×C)과 전치 여부로 목표 칸 (i,j) 가 가져올 원본 위치. 전치면 행·열이 바뀐다
@@ -43776,7 +43784,8 @@ function ds_pasteInternal(mode, transpose) {
       var src = fillSel ? { r: 0, c: 0 } : ds_pasteSource(i, j, !!transpose), cell = clip.matrix[src.r] && clip.matrix[src.r][src.c], row = ds.rows[ri];
       if (!cell || !ds_isDataRow(row)) return;
       if (!row.cells) row.cells = {}; if (!row.cellStyles) row.cellStyles = {}; if (!row.cellAligns) row.cellAligns = {}; if (!row.cellRich) row.cellRich = {}; if (!row.cellRules) row.cellRules = {};
-      if (mode === 'all' || mode === 'values') { row.cells[cid] = cell.v; if (mode === 'values') delete row.cellRich[cid]; }
+      if (mode === 'all') row.cells[cid] = ds_isFormula(cell.v) && cell.i !== undefined ? ds_refShift(cell.v, ri - cell.i, ds_getColumnIndex(ds, cid) - cell.j) : cell.v; // 수식은 옮긴 만큼 상대 참조 이동(#421)
+      if (mode === 'values') { row.cells[cid] = cell.shown !== undefined ? cell.shown : cell.v; delete row.cellRich[cid]; }
       if (mode === 'all' || mode === 'format') { if (cell.st) row.cellStyles[cid] = cl(cell.st); else delete row.cellStyles[cid]; if (cell.al) row.cellAligns[cid] = cell.al; else delete row.cellAligns[cid]; }
       if (mode === 'all') { if (cell.rc) row.cellRich[cid] = cell.rc; else delete row.cellRich[cid]; }
       if (mode === 'all' || mode === 'rules') { if (cell.ru) row.cellRules[cid] = cl(cell.ru); else delete row.cellRules[cid]; }
@@ -44347,6 +44356,7 @@ function ds_startDragAutoScroll(x, y) {
   }, 40);
 }
 function ds_handleCellMouseDown(e, rowIdx, colId) {
+  if (typeof ds_refPickStart === 'function' && ds_refPickStart(e, parseInt(rowIdx, 10), colId)) return; // 수식 편집 중: 참조 입력(#421)
   var isSameEditingCell = ds_isCellInEditMode(rowIdx, colId);
   if (e) {
     e.stopPropagation();
@@ -44569,8 +44579,9 @@ function ds_fillEnd(e) {
         var row = ds.rows[ri];
         if (!ds_isDataRow(row) || covered(ri, colId)) return;
         if (!row.cells || typeof row.cells !== 'object') row.cells = {};
-        row.cells[colId] = vals[i];
-        copyFmt(seed.rowIdxs[i % seed.rowIdxs.length], colId, row, colId);
+        var srcRi = seed.rowIdxs[i % seed.rowIdxs.length];
+        row.cells[colId] = ds_isFormula(seq[i % seq.length]) ? ds_refShift(seq[i % seq.length], ri - srcRi, 0) : vals[i]; // 수식은 상대 참조 이동(#421)
+        copyFmt(srcRi, colId, row, colId);
       });
     });
   } else {
@@ -44582,8 +44593,9 @@ function ds_fillEnd(e) {
       tgt.cols.forEach(function(cid, i) {
         if (covered(ri, cid)) return;
         if (!row.cells || typeof row.cells !== 'object') row.cells = {};
-        row.cells[cid] = vals[i];
-        copyFmt(ri, seed.colIds[i % seed.colIds.length], row, cid);
+        var srcCid = seed.colIds[i % seed.colIds.length];
+        row.cells[cid] = ds_isFormula(seq[i % seq.length]) ? ds_refShift(seq[i % seq.length], 0, ds_getColumnIndex(ds, cid) - ds_getColumnIndex(ds, srcCid)) : vals[i];
+        copyFmt(ri, srcCid, row, cid);
       });
     });
   }
@@ -45340,10 +45352,11 @@ function ds_insertColumnAt(colId, after) {
   var idx = ds.columns.findIndex(function(c) { return c.id === colId; });
   if (idx < 0) idx = ds.columns.length - 1;
   var insertAt = after ? idx + 1 : idx;
-  var colIdsBefore = ds.columns.map(function(c) { return c.id; }), newColId = mkId();
+  var colIdsBefore = ds.columns.map(function(c) { return c.id; }), newColId = mkId(), refSnap = ds_refSnapshot(ds);
   ds.columns.splice(insertAt, 0, { id: newColId, name: '', width: 160 });
   var fSheet = _dsActiveSheet(ds);
   if (fSheet) fSheet.merges = ds_mergeAfterInsert(fSheet.merges, colIdsBefore, insertAt, newColId, 'c');
+  ds_refFollow(ds, refSnap); // 수식 참조 보정(#421)
   if (fSheet) fSheet.frozenCols = ds_freezeAfterInsert(fSheet.frozenCols || 0, insertAt);
   persist();
   renderDataSheetEditor();
@@ -45353,7 +45366,7 @@ function ds_removeColumn(colId) {
   if (!ds) return;
   if (ds.columns.length <= 1) { alert('마지막 열은 삭제할 수 없습니다.'); return; }
   if (!confirm('이 열을 삭제할까요? 모든 행의 해당 열 데이터도 함께 사라집니다.')) return;
-  var _rmIdx = ds.columns.findIndex(function(c) { return c.id === colId; });
+  var _rmIdx = ds.columns.findIndex(function(c) { return c.id === colId; }), refSnap = ds_refSnapshot(ds);
   if (_rmIdx >= 0) {
     ds.columns.splice(_rmIdx, 1);
     var fSheet = _dsActiveSheet(ds);
@@ -45367,6 +45380,7 @@ function ds_removeColumn(colId) {
     if (r.cellNotes) delete r.cellNotes[colId];
     if (r.cellImg) delete r.cellImg[colId];
   });
+  ds_refFollow(ds, refSnap);
   if (_dsActiveCellColId === colId) {
     _dsActiveCellRowIdx = null;
     _dsActiveCellColId = null;
@@ -45850,8 +45864,9 @@ function _dsDragEnd() {
     var insertAt = to > from ? to - 1 : to;
     if (insertAt !== from && from >= 0 && from < ds.rows.length && ds_moveBreaksMerge(ds_activeMerges(ds), ds.rows.map(function(r) { return r.id; }), from, insertAt, 'r')) { if (typeof rubyToast === 'function') rubyToast('병합된 칸이 흩어지는 이동은 할 수 없습니다. 먼저 병합을 해제하세요.'); }
     else if (insertAt !== from && from >= 0 && from < ds.rows.length) {
-      var movedRow = ds.rows.splice(from, 1)[0];
+      var rowSnap = ds_refSnapshot(ds), movedRow = ds.rows.splice(from, 1)[0];
       ds.rows.splice(insertAt, 0, movedRow);
+      ds_refFollow(ds, rowSnap);
       _dsSelectedRowIdxs = [insertAt];
       _dsRowSelectionAnchorIdx = insertAt;
       _dsActiveRowIdx = insertAt;
@@ -45869,8 +45884,9 @@ function _dsDragEnd() {
     var cInsertAt = cTo > cFrom ? cTo - 1 : cTo;
     if (cInsertAt !== cFrom && cFrom >= 0 && cFrom < ds.columns.length && ds_moveBreaksMerge(ds_activeMerges(ds), ds.columns.map(function(c) { return c.id; }), cFrom, cInsertAt, 'c')) { if (typeof rubyToast === 'function') rubyToast('병합된 칸이 흩어지는 이동은 할 수 없습니다. 먼저 병합을 해제하세요.'); }
     else if (cInsertAt !== cFrom && cFrom >= 0 && cFrom < ds.columns.length) {
-      var movedCol = ds.columns.splice(cFrom, 1)[0];
+      var colSnap = ds_refSnapshot(ds), movedCol = ds.columns.splice(cFrom, 1)[0];
       ds.columns.splice(cInsertAt, 0, movedCol);
+      ds_refFollow(ds, colSnap);
       _dsSelectedColIds = [movedCol.id];
       _dsColSelectionAnchorId = movedCol.id;
       _dsSelectedRowIdxs = [];
@@ -45964,6 +45980,7 @@ function ds_insertRowAt(rowIdx, after, asCategory) {
   if (asCategory && grown.some(function(m) { return m.r.indexOf(newRowId) >= 0; })) { if (typeof rubyToast === 'function') rubyToast('병합된 칸 가운데에는 카테고리 행을 넣을 수 없습니다.'); return; }
   if (fSheet) fSheet.frozenRows = ds_freezeAfterInsert(fSheet.frozenRows || 0, insertAt);
   if (fSheet) fSheet.merges = grown;
+  var refSnap = ds_refSnapshot(ds);
   ds.rows.splice(insertAt, 0, {
     id: newRowId,
     isCategory: !!asCategory,
@@ -45973,6 +45990,7 @@ function ds_insertRowAt(rowIdx, after, asCategory) {
     cellAligns: {},
     cells: {},
   });
+  ds_refFollow(ds, refSnap);
   _dsActiveRowIdx = insertAt;
   _dsActiveCellRowIdx = null;
   _dsActiveCellColId = null;
@@ -48085,6 +48103,94 @@ function ds_printCleanup() {
   }
   if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind(); }
 })();
+// ── 수식 2차(#421): 참조 고쳐 쓰기(삽입·삭제·이동·정렬), 상대 참조 이동(채우기·붙여넣기), 칸 클릭으로 참조 입력 ──
+function ds_isFormula(v) { v = String(v == null ? '' : v); return /^\s*=/.test(v) && v.trim().length > 1; }
+function ds_refText(r) { return (r.absC ? '$' : '') + ds_colLetters(r.j) + (r.absR ? '$' : '') + (r.i + 1); }
+// 수식 글자의 A1·A1:B3 참조를 fn(a, b|null) 의 결과 { a, b } 로 바꾼다(null 이면 #REF!). 따옴표 안 글자와 함수 이름은 건드리지 않음
+function ds_refRewrite(formula, fn) {
+  return String(formula).replace(/("(?:[^"]|"")*")|(^|[^A-Za-z0-9_$])(\$?)([A-Za-z]{1,3})(\$?)(\d+)(?::(\$?)([A-Za-z]{1,3})(\$?)(\d+))?(?![A-Za-z0-9_(])/g, function(m, str, pre, c1, l1, r1, n1, c2, l2, r2, n2) {
+    if (str) return m;
+    var a = { i: +n1 - 1, j: ds_colFromLetters(l1), absR: !!r1, absC: !!c1 }, b = l2 === undefined ? null : { i: +n2 - 1, j: ds_colFromLetters(l2), absR: !!r2, absC: !!c2 };
+    var out = fn(a, b);
+    return pre + (!out ? '#REF!' : ds_refText(out.a) + (out.b ? ':' + ds_refText(out.b) : ''));
+  });
+}
+// rowMap·colMap: 예전 번호 → 새 번호(-1 = 삭제). 배열 밖 번호는 그대로. 범위는 남은 칸의 처음~끝(모두 지우면 #REF!)
+function ds_refAdjust(formula, rowMap, colMap) {
+  var one = function(map, n) { return n < map.length ? map[n] : n; };
+  var span = function(map, x, y) { var lo = Infinity, hi = -1; for (var k = Math.min(x, y); k <= Math.max(x, y); k++) { var v = one(map, k); if (v >= 0) { lo = Math.min(lo, v); hi = Math.max(hi, v); } } return hi < 0 ? null : [lo, hi]; };
+  return ds_refRewrite(formula, function(a, b) {
+    if (!b) { var i = one(rowMap, a.i), j = one(colMap, a.j); return i < 0 || j < 0 ? null : { a: Object.assign({}, a, { i: i, j: j }), b: null }; }
+    var rs = span(rowMap, a.i, b.i), cs = span(colMap, a.j, b.j);
+    return rs && cs ? { a: Object.assign({}, a, { i: rs[0], j: cs[0] }), b: Object.assign({}, b, { i: rs[1], j: cs[1] }) } : null;
+  });
+}
+function ds_refShift(formula, di, dj) { // 채우기·붙여넣기: $ 없는 부분만 옮김
+  var move = function(r) { var i = r.absR ? r.i : r.i + di, j = r.absC ? r.j : r.j + dj; return i < 0 || j < 0 ? null : Object.assign({}, r, { i: i, j: j }); };
+  return ds_refRewrite(formula, function(a, b) { var x = move(a), y = b && move(b); return !x || (b && !y) ? null : { a: x, b: y || null }; });
+}
+function ds_refSnapshot(ds) { return { r: ds.rows.map(function(x) { return x.id; }), c: ds.columns.map(function(x) { return x.id; }) }; }
+function ds_refFollow(ds, snap) { // 행·열 구조가 바뀐 뒤: 같은 칸을 계속 가리키게 모든 수식을 고쳐 씀
+  var toMap = function(ids, items) { var pos = {}; items.forEach(function(x, i) { pos[x.id] = i; }); return ids.map(function(id) { return pos[id] === undefined ? -1 : pos[id]; }); };
+  var rowMap = toMap(snap.r, ds.rows), colMap = toMap(snap.c, ds.columns);
+  ds.rows.forEach(function(row) { Object.keys(row.cells || {}).forEach(function(k) { if (ds_isFormula(row.cells[k])) row.cells[k] = ds_refAdjust(row.cells[k], rowMap, colMap); }); });
+}
+// 범위 정렬(칸만 이동): 정렬한 열의 한 칸 참조는 옮겨 간 행으로(범위 참조는 자리 기준 그대로)
+function ds_refFollowCells(rows, perm, colIdxs) {
+  var to = [];
+  perm.forEach(function(src, i) { to[src] = i; });
+  rows.forEach(function(row) {
+    Object.keys(row.cells || {}).forEach(function(k) {
+      if (ds_isFormula(row.cells[k])) row.cells[k] = ds_refRewrite(row.cells[k], function(a, b) { return !b && colIdxs.indexOf(a.j) >= 0 && to[a.i] !== undefined ? { a: Object.assign({}, a, { i: to[a.i] }), b: null } : { a: a, b: b }; });
+    });
+  });
+}
+// 편집 중인 수식에 참조 끼우기: 커서 앞이 연산자·여는 괄호·쉼표이거나 방금 끼운 참조 뒤일 때만 → { value, span } 또는 null
+function ds_refInsert(value, start, end, ref, span) {
+  if (!ds_isFormula(value) && String(value).trim() !== '=') return null;
+  if (span && start === span[1] && end === span[1]) start = span[0];
+  else if (!/[=+\-*\/(,&<>:^]\s*$/.test(value.slice(0, start))) return null;
+  return { value: value.slice(0, start) + ref + value.slice(end), span: [start, start + ref.length] };
+}
+var _dsRefPick = null; // { ta, span, from: { i, j } }
+function ds_refPickStart(e, rowIdx, colId) { // 수식 편집 중 다른 칸을 누르면 참조 입력(true 면 선택 이동 안 함)
+  if (!e || e.button !== 0 || !_dsCellEditMode || _dsActiveCellRowIdx === null) return false;
+  var ds = findDataSheet(_dsEditId), ta = ds && ds_getCellTextarea(_dsActiveCellRowIdx, _dsActiveCellColId);
+  if (!ta || document.activeElement !== ta || (rowIdx === _dsActiveCellRowIdx && colId === _dsActiveCellColId)) return false;
+  var j = ds_getColumnIndex(ds, colId), same = _dsRefPick && _dsRefPick.ta === ta ? _dsRefPick.span : null;
+  var next = ds_refInsert(ta.value, ta.selectionStart, ta.selectionEnd, ds_colLetters(j) + (rowIdx + 1), same);
+  if (!next) return false;
+  e.preventDefault(); e.stopPropagation();
+  _dsRefPick = { ta: ta, span: next.span, from: { i: rowIdx, j: j } };
+  var put = function(n) { ta.value = n.value; ta.setSelectionRange(n.span[1], n.span[1]); _dsRefPick.span = n.span; ds_handleCellInput(ta); ds_refPaint(ta); };
+  put(next);
+  var move = function(ev) {
+    var at = ds_getCellCoordsFromPoint(ev.clientX, ev.clientY);
+    if (!at) return;
+    var f = _dsRefPick.from, tj = ds_getColumnIndex(ds, at.colId), r0 = Math.min(f.i, at.rowIdx), r1 = Math.max(f.i, at.rowIdx), c0 = Math.min(f.j, tj), c1 = Math.max(f.j, tj);
+    var ref = ds_colLetters(c0) + (r0 + 1) + (r0 !== r1 || c0 !== c1 ? ':' + ds_colLetters(c1) + (r1 + 1) : '');
+    if (ta.value.slice(_dsRefPick.span[0], _dsRefPick.span[1]) !== ref) put({ value: ta.value.slice(0, _dsRefPick.span[0]) + ref + ta.value.slice(_dsRefPick.span[1]), span: [_dsRefPick.span[0], _dsRefPick.span[0] + ref.length] });
+  };
+  var up = function() { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); ta.focus(); };
+  document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+  return true;
+}
+var DS_REF_COLORS = 6;
+function ds_refPaint(ta) { // 편집 중인 수식이 가리키는 칸에 색 테두리
+  document.querySelectorAll('#ds-editor-body td[data-ref-color]').forEach(function(td) { td.removeAttribute('data-ref-color'); });
+  if (!ta || !ds_isFormula(ta.value)) return;
+  var n = 0;
+  ds_refRewrite(ta.value, function(a, b) {
+    var color = n++ % DS_REF_COLORS, y = b || a, ds = findDataSheet(_dsEditId), count = 0;
+    for (var i = Math.min(a.i, y.i); i <= Math.max(a.i, y.i) && count < 2000; i++) for (var j = Math.min(a.j, y.j); j <= Math.max(a.j, y.j) && count < 2000; j++, count++) { var cell = ds.columns[j] && ds_getCellTextarea(i, ds.columns[j].id); if (cell) cell.closest('td').setAttribute('data-ref-color', color); }
+    return { a: a, b: b };
+  });
+}
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('input', function(e) { if (e.target && e.target.classList && e.target.classList.contains('ds-cell-input')) { if (_dsRefPick && e.isTrusted) _dsRefPick = null; ds_refPaint(e.target); } });
+  document.addEventListener('focusin', function(e) { if (e.target && e.target.classList && e.target.classList.contains('ds-cell-input')) ds_refPaint(_dsCellEditMode ? e.target : null); });
+  document.addEventListener('focusout', function(e) { if (e.target && e.target.classList && e.target.classList.contains('ds-cell-input')) { _dsRefPick = null; ds_refPaint(null); } });
+}
 // ── 시트 안 찾기·바꾸기(#400) ──
 // o = { matchCase, whole(셀 전체 일치), regex, formulas(수식 글자까지 검색) }. 빈 검색어·잘못된 정규식·빈 글자와 맞는 정규식은 null
 function ds_findRegex(q, o) {
@@ -48322,7 +48428,7 @@ function ds_openStatMenu(e) {
 function ds_colLetters(i) { var s0 = ''; i = i + 1; while (i > 0) { var r = (i - 1) % 26; s0 = String.fromCharCode(65 + r) + s0; i = Math.floor((i - 1) / 26); } return s0; }
 function ds_colFromLetters(l) { var n = 0; l = l.toUpperCase(); for (var k = 0; k < l.length; k++) n = n * 26 + (l.charCodeAt(k) - 64); return n - 1; }
 function ds_fmlTokens(src) {
-  var re = /\s*(?:(\d+(?:\.\d+)?)|"((?:[^"]|"")*)"|(\$?[A-Za-z]{1,3}\$?\d+)|([A-Za-z_][A-Za-z0-9_]*)|(<>|<=|>=|[-+*\/&=<>(),:%]))/y, out = [], m;
+  var re = /\s*(?:(\d+(?:\.\d+)?)|"((?:[^"]|"")*)"|(\$?[A-Za-z]{1,3}\$?\d+)|([A-Za-z_][A-Za-z0-9_]*)|(<>|<=|>=|[-+*\/&=<>(),:%^])|(#REF!))/y, out = [], m;
   src = String(src);
   re.lastIndex = 0;
   while (re.lastIndex < src.length) {
@@ -48333,6 +48439,7 @@ function ds_fmlTokens(src) {
     else if (m[2] !== undefined) out.push({ t: 'str', v: m[2].replace(/""/g, '"') });
     else if (m[3] !== undefined) out.push({ t: 'ref', v: m[3] });
     else if (m[4] !== undefined) out.push({ t: 'id', v: m[4].toUpperCase() });
+    else if (m[6] !== undefined) throw { err: '#REF!' }; // 지운 칸을 가리키던 참조(#421)
     else out.push({ t: 'op', v: m[5] });
   }
   return out;
@@ -48349,7 +48456,8 @@ function ds_fmlParse(src) { // 수식(= 뒤) → AST. 문법 오류는 { err: '#
   }
   function parseConcat() { var l = parseAdd(); while (isOp('&')) { take(); l = { k: 'bin', op: '&', l: l, r: parseAdd() }; } return l; }
   function parseAdd() { var l = parseMul(); while (isOp('+') || isOp('-')) { var op = take().v; l = { k: 'bin', op: op, l: l, r: parseMul() }; } return l; }
-  function parseMul() { var l = parseUnary(); while (isOp('*') || isOp('/')) { var op = take().v; l = { k: 'bin', op: op, l: l, r: parseUnary() }; } return l; }
+  function parseMul() { var l = parsePow(); while (isOp('*') || isOp('/')) { var op = take().v; l = { k: 'bin', op: op, l: l, r: parsePow() }; } return l; }
+  function parsePow() { var l = parseUnary(); while (isOp('^')) { take(); l = { k: 'bin', op: '^', l: l, r: parseUnary() }; } return l; } // 부호가 ^ 보다 먼저(-2^2 = 4, 구글 시트와 같음)
   function parseUnary() { if (isOp('-') || isOp('+')) { var op = take().v; return { k: 'un', op: op, a: parseUnary() }; } return parsePostfix(); }
   function parsePostfix() { var a = parsePrimary(); while (isOp('%')) { take(); a = { k: 'pct', a: a }; } return a; }
   function parsePrimary() {
@@ -48427,6 +48535,7 @@ function ds_fmlEval(n, env) {
       }
       var a = ds_fmlNum(l), b = ds_fmlNum(rr);
       if (n.op === '+') return a + b; if (n.op === '-') return a - b; if (n.op === '*') return a * b;
+      if (n.op === '^') { var pw = Math.pow(a, b); if (!isFinite(pw)) throw { err: '#NUM!' }; return pw; }
       if (b === 0) throw { err: '#DIV/0!' };
       return a / b;
     case 'fn':
@@ -48440,6 +48549,16 @@ function ds_fmlEval(n, env) {
         case 'IF': if (n.args.length < 2) throw { err: '#N/A' }; var cond = ds_fmlEval(n.args[0], env); return (cond === true || (typeof cond === 'number' && cond !== 0)) ? ds_fmlEval(n.args[1], env) : (n.args[2] ? ds_fmlEval(n.args[2], env) : false);
         case 'ROUND': if (!n.args.length) throw { err: '#N/A' }; var x = ds_fmlNum(ds_fmlEval(n.args[0], env)), d = n.args[1] ? Math.round(ds_fmlNum(ds_fmlEval(n.args[1], env))) : 0, f = Math.pow(10, d); return Math.round(x * f + (x < 0 ? -1e-9 : 1e-9)) / f;
         case 'ABS': if (!n.args.length) throw { err: '#N/A' }; return Math.abs(ds_fmlNum(ds_fmlEval(n.args[0], env)));
+        case 'INT': if (!n.args.length) throw { err: '#N/A' }; return Math.floor(ds_fmlNum(ds_fmlEval(n.args[0], env)));
+        case 'MOD': if (n.args.length < 2) throw { err: '#N/A' }; var mx1 = ds_fmlNum(ds_fmlEval(n.args[0], env)), md = ds_fmlNum(ds_fmlEval(n.args[1], env)); if (!md) throw { err: '#DIV/0!' }; return mx1 - md * Math.floor(mx1 / md);
+        case 'TODAY': var td = new Date(); return td.getFullYear() + '-' + ('0' + (td.getMonth() + 1)).slice(-2) + '-' + ('0' + td.getDate()).slice(-2);
+        case 'COUNTIF': case 'SUMIF':
+          if (n.args.length < 2 || n.args[0].k !== 'range') throw { err: '#N/A' };
+          var list = flat([n.args[0]]), crit = ds_fmlText(ds_fmlEval(n.args[1], env)), cm = /^(<>|<=|>=|=|<|>)?([\s\S]*)$/.exec(crit), cop = cm[1] || '=', cv = cm[2], cn = ds_parseNumber(cv);
+          var hit = function(v) { var text = ds_fmlText(v), num = typeof v === 'number' ? v : NaN; if (!isNaN(cn) && !isNaN(num)) return cop === '=' ? num === cn : cop === '<>' ? num !== cn : cop === '<' ? num < cn : cop === '>' ? num > cn : cop === '<=' ? num <= cn : num >= cn; if (cop === '=') return text.toLowerCase() === cv.toLowerCase(); if (cop === '<>') return text.toLowerCase() !== cv.toLowerCase(); return false; };
+          if (n.name === 'COUNTIF') return list.filter(hit).length;
+          var adds = n.args[2] ? flat([n.args[2]]) : list;
+          return list.reduce(function(sum, v, k) { return hit(v) && typeof adds[k] === 'number' ? sum + adds[k] : sum; }, 0);
         case 'CONCAT': return flat(n.args).map(ds_fmlText).join('');
         case 'LEN': if (!n.args.length) throw { err: '#N/A' }; return ds_fmlText(ds_fmlEval(n.args[0], env)).length;
       }
@@ -48765,7 +48884,8 @@ function ds_sortApply(keys, from, to, colIds) {
   var perm = ds_sortPlan(ds.rows, keys, from, to), moved = perm.some(function(src, i) { return src !== i; });
   if (!moved) return;
   var viewport = ds_captureEditorViewport();
-  if (!colIds) ds.rows = _dsActiveSheet(ds).rows = perm.map(function(src) { return ds.rows[src]; });
+  var sortSnap = ds_refSnapshot(ds);
+  if (!colIds) { ds.rows = _dsActiveSheet(ds).rows = perm.map(function(src) { return ds.rows[src]; }); ds_refFollow(ds, sortSnap); }
   else {
     var snap = ds.rows.map(function(r) { return colIds.map(function(id) { return { v: r.cells && r.cells[id], st: r.cellStyles && r.cellStyles[id], rc: r.cellRich && r.cellRich[id], al: r.cellAligns && r.cellAligns[id], ru: r.cellRules && r.cellRules[id] }; }); });
     perm.forEach(function(src, i) {
@@ -48782,6 +48902,7 @@ function ds_sortApply(keys, from, to, colIds) {
         if (d.ru) row.cellRules[id] = d.ru; else delete row.cellRules[id];
       });
     });
+    ds_refFollowCells(ds.rows, perm, colIds.map(function(id) { return ds_getColumnIndex(ds, id); }));
   }
   _dsActiveCellRowIdx = null; _dsActiveCellColId = null; _dsCellEditMode = false;
   persist(); // 한 번에 저장 → Ctrl+Z 한 번
@@ -48861,10 +48982,11 @@ function ds_removeRows(idxs) { // 한 번에 지우고 persist() 도 한 번 →
   var removed = Array.from(new Set(idxs)).filter(function(i) { return ds.rows[i]; }).sort(function(a, b) { return a - b; });
   if (!removed.length) return;
   var viewport = ds_captureEditorViewport();
-  var removedIds = removed.map(function(i) { return ds.rows[i].id; });
+  var removedIds = removed.map(function(i) { return ds.rows[i].id; }), refSnap = ds_refSnapshot(ds);
   for (var k = removed.length - 1; k >= 0; k--) ds.rows.splice(removed[k], 1);
   var fSheet = _dsActiveSheet(ds);
   if (fSheet) fSheet.merges = ds_mergeAfterRemove(fSheet.merges, removedIds, 'r');
+  ds_refFollow(ds, refSnap);
   if (fSheet) fSheet.frozenRows = ds_freezeAfterRemove(fSheet.frozenRows || 0, removed);
   _dsActiveRowIdx = _dsActiveRowIdx === null ? null : ds_rowShift(_dsActiveRowIdx, removed);
   _dsSelectedRowIdxs = _dsSelectedRowIdxs.map(function(i) { return ds_rowShift(i, removed); }).filter(function(i) { return i !== null; });

@@ -9,7 +9,7 @@ const run = (grid, formula) => { const { rows, cols } = mk(grid); return F.ds_fo
 ok(F.ds_colLetters(0) === 'A' && F.ds_colLetters(25) === 'Z' && F.ds_colLetters(26) === 'AA' && F.ds_colFromLetters('AB') === 27, '열 문자(A…Z, AA)');
 ok(F.ds_parseNumber('10%') === 0.1 && F.ds_parseNumber('-5%') === -0.05 && isNaN(F.ds_parseNumber('%')) && F.ds_parseNumber('1,000') === 1000, '숫자 파서: 10% → 0.1(정렬·필터·수식 공용)');
 const g = [['1', '2', '3'], ['4', '', '글자'], ['10', '20', '=A1+B1']];
-ok(run(g, '=1+2*3').v === 7 && run(g, '=(1+2)*3').v === 9 && run(g, '=-2^1').err === '#ERROR!' && run(g, '=10/4').v === 2.5 && run(g, '=50%').v === 0.5, '사칙·괄호·단항·%');
+ok(run(g, '=1+2*3').v === 7 && run(g, '=(1+2)*3').v === 9 && run(g, '=-2^1').v === -2 && run(g, '=10/4').v === 2.5 && run(g, '=50%').v === 0.5, '사칙·괄호·단항·%');
 ok(run(g, '=A1+B1').v === 3 && run(g, '=$A$1*C1').v === 3 && run(g, '=A2+B2').v === 4 && run(g, '=C3*2').v === 6, '셀 참조($ 포함)·빈 칸=0·수식 칸 재귀');
 ok(run(g, '=SUM(A1:C1)').v === 6 && run(g, '=SUM(A1:A3)').v === 15 && run(g, '=SUM(A1:C2)').v === 10 && run(g, '=SUM(A1,B1,10)').v === 13, 'SUM(범위·인수, 글자·빈 칸 무시)');
 ok(run(g, '=AVERAGE(A1:A3)').v === 5 && run(g, '=AVERAGE(C2:C2)').err === '#DIV/0!' && run(g, '=MIN(A1:A3)').v === 1 && run(g, '=MAX(A1:A3)').v === 10 && run(g, '=COUNT(A1:C2)').v === 4 && run(g, '=COUNTA(A1:C2)').v === 5, 'AVERAGE/MIN/MAX/COUNT/COUNTA');
