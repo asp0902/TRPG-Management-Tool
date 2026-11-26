@@ -16,4 +16,5 @@ const ce = { contains: () => true };
 const at = (tag, cls) => { const fmt = tag && { tagName: tag, classList: { contains: c => c === cls } }; const el = { closest: q => q.startsWith('[') ? ce : fmt };
   return new Function('window', 'Node', src + ';return tbGetCurrentBlockFormat()')({ getSelection: () => ({ rangeCount: 1, getRangeAt: () => ({ startContainer: el }) }) }, { TEXT_NODE: 3 }); };
 ok(at('P') === '' && at(null) === '' && at('P', 'tb-title') === 'title' && at('H4') === 'h4' && at('H2') === 'h2', '예전 p 는 일반 텍스트, 제목·h4 판별');
+ok(html.includes('[contenteditable] > h4:last-child, [contenteditable] > p.tb-title:last-child { margin-bottom: 0; }') && html.includes('[contenteditable] > h1:only-child { padding-bottom: 0; border-bottom: 0; }'), '마지막 요소 아래 여백 0·단독 제목 1 구분선 없음(#429)');
 process.exit(f ? 1 : 0);

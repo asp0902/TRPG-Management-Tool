@@ -3720,6 +3720,9 @@ body.is-block-range-selecting * {
 [contenteditable] h4 { font-size: 16px; font-weight: 400; color: #6b7280; margin: 0.5em 0 0.4em; }
 p.tb-title { font-size: 30px; font-weight: 400; color: #111; line-height: 1.3; margin: 0 0 0.3em; }
 [contenteditable] > h1:first-child, [contenteditable] > h2:first-child, [contenteditable] > h3:first-child, [contenteditable] > h4:first-child { margin-top: 0; }
+/* 마지막 요소의 아래 여백이 남으면 글이 위로 치우친다(#429). 블록 사이 간격은 블록 여백이 맡는다. 제목 1 이 혼자면 구분선도 뺀다 */
+[contenteditable] > h1:last-child, [contenteditable] > h2:last-child, [contenteditable] > h3:last-child, [contenteditable] > h4:last-child, [contenteditable] > p.tb-title:last-child { margin-bottom: 0; }
+[contenteditable] > h1:only-child { padding-bottom: 0; border-bottom: 0; }
 [contenteditable="true"] span[style*="font-family"]:not(:has(:is(br, div, p, li, ul, ol, blockquote, h1, h2, h3, h4))) { line-height: 0; }
 [contenteditable="true"][style*="Nanum Myeongjo"],
 [contenteditable="true"] [style*="Nanum Myeongjo"] {
