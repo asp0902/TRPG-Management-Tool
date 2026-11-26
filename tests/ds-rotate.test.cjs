@@ -1,0 +1,13 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const ctx = {}; vm.createContext(ctx);
+vm.runInContext(html.slice(html.indexOf('function ds_normRot'), html.indexOf('function ds_rotPaint')), ctx);
+const N = ctx.ds_normRot, B = ctx.ds_rotBox;
+ok(N('stack') === 'stack' && N('45') === 45 && N(-90) === -90 && N(30.4) === 30, '각도·세로 쌓기 값 정규화');
+ok(N(0) === undefined && N(91) === undefined && N(-100) === undefined && N('abc') === undefined && N('') === undefined && N(null) === undefined && N(undefined) === undefined, '0·범위 밖·잘못된 값은 회전 없음');
+ok(B(100, 20, 90).w === 20 && B(100, 20, 90).h === 100 && B(100, 20, -90).h === 100, '90도: 가로·세로가 바뀜');
+ok(B(100, 20, 45).w === 85 && B(100, 20, 45).h === 85 && B(100, 20, 'stack').w === 20, '45도·세로 쌓기 상자');
+ok(/out\.rot = rot/.test(html) && /st\.wrap \|\| st\.rot/.test(html), '셀 서식에 저장(빈 서식 판정 포함)');
+ok(/ds_rotPaint\(\); \/\/ 텍스트 회전/.test(html) && /ds_rotBox\(w, Math\.ceil/.test(html) && /'ds-numfmt-btn', 'ds-rot-btn'/.test(html), '렌더·열 너비 맞춤·툴바 메뉴 연결');
+process.exit(f ? 1 : 0);
