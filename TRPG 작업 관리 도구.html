@@ -2811,7 +2811,13 @@ body.file-dragging iframe { pointer-events: none; } /* 파일을 끄는 동안 i
 .scenario-item.active { background: #2a2a2a; border-left-color: #fff; }
 .bookmark-sidebar-pin { font-size: 10px; color: #bbb; flex: 0 0 auto; }
 .bookmark-sidebar-empty { padding: 12px 14px; font-size: 12px; color: #777; }
-.bookmark-card.flash { animation: bookmark-flash 1.5s ease-out; }
+.music-sidebar-head { display: flex; align-items: center; gap: 7px; width: 100%; box-sizing: border-box; padding: 8px 14px; background: transparent; border: none; color: #ddd; font: inherit; font-size: 12px; font-weight: 700; text-align: left; cursor: pointer; }
+.music-sidebar-head:hover { background: #1e1e1e; }
+.music-sidebar-head i { font-size: 9px; width: 10px; color: #888; }
+.music-sidebar-head .music-dot { flex: 0 0 auto; }
+.music-sidebar-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.music-sidebar-item { padding-left: 31px; }
+.bookmark-card.flash, .music-card.flash { animation: bookmark-flash 1.5s ease-out; }
 @keyframes bookmark-flash { 0%, 60% { box-shadow: 0 0 0 4px #ff9628; } 100% { box-shadow: 0 0 0 4px rgba(255, 150, 40, 0); } }
 .scenario-item-main {
   flex: 1; min-width: 0;
@@ -13573,7 +13579,10 @@ function updateSidebarPrimaryAction() {
   if (!btn) return;
   const isCharacterContext = currentPage === 'character' || !!getCharacterSheetIdFromPage(currentPage);
   if (folderBtn) folderBtn.style.display = (currentPage === 'scenario' || currentPage === 'rulebook' || currentPage === 'bookmark') ? 'none' : '';
-  if (currentPage === 'bookmark') {
+  if (currentPage === 'music') {
+    btn.textContent = '＋ 곡';
+    btn.title = '새 곡 추가';
+  } else if (currentPage === 'bookmark') {
     btn.textContent = '＋ 북마크';
     btn.title = '새 북마크 추가';
   } else if (currentPage === 'css-macro') {
@@ -13602,6 +13611,7 @@ function toggleFolder(folderId, event) {
   renderList();
 }
 function createFolder() {
+  if (currentPage === 'music') { openMusicFolderModal(); return; } // 음악 폴더(#423)
   const folders = getSidebarFolders();
   const fallback = `새 폴더 ${folders.length + 1}`;
   const input = prompt('폴더 이름을 입력하세요.', fallback);
@@ -14345,6 +14355,11 @@ function renderList() {
     renderBookmarkSidebar(el);
     return;
   }
+  if (currentPage === 'music') {
+    updateSidebarPrimaryAction();
+    renderMusicSidebar(el);
+    return;
+  }
   const frag = document.createDocumentFragment();
   const sidebarFolders = getSidebarFolders();
   const folderIds = new Set(sidebarFolders.map(folder => folder.id));
@@ -14378,6 +14393,10 @@ function createNew(folderId = '') {
   }
   if (currentPage === 'bookmark') {
     openBookmarkModal();
+    return;
+  }
+  if (currentPage === 'music') {
+    openMusicYoutubeModal();
     return;
   }
   const s = mkScenario(folderId);
@@ -37172,7 +37191,10 @@ function renderBookmarkSidebar(el) {
   });
 }
 function focusBookmarkCard(bookmarkId) {
-  const card = [...document.querySelectorAll('#bookmark-grid .bookmark-card')].find(c => c.dataset.bookmarkId === bookmarkId);
+  focusGridCard([...document.querySelectorAll('#bookmark-grid .bookmark-card')].find(c => c.dataset.bookmarkId === bookmarkId));
+}
+// 왼쪽 목록에서 고른 카드로 스크롤하고 잠깐 강조(BOOKMARK·MUSIC 공용)
+function focusGridCard(card) {
   if (!card) return;
   closeSidebarOnCompactViewport();
   card.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -37646,6 +37668,37 @@ async function musicLoadLocal() {
 }
 function musicFolderOf(track) { return state.musicFolders.find(folder => folder.id === track.folderId) || null; }
 function musicTrackTitle(track) { return track.title || track.fileName || track.url || '제목 없음'; }
+// MUSIC 왼쪽 목록(#423): 그리드와 같은 결과(musicVisibleTracks)를 음악 폴더 순서로 묶는다. 「분류 없음」은 맨 아래, 빈 묶음은 숨김
+function musicSidebarGroups(tracks, folders) {
+  const ids = new Set(folders.map(folder => folder.id));
+  return [...folders.map(folder => ({ id: folder.id, name: folder.name, color: folder.color, tracks: tracks.filter(track => track.folderId === folder.id) })),
+    { id: 'none', name: '분류 없음', color: '', tracks: tracks.filter(track => !ids.has(track.folderId)) }].filter(group => group.tracks.length);
+}
+const musicSidebarClosed = new Set(); // 접은 묶음(화면에서만, 저장 안 함)
+function renderMusicSidebar(el) {
+  const groups = musicSidebarGroups(musicVisibleTracks(), state.musicFolders);
+  const add = (parent, tag, className, text) => { const node = document.createElement(tag); node.className = className; if (text !== undefined) node.textContent = text; parent.appendChild(node); return node; };
+  if (!groups.length) { add(el, 'div', 'bookmark-sidebar-empty', '곡 없음'); return; }
+  groups.forEach(group => {
+    const closed = musicSidebarClosed.has(group.id);
+    const head = add(el, 'button', 'music-sidebar-head');
+    head.type = 'button';
+    head.setAttribute('aria-expanded', String(!closed));
+    add(head, 'i', 'fa-solid ' + (closed ? 'fa-chevron-right' : 'fa-chevron-down'));
+    const dot = add(head, 'span', 'music-dot');
+    dot.style.background = group.color || 'transparent';
+    dot.style.border = '1px solid ' + (group.color || '#888');
+    add(head, 'span', 'music-sidebar-name', group.name).title = group.name;
+    head.onclick = () => { if (closed) musicSidebarClosed.delete(group.id); else musicSidebarClosed.add(group.id); renderList(); };
+    if (closed) return;
+    group.tracks.forEach(track => {
+      const item = add(el, 'div', 'scenario-item music-sidebar-item');
+      const name = add(add(item, 'div', 'scenario-item-main'), 'span', 'scenario-item-name', musicTrackTitle(track));
+      name.title = musicTrackTitle(track);
+      item.onclick = () => focusGridCard([...document.querySelectorAll('#music-grid .music-card')].find(card => card.dataset.id === track.id));
+    });
+  });
+}
 function musicVisibleTracks() {
   const q = musicView.q.trim().toLowerCase();
   let list = state.musicTracks.filter(track => {
@@ -37695,6 +37748,7 @@ function renderMusicPage() {
     list.forEach(track => { const album = track.album || '앨범 없음'; if (album !== last) { html += '<div class="music-album-head">' + esc(album) + '</div>'; last = album; } html += renderMusicCard(track); });
     grid.innerHTML = html;
   } else grid.innerHTML = list.map(renderMusicCard).join('');
+  if (currentPage === 'music') renderList(); // 왼쪽 목록도 같은 결과로(#423)
   document.getElementById('music-search').value = musicView.q;
   document.getElementById('music-sort').value = musicView.sort;
   document.getElementById('music-by-album').checked = musicView.byAlbum;
