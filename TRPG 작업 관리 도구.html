@@ -2809,6 +2809,10 @@ body.file-dragging iframe { pointer-events: none; } /* 파일을 끄는 동안 i
 .scenario-folder .scenario-item { padding-left: 31px; }
 .scenario-item:hover { background: #1e1e1e; }
 .scenario-item.active { background: #2a2a2a; border-left-color: #fff; }
+.bookmark-sidebar-pin { font-size: 10px; color: #bbb; flex: 0 0 auto; }
+.bookmark-sidebar-empty { padding: 12px 14px; font-size: 12px; color: #777; }
+.bookmark-card.flash { animation: bookmark-flash 1.5s ease-out; }
+@keyframes bookmark-flash { 0%, 60% { box-shadow: 0 0 0 4px #ff9628; } 100% { box-shadow: 0 0 0 4px rgba(255, 150, 40, 0); } }
 .scenario-item-main {
   flex: 1; min-width: 0;
   display: flex; align-items: center; gap: 6px;
@@ -13568,8 +13572,11 @@ function updateSidebarPrimaryAction() {
   const folderBtn = document.getElementById('sidebar-folder-btn');
   if (!btn) return;
   const isCharacterContext = currentPage === 'character' || !!getCharacterSheetIdFromPage(currentPage);
-  if (folderBtn) folderBtn.style.display = (currentPage === 'scenario' || currentPage === 'rulebook') ? 'none' : '';
-  if (currentPage === 'css-macro') {
+  if (folderBtn) folderBtn.style.display = (currentPage === 'scenario' || currentPage === 'rulebook' || currentPage === 'bookmark') ? 'none' : '';
+  if (currentPage === 'bookmark') {
+    btn.textContent = '＋ 북마크';
+    btn.title = '새 북마크 추가';
+  } else if (currentPage === 'css-macro') {
     btn.textContent = '＋ 매크로';
     btn.title = '새 매크로 추가';
   } else if (isCharacterContext) {
@@ -14333,6 +14340,11 @@ function renderList() {
     renderRulebookSidebar(el);
     return;
   }
+  if (currentPage === 'bookmark') {
+    updateSidebarPrimaryAction();
+    renderBookmarkSidebar(el);
+    return;
+  }
   const frag = document.createDocumentFragment();
   const sidebarFolders = getSidebarFolders();
   const folderIds = new Set(sidebarFolders.map(folder => folder.id));
@@ -14362,6 +14374,10 @@ function createNew(folderId = '') {
   }
   if (currentPage === 'rulebook') {
     openRulebookModal();
+    return;
+  }
+  if (currentPage === 'bookmark') {
+    openBookmarkModal();
     return;
   }
   const s = mkScenario(folderId);
@@ -37107,10 +37123,8 @@ function toggleBookmarkPin(bookmarkId) {
   persist();
   renderBookmarkPage();
 }
-function renderBookmarkPage() {
-  const grid = document.getElementById('bookmark-grid');
-  if (!grid) return;
-  renderBookmarkTagFilters();
+// 검색어·태그 필터를 적용한 표시 순서(카드 그리드와 왼쪽 목록 공용, #422)
+function getVisibleBookmarks() {
   const query = String(document.getElementById('bookmark-search')?.value || '').trim().toLowerCase();
   const visible = state.bookmarks.filter(bookmark => {
     const tagMatch = activeBookmarkTag === 'all'
@@ -37126,8 +37140,54 @@ function renderBookmarkPage() {
     return values.some(value => String(value || '').toLowerCase().includes(query));
   });
   // 고정된 항목을 앞으로(표시할 때만): 최근에 고정한 것이 맨 앞, 나머지는 기존 순서 그대로. state.bookmarks 의 원래 순서는 바꾸지 않는다(#244).
-  const pinnedFirst = [...visible.filter(b => b.pinned).sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0)), ...visible.filter(b => !b.pinned)];
-  if (!visible.length) {
+  return [...visible.filter(b => b.pinned).sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0)), ...visible.filter(b => !b.pinned)];
+}
+function renderBookmarkSidebar(el) {
+  const list = getVisibleBookmarks();
+  if (!list.length) {
+    const empty = document.createElement('div');
+    empty.className = 'bookmark-sidebar-empty';
+    empty.textContent = '북마크 없음';
+    el.appendChild(empty);
+    return;
+  }
+  list.forEach(bookmark => {
+    const item = document.createElement('div');
+    item.className = 'scenario-item bookmark-sidebar-item';
+    const main = document.createElement('div');
+    main.className = 'scenario-item-main';
+    if (bookmark.pinned) {
+      const pin = document.createElement('i');
+      pin.className = 'fa-solid fa-thumbtack bookmark-sidebar-pin';
+      pin.setAttribute('aria-label', '고정');
+      main.appendChild(pin);
+    }
+    const name = document.createElement('span');
+    name.className = 'scenario-item-name';
+    name.textContent = name.title = getBookmarkDisplayTitle(bookmark);
+    main.appendChild(name);
+    item.appendChild(main);
+    item.onclick = () => focusBookmarkCard(bookmark.id);
+    el.appendChild(item);
+  });
+}
+function focusBookmarkCard(bookmarkId) {
+  const card = [...document.querySelectorAll('#bookmark-grid .bookmark-card')].find(c => c.dataset.bookmarkId === bookmarkId);
+  if (!card) return;
+  closeSidebarOnCompactViewport();
+  card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  card.classList.remove('flash');
+  void card.offsetWidth; // 연속 클릭에도 강조를 다시 시작
+  card.classList.add('flash');
+  setTimeout(() => card.classList.remove('flash'), 1600);
+}
+function renderBookmarkPage() {
+  const grid = document.getElementById('bookmark-grid');
+  if (!grid) return;
+  renderBookmarkTagFilters();
+  if (currentPage === 'bookmark') renderList(); // 왼쪽 목록도 같은 결과로
+  const pinnedFirst = getVisibleBookmarks();
+  if (!pinnedFirst.length) {
     grid.innerHTML = `<div class="bookmark-empty">${state.bookmarks.length ? '검색 결과가 없습니다.<br>다른 제목이나 태그로 다시 찾아보세요.' : '등록된 북마크가 없습니다.<br>＋ 북마크 추가 버튼으로 첫 링크를 저장해보세요.'}</div>`;
     return;
   }

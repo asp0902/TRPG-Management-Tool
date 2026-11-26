@@ -6,7 +6,8 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도�
 const norm = html.slice(html.indexOf('function normalizeBookmarkRecord'), html.indexOf('// opts.promoteLegacyContent'));
 assert.ok(norm.includes('pinned: input?.pinned === true') && norm.includes('pinnedAt:'));
 assert.ok(html.includes('pinned: false, pinnedAt: 0, // 상단 고정(#244)'));
-assert.ok(html.includes("const pinnedFirst = [...visible.filter(b => b.pinned).sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0)), ...visible.filter(b => !b.pinned)];"));
+assert.ok(html.includes("return [...visible.filter(b => b.pinned).sort((a, b) => (b.pinnedAt || 0) - (a.pinnedAt || 0)), ...visible.filter(b => !b.pinned)];")); // getVisibleBookmarks(#422)
+assert.ok(html.includes('const pinnedFirst = getVisibleBookmarks();'));
 assert.ok(html.includes('grid.innerHTML = pinnedFirst.map('));
 assert.ok(html.includes("onclick=\"event.stopPropagation();toggleBookmarkPin('${bookmark.id}')\""));
 assert.ok(html.includes('aria-pressed="${bookmark.pinned'));
