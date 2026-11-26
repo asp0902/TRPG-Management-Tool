@@ -38,5 +38,5 @@ ok(map['0:0'].band === '#aaaaaa' && map['1:0'].band === '#cccccc' && map['2:0'].
 const hid = F.ds_cfOverlay(rows, cols, [], [Object.assign({ header: '', footer: '', odd: '#cccccc', even: '#dddddd' }, all)], () => '', [true, false, true, true]);
 ok(!hid['1:0'] && hid['2:0'].band === '#dddddd' && hid['3:0'].band === '#cccccc', '줄무늬는 보이는 행만 셈');
 ok(/cf: ds_normCf\(sheet\.cf, rows, columns\)/.test(html) && /banding: ds_normBanding/.test(html) && /ds_cfPaint\(ds\);/.test(html), '시트 저장·정규화·렌더 연결');
-ok(/rowIdMap\[id\]/.test(html) && /\['cells', 'cellAligns', 'cellRich', 'cellStyles', 'cellRules'\]/.test(html), '시트 복제 때 병합·데이터 확인·필터·범위도 새 id 로');
+ok(/rowIdMap\[id\]/.test(html) && /\['cells', 'cellAligns', 'cellRich', 'cellStyles', 'cellRules', /.test(html), '시트 복제 때 병합·데이터 확인·필터·범위도 새 id 로');
 process.exit(f ? 1 : 0);

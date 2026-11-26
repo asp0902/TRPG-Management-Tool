@@ -7201,7 +7201,23 @@ body.block-pointer-dragging {
 .ds-sheet-color { position: absolute; left: 4px; right: 4px; bottom: 1px; height: 3px; border-radius: 2px; pointer-events: none; }
 .ds-sheet-lock { font-size: 10px; margin-right: 5px; color: #888; }
 #ds-editor-body.ds-locked #ds-fill-handle, #ds-editor-body.ds-locked .ds-row-add-row { display: none; }
-.ds-clean-option, .ds-rot-option { white-space: nowrap; }
+.ds-clean-option, .ds-rot-option, .ds-insert-option { white-space: nowrap; }
+#ds-ctx-menu { max-height: calc(100vh - 8px); overflow-y: auto; }
+/* 삽입: 링크·메모·이미지·특수문자(#407) */
+.ds-cell-rich a { color: #1155cc; text-decoration: underline; }
+.ds-table td.ds-has-note { position: relative; }
+.ds-table td.ds-has-note::after { content: ''; position: absolute; top: 0; right: 0; border-top: 8px solid #111; border-left: 8px solid transparent; pointer-events: none; }
+.ds-table img.ds-cell-img { display: block; max-width: calc(100% - 8px); max-height: 120px; margin: 4px auto; object-fit: contain; }
+#ds-hover-pop { display: none; position: fixed; z-index: 9100; max-width: 320px; padding: 8px 10px; background: #fff; border: 1px solid #d5d5d5; border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.18); font-size: 12px; }
+.ds-hover-item + .ds-hover-item { margin-top: 8px; border-top: 1px solid #eee; padding-top: 8px; }
+.ds-hover-text { white-space: pre-wrap; word-break: break-all; max-height: 160px; overflow-y: auto; }
+.ds-hover-acts { display: flex; justify-content: flex-end; gap: 4px; margin-top: 4px; }
+.ds-hover-acts button { border: 1px solid #ddd; border-radius: 4px; background: #fff; font: inherit; font-size: 12px; padding: 1px 8px; cursor: pointer; }
+.ds-char-head { font-size: 12px; color: #777; margin: 4px 0 2px; }
+#ds-ins-sec-char { max-height: 320px; overflow-y: auto; }
+.ds-char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 3px; }
+.ds-char-grid button { height: 32px; border: 1px solid #e5e5e5; border-radius: 4px; background: #fff; font-size: 16px; cursor: pointer; }
+.ds-char-grid button:hover { background: #111; color: #fff; }
 .ds-statusbar-stat { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; color: #444; font: inherit; font-size: 12px; font-weight: 700; padding: 1px 8px; cursor: pointer; }
 .ds-statusbar-stat:hover { background: #f3f4f6; border-color: #bbb; }
 .ds-statusbar-selection { color: #a0a0a0; font-weight: 600; }
@@ -8930,6 +8946,29 @@ select.sh-field-input,
       <button type="button" class="link-insert-btn cancel" id="ds-clean-cancel">취소</button>
     </div>
   </div>
+
+  <!-- 데이터 시트 삽입 팝업(#407): 삭제(왼쪽) [실행] [취소] -->
+  <div id="ds-ins-backdrop" class="link-insert-backdrop"></div>
+  <div id="ds-ins-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-ins-title">
+    <div class="link-insert-head">
+      <h2 id="ds-ins-title" class="link-insert-title">삽입</h2>
+      <div class="link-insert-head-actions"><button type="button" class="link-insert-close" id="ds-ins-close" aria-label="닫기">×</button></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-body ds-style-body">
+      <div id="ds-ins-sec-link"><div id="ds-ins-scope" style="font-size:12px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div><div class="ds-style-row"><input id="ds-ins-url" class="link-insert-input" type="text" placeholder="URL을 입력하세요." aria-label="링크 주소"></div></div>
+      <div id="ds-ins-sec-note"><textarea id="ds-ins-note" rows="5" aria-label="메모" placeholder="메모를 입력하세요. (Ctrl+Enter 실행)" style="width:100%;box-sizing:border-box;font:inherit;padding:8px;"></textarea></div>
+      <div id="ds-ins-sec-img"><div class="ds-style-row"><input id="ds-ins-img-url" class="link-insert-input" type="text" placeholder="이미지 URL (https://...)" aria-label="이미지 주소"><button type="button" class="link-insert-btn cancel" id="ds-ins-img-pick">파일 선택</button><input type="file" id="ds-ins-img-file" accept="image/*" hidden></div><div style="font-size:12px;color:#777;">이 창에서 Ctrl+V 로 클립보드 이미지를 붙여넣을 수 있습니다.</div><img id="ds-ins-img-preview" alt="미리보기" style="display:none;max-width:100%;max-height:160px;"></div>
+      <div id="ds-ins-sec-char"></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-actions">
+      <button type="button" class="link-insert-btn cancel" id="ds-ins-delete" style="margin-right:auto;">삭제</button>
+      <button type="button" class="link-insert-btn primary" id="ds-ins-submit">실행</button>
+      <button type="button" class="link-insert-btn cancel" id="ds-ins-cancel">취소</button>
+    </div>
+  </div>
+  <div id="ds-hover-pop" role="tooltip"></div>
 
   <!-- 데이터 시트 범위 정렬 팝업(#390): [실행] [취소] 순서 -->
   <div id="ds-sort-backdrop" class="link-insert-backdrop"></div>
@@ -41701,8 +41740,18 @@ function ds_richApplyStyleText(css, f) { // style 속성 문자열 → 서식(f)
 }
 // 루비 문자(#382): <ruby>본문<rt>읽기</rt></ruby>. 읽기 글자는 서식 조각의 f.ruby 로만 두고 순수 텍스트(cells)에는 본문 글자만 들어간다
 function ds_richRubyText(s) { return ds_richDecode(String(s == null ? '' : s).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '').replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim().slice(0, 40); }
+// 순수 함수: http·https·mailto 만 허용하고 따옴표·괄호·공백은 % 인코딩. 그 밖은 ''
+function ds_safeHref(url) {
+  url = String(url == null ? '' : url).trim();
+  if (!/^(https?:\/\/[^\s\/]|mailto:[^\s@]+@)/i.test(url) || /[\u0000-\u001f]/.test(url) || url.length > 2000) return '';
+  return url.replace(/[\s"'<>`\\]/g, function(c) { return '%' + ('0' + c.charCodeAt(0).toString(16).toUpperCase()).slice(-2); });
+}
+function ds_insertLinkInput(v) { v = String(v || '').trim(); if (v && !/^[a-z][a-z0-9+.-]*:/i.test(v)) v = (/^[^\s\/@]+@[^\s\/@]+$/.test(v) ? 'mailto:' : 'https://') + v; return ds_safeHref(v); }
+function ds_normCellMap(o, fn) { var out = {}; if (o && typeof o === 'object' && !Array.isArray(o)) Object.keys(o).forEach(function(k) { var v = fn(o[k]); if (v) out[k] = v; }); return out; }
+function ds_normNote(v) { return typeof v === 'string' && v.trim() ? v.slice(0, 5000) : ''; }
+function ds_normCellImg(v) { return typeof v === 'string' && /^(https?:\/\/\S+|data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+\/=]+)$/i.test(v) ? v : ''; }
 function ds_richSameFmt(a, b) {
-  return (a.ruby || '') === (b.ruby || '') && !!a.b === !!b.b && !!a.i === !!b.i && !!a.u === !!b.u && !!a.s === !!b.s && (a.color || '') === (b.color || '') && (a.bg || '') === (b.bg || '') && (a.size || 0) === (b.size || 0) && (a.font || '') === (b.font || '');
+  return (a.href || '') === (b.href || '') && (a.ruby || '') === (b.ruby || '') && !!a.b === !!b.b && !!a.i === !!b.i && !!a.u === !!b.u && !!a.s === !!b.s && (a.color || '') === (b.color || '') && (a.bg || '') === (b.bg || '') && (a.size || 0) === (b.size || 0) && (a.font || '') === (b.font || '');
 }
 function ds_richParse(html) { // → [{ text, f:{b,i,u,s,color,bg,size} }]
   html = String(html == null ? '' : html);
@@ -41738,7 +41787,8 @@ function ds_richParse(html) { // → [{ text, f:{b,i,u,s,color,bg,size} }]
     if (tag === 'div' || tag === 'p') { if (!closing && segs.length && !atLineStart) push('\n'); continue; } // 블록은 줄바꿈으로
     if (closing) { for (var i = stack.length - 1; i > 0; i--) { if (stack[i].tag === tag) { stack.length = i; break; } } continue; }
     var f = Object.assign({}, stack[stack.length - 1].f);
-    if (tag === 'b' || tag === 'strong') f.b = true;
+    if (tag === 'a') { var hm = /href\s*=\s*"([^"]*)"|href\s*=\s*'([^']*)'/i.exec(attrs), href = hm ? ds_safeHref(ds_richDecode(hm[1] !== undefined ? hm[1] : hm[2])) : ''; if (href) f.href = href; } // 링크(#407): http·https·mailto 만
+    else if (tag === 'b' || tag === 'strong') f.b = true;
     else if (tag === 'i' || tag === 'em') f.i = true;
     else if (tag === 'u') f.u = true;
     else if (tag === 's' || tag === 'strike' || tag === 'del') f.s = true;
@@ -41755,7 +41805,7 @@ function ds_richParse(html) { // → [{ text, f:{b,i,u,s,color,bg,size} }]
   }
   return segs;
 }
-function ds_richHasFormat(segs) { return segs.some(function(s) { return !!(s.f.b || s.f.i || s.f.u || s.f.s || s.f.color || s.f.bg || s.f.size || s.f.font || s.f.ruby); }); }
+function ds_richHasFormat(segs) { return segs.some(function(s) { return !!(s.f.b || s.f.i || s.f.u || s.f.s || s.f.color || s.f.bg || s.f.size || s.f.font || s.f.ruby || s.f.href); }); }
 function ds_richSerialize(segs) {
   var out = '', plain = '';
   segs.forEach(function(seg) {
@@ -41770,6 +41820,7 @@ function ds_richSerialize(segs) {
     if (f.size) st.push('font-size:' + f.size + 'px');
     if (f.font) st.push('font-family:' + ds_richEsc(f.font));
     if (st.length) inner = '<span style="' + st.join(';') + ';">' + inner + '</span>';
+    if (f.href) inner = '<a href="' + ds_richEsc(f.href) + '">' + inner + '</a>';
     out += inner;
     plain += seg.text;
   });
@@ -41866,6 +41917,8 @@ function normalizeDataSheetRow(r, columns) {
     cellAligns: cellAligns,
     cellStyles: cellStyles,
     cellRich: cellRich,
+    cellNotes: ds_normCellMap(r.cellNotes, ds_normNote), // 셀 메모(#407)
+    cellImg: ds_normCellMap(r.cellImg, ds_normCellImg), // 셀 안 이미지(#407)
     hidden: !!r.hidden, // 행 숨기기(#393, 필터로 숨긴 것과 별개)
     cellRules: (function() { var o = {}; if (r.cellRules && typeof r.cellRules === 'object' && !Array.isArray(r.cellRules)) Object.keys(r.cellRules).forEach(function(k) { var n = ds_normRule(r.cellRules[k]); if (n) o[k] = n; }); return o; })(),
     cells: cells,
@@ -42638,6 +42691,8 @@ function renderDataSheetEditor() {
   ds_updateDataSheetStatusbar(ds);
   ds_renderSheetTabs(ds);
   body.innerHTML = _dsRenderFlatTable(ds);
+  ds_hoverHide();
+  ds_insertPaint(); // 셀 메모·이미지(#407)
   ds_groupPaint(); // 행·열 그룹(#404)
   ds_rotPaint(); // 텍스트 회전(#403)
   ds_cfPaint(ds); // 조건부 서식·교차 색상(#401)
@@ -42770,7 +42825,7 @@ function ds_duplicateSheet(sheetId) {
     var nid = mkId();
     rowIdMap[r.id] = nid;
     r.id = nid;
-    ['cells', 'cellAligns', 'cellRich', 'cellStyles', 'cellRules'].forEach(function(f) { if (r[f] && typeof r[f] === 'object') r[f] = remapKeys(r[f], colIdMap); });
+    ['cells', 'cellAligns', 'cellRich', 'cellStyles', 'cellRules', 'cellNotes', 'cellImg'].forEach(function(f) { if (r[f] && typeof r[f] === 'object') r[f] = remapKeys(r[f], colIdMap); });
   });
   [].concat(clone.cf || [], clone.banding || []).forEach(function(x) { x.id = mkId(); x.rows = x.rows.map(function(id) { return rowIdMap[id]; }); x.cols = x.cols.map(function(id) { return colIdMap[id]; }); });
   if (clone.groups) { (clone.groups.rows || []).forEach(function(g) { g.ids = g.ids.map(function(id) { return rowIdMap[id]; }); }); (clone.groups.cols || []).forEach(function(g) { g.ids = g.ids.map(function(id) { return colIdMap[id]; }); }); }
@@ -42884,6 +42939,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
   var cleanMenu = opt('ds-clean-option', '', 'ds_openCleanDialog(' + String.fromCharCode(39) + 'dedup' + String.fromCharCode(39) + ')', 'fa-clone', '중복 항목 삭제…')
     + opt('ds-clean-option', '', 'ds_trimWhitespace()', 'fa-eraser', '공백 제거')
     + opt('ds-clean-option', '', 'ds_openCleanDialog(' + String.fromCharCode(39) + 'split' + String.fromCharCode(39) + ')', 'fa-table-columns', '텍스트를 열로 분할…');
+  var insertMenu = [['link', '링크 삽입 (Ctrl+K)', 'fa-link'], ['note', '셀 메모', 'fa-note-sticky'], ['img', '셀 안 이미지', 'fa-image'], ['char', '특수문자 삽입', 'fa-icons']].map(function(a) { return opt('ds-insert-option', '', 'ds_openInsert(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('');
   var mergeMenu = [['all', '모두 병합', 'fa-object-group'], ['horiz', '가로로 병합', 'fa-arrows-left-right'], ['vert', '세로로 병합', 'fa-arrows-up-down'], ['none', '병합 해제', 'fa-object-ungroup']].map(function(a) { return opt('ds-merge-option', '', 'ds_mergeCells(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('');
   var borderMenu = [['all', '모두', 'fa-border-all'], ['inner', '안쪽', 'fa-border-none'], ['hinner', '가로 안쪽', 'fa-grip-lines'], ['vinner', '세로 안쪽', 'fa-grip-lines-vertical'], ['outer', '바깥쪽', 'fa-square'], ['left', '왼쪽', 'fa-arrow-left'], ['top', '위쪽', 'fa-arrow-up'], ['right', '오른쪽', 'fa-arrow-right'], ['bottom', '아래쪽', 'fa-arrow-down'], ['clear', '테두리 지우기', 'fa-ban']].map(function(a) { return opt('ds-border-option', '', 'ds_applyBorder(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('')
     + '<div class="ds-border-ctl" onmousedown="event.stopPropagation()"><select id="ds-border-style" onchange="_dsBorderStyle=this.value" title="선 종류" aria-label="선 종류">' + [['thin', '얇게'], ['med', '보통'], ['thick', '굵게'], ['dot', '점선'], ['dash', '파선'], ['double', '이중선']].map(function(a) { return '<option value="' + a[0] + '"' + (a[0] === _dsBorderStyle ? ' selected' : '') + '>' + a[1] + '</option>'; }).join('') + '</select><input type="color" id="ds-border-color" value="' + _dsBorderColor + '" oninput="_dsBorderColor=this.value" title="선 색" aria-label="선 색"></div>';
@@ -42924,6 +42980,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + picker('numfmt', '숫자 형식', 'fa-hashtag', numFmtMenu)
     + picker('rot', '텍스트 회전', 'fa-text-slash', rotMenu)
     + picker('clean', '데이터 정리', 'fa-broom', cleanMenu)
+    + picker('insert', '삽입', 'fa-square-plus', insertMenu)
     + btn('ds-cf-btn', 'ds_openCfDialog()', '조건부 서식', 'fa-wand-magic-sparkles')
     + btn('ds-band-btn', 'ds_openBandDialog()', '교차 색상', 'fa-bars-staggered')
     + SEP
@@ -43758,6 +43815,8 @@ function ds_handleDocumentCopy(e) {
 function ds_handleDocumentPaste(e) {
   if (currentPage !== 'datasheet' || ds_shouldUseNativeClipboard(e)) return;
   var text = e.clipboardData && typeof e.clipboardData.getData === 'function' ? e.clipboardData.getData('text/plain') : null;
+  var imgFile = !text && typeof getImageFileFromTransfer === 'function' ? getImageFileFromTransfer(e.clipboardData) : null; // 글자 없는 이미지는 칸을 비우지 않고 셀 안 이미지로(#407)
+  if (imgFile) { ds_pasteCellImage(e, imgFile); return; }
   if (text == null) return;
   var pasteValuesOnly = _dsPasteValuesOnly; _dsPasteValuesOnly = false;
   if (!pasteValuesOnly && _dsInternalClip && _dsInternalClip.text === text && ds_pasteInternal('all', false)) { e.preventDefault(); e.stopImmediatePropagation?.(); return; } // 앱 안에서 복사했으면 값+서식+규칙(구글 시트와 같음)
@@ -45157,6 +45216,8 @@ function ds_removeColumn(colId) {
     if (r.cells) delete r.cells[colId];
     if (r.cellAligns) delete r.cellAligns[colId];
     if (r.cellRules) delete r.cellRules[colId];
+    if (r.cellNotes) delete r.cellNotes[colId];
+    if (r.cellImg) delete r.cellImg[colId];
   });
   if (_dsActiveCellColId === colId) {
     _dsActiveCellRowIdx = null;
@@ -46260,7 +46321,7 @@ function ds_dialogShow(id) {
   dlg.style.left = Math.max(16, base.left + (base.width - r.width) / 2) + 'px';
   dlg.style.top = Math.max(16, Math.min(base.top + (base.height - r.height) / 2, window.innerHeight - r.height - 16)) + 'px';
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); // 칸에 남은 포커스를 대화상자로(Enter·Esc 가 대화상자에 가도록)
-  var first = Array.from(dlg.querySelectorAll('.link-insert-body select, .link-insert-body input, .link-insert-actions .primary')).find(function(el) { return el.offsetParent !== null; });
+  var first = Array.from(dlg.querySelectorAll('.link-insert-body select, .link-insert-body input, .link-insert-body textarea, .link-insert-actions .primary, .link-insert-close')).filter(function(el) { return el.offsetParent !== null; }).sort(function(a, b) { return (a.classList.contains('link-insert-close') ? 1 : 0) - (b.classList.contains('link-insert-close') ? 1 : 0); })[0];
   if (first) { first.focus(); setTimeout(function() { if (dlg.classList.contains('open') && !dlg.contains(document.activeElement)) first.focus(); }, 0); }
 }
 function ds_dialogHide(id) { document.getElementById(id)?.classList.remove('open'); document.getElementById(id.replace('-dialog', '-backdrop'))?.classList.remove('open'); }
@@ -46859,6 +46920,201 @@ function ds_applyCleanDialog() {
     on('ds-clean-dialog', 'keydown', function(e) { if (e.isComposing) return; if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); ds_applyCleanDialog(); } else if (e.key === 'Escape') { e.preventDefault(); hide(); } });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind();
+})();
+// ── 삽입(#407): 링크(cellRich 의 href)·셀 메모(row.cellNotes)·셀 안 이미지(row.cellImg)·특수문자 ──
+var DS_SPECIAL_CHARS = [['화살표', '← ↑ → ↓ ↔ ↕ ↖ ↗ ↘ ↙ ⇐ ⇒ ⇔ ➜ ➤ ↩ ↪ ⟳'], ['도형', '■ □ ▲ △ ▼ ▽ ◆ ◇ ● ○ ◎ ★ ☆ ♠ ♣ ♥ ♦ ✓ ✔ ✗ ✘ ※'], ['수학', '± × ÷ ≠ ≤ ≥ ≒ ∞ √ ∑ ∏ ∫ ° ‰ ½ ⅓ ¼ π Δ'], ['주사위·TRPG', '⚀ ⚁ ⚂ ⚃ ⚄ ⚅ 🎲 ⚔ 🛡 🏹 ☠ ❤ ✨ 🔥 💧 ⚡ 🌙 ☀ ⚠'], ['문장 부호', '「 」 『 』 【 】 《 》 〈 〉 … ‥ · • — – ～ § ¶ ™ © ®']];
+var _dsIns = null; // { mode, rowId, colId, start, end }
+function ds_insertTarget(rowIdx, colId) { // 대상 칸과 선택 글자 범위(편집 중 선택이 없으면 칸 전체)
+  var ds = findDataSheet(_dsEditId);
+  if (!ds) return null;
+  var sel = rowIdx === undefined && typeof ds_richSelection === 'function' ? ds_richSelection() : null;
+  if (rowIdx === undefined) { rowIdx = sel ? parseInt(sel.ta.dataset.rowIdx, 10) : _dsActiveCellRowIdx; colId = sel ? sel.ta.dataset.colId : _dsActiveCellColId; }
+  var row = rowIdx === null || rowIdx === undefined ? null : ds.rows[rowIdx];
+  if (!ds_isDataRow(row) || !colId || colId === DS_ROW_COL) { if (typeof rubyToast === 'function') rubyToast('먼저 데이터 칸을 선택하세요.'); return null; }
+  var ta = ds_getCellTextarea(rowIdx, colId), editing = ta && ds_isCellInEditMode(rowIdx, colId);
+  return { row: row, rowId: row.id, colId: colId, sel: sel ? { start: sel.start, end: sel.end } : null, caret: editing && document.activeElement === ta ? { start: ta.selectionStart, end: ta.selectionEnd } : null };
+}
+function ds_cellValue(row, colId) { return row.cells && row.cells[colId] != null ? String(row.cells[colId]) : ''; }
+function ds_linkAt(html, start, end) { // 범위 안(없으면 전체) 첫 링크 주소
+  var pos = 0, found = '';
+  ds_richParse(html).forEach(function(seg) { var a = pos, b = pos + seg.text.length; pos = b; if (!found && seg.f.href && (start === undefined || Math.max(start, a) < Math.min(end, b))) found = seg.f.href; });
+  return found;
+}
+function ds_pasteCellImage(e, file) { // 칸을 선택한 상태에서 이미지만 붙여넣으면 셀 안 이미지
+  if (_dsActiveCellRowIdx === null || !_dsActiveCellColId) return;
+  var t = ds_insertTarget(_dsActiveCellRowIdx, _dsActiveCellColId);
+  if (!t) return;
+  e.preventDefault(); e.stopImmediatePropagation?.();
+  ds_insFile(file, function(url) { var v = ds_normCellImg(url); if (!v) return; ds_setCellMap(t.row, 'cellImg', t.colId, v); ds_saveStyleRules(); });
+}
+function ds_openInsert(mode, rowIdx, colId) {
+  var t = ds_insertTarget(rowIdx, colId), $ = function(id) { return document.getElementById(id); };
+  if (!t) return;
+  var row = t.row, val = ds_cellValue(row, t.colId), cur = '';
+  _dsHideFormatMenus();
+  if (mode === 'link') {
+    if (/^\s*=/.test(val)) { if (typeof rubyToast === 'function') rubyToast('수식 칸에는 링크를 넣을 수 없습니다.'); return; }
+    cur = ds_linkAt(ds_getCellRich(row, t.colId, val), t.sel ? t.sel.start : undefined, t.sel ? t.sel.end : undefined);
+    $('ds-ins-url').value = cur;
+    $('ds-ins-scope').textContent = t.sel ? '선택한 글자: ' + val.slice(t.sel.start, t.sel.end) : '칸 전체';
+  } else if (mode === 'note') { cur = (row.cellNotes && row.cellNotes[t.colId]) || ''; $('ds-ins-note').value = cur; }
+  else if (mode === 'img') { cur = (row.cellImg && row.cellImg[t.colId]) || ''; ds_insSetImage(cur); }
+  _dsIns = { mode: mode, rowId: t.rowId, colId: t.colId, sel: t.sel, caret: t.caret };
+  $('ds-ins-title').textContent = { link: '링크 삽입', note: '셀 메모', img: '셀 안 이미지', char: '특수문자 삽입' }[mode];
+  ['link', 'note', 'img', 'char'].forEach(function(m) { $('ds-ins-sec-' + m).style.display = m === mode ? '' : 'none'; });
+  $('ds-ins-delete').style.display = cur ? '' : 'none';
+  $('ds-ins-submit').style.display = mode === 'char' ? 'none' : '';
+  ds_dialogShow('ds-ins-dialog');
+}
+var _dsInsImage = '';
+function ds_insSetImage(v) {
+  _dsInsImage = ds_normCellImg(v);
+  var input = document.getElementById('ds-ins-img-url'), prev = document.getElementById('ds-ins-img-preview');
+  input.value = _dsInsImage.indexOf('data:') === 0 ? '' : _dsInsImage;
+  input.placeholder = _dsInsImage.indexOf('data:') === 0 ? '파일·클립보드 이미지 사용 중' : '이미지 URL (https://...)';
+  prev.style.display = _dsInsImage ? '' : 'none';
+  if (_dsInsImage) prev.src = _dsInsImage; else prev.removeAttribute('src');
+}
+function ds_insFile(file, done) {
+  if (!file || !/^image\//.test(file.type)) return;
+  var reader = new FileReader();
+  reader.onload = function(e) { rbShrinkImage(String(e.target.result || '')).then(done); };
+  reader.readAsDataURL(file);
+}
+function ds_insRow() { var ds = findDataSheet(_dsEditId); return ds && _dsIns ? ds.rows.find(function(r) { return r.id === _dsIns.rowId; }) : null; }
+function ds_setCellMap(row, key, colId, value) { if (!row[key]) row[key] = {}; if (value) row[key][colId] = value; else delete row[key][colId]; }
+function ds_setCellLink(row, colId, url, sel) { // url '' 이면 해제. 빈 칸이면 주소를 글자로 넣는다
+  var val = ds_cellValue(row, colId);
+  if (!val) { if (!url) return; val = url; if (!row.cells) row.cells = {}; row.cells[colId] = val; sel = null; }
+  var html = ds_getCellRich(row, colId, val) || ds_richFromText(val);
+  ds_setCellMap(row, 'cellRich', colId, ds_richFormatRange(html, sel ? sel.start : 0, sel ? sel.end : val.length, { href: url }));
+}
+function ds_applyInsert(remove) {
+  var st = _dsIns, row = ds_insRow(), $ = function(id) { return document.getElementById(id); };
+  if (!st || !row || st.mode === 'char') return;
+  if (st.mode === 'link') {
+    var url = remove === true ? '' : ds_insertLinkInput($('ds-ins-url').value);
+    if (remove !== true && !url) { if (typeof rubyToast === 'function') rubyToast('http, https, mailto 주소만 넣을 수 있습니다.'); return; }
+    ds_setCellLink(row, st.colId, url, remove === true ? null : st.sel);
+  } else if (st.mode === 'note') ds_setCellMap(row, 'cellNotes', st.colId, remove === true ? '' : ds_normNote($('ds-ins-note').value));
+  else {
+    var typed = $('ds-ins-img-url').value.trim(), img = remove === true ? '' : (typed ? ds_normCellImg(typed) : _dsInsImage);
+    if (remove !== true && !img) { if (typeof rubyToast === 'function') rubyToast('이미지 주소(http, https)나 파일을 넣으세요.'); return; }
+    ds_setCellMap(row, 'cellImg', st.colId, img);
+  }
+  ds_dialogHide('ds-ins-dialog');
+  ds_saveStyleRules();
+}
+function ds_insertChar(ch) {
+  var st = _dsIns, row = ds_insRow();
+  if (!st || !row) return;
+  var val = ds_cellValue(row, st.colId), at = st.sel || st.caret || { start: val.length, end: val.length };
+  var rich = ds_getCellRich(row, st.colId, val);
+  if (!row.cells) row.cells = {};
+  row.cells[st.colId] = val.slice(0, at.start) + ch + val.slice(at.end);
+  if (rich) ds_setCellMap(row, 'cellRich', st.colId, at.end > at.start ? ds_richReplaceRange(rich, at.start, at.end, ch) : ds_richInsertAt(rich, at.start, ch));
+  ds_dialogHide('ds-ins-dialog');
+  _dsCellEditMode = false;
+  ds_saveStyleRules();
+}
+function ds_richInsertAt(html, pos, text) { // 글자 사이에 끼움(앞 글자 서식을 이어받되 링크는 늘리지 않음)
+  var segs = ds_richParse(html), out = [], at = 0, done = false;
+  segs.forEach(function(seg) {
+    var a = at, b = at + seg.text.length; at = b;
+    if (done || pos > b || (pos < a)) { out.push(seg); return; }
+    var f = Object.assign({}, seg.f); delete f.href; delete f.ruby;
+    out.push({ text: seg.text.slice(0, pos - a), f: seg.f }, { text: text, f: f }, { text: seg.text.slice(pos - a), f: seg.f });
+    done = true;
+  });
+  if (!done) out.push({ text: text, f: {} });
+  out = out.filter(function(x) { return x.text; });
+  return ds_richHasFormat(out) ? ds_richSerialize(out) : '';
+}
+function ds_insertPaint() { // 메모 삼각형·셀 안 이미지
+  var ds = findDataSheet(_dsEditId), body = document.getElementById('ds-editor-body');
+  if (!ds || !body) return;
+  body.querySelectorAll('textarea.ds-cell-input').forEach(function(ta) {
+    var row = ds.rows[parseInt(ta.dataset.rowIdx, 10)], td = ta.closest('td'), id = ta.dataset.colId;
+    if (!row || !td) return;
+    td.classList.toggle('ds-has-note', !!(row.cellNotes && row.cellNotes[id]));
+    var src = (row.cellImg && row.cellImg[id]) || '', img = td.querySelector(':scope > img.ds-cell-img');
+    td.classList.toggle('ds-has-img', !!src);
+    if (!src) { if (img) img.remove(); return; }
+    if (!img) { img = document.createElement('img'); img.className = 'ds-cell-img'; img.alt = ''; img.referrerPolicy = 'no-referrer'; img.draggable = false; td.insertBefore(img, td.firstChild);
+      img.addEventListener('mousedown', function(e) { ds_handleCellMouseDown(e, parseInt(ta.dataset.rowIdx, 10), id); }); }
+    if (img.getAttribute('src') !== src) img.src = src;
+  });
+}
+// 링크·메모 미리보기: 칸 위의 좌표가 링크 글자(또는 메모 칸)에 닿으면 팝업
+function ds_linkElAt(td, x, y) {
+  return Array.from(td.querySelectorAll('.ds-cell-rich a[href]')).find(function(a) { return Array.from(a.getClientRects()).some(function(r) { return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; }); }) || null;
+}
+var _dsHoverTimer = null;
+function ds_hoverHide() { var pop = document.getElementById('ds-hover-pop'); if (pop) { pop.style.display = 'none'; pop.dataset.key = ''; } }
+function ds_hoverShow(td, link, x, y) {
+  var ta = td.querySelector('textarea.ds-cell-input'), ds = findDataSheet(_dsEditId), pop = document.getElementById('ds-hover-pop');
+  var row = ds && ta ? ds.rows[parseInt(ta.dataset.rowIdx, 10)] : null;
+  if (!row || !pop) return;
+  var note = (row.cellNotes && row.cellNotes[ta.dataset.colId]) || '', href = link ? ds_safeHref(link.getAttribute('href')) : '', key = row.id + ta.dataset.colId + href;
+  if (!note && !href) return;
+  if (pop.dataset.key === key && pop.style.display === 'block') return;
+  pop.dataset.key = key; pop.textContent = '';
+  var rowIdx = parseInt(ta.dataset.rowIdx, 10), colId = ta.dataset.colId;
+  var line = function(text, mode, openUrl) {
+    var box = document.createElement('div'); box.className = 'ds-hover-item';
+    var t = document.createElement('div'); t.className = 'ds-hover-text'; t.textContent = text; box.appendChild(t);
+    var acts = document.createElement('div'); acts.className = 'ds-hover-acts';
+    var btn = function(label, fn) { var b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.onclick = function() { ds_hoverHide(); fn(); }; acts.appendChild(b); };
+    if (openUrl) btn('열기', function() { window.open(openUrl, '_blank', 'noopener'); });
+    btn('수정', function() { ds_openInsert(mode, rowIdx, colId); });
+    box.appendChild(acts); pop.appendChild(box);
+  };
+  if (href) line(href, 'link', href);
+  if (note) line(note, 'note');
+  pop.style.display = 'block';
+  var r = td.getBoundingClientRect(), pr = pop.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(href ? x : r.right + 2, window.innerWidth - pr.width - 8)) + 'px';
+  pop.style.top = Math.max(8, Math.min(href ? y + 14 : r.top, window.innerHeight - pr.height - 8)) + 'px';
+}
+(function() {
+  function bind() {
+    if (window.__dsInsBound) return;
+    window.__dsInsBound = true;
+    var $ = function(id) { return document.getElementById(id); }, on = function(id, ev, fn) { var el = $(id); if (el) el.addEventListener(ev, fn); };
+    var hide = function() { ds_dialogHide('ds-ins-dialog'); };
+    on('ds-ins-submit', 'click', function() { ds_applyInsert(); });
+    on('ds-ins-delete', 'click', function() { ds_applyInsert(true); });
+    ['ds-ins-cancel', 'ds-ins-close', 'ds-ins-backdrop'].forEach(function(id) { on(id, 'click', hide); });
+    on('ds-ins-dialog', 'keydown', function(e) { if (e.isComposing) return; if (e.key === 'Escape') { e.preventDefault(); hide(); } else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON' && !(e.target.tagName === 'TEXTAREA' && !e.ctrlKey && !e.metaKey)) { e.preventDefault(); ds_applyInsert(); } });
+    on('ds-ins-img-url', 'input', function() { var v = ds_normCellImg(this.value.trim()), prev = $('ds-ins-img-preview'); _dsInsImage = v; prev.style.display = v ? '' : 'none'; if (v) prev.src = v; });
+    on('ds-ins-img-file', 'change', function() { ds_insFile(this.files && this.files[0], ds_insSetImage); this.value = ''; });
+    on('ds-ins-img-pick', 'click', function() { $('ds-ins-img-file').click(); });
+    on('ds-ins-dialog', 'paste', function(e) { if (_dsIns && _dsIns.mode === 'img') { var file = getImageFileFromTransfer(e.clipboardData); if (file) { e.preventDefault(); ds_insFile(file, ds_insSetImage); } } });
+    var grid = $('ds-ins-sec-char');
+    if (grid) DS_SPECIAL_CHARS.forEach(function(g) {
+      var h = document.createElement('div'); h.className = 'ds-char-head'; h.textContent = g[0]; grid.appendChild(h);
+      var box = document.createElement('div'); box.className = 'ds-char-grid'; grid.appendChild(box);
+      g[1].split(' ').forEach(function(ch) { var b = document.createElement('button'); b.type = 'button'; b.textContent = ch; b.title = ch; b.onclick = function() { ds_insertChar(ch); }; box.appendChild(b); });
+    });
+    document.addEventListener('keydown', function(e) {
+      if (currentPage !== 'datasheet' || !_dsEditId || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || String(e.key).toLowerCase() !== 'k') return;
+      e.preventDefault(); e.stopPropagation(); ds_openInsert('link');
+    }, true);
+    document.addEventListener('mousedown', function(e) { // Ctrl+클릭: 링크 열기
+      if (currentPage !== 'datasheet' || e.button !== 0 || !(e.ctrlKey || e.metaKey) || !e.target.closest) return;
+      var td = e.target.closest('#ds-editor-body td'), a = td && ds_linkElAt(td, e.clientX, e.clientY), href = a && ds_safeHref(a.getAttribute('href'));
+      if (!href) return;
+      e.preventDefault(); e.stopPropagation(); window.open(href, '_blank', 'noopener');
+    }, true);
+    document.addEventListener('mousemove', function(e) {
+      if (currentPage !== 'datasheet' || !e.target.closest || e.target.closest('#ds-hover-pop')) { if (e.target.closest && e.target.closest('#ds-hover-pop')) clearTimeout(_dsHoverTimer); return; }
+      var td = e.buttons ? null : e.target.closest('#ds-editor-body td'), a = td && ds_linkElAt(td, e.clientX, e.clientY);
+      clearTimeout(_dsHoverTimer);
+      if (td && (a || td.classList.contains('ds-has-note'))) _dsHoverTimer = setTimeout(function() { ds_hoverShow(td, a, e.clientX, e.clientY); }, 250);
+      else _dsHoverTimer = setTimeout(ds_hoverHide, 300);
+    });
+  }
+  if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind(); }
 })();
 // ── 시트 안 찾기·바꾸기(#400) ──
 // o = { matchCase, whole(셀 전체 일치), regex, formulas(수식 글자까지 검색) }. 빈 검색어·잘못된 정규식·빈 글자와 맞는 정규식은 null
@@ -47849,6 +48105,12 @@ function ds_openRowMenu(e, rowIdx, colId) {
     }
   }
   if (colId && ds_isDataRow(row)) fzItems = fzItems.concat([{ sep: true }, { label: '선택하여 붙여넣기 · 값만', action: function() { ds_pasteSpecial('values'); } }, { label: '선택하여 붙여넣기 · 서식만', disabled: !_dsInternalClip, action: function() { ds_pasteSpecial('format'); } }, { label: '선택하여 붙여넣기 · 데이터 확인 규칙만', disabled: !_dsInternalClip, action: function() { ds_pasteSpecial('rules'); } }, { label: '선택하여 붙여넣기 · 행/열 바꿈', disabled: !_dsInternalClip, action: function() { ds_pasteSpecial('transpose'); } }]);
+  if (colId && ds_isDataRow(row)) {
+    var insItems = [{ sep: true }, { label: '링크 삽입', action: function() { ds_openInsert('link', rowIdx, colId); } }, { label: row.cellNotes && row.cellNotes[colId] ? '메모 수정' : '메모 삽입', action: function() { ds_openInsert('note', rowIdx, colId); } }, { label: '셀 안 이미지', action: function() { ds_openInsert('img', rowIdx, colId); } }];
+    if (row.cellNotes && row.cellNotes[colId]) insItems.push({ label: '메모 삭제', action: function() { delete row.cellNotes[colId]; ds_saveStyleRules(); } });
+    if (row.cellImg && row.cellImg[colId]) insItems.push({ label: '이미지 삭제', action: function() { delete row.cellImg[colId]; ds_saveStyleRules(); } });
+    fzItems = fzItems.concat(insItems);
+  }
   var grpRows = keepRange ? rangeInfo.rowIdxs : (_dsSelectedRowIdxs.includes(rowIdx) ? _dsSelectedRowIdxs.slice() : [rowIdx]);
   _dsShowContextMenu(e.clientX, e.clientY, items.concat(fzItems, ds_groupMenuItems('rows', grpRows)));
 }

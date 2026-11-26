@@ -71,7 +71,7 @@ ok(/function ds_toggleCellStyle[\s\S]{0,400}ds_richPartialTarget\(\)/.test(html)
 ok(/ds_richDiscard\(rowIdx, colId\)/.test(html) && /if \(options\.replaceText !== undefined\) ds_richDiscard/.test(html), '글자를 바꿔 쓰기 시작하면 서식 폐기');
 ok(/textarea\.ds-cell-input\.ds-cell-editing, \.ds-cell-rich\[contenteditable="true"\]/.test(html), '#377 한글 조합 Enter 처리 선택자가 서식 편집 칸까지 확장');
 ok(/\.ds-cell-rich\[contenteditable="true"\]'\)\) return true;/.test(html), '서식 편집 칸 Ctrl+Z 는 브라우저 기본 동작');
-ok(/dstRow\.cellRich\[dstColId\] = rc/.test(html) && /\['cells', 'cellAligns', 'cellRich', 'cellStyles', 'cellRules'\]\.forEach\(function\(f\) \{ if \(r\[f\]/.test(html), '채우기·열 복제 시 cellRich 따라감');
+ok(/dstRow\.cellRich\[dstColId\] = rc/.test(html) && /\['cells', 'cellAligns', 'cellRich', 'cellStyles', 'cellRules', 'cellNotes', 'cellImg'\]\.forEach\(function\(f\) \{ if \(r\[f\]/.test(html), '채우기·열 복제 시 cellRich 따라감');
 ok(/function ds_applyCellFont[\s\S]{0,300}ds_richSelection\(\)/.test(html) && /function ds_applyCellSize[\s\S]{0,300}ds_richSelection\(\)/.test(html) && /function ds_openCellColorPanel[\s\S]{0,900}ds_richSelection\(\)/.test(html), '글꼴·크기·색상 패널: 편집 중 선택이 있으면 선택 글자에만(선택 없으면 셀 전체)');
 ok(/e\.target\.closest\('#ds-format-toolbar'\)\) _dsRichPending = ds_richSaveSelection\(\)/.test(html), '도구 막대를 누르기 직전의 선택을 오프셋으로 저장');
 ok(/cpTarget\.partial\.d\.innerHTML = cpTarget\.partial\.orig/.test(html) && /pt\.d\.innerHTML = pt\.orig;/.test(html), '색상 패널: 취소 시 원래 HTML 복귀, 적용 시 한 번 저장');
