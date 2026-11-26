@@ -1,0 +1,18 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+let n = 0; const ctx = { mkId: () => 'n' + (++n), ds_normFilter: (v, cols) => v && v.cols ? { cols: Object.fromEntries(Object.entries(v.cols).filter(([k]) => cols.some(c => c.id === k))) } : null, _dsActiveSheet: d => d.sheet }; vm.createContext(ctx);
+const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
+vm.runInContext(cut('function ds_filterHolder', 'function ds_viewAction'), ctx);
+const sheet = { filter: { cols: { base: 1 } }, filterViews: [{ id: 'v1', name: 'A', filter: { cols: { view: 1 } } }], activeViewId: '' };
+ok(ctx.ds_filterHolder(sheet) === sheet && ctx.ds_activeFilter({ sheet }).cols.base === 1, '보기가 꺼져 있으면 기본 필터');
+sheet.activeViewId = 'v1';
+ok(ctx.ds_filterHolder(sheet) === sheet.filterViews[0] && ctx.ds_activeFilter({ sheet }).cols.view === 1, '켜져 있으면 보기의 필터');
+sheet.activeViewId = 'gone'; ok(ctx.ds_filterHolder(sheet) === sheet && ctx.ds_filterHolder(null) === null, '없는 보기 id·시트 없음');
+const norm = ctx.ds_normFilterViews([{ id: 'a', filter: { cols: { x: 1, gone: 1 } } }, null, { name: '비고' }], [{ id: 'x' }]);
+ok(norm.length === 2 && norm[0].name === '필터 보기 1' && Object.keys(norm[0].filter.cols).join() === 'x' && JSON.stringify(norm[1].filter) === '{"cols":{}}' && ctx.ds_normFilterViews(undefined, []).length === 0, '정규화·옛 데이터');
+const views = [{ name: '필터 보기 1' }, { name: '전투' }];
+ok(ctx.ds_viewName(views) === '필터 보기 2' && ctx.ds_viewName(views, '전투') === '전투 (2)' && ctx.ds_viewName(views, '새 이름') === '새 이름', '이름 겹침 피하기');
+ok(/filterViews: ds_normFilterViews/.test(html) && /ds_viewBarPaint\(\); \/\/ 필터 보기 띠/.test(html) && /picker\('fview', '필터 보기'/.test(html) && /v\.filter\.cols = remapKeys\(v\.filter\.cols, colIdMap\)/.test(html), '저장·띠·메뉴·시트 복제');
+ok(/holder\.filter = ds_normFilter\(holder\.filter/.test(html) && /holder\.filter = ds_slicerFilter\(holder\.filter/.test(html) && /var fillVis = ds_visibleRows\(ds\)/.test(html), '머리글 필터·슬라이서는 켜진 필터에, 채우기는 가린 행 제외');
+process.exit(f ? 1 : 0);

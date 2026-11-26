@@ -7201,7 +7201,12 @@ body.block-pointer-dragging {
 .ds-sheet-color { position: absolute; left: 4px; right: 4px; bottom: 1px; height: 3px; border-radius: 2px; pointer-events: none; }
 .ds-sheet-lock { font-size: 10px; margin-right: 5px; color: #888; }
 #ds-editor-body.ds-locked #ds-fill-handle, #ds-editor-body.ds-locked .ds-row-add-row { display: none; }
-.ds-clean-option, .ds-rot-option, .ds-insert-option { white-space: nowrap; }
+.ds-clean-option, .ds-rot-option, .ds-insert-option, .ds-fview-option { white-space: nowrap; }
+/* 필터 보기 띠(#417) */
+.ds-view-bar { display: flex; align-items: center; gap: 8px; margin: 12px 0 -8px 22px; padding: 6px 10px; background: #444; color: #fff; border-radius: 6px; font-size: 12px; width: max-content; max-width: calc(100% - 22px); position: sticky; left: 22px; }
+.ds-view-bar span { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-view-bar button { border: 1px solid #777; border-radius: 4px; background: transparent; color: #fff; font: inherit; padding: 1px 8px; cursor: pointer; }
+.ds-view-bar button:hover { background: #666; }
 #ds-ctx-menu { max-height: calc(100vh - 8px); overflow-y: auto; }
 /* 삽입: 링크·메모·이미지·특수문자(#407) */
 .ds-cell-rich a { color: #1155cc; text-decoration: underline; }
@@ -41694,6 +41699,8 @@ function normalizeDataSheetSheet(sheet) {
     frozenRows: ds_normFreeze(sheet.frozenRows, rows.length),
     frozenCols: ds_normFreeze(sheet.frozenCols, columns.length),
     filter: ds_normFilter(sheet.filter, columns),
+    filterViews: ds_normFilterViews(sheet.filterViews, columns), // 필터 보기(#417)
+    activeViewId: (Array.isArray(sheet.filterViews) && sheet.filterViews.some(function(v) { return v && v.id === sheet.activeViewId; })) ? String(sheet.activeViewId) : '',
     merges: ds_normMerges(sheet.merges, rows, columns),
     cf: ds_normCf(sheet.cf, rows, columns),
     banding: ds_normBanding(sheet.banding, rows, columns),
@@ -42784,6 +42791,7 @@ function renderDataSheetEditor() {
   ds_updateDataSheetStatusbar(ds);
   ds_renderSheetTabs(ds);
   body.innerHTML = _dsRenderFlatTable(ds);
+  ds_viewBarPaint(); // 필터 보기 띠(#417)
   ds_viewPaint(); // 확대·축소·격자선(#409): 다른 칠하기보다 먼저
   ds_hoverHide();
   ds_slicerPaint(); // 슬라이서(#410)
@@ -42928,6 +42936,7 @@ function ds_duplicateSheet(sheetId) {
   (clone.slicers || []).forEach(function(x) { x.id = mkId(); x.colId = colIdMap[x.colId]; });
   (clone.merges || []).forEach(function(m) { m.r = m.r.map(function(id) { return rowIdMap[id]; }); m.c = m.c.map(function(id) { return colIdMap[id]; }); });
   if (clone.filter && clone.filter.cols) clone.filter.cols = remapKeys(clone.filter.cols, colIdMap);
+  (clone.filterViews || []).forEach(function(v) { v.filter.cols = remapKeys(v.filter.cols, colIdMap); });
   clone.id = mkId();
   clone.locked = false; clone.hidden = false; // 복사본은 보호·숨김 해제(#405)
   clone.name = _dsUniqueSheetName(ds, (src.name || '시트') + ' 복사본');
@@ -43044,6 +43053,10 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
   var insertMenu = [['link', '링크 삽입 (Ctrl+K)', 'fa-link'], ['note', '셀 메모', 'fa-note-sticky'], ['img', '셀 안 이미지', 'fa-image'], ['char', '특수문자 삽입', 'fa-icons']].map(function(a) { return opt('ds-insert-option', '', 'ds_openInsert(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('')
     + opt('ds-insert-option', '', 'ds_addSlicer()', 'fa-sliders', '슬라이서 추가')
     + opt('ds-insert-option', '', 'ds_addChart()', 'fa-chart-column', '차트');
+  var fvSheet = _dsActiveSheet(ds), q = String.fromCharCode(39);
+  var viewMenu = opt('ds-fview-option', '', 'ds_viewAction(' + q + 'new' + q + ')', 'fa-plus', '새 필터 보기 만들기')
+    + ((fvSheet && fvSheet.filterViews) || []).map(function(v) { return opt('ds-fview-option', '', 'ds_viewAction(' + q + 'use' + q + ',' + q + esc(v.id) + q + ')', v.id === fvSheet.activeViewId ? 'fa-check' : 'fa-eye', esc(v.name)); }).join('')
+    + (fvSheet && fvSheet.activeViewId ? opt('ds-fview-option', '', 'ds_viewAction(' + q + 'close' + q + ')', 'fa-xmark', '필터 보기 닫기') : '');
   var mergeMenu = [['all', '모두 병합', 'fa-object-group'], ['horiz', '가로로 병합', 'fa-arrows-left-right'], ['vert', '세로로 병합', 'fa-arrows-up-down'], ['none', '병합 해제', 'fa-object-ungroup']].map(function(a) { return opt('ds-merge-option', '', 'ds_mergeCells(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('');
   var borderMenu = [['all', '모두', 'fa-border-all'], ['inner', '안쪽', 'fa-border-none'], ['hinner', '가로 안쪽', 'fa-grip-lines'], ['vinner', '세로 안쪽', 'fa-grip-lines-vertical'], ['outer', '바깥쪽', 'fa-square'], ['left', '왼쪽', 'fa-arrow-left'], ['top', '위쪽', 'fa-arrow-up'], ['right', '오른쪽', 'fa-arrow-right'], ['bottom', '아래쪽', 'fa-arrow-down'], ['clear', '테두리 지우기', 'fa-ban']].map(function(a) { return opt('ds-border-option', '', 'ds_applyBorder(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('')
     + '<div class="ds-border-ctl" onmousedown="event.stopPropagation()"><select id="ds-border-style" onchange="_dsBorderStyle=this.value" title="선 종류" aria-label="선 종류">' + [['thin', '얇게'], ['med', '보통'], ['thick', '굵게'], ['dot', '점선'], ['dash', '파선'], ['double', '이중선']].map(function(a) { return '<option value="' + a[0] + '"' + (a[0] === _dsBorderStyle ? ' selected' : '') + '>' + a[1] + '</option>'; }).join('') + '</select><input type="color" id="ds-border-color" value="' + _dsBorderColor + '" oninput="_dsBorderColor=this.value" title="선 색" aria-label="선 색"></div>';
@@ -43087,6 +43100,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + picker('rot', '텍스트 회전', 'fa-text-slash', rotMenu)
     + picker('clean', '데이터 정리', 'fa-broom', cleanMenu)
     + picker('insert', '삽입', 'fa-square-plus', insertMenu)
+    + picker('fview', '필터 보기', 'fa-eye', viewMenu)
     + btn('ds-cf-btn', 'ds_openCfDialog()', '조건부 서식', 'fa-wand-magic-sparkles')
     + btn('ds-band-btn', 'ds_openBandDialog()', '교차 색상', 'fa-bars-staggered')
     + SEP
@@ -44055,7 +44069,7 @@ function ds_updateFormatToolbarState(ds) {
   if (lhSel) lhSel.value = (hasStyleTargets && refStyle.lh) ? String(refStyle.lh) : '';
   ds_updateFreezeMenu(ds);
   var fbtn2 = document.getElementById('ds-filter-toggle-btn');
-  if (fbtn2) { var fsh = _dsActiveSheet(ds); fbtn2.classList.toggle('active', !!(fsh && fsh.filter)); fbtn2.title = fsh && fsh.filter ? '필터 끄기' : '필터 만들기'; }
+  if (fbtn2) { var fsh = _dsActiveSheet(ds), fon = !!(fsh && ds_filterHolder(fsh).filter); fbtn2.classList.toggle('active', fon); fbtn2.title = fsh && fsh.activeViewId ? '필터 보기 닫기' : fon ? '필터 끄기' : '필터 만들기'; }
   ds_positionFillHandle();
   ds_updateDataSheetStatusbar(ds);
 }
@@ -44511,6 +44525,9 @@ function ds_fillEnd(e) {
   var ds = findDataSheet(_dsEditId);
   if (!ds) return;
   var seed = ctx.seed, tgt = ctx.target;
+  if (tgt.axis === 'v') { var fillVis = ds_visibleRows(ds); tgt = { axis: 'v', rows: tgt.rows.filter(function(i) { return fillVis[i]; }) }; } // 필터로 가린·숨긴 행은 채우지 않음(#417)
+  else tgt = { axis: 'h', cols: tgt.cols.filter(function(id) { var c = ds.columns.find(function(x) { return x.id === id; }); return c && !c.hidden; }) };
+  if (!(tgt.rows || tgt.cols).length) { ds_positionFillHandle(); return; }
   function copyFmt(srcRowIdx, srcColId, dstRow, dstColId) {
     var srcRow = ds.rows[srcRowIdx];
     var al = ds_getCellTextAlign(srcRow, srcColId);
@@ -46169,7 +46186,50 @@ function ds_filterVisible(rows, filter) {
   flush(rows.length);
   return vis;
 }
-function ds_activeFilter(ds) { var sh = _dsActiveSheet(ds); return sh && sh.filter ? sh.filter : null; }
+// 필터 보기(#417): sheet.filterViews = [{ id, name, filter }], sheet.activeViewId. 켜져 있으면 기본 필터 대신 그 필터를 읽고 쓴다
+function ds_filterHolder(sheet) { return (sheet && sheet.activeViewId && (sheet.filterViews || []).find(function(v) { return v.id === sheet.activeViewId; })) || sheet || null; }
+function ds_normFilterViews(list, columns) {
+  return (Array.isArray(list) ? list : []).map(function(v, i) { return v && typeof v === 'object' ? { id: String(v.id || mkId()), name: String(v.name || '필터 보기 ' + (i + 1)).slice(0, 60), filter: ds_normFilter(v.filter, columns) || { cols: {} } } : null; }).filter(Boolean).slice(0, 50);
+}
+function ds_viewName(views, base) { // 겹치지 않는 이름
+  var used = {}, n = 1, name = base;
+  views.forEach(function(v) { used[v.name] = true; });
+  if (!name) { while (used['필터 보기 ' + n]) n++; return '필터 보기 ' + n; }
+  while (used[name]) name = base + ' (' + (++n) + ')';
+  return name;
+}
+function ds_activeFilter(ds) { var h = ds_filterHolder(_dsActiveSheet(ds)); return h && h.filter ? h.filter : null; }
+function ds_viewAction(kind, id) { // new / use / close / rename / copy / delete
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds);
+  _dsHideFormatMenus();
+  if (!sheet) return;
+  var views = sheet.filterViews || (sheet.filterViews = []), cur = views.find(function(v) { return v.id === sheet.activeViewId; });
+  var add = function(name, filter) { var v = { id: mkId(), name: name, filter: JSON.parse(JSON.stringify(filter || { cols: {} })) }; views.push(v); sheet.activeViewId = v.id; };
+  if (kind === 'new') add(ds_viewName(views), ds_filterHolder(sheet).filter);
+  else if (kind === 'use') sheet.activeViewId = id;
+  else if (kind === 'close') sheet.activeViewId = '';
+  else if (!cur) return;
+  else if (kind === 'copy') add(ds_viewName(views, cur.name + ' 복사본'), cur.filter);
+  else if (kind === 'delete') { sheet.filterViews = views.filter(function(v) { return v !== cur; }); sheet.activeViewId = ''; }
+  else if (kind === 'rename') {
+    var input = prompt('필터 보기 이름', cur.name);
+    if (input === null || !input.trim() || input.trim() === cur.name) return;
+    cur.name = ds_viewName(views.filter(function(v) { return v !== cur; }), input.trim().slice(0, 60));
+  }
+  _dsSelectedCellRange = null;
+  var viewport = ds_captureEditorViewport();
+  _dsForceNextHistoryCommit = true; persist(); renderDataSheetEditor(); ds_restoreEditorViewport(viewport);
+}
+function ds_viewBarPaint() { // 켜진 필터 보기의 이름 띠(표 위)
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds), body = document.getElementById('ds-editor-body');
+  if (!sheet || !body) return;
+  var v = (sheet.filterViews || []).find(function(x) { return x.id === sheet.activeViewId; });
+  if (!v) return;
+  var bar = document.createElement('div'), name = document.createElement('span');
+  bar.className = 'ds-view-bar'; name.textContent = '필터 보기: ' + v.name; bar.appendChild(name);
+  [['rename', '이름 바꾸기'], ['copy', '복제'], ['delete', '삭제'], ['close', '닫기']].forEach(function(a) { var b = document.createElement('button'); b.type = 'button'; b.textContent = a[1]; b.onclick = function() { ds_viewAction(a[0]); }; bar.appendChild(b); });
+  body.insertBefore(bar, body.firstChild);
+}
 function ds_visibleRows(ds) { // 필터와 「행 숨기기」(#393)를 모두 반영한 표시 여부
   var rows = ds.rows || [], vis = ds_filterVisible(rows, ds_activeFilter(ds));
   rows.forEach(function(r, i) { if (r.hidden) vis[i] = false; });
@@ -46206,7 +46266,8 @@ function ds_afterHideChange() {
 function ds_toggleFilter() { // 툴바 「필터 만들기」: 켜고 끄기(끄면 모든 열 필터 해제)
   var ds = findDataSheet(_dsEditId), sheet = _dsActiveSheet(ds);
   if (!sheet) return;
-  sheet.filter = sheet.filter ? null : { cols: {} };
+  if (sheet.activeViewId) sheet.activeViewId = ''; // 필터 보기가 켜져 있으면 보기만 닫는다(#417)
+  else sheet.filter = sheet.filter ? null : { cols: {} };
   var viewport = ds_captureEditorViewport();
   persist();
   renderDataSheetEditor();
@@ -46218,9 +46279,10 @@ function ds_closeFilterMenu() { var m = document.getElementById('ds-filter-menu'
 function ds_openFilterMenu(e, colId) {
   e.preventDefault(); e.stopPropagation();
   var ds = findDataSheet(_dsEditId), sheet = _dsActiveSheet(ds), menu = document.getElementById('ds-filter-menu');
-  if (!ds || !sheet || !sheet.filter || !menu) return;
+  var holder = ds_filterHolder(sheet);
+  if (!ds || !sheet || !holder.filter || !menu) return;
   _dsHideContextMenu(); _dsHideFormatMenus();
-  var spec = sheet.filter.cols[colId] || {}, counts = {}, order = [];
+  var spec = holder.filter.cols[colId] || {}, counts = {}, order = [];
   ds.rows.forEach(function(r) { if (!ds_isDataRow(r)) return; var v = r.cells && r.cells[colId] != null ? String(r.cells[colId]) : ''; if (counts[v] === undefined) { counts[v] = 0; order.push(v); } counts[v]++; });
   order.sort(function(a, b) { return ds_sortCompare(a, b, false); });
   var hide = spec.hide || [], checked = new Set(order.filter(function(v) { return hide.indexOf(v) < 0; }));
@@ -46259,13 +46321,14 @@ function ds_filterMenuAll(on) {
 }
 function ds_filterMenuApply() {
   var st = _dsFilterMenuState, ds = findDataSheet(_dsEditId), sheet = _dsActiveSheet(ds);
-  if (!st || !sheet || !sheet.filter) return;
+  var holder = ds_filterHolder(sheet);
+  if (!st || !sheet || !holder.filter) return;
   var spec = {}, hide = st.values.filter(function(v) { return !st.checked.has(v.key); }).map(function(v) { return v.key; });
   if (hide.length) spec.hide = hide;
   var type = document.getElementById('ds-filter-cond').value;
   if (type) spec.cond = { type: type, a: document.getElementById('ds-filter-a').value, b: document.getElementById('ds-filter-b').value };
-  if (spec.hide || spec.cond) sheet.filter.cols[st.colId] = spec; else delete sheet.filter.cols[st.colId];
-  sheet.filter = ds_normFilter(sheet.filter, ds.columns);
+  if (spec.hide || spec.cond) holder.filter.cols[st.colId] = spec; else delete holder.filter.cols[st.colId];
+  holder.filter = ds_normFilter(holder.filter, ds.columns);
   ds_closeFilterMenu();
   var viewport = ds_captureEditorViewport();
   persist(); // 한 번에 저장 → Ctrl+Z 한 번
@@ -47437,7 +47500,8 @@ function ds_slicerFilter(filter, colId, hide) {
 function ds_slicerApply(colId, hide) {
   var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds);
   if (!sheet) return;
-  sheet.filter = ds_slicerFilter(sheet.filter, colId, hide);
+  var holder = ds_filterHolder(sheet);
+  holder.filter = ds_slicerFilter(holder.filter, colId, hide);
   var viewport = ds_captureEditorViewport();
   _dsForceNextHistoryCommit = true; persist(); renderDataSheetEditor(); ds_restoreEditorViewport(viewport);
 }
@@ -47450,7 +47514,8 @@ function ds_addSlicer() {
   if (!sheet.slicers) sheet.slicers = [];
   var n = sheet.slicers.length, body = document.getElementById('ds-editor-body');
   sheet.slicers.push({ id: mkId(), colId: colId, x: ds_floatPos((body ? body.scrollLeft + body.clientWidth - 260 : 400) - n * 24, 40), y: ds_floatPos((body ? body.scrollTop : 0) + 40 + n * 24, 40) });
-  if (!sheet.filter) sheet.filter = { cols: {} };
+  var holder = ds_filterHolder(sheet);
+  if (!holder.filter) holder.filter = { cols: {} };
   _dsForceNextHistoryCommit = true; persist(); renderDataSheetEditor();
 }
 var _dsSlicerScroll = {};
@@ -47463,7 +47528,7 @@ function ds_slicerPaint() {
     var title = ds.columns[ci].name || (ds_colLetters(ci) + '열');
     var f = ds_floatCard(sl, title, function() { var cur = _dsActiveSheet(findDataSheet(_dsEditId)); cur.slicers = (cur.slicers || []).filter(function(x) { return x.id !== sl.id; }); ds_slicerApply(sl.colId, []); });
     f.card.classList.add('ds-slicer');
-    var values = ds_slicerValues(ds.rows, sl.colId), spec = (sheet.filter && sheet.filter.cols && sheet.filter.cols[sl.colId]) || {}, hide = spec.hide || [];
+    var values = ds_slicerValues(ds.rows, sl.colId), spec = ((ds_filterHolder(sheet).filter || {}).cols || {})[sl.colId] || {}, hide = spec.hide || [];
     var links = document.createElement('div'); links.className = 'ds-slicer-links';
     [['모두 선택', []], ['모두 해제', values.map(function(v) { return v.key; })]].forEach(function(a) { var b = document.createElement('button'); b.type = 'button'; b.textContent = a[0]; b.onclick = function() { ds_slicerApply(sl.colId, a[1]); }; links.appendChild(b); });
     var list = document.createElement('div'); list.className = 'ds-slicer-list';
