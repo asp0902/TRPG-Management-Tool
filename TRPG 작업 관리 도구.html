@@ -7186,6 +7186,16 @@ body.block-pointer-dragging {
 .ds-rot-stack { writing-mode: vertical-rl; text-orientation: upright; }
 .ds-rot-up { writing-mode: vertical-rl; transform: rotate(180deg); }
 .ds-rot-down { writing-mode: vertical-rl; }
+/* 행·열 그룹(#404) */
+.ds-table td.ds-row-num.ds-grp-row { box-shadow: inset calc(var(--ds-grp, 1) * 3px) 0 0 #1a73e8; }
+.ds-table thead th.ds-grp-col { box-shadow: inset 0 calc(var(--ds-grp, 1) * 3px) 0 #1a73e8; }
+.ds-grp-box { position: absolute; display: flex; gap: 1px; z-index: 6; }
+.ds-grp-box-row { left: 1px; bottom: 1px; }
+.ds-grp-box-row.after { bottom: auto; top: 1px; }
+.ds-grp-box-col { right: 2px; top: 1px; }
+.ds-grp-box-col.after { right: auto; left: 2px; }
+.ds-grp-btn { width: 13px; height: 13px; padding: 0; border: 1px solid #1a73e8; border-radius: 2px; background: #fff; color: #1a73e8; font-size: 10px; line-height: 11px; cursor: pointer; }
+.ds-grp-btn:hover { background: #1a73e8; color: #fff; }
 .ds-statusbar-stat { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; color: #444; font: inherit; font-size: 12px; font-weight: 700; padding: 1px 8px; cursor: pointer; }
 .ds-statusbar-stat:hover { background: #f3f4f6; border-color: #bbb; }
 .ds-statusbar-selection { color: #a0a0a0; font-weight: 600; }
@@ -41518,6 +41528,7 @@ function normalizeDataSheetSheet(sheet) {
     merges: ds_normMerges(sheet.merges, rows, columns),
     cf: ds_normCf(sheet.cf, rows, columns),
     banding: ds_normBanding(sheet.banding, rows, columns),
+    groups: ds_normGroups(sheet.groups, rows, columns),
   };
 }
 function normalizeDataSheetColumn(col) {
@@ -42590,6 +42601,7 @@ function renderDataSheetEditor() {
   ds_updateDataSheetStatusbar(ds);
   ds_renderSheetTabs(ds);
   body.innerHTML = _dsRenderFlatTable(ds);
+  ds_groupPaint(); // 행·열 그룹(#404)
   ds_rotPaint(); // 텍스트 회전(#403)
   ds_cfPaint(ds); // 조건부 서식·교차 색상(#401)
   ds_findPaint(); // 찾기 강조 다시 칠하기(#400)
@@ -42716,6 +42728,7 @@ function ds_duplicateSheet(sheetId) {
     ['cells', 'cellAligns', 'cellRich', 'cellStyles', 'cellRules'].forEach(function(f) { if (r[f] && typeof r[f] === 'object') r[f] = remapKeys(r[f], colIdMap); });
   });
   [].concat(clone.cf || [], clone.banding || []).forEach(function(x) { x.id = mkId(); x.rows = x.rows.map(function(id) { return rowIdMap[id]; }); x.cols = x.cols.map(function(id) { return colIdMap[id]; }); });
+  if (clone.groups) { (clone.groups.rows || []).forEach(function(g) { g.ids = g.ids.map(function(id) { return rowIdMap[id]; }); }); (clone.groups.cols || []).forEach(function(g) { g.ids = g.ids.map(function(id) { return colIdMap[id]; }); }); }
   (clone.merges || []).forEach(function(m) { m.r = m.r.map(function(id) { return rowIdMap[id]; }); m.c = m.c.map(function(id) { return colIdMap[id]; }); });
   if (clone.filter && clone.filter.cols) clone.filter.cols = remapKeys(clone.filter.cols, colIdMap);
   clone.id = mkId();
@@ -46438,6 +46451,122 @@ function ds_applyCellRot(v) {
 (function() { // 편집을 끝낸 칸은 다시 돌려 그린다
   document.addEventListener('focusout', function(e) { if (currentPage === 'datasheet' && e.target.closest && e.target.closest('#ds-editor-body td.ds-rot')) setTimeout(ds_rotPaint, 0); });
 })();
+// ── 행·열 그룹(#404): sheet.groups = { rows: [{ id, ids:[행 id], closed }], cols: [...] }. 접기·펴기는 숨기기(#393)의 hidden 을 그대로 쓴다 ──
+var DS_GROUP_DEPTH = 3;
+function ds_groupSpan(g, items) { // items: 현재 순서의 행 또는 열 → [처음, 끝] (남은 id 기준) 또는 null
+  var want = {}, a = -1, b = -1;
+  g.ids.forEach(function(id) { want[id] = 1; });
+  items.forEach(function(x, i) { if (x && want[x.id]) { if (a < 0) a = i; b = i; } });
+  return a < 0 ? null : [a, b];
+}
+function ds_groupCheck(spans, a, b) { // 새 그룹 [a,b] 를 만들 수 없으면 이유, 가능하면 ''
+  var parents = 0, children = [];
+  for (var i = 0; i < spans.length; i++) {
+    var x = spans[i][0], y = spans[i][1];
+    if (x === a && y === b) return '이미 같은 그룹이 있습니다.';
+    if (x <= a && y >= b) parents++;
+    else if (x >= a && y <= b) children.push(spans[i]);
+    else if (!(y < a || x > b)) return '다른 그룹과 일부만 겹치는 그룹은 만들 수 없습니다.';
+  }
+  var inner = children.reduce(function(m, c) { return Math.max(m, children.filter(function(o) { return o[0] <= c[0] && o[1] >= c[1]; }).length); }, 0);
+  return parents + 1 + inner > DS_GROUP_DEPTH ? '그룹은 ' + DS_GROUP_DEPTH + '단계까지만 겹칠 수 있습니다.' : '';
+}
+function ds_groupLevel(spans, k) { return spans.filter(function(o) { return o && o[0] <= spans[k][0] && o[1] >= spans[k][1]; }).length; }
+function ds_normGroups(g, rows, columns) {
+  var one = function(list, items) {
+    var valid = {};
+    (items || []).forEach(function(x) { if (x && x.id) valid[x.id] = true; });
+    return (Array.isArray(list) ? list : []).map(function(x) {
+      var ids = x && Array.isArray(x.ids) ? x.ids.filter(function(id) { return typeof id === 'string' && valid[id]; }) : [];
+      return ids.length ? { id: String(x.id || mkId()), ids: ids, closed: !!x.closed } : null;
+    }).filter(Boolean).slice(0, 200);
+  };
+  g = g && typeof g === 'object' ? g : {};
+  return { rows: one(g.rows, rows), cols: one(g.cols, columns) };
+}
+// 접기/펴기를 hidden 에 반영: 펼 때 다른 접힌 그룹에 속한 것은 숨긴 채 둔다
+function ds_groupSetClosed(list, group, items, closed) {
+  group.closed = closed;
+  var span = ds_groupSpan(group, items);
+  if (!span) return;
+  for (var i = span[0]; i <= span[1]; i++) {
+    items[i].hidden = closed || list.some(function(o) { if (o === group || !o.closed) return false; var s = ds_groupSpan(o, items); return !!s && s[0] <= i && s[1] >= i; });
+  }
+}
+function ds_groupContext(kind) {
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds);
+  if (!sheet) return null;
+  if (!sheet.groups) sheet.groups = { rows: [], cols: [] };
+  return { ds: ds, list: sheet.groups[kind], items: kind === 'rows' ? ds.rows : ds.columns };
+}
+function ds_groupAdd(kind, idxs) {
+  var c = ds_groupContext(kind);
+  if (!c || !idxs.length) return;
+  var a = Math.min.apply(null, idxs), b = Math.max.apply(null, idxs);
+  if (kind === 'cols' && a === 0 && b === c.items.length - 1) { if (typeof rubyToast === 'function') rubyToast('모든 열을 한 그룹으로 만들 수는 없습니다.'); return; }
+  var why = ds_groupCheck(c.list.map(function(g) { return ds_groupSpan(g, c.items); }).filter(Boolean), a, b);
+  if (why) { if (typeof rubyToast === 'function') rubyToast(why); return; }
+  c.list.push({ id: mkId(), ids: c.items.slice(a, b + 1).map(function(x) { return x.id; }), closed: false });
+  ds_afterHideChange();
+}
+function ds_groupAt(c, idxs) { // 선택과 겹치는 그룹 중 가장 안쪽(좁은) 것
+  var hit = c.list.map(function(g) { var s = ds_groupSpan(g, c.items); return s && idxs.some(function(i) { return i >= s[0] && i <= s[1]; }) ? { g: g, n: s[1] - s[0] } : null; }).filter(Boolean).sort(function(x, y) { return x.n - y.n; });
+  return hit.length ? hit[0].g : null;
+}
+function ds_groupRemove(kind, idxs) {
+  var c = ds_groupContext(kind), g = c && ds_groupAt(c, idxs);
+  if (!g) return;
+  if (g.closed) ds_groupSetClosed(c.list, g, c.items, false);
+  c.list.splice(c.list.indexOf(g), 1);
+  ds_afterHideChange();
+}
+function ds_groupToggle(kind, id) {
+  var c = ds_groupContext(kind), g = c && c.list.find(function(x) { return x.id === id; });
+  if (!g) return;
+  ds_groupSetClosed(c.list, g, c.items, !g.closed);
+  ds_afterHideChange();
+}
+function ds_groupMenuItems(kind, idxs) {
+  var c = ds_groupContext(kind), unit = kind === 'rows' ? '행' : '열';
+  if (!c || !idxs.length) return [];
+  var n = Math.max.apply(null, idxs) - Math.min.apply(null, idxs) + 1;
+  var out = [{ sep: true }, { label: unit + ' ' + n + '개 그룹화', action: function() { ds_groupAdd(kind, idxs); } }];
+  if (ds_groupAt(c, idxs)) out.push({ label: unit + ' 그룹 해제', action: function() { ds_groupRemove(kind, idxs); } });
+  return out;
+}
+function ds_groupPaint() { // 머리글에 그룹 막대(단계만큼 두꺼움)와 ⊟/⊞ 버튼. 버튼은 그룹 바로 앞(없으면 뒤)의 보이는 머리글에, 둘 다 없으면 왼쪽 위 모서리에
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds), body = document.getElementById('ds-editor-body');
+  if (!sheet || !body || !sheet.groups) return;
+  var vis = ds_visibleRows(ds);
+  ['rows', 'cols'].forEach(function(kind) {
+    var rows = kind === 'rows', items = rows ? ds.rows : ds.columns, list = sheet.groups[kind] || [];
+    var spans = list.map(function(g) { return ds_groupSpan(g, items); });
+    var head = function(i) { return rows ? body.querySelector('tr[data-row-idx="' + i + '"] > td.ds-row-num') : body.querySelector('thead th[data-col-id="' + CSS.escape(items[i].id) + '"]'); };
+    var shown = function(i) { return (rows ? vis[i] : !items[i].hidden) && !!head(i); };
+    list.forEach(function(g, k) {
+      var s = spans[k];
+      if (!s) return;
+      var level = ds_groupLevel(spans, k);
+      for (var i = s[0]; i <= s[1]; i++) { var h = head(i); if (h) { h.classList.add(rows ? 'ds-grp-row' : 'ds-grp-col'); h.style.setProperty('--ds-grp', Math.max(level, parseInt(h.style.getPropertyValue('--ds-grp'), 10) || 0)); } }
+      if (list.some(function(x, j) { var t = spans[j]; return x !== g && x.closed && t && t[0] <= s[0] && t[1] >= s[1]; })) return; // 접힌 바깥 그룹 안의 버튼은 숨김
+      var at = null;
+      for (var a = s[0] - 1; a >= 0 && !at; a--) if (shown(a)) at = head(a);
+      var after = false;
+      for (var b = s[1] + 1; b < items.length && !at; b++) if (shown(b)) { at = head(b); after = true; }
+      if (!at) at = body.querySelector('thead th');
+      if (!at) return;
+      var box = at.querySelector(':scope > .ds-grp-box');
+      if (!box) { box = document.createElement('span'); box.className = 'ds-grp-box ' + (rows ? 'ds-grp-box-row' : 'ds-grp-box-col') + (after ? ' after' : ''); at.appendChild(box); }
+      var btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'ds-grp-btn'; btn.textContent = g.closed ? '＋' : '－';
+      btn.title = (rows ? '행 ' + (s[0] + 1) + '–' + (s[1] + 1) : '열 ' + ds_colLetters(s[0]) + '–' + ds_colLetters(s[1])) + (g.closed ? ' 펼치기' : ' 접기');
+      btn.setAttribute('aria-label', btn.title); btn.setAttribute('aria-expanded', String(!g.closed));
+      btn.onmousedown = function(e) { e.preventDefault(); e.stopPropagation(); };
+      btn.onclick = function(e) { e.stopPropagation(); ds_groupToggle(kind, g.id); };
+      box.appendChild(btn);
+    });
+  });
+}
 // ── 시트 안 찾기·바꾸기(#400) ──
 // o = { matchCase, whole(셀 전체 일치), regex, formulas(수식 글자까지 검색) }. 빈 검색어·잘못된 정규식·빈 글자와 맞는 정규식은 null
 function ds_findRegex(q, o) {
@@ -47427,7 +47556,8 @@ function ds_openRowMenu(e, rowIdx, colId) {
     }
   }
   if (colId && ds_isDataRow(row)) fzItems = fzItems.concat([{ sep: true }, { label: '선택하여 붙여넣기 · 값만', action: function() { ds_pasteSpecial('values'); } }, { label: '선택하여 붙여넣기 · 서식만', disabled: !_dsInternalClip, action: function() { ds_pasteSpecial('format'); } }, { label: '선택하여 붙여넣기 · 데이터 확인 규칙만', disabled: !_dsInternalClip, action: function() { ds_pasteSpecial('rules'); } }, { label: '선택하여 붙여넣기 · 행/열 바꿈', disabled: !_dsInternalClip, action: function() { ds_pasteSpecial('transpose'); } }]);
-  _dsShowContextMenu(e.clientX, e.clientY, items.concat(fzItems));
+  var grpRows = keepRange ? rangeInfo.rowIdxs : (_dsSelectedRowIdxs.includes(rowIdx) ? _dsSelectedRowIdxs.slice() : [rowIdx]);
+  _dsShowContextMenu(e.clientX, e.clientY, items.concat(fzItems, ds_groupMenuItems('rows', grpRows)));
 }
 function ds_openColumnMenu(e, colId) {
   e.preventDefault();
@@ -47450,6 +47580,7 @@ function ds_openColumnMenu(e, colId) {
   var cSheet = _dsActiveSheet(ds);
   if (cSheet && (cSheet.frozenCols || 0) > 0) items.push({ label: '열 고정 해제', action: function() { ds_setFreeze('cols', 0); } });
   if (ds_anyHidden(ds)) items.push({ label: '모두 숨기기 해제', action: ds_unhideAll });
+  items = items.concat(ds_groupMenuItems('cols', ds_fitTargetCols(colId, _dsSelectedColIds).map(function(id) { return ds_getColumnIndex(ds, id); })));
   _dsShowContextMenu(e.clientX, e.clientY, items);
 }
 function _dsShowContextMenu(x, y, items) {
