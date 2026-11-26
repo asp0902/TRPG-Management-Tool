@@ -8970,6 +8970,28 @@ select.sh-field-input,
   </div>
   <div id="ds-hover-pop" role="tooltip"></div>
 
+  <!-- 데이터 시트 CSV 가져오기 팝업(#408): [실행] [취소] -->
+  <div id="ds-csv-backdrop" class="link-insert-backdrop"></div>
+  <div id="ds-csv-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-csv-title">
+    <div class="link-insert-head">
+      <h2 id="ds-csv-title" class="link-insert-title">CSV/TSV 가져오기</h2>
+      <div class="link-insert-head-actions"><button type="button" class="link-insert-close" id="ds-csv-close" aria-label="닫기">×</button></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-body ds-style-body">
+      <input type="file" id="ds-csv-file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" aria-label="가져올 파일">
+      <div id="ds-csv-info" style="font-size:12px;color:#666;"></div>
+      <div class="ds-style-row"><label for="ds-csv-mode">방식</label><select id="ds-csv-mode"><option value="new">새 시트로</option><option value="replace">현재 시트 바꾸기</option><option value="paste">선택한 칸부터 붙이기</option></select></div>
+      <div class="ds-style-row"><label for="ds-csv-sep">구분자</label><select id="ds-csv-sep"><option value="auto">자동</option><option value="comma">쉼표 ,</option><option value="tab">탭</option><option value="semicolon">세미콜론 ;</option></select></div>
+      <div class="ds-style-row"><label><input type="checkbox" id="ds-csv-header"> 첫 행을 열 이름으로 사용</label></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-actions">
+      <button type="button" class="link-insert-btn primary" id="ds-csv-submit">실행</button>
+      <button type="button" class="link-insert-btn cancel" id="ds-csv-cancel">취소</button>
+    </div>
+  </div>
+
   <!-- 데이터 시트 범위 정렬 팝업(#390): [실행] [취소] 순서 -->
   <div id="ds-sort-backdrop" class="link-insert-backdrop"></div>
   <div id="ds-sort-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-sort-title">
@@ -42868,6 +42890,9 @@ function ds_openSheetTabMenu(e, sheetId) {
     { label: '이름 변경', action: function() { ds_startRenameSheet(sheetId); } },
     { label: '시트 복제', action: function() { ds_duplicateSheet(sheetId); } },
     { sep: true },
+    { label: 'CSV 내보내기', action: function() { ds_exportCsv(sheetId); } },
+    { label: 'CSV/TSV 가져오기…', action: function() { ds_switchSheet(sheetId); ds_openCsvImport(); } },
+    { sep: true },
     { label: '색상 변경…', action: function() { ds_pickSheetColor(sheetId); } },
     { label: '색상 지우기', disabled: !target.color, action: function() { ds_setSheetColor(sheetId, ''); } },
     { label: '시트 숨기기', disabled: visibleCount <= 1, action: function() { ds_setSheetHidden(sheetId, true); } },
@@ -47113,6 +47138,135 @@ function ds_hoverShow(td, link, x, y) {
       if (td && (a || td.classList.contains('ds-has-note'))) _dsHoverTimer = setTimeout(function() { ds_hoverShow(td, a, e.clientX, e.clientY); }, 250);
       else _dsHoverTimer = setTimeout(ds_hoverHide, 300);
     });
+  }
+  if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind(); }
+})();
+// ── CSV 가져오기·내보내기(#408) ──
+var DS_CSV_MAX_ROWS = 5000, DS_CSV_MAX_COLS = 100;
+function ds_csvSerialize(matrix, delim) { // 구분자·따옴표·줄바꿈·앞뒤 공백이 있으면 따옴표로 감싸고 따옴표는 겹쳐 쓴다
+  delim = delim || ',';
+  return matrix.map(function(row) {
+    return row.map(function(v) { v = String(v == null ? '' : v); return v.indexOf(delim) >= 0 || /["\r\n]/.test(v) || /^\s|\s$/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(delim);
+  }).join('\r\n');
+}
+function ds_csvDetect(text) { // 따옴표 밖의 처음 20줄에서 , 탭 ; 중 가장 많은 것(같으면 앞의 것)
+  var counts = { ',': 0, '\t': 0, ';': 0 }, q = false, lines = 0;
+  for (var i = 0; i < text.length && lines < 20; i++) {
+    var c = text[i];
+    if (c === '"') q = !q;
+    else if (!q && c === '\n') lines++;
+    else if (!q && counts[c] !== undefined) counts[c]++;
+  }
+  return [',', '\t', ';'].reduce(function(best, d) { return counts[d] > counts[best] ? d : best; }, ',');
+}
+function ds_csvParse(text, delim) {
+  text = String(text == null ? '' : text).replace(/^\ufeff/, '');
+  delim = delim || ds_csvDetect(text);
+  var rows = [], row = [], cell = '', q = false;
+  for (var i = 0; i < text.length; i++) {
+    var c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else if (c !== '\r' || text[i + 1] !== '\n') cell += c; }
+    else if (c === '"' && cell === '') q = true;
+    else if (c === delim) { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows;
+}
+// 내보낼 표: 화면에 보이는 값(수식 결과·숫자 형식). 열 이름이 하나라도 있으면 첫 줄. 카테고리·메모 행은 첫 칸에 이름·내용
+function ds_csvMatrix(sheet) {
+  var cols = sheet.columns || [], rows = sheet.rows || [], env = ds_formulaEnv(rows, cols), out = [];
+  if (cols.some(function(c) { return c.name; })) out.push(cols.map(function(c) { return c.name || ''; }));
+  rows.forEach(function(r) {
+    if (r.isCategory || r.isMemo) { out.push(cols.map(function(c, j) { return j ? '' : (r.isCategory ? r.categoryName : r.memoText) || ''; })); return; }
+    out.push(cols.map(function(c) {
+      var raw = r.cells && r.cells[c.id] != null ? String(r.cells[c.id]) : '', d = ds_cellDisplay(raw, ds_normalizeCellStyle(r.cellStyles && r.cellStyles[c.id]).nf, env);
+      return d ? d.text : raw;
+    }));
+  });
+  return out;
+}
+function ds_decodeText(buffer) { // UTF-8 이 아니면 한글 엑셀 CSV(EUC-KR/CP949)로
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buffer); } catch (e) { return new TextDecoder('euc-kr').decode(buffer); }
+}
+function ds_exportCsv(sheetId) {
+  var ds = findDataSheet(_dsEditId), sheet = ds && (ds.sheets.find(function(s) { return s.id === sheetId; }) || _dsActiveSheet(ds));
+  if (!sheet) return;
+  var blob = new Blob(['\ufeff' + ds_csvSerialize(ds_csvMatrix(sheet), ',')], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a'), url = URL.createObjectURL(blob);
+  a.href = url; a.download = ((ds.title || '데이터 시트') + ' - ' + (sheet.name || '시트')).replace(/[\\\/:*?"<>|]/g, '_') + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+}
+var _dsCsvText = null, _dsCsvName = '';
+function ds_openCsvImport() {
+  var $ = function(id) { return document.getElementById(id); };
+  if (!findDataSheet(_dsEditId)) return;
+  _dsCsvText = null; _dsCsvName = '';
+  $('ds-csv-file').value = ''; $('ds-csv-info').textContent = 'CSV·TSV 파일을 고르세요.';
+  $('ds-csv-mode').value = 'new'; $('ds-csv-sep').value = 'auto'; $('ds-csv-header').checked = true; $('ds-csv-header').disabled = false;
+  ds_dialogShow('ds-csv-dialog');
+}
+function ds_csvRows() { // 현재 선택한 구분자로 해석한 표(크기 제한)
+  var sep = document.getElementById('ds-csv-sep').value, delim = sep === 'comma' ? ',' : sep === 'tab' ? '\t' : sep === 'semicolon' ? ';' : null;
+  return _dsCsvText === null ? [] : ds_csvParse(_dsCsvText, delim).slice(0, DS_CSV_MAX_ROWS + 1).map(function(r) { return r.slice(0, DS_CSV_MAX_COLS); });
+}
+function ds_csvInfo() {
+  var m = ds_csvRows(), w = m.reduce(function(x, r) { return Math.max(x, r.length); }, 0);
+  if (_dsCsvText !== null) document.getElementById('ds-csv-info').textContent = _dsCsvName + ' · ' + m.length + '행 × ' + w + '열' + (m.length > DS_CSV_MAX_ROWS ? ' (' + DS_CSV_MAX_ROWS + '행까지만)' : '');
+}
+function ds_csvSheet(matrix, hasHeader, name) { // 표 → 새 시트 객체
+  var width = matrix.reduce(function(x, r) { return Math.max(x, r.length); }, 1), head = hasHeader ? matrix[0] || [] : [], body = hasHeader ? matrix.slice(1) : matrix;
+  var columns = [];
+  for (var j = 0; j < width; j++) columns.push({ id: mkId(), name: String(head[j] || ''), width: 160 });
+  var rows = body.slice(0, DS_CSV_MAX_ROWS).map(function(r) { var cells = {}; r.forEach(function(v, j) { if (v !== '') cells[columns[j].id] = v; }); return { id: mkId(), cells: cells }; });
+  return normalizeDataSheetSheet({ name: name, columns: columns, rows: rows });
+}
+function ds_applyCsvImport() {
+  var ds = findDataSheet(_dsEditId), $ = function(id) { return document.getElementById(id); }, toast = function(m) { if (typeof rubyToast === 'function') rubyToast(m); };
+  var matrix = ds_csvRows();
+  if (!ds || !matrix.length) { toast('가져올 내용이 없습니다.'); return; }
+  var mode = $('ds-csv-mode').value, header = $('ds-csv-header').checked, name = _dsCsvName.replace(/\.[^.]+$/, '') || '가져온 시트', active = _dsActiveSheet(ds);
+  if (mode !== 'new' && active.locked) { toast('보호된 시트에는 가져올 수 없습니다.'); return; }
+  if (mode === 'paste') {
+    var colAt = ds_getColumnIndex(ds, _dsActiveCellColId);
+    if (_dsActiveCellRowIdx === null || colAt < 0) { toast('붙여 넣을 시작 칸을 먼저 선택하세요.'); return; }
+    var body = matrix.slice(0, DS_CSV_MAX_ROWS), width = body.reduce(function(x, r) { return Math.max(x, r.length); }, 1);
+    var rowIdxs = ds_collectPasteRowIdxs(ds, _dsActiveCellRowIdx, body.length), colIds = ds_collectPasteColIds(ds, colAt, width);
+    var filled = rowIdxs.some(function(ri, i) { return colIds.some(function(id, j) { return body[i][j] !== undefined && ds.rows[ri].cells && ds.rows[ri].cells[id]; }); });
+    if (filled && !confirm('선택한 칸부터의 내용을 덮어씁니다. 계속할까요?')) return;
+    rowIdxs.forEach(function(ri, i) { var row = ds.rows[ri]; if (!row.cells) row.cells = {}; colIds.forEach(function(id, j) { if (body[i][j] === undefined) return; row.cells[id] = body[i][j]; if (row.cellRich) delete row.cellRich[id]; }); });
+  } else {
+    var sheet = ds_csvSheet(matrix, header, mode === 'new' ? _dsUniqueSheetName(ds, name) : active.name);
+    if (mode === 'new') { ds.sheets.push(sheet); _dsBindActiveSheet(ds, sheet); }
+    else {
+      if (!confirm('현재 시트의 내용을 모두 바꿉니다. 계속할까요? (Ctrl+Z 로 복원)')) return;
+      sheet.id = active.id; sheet.color = active.color;
+      ds.sheets[ds.sheets.indexOf(active)] = sheet; _dsBindActiveSheet(ds, sheet);
+    }
+  }
+  ds_dialogHide('ds-csv-dialog');
+  ds_saveStyleRules();
+  toast('가져오기를 마쳤습니다.');
+}
+(function() {
+  function bind() {
+    if (window.__dsCsvBound) return;
+    window.__dsCsvBound = true;
+    var on = function(id, ev, fn) { var el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+    var hide = function() { ds_dialogHide('ds-csv-dialog'); };
+    on('ds-csv-submit', 'click', ds_applyCsvImport);
+    ['ds-csv-cancel', 'ds-csv-close', 'ds-csv-backdrop'].forEach(function(id) { on(id, 'click', hide); });
+    on('ds-csv-file', 'change', function() {
+      var file = this.files && this.files[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { document.getElementById('ds-csv-info').textContent = '5MB 이하 파일만 가져올 수 있습니다.'; _dsCsvText = null; return; }
+      file.arrayBuffer().then(function(buf) { _dsCsvText = ds_decodeText(buf); _dsCsvName = file.name; ds_csvInfo(); });
+    });
+    on('ds-csv-sep', 'change', ds_csvInfo);
+    on('ds-csv-mode', 'change', function() { document.getElementById('ds-csv-header').disabled = this.value === 'paste'; });
+    on('ds-csv-dialog', 'keydown', function(e) { if (e.isComposing) return; if (e.key === 'Escape') { e.preventDefault(); hide(); } else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON' && e.target.type !== 'file') { e.preventDefault(); ds_applyCsvImport(); } });
   }
   if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind(); }
 })();
