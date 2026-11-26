@@ -7158,6 +7158,23 @@ body.block-pointer-dragging {
 #ds-find-panel .ds-find-opts select { height: 26px; font-size: 12px; padding: 0 22px 0 8px; line-height: 24px; }
 .ds-table td.ds-find-hit { box-shadow: inset 0 0 0 100px rgba(255, 224, 70, .45); }
 .ds-table td.ds-find-cur { box-shadow: inset 0 0 0 100px rgba(255, 150, 40, .55); }
+/* 조건부 서식·교차 색상 팝업(#401) */
+.ds-style-body { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.ds-style-body > div > div + div { margin-top: 8px; }
+.ds-style-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.ds-style-row select { height: 30px; font-size: 13px; }
+.ds-style-row .link-insert-input { flex: 1; min-width: 70px; }
+.ds-style-row .link-insert-btn { flex: 0 0 auto; margin-left: auto; padding: 4px 10px; }
+.ds-style-body label { display: inline-flex; align-items: center; gap: 4px; }
+.ds-style-body input[type=color] { width: 34px; height: 26px; padding: 0; border: 1px solid #ddd; border-radius: 4px; background: #fff; }
+#ds-cf-list { display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto; }
+#ds-cf-list:empty { display: none; }
+.ds-cf-item { display: flex; gap: 4px; }
+.ds-cf-item button { border: 1px solid #ddd; border-radius: 4px; background: #fff; font: inherit; font-size: 12px; cursor: pointer; padding: 3px 8px; }
+.ds-cf-item .ds-cf-name { flex: 1; text-align: left; }
+.ds-cf-item.active .ds-cf-name { border-color: #000; font-weight: 700; }
+.ds-cf-item button:disabled { opacity: .35; cursor: default; }
+.ds-band-preset { width: 40px; height: 34px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; padding: 0; }
 .ds-statusbar-stat { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; color: #444; font: inherit; font-size: 12px; font-weight: 700; padding: 1px 8px; cursor: pointer; }
 .ds-statusbar-stat:hover { background: #f3f4f6; border-color: #bbb; }
 .ds-statusbar-selection { color: #a0a0a0; font-weight: 600; }
@@ -8808,6 +8825,55 @@ select.sh-field-input,
       <label><input type="checkbox" id="ds-find-regex"> 정규식</label>
       <label><input type="checkbox" id="ds-find-formula"> 수식 안 검색</label>
       <select id="ds-find-scope" aria-label="범위"><option value="sheet">이 시트</option><option value="all">모든 시트</option></select>
+    </div>
+  </div>
+
+  <!-- 데이터 시트 조건부 서식·교차 색상 팝업(#401): 삭제(왼쪽) [실행] [취소] -->
+  <div id="ds-cf-backdrop" class="link-insert-backdrop"></div>
+  <div id="ds-cf-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-cf-title">
+    <div class="link-insert-head">
+      <h2 id="ds-cf-title" class="link-insert-title">조건부 서식</h2>
+      <div class="link-insert-head-actions"><button type="button" class="link-insert-close" id="ds-cf-close" aria-label="닫기">×</button></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-body ds-style-body">
+      <div id="ds-cf-list"></div>
+      <div class="ds-style-row"><span id="ds-cf-range"></span><button type="button" class="link-insert-btn cancel" id="ds-cf-new">＋ 새 규칙</button></div>
+      <label id="ds-cf-resel-wrap"><input type="checkbox" id="ds-cf-resel"> 범위를 현재 선택으로 바꾸기</label>
+      <div class="ds-style-row"><select id="ds-cf-kind" aria-label="규칙 종류"><option value="single">단일 색상</option><option value="scale">색상 스케일</option></select></div>
+      <div id="ds-cf-single">
+        <div class="ds-style-row"><select id="ds-cf-cond" aria-label="조건"></select><input type="text" id="ds-cf-a" class="link-insert-input" aria-label="값"><input type="text" id="ds-cf-b2" class="link-insert-input" aria-label="둘째 값"></div>
+        <div class="ds-style-row"><label><input type="checkbox" id="ds-cf-b"> <b>굵게</b></label><label><input type="checkbox" id="ds-cf-i"> <i>기울임</i></label><label><input type="checkbox" id="ds-cf-u"> <u>밑줄</u></label><label><input type="checkbox" id="ds-cf-s"> <s>취소선</s></label></div>
+        <div class="ds-style-row"><label><input type="checkbox" id="ds-cf-color-on"> 글자색</label><input type="color" id="ds-cf-color" aria-label="글자색 색"><label><input type="checkbox" id="ds-cf-bg-on"> 배경색</label><input type="color" id="ds-cf-bg" aria-label="배경색 색"></div>
+      </div>
+      <div id="ds-cf-scale"><div class="ds-style-row"><label for="ds-cf-min">최솟값</label><input type="color" id="ds-cf-min" aria-label="최솟값 색"><label><input type="checkbox" id="ds-cf-mid-on"> 중간</label><input type="color" id="ds-cf-mid" aria-label="중간 색"><label for="ds-cf-max">최댓값</label><input type="color" id="ds-cf-max" aria-label="최댓값 색"></div></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-actions">
+      <button type="button" class="link-insert-btn cancel" id="ds-cf-delete" style="margin-right:auto;">삭제</button>
+      <button type="button" class="link-insert-btn primary" id="ds-cf-submit">실행</button>
+      <button type="button" class="link-insert-btn cancel" id="ds-cf-cancel">취소</button>
+    </div>
+  </div>
+
+  <div id="ds-band-backdrop" class="link-insert-backdrop"></div>
+  <div id="ds-band-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-band-title">
+    <div class="link-insert-head">
+      <h2 id="ds-band-title" class="link-insert-title">교차 색상</h2>
+      <div class="link-insert-head-actions"><button type="button" class="link-insert-close" id="ds-band-close" aria-label="닫기">×</button></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-body ds-style-body">
+      <div id="ds-band-range"></div>
+      <div id="ds-band-presets" class="ds-style-row"></div>
+      <div class="ds-style-row"><label><input type="checkbox" id="ds-band-header-on"> 머리글</label><input type="color" id="ds-band-header" aria-label="머리글 색"><label><input type="checkbox" id="ds-band-footer-on"> 바닥글</label><input type="color" id="ds-band-footer" aria-label="바닥글 색"></div>
+      <div class="ds-style-row"><label for="ds-band-odd">색 1</label><input type="color" id="ds-band-odd" aria-label="색 1 색"><label for="ds-band-even">색 2</label><input type="color" id="ds-band-even" aria-label="색 2 색"></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-actions">
+      <button type="button" class="link-insert-btn cancel" id="ds-band-delete" style="margin-right:auto;">삭제</button>
+      <button type="button" class="link-insert-btn primary" id="ds-band-submit">실행</button>
+      <button type="button" class="link-insert-btn cancel" id="ds-band-cancel">취소</button>
     </div>
   </div>
 
@@ -41439,6 +41505,8 @@ function normalizeDataSheetSheet(sheet) {
     frozenCols: ds_normFreeze(sheet.frozenCols, columns.length),
     filter: ds_normFilter(sheet.filter, columns),
     merges: ds_normMerges(sheet.merges, rows, columns),
+    cf: ds_normCf(sheet.cf, rows, columns),
+    banding: ds_normBanding(sheet.banding, rows, columns),
   };
 }
 function normalizeDataSheetColumn(col) {
@@ -42509,6 +42577,7 @@ function renderDataSheetEditor() {
   ds_updateDataSheetStatusbar(ds);
   ds_renderSheetTabs(ds);
   body.innerHTML = _dsRenderFlatTable(ds);
+  ds_cfPaint(ds); // 조건부 서식·교차 색상(#401)
   ds_findPaint(); // 찾기 강조 다시 칠하기(#400)
   // 초기 자동 높이
   requestAnimationFrame(function() {
@@ -42623,29 +42692,17 @@ function ds_duplicateSheet(sheetId) {
     colIdMap[c.id] = nid;
     c.id = nid;
   });
+  var rowIdMap = {};
+  var remapKeys = function(o, map) { var out = {}; Object.keys(o).forEach(function(k) { out[map[k] || k] = o[k]; }); return out; };
   (clone.rows || []).forEach(function(r) {
-    r.id = mkId();
-    if (r.cells && typeof r.cells === 'object') {
-      var nc = {};
-      Object.keys(r.cells).forEach(function(k) { nc[colIdMap[k] || k] = r.cells[k]; });
-      r.cells = nc;
-    }
-    if (r.cellAligns && typeof r.cellAligns === 'object') {
-      var na = {};
-      Object.keys(r.cellAligns).forEach(function(k) { na[colIdMap[k] || k] = r.cellAligns[k]; });
-      r.cellAligns = na;
-    }
-    if (r.cellRich && typeof r.cellRich === 'object') {
-      var nr = {};
-      Object.keys(r.cellRich).forEach(function(k) { nr[colIdMap[k] || k] = r.cellRich[k]; });
-      r.cellRich = nr;
-    }
-    if (r.cellStyles && typeof r.cellStyles === 'object') {
-      var ns = {};
-      Object.keys(r.cellStyles).forEach(function(k) { ns[colIdMap[k] || k] = r.cellStyles[k]; });
-      r.cellStyles = ns;
-    }
+    var nid = mkId();
+    rowIdMap[r.id] = nid;
+    r.id = nid;
+    ['cells', 'cellAligns', 'cellRich', 'cellStyles', 'cellRules'].forEach(function(f) { if (r[f] && typeof r[f] === 'object') r[f] = remapKeys(r[f], colIdMap); });
   });
+  [].concat(clone.cf || [], clone.banding || []).forEach(function(x) { x.id = mkId(); x.rows = x.rows.map(function(id) { return rowIdMap[id]; }); x.cols = x.cols.map(function(id) { return colIdMap[id]; }); });
+  (clone.merges || []).forEach(function(m) { m.r = m.r.map(function(id) { return rowIdMap[id]; }); m.c = m.c.map(function(id) { return colIdMap[id]; }); });
+  if (clone.filter && clone.filter.cols) clone.filter.cols = remapKeys(clone.filter.cols, colIdMap);
   clone.id = mkId();
   clone.name = _dsUniqueSheetName(ds, (src.name || '시트') + ' 복사본');
   var newSheet = normalizeDataSheetSheet(clone);
@@ -42779,6 +42836,8 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + picker('border', '테두리', 'fa-border-all', borderMenu)
     + picker('merge', '셀 병합', 'fa-object-group', mergeMenu)
     + picker('numfmt', '숫자 형식', 'fa-hashtag', numFmtMenu)
+    + btn('ds-cf-btn', 'ds_openCfDialog()', '조건부 서식', 'fa-wand-magic-sparkles')
+    + btn('ds-band-btn', 'ds_openBandDialog()', '교차 색상', 'fa-bars-staggered')
     + SEP
     + picker('halign', '가로 맞춤', 'fa-align-left', halign)
     + picker('valign', '세로 맞춤', 'fa-arrow-up', valign)
@@ -45958,6 +46017,289 @@ function ds_filterMenuApply() {
 }
 document.addEventListener('mousedown', function(e) { if (_dsFilterMenuState && e.target && e.target.closest && !e.target.closest('#ds-filter-menu, .ds-filter-btn')) ds_closeFilterMenu(); }, true);
 document.addEventListener('keydown', function(e) { if (_dsFilterMenuState && e.key === 'Escape') { e.preventDefault(); ds_closeFilterMenu(); } }, true);
+// ── 조건부 서식·교차 색상(#401): 표시만 바꾸고 셀 서식 데이터(cellStyles)는 건드리지 않는다 ──
+// sheet.cf = [{ id, rows:[행 id], cols:[열 id], kind:'single', cond:{type,a,b}, style:{b,i,u,s,color,bg} } | { id, rows, cols, kind:'scale', scale:{min,mid,max} }]
+// sheet.banding = [{ id, rows, cols, header, footer, odd, even }]. 범위는 남아 있는 id 의 처음~끝(안에 끼운 행·열 포함, 지우면 줄고 다 지우면 규칙 삭제)
+var DS_CF_CONDS = [['notempty', '비어 있지 않음'], ['empty', '비어 있음'], ['contains', '텍스트 포함'], ['starts', '텍스트 시작'], ['ends', '텍스트 끝'], ['equals', '텍스트 일치'], ['gt', '숫자 >'], ['ge', '숫자 ≥'], ['lt', '숫자 <'], ['le', '숫자 ≤'], ['eq', '숫자 ='], ['ne', '숫자 ≠'], ['between', '숫자 사이']];
+function ds_cfColor(v) { return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : ''; }
+function ds_cfIds(list, valid) { return Array.isArray(list) ? list.filter(function(id) { return typeof id === 'string' && valid[id]; }) : []; }
+function ds_cfValidIds(rows, columns) {
+  var r = {}, c = {};
+  (rows || []).forEach(function(x) { if (x && x.id) r[x.id] = true; });
+  (columns || []).forEach(function(x) { c[x.id] = true; });
+  return { r: r, c: c };
+}
+function ds_normCf(list, rows, columns) {
+  if (!Array.isArray(list)) return [];
+  var v = ds_cfValidIds(rows, columns);
+  return list.map(function(x) {
+    if (!x || typeof x !== 'object') return null;
+    var out = { id: String(x.id || mkId()), rows: ds_cfIds(x.rows, v.r), cols: ds_cfIds(x.cols, v.c) };
+    if (!out.rows.length || !out.cols.length) return null;
+    if (x.kind === 'scale') {
+      var sc = x.scale || {}, min = ds_cfColor(sc.min), max = ds_cfColor(sc.max);
+      if (!min || !max) return null;
+      out.kind = 'scale'; out.scale = { min: min, mid: ds_cfColor(sc.mid), max: max };
+      return out;
+    }
+    var cd = x.cond || {}, st = x.style || {}, style = {};
+    if (!DS_CF_CONDS.some(function(k) { return k[0] === cd.type; })) return null;
+    ['b', 'i', 'u', 's'].forEach(function(k) { if (st[k]) style[k] = true; });
+    if (ds_cfColor(st.color)) style.color = ds_cfColor(st.color);
+    if (ds_cfColor(st.bg)) style.bg = ds_cfColor(st.bg);
+    if (!Object.keys(style).length) return null;
+    out.kind = 'single'; out.cond = { type: cd.type, a: String(cd.a == null ? '' : cd.a).slice(0, 200), b: String(cd.b == null ? '' : cd.b).slice(0, 200) }; out.style = style;
+    return out;
+  }).filter(Boolean).slice(0, 100);
+}
+function ds_normBanding(list, rows, columns) {
+  if (!Array.isArray(list)) return [];
+  var v = ds_cfValidIds(rows, columns);
+  return list.map(function(x) {
+    if (!x || typeof x !== 'object') return null;
+    var out = { id: String(x.id || mkId()), rows: ds_cfIds(x.rows, v.r), cols: ds_cfIds(x.cols, v.c), header: ds_cfColor(x.header), footer: ds_cfColor(x.footer), odd: ds_cfColor(x.odd) || '#ffffff', even: ds_cfColor(x.even) || '#f3f3f3' };
+    return out.rows.length && out.cols.length ? out : null;
+  }).filter(Boolean).slice(0, 50);
+}
+function ds_cfSpan(item, rows, columns) { // 현재 순서에서의 범위 { r1, r2, c1, c2 } 또는 null
+  var r = [], c = [], want = {};
+  item.rows.forEach(function(id) { want[id] = 1; });
+  rows.forEach(function(x, i) { if (x && want[x.id]) r.push(i); });
+  columns.forEach(function(x, j) { if (item.cols.indexOf(x.id) >= 0) c.push(j); });
+  return r.length && c.length ? { r1: r[0], r2: r[r.length - 1], c1: c[0], c2: c[c.length - 1] } : null;
+}
+function ds_cfCondMatch(v, cond) {
+  v = v == null ? '' : String(v);
+  var t = cond.type, low = v.toLowerCase(), a = String(cond.a == null ? '' : cond.a), al = a.toLowerCase();
+  if (t === 'empty') return !v.trim();
+  if (t === 'notempty') return !!v.trim();
+  if (t === 'contains') return !!a && low.indexOf(al) >= 0;
+  if (t === 'starts') return !!a && low.indexOf(al) === 0;
+  if (t === 'ends') return !!a && low.length >= al.length && low.slice(low.length - al.length) === al;
+  if (t === 'equals') return !!a && low === al;
+  var n = ds_parseNumber(v), x = ds_parseNumber(a), y = ds_parseNumber(cond.b);
+  if (isNaN(n) || isNaN(x)) return false;
+  if (t === 'gt') return n > x; if (t === 'ge') return n >= x; if (t === 'lt') return n < x; if (t === 'le') return n <= x; if (t === 'eq') return n === x; if (t === 'ne') return n !== x;
+  return t === 'between' && !isNaN(y) && n >= Math.min(x, y) && n <= Math.max(x, y);
+}
+function ds_cfMix(c1, c2, t) {
+  var out = '#';
+  for (var k = 1; k < 7; k += 2) { var a = parseInt(c1.substr(k, 2), 16), b = parseInt(c2.substr(k, 2), 16); out += ('0' + Math.round(a + (b - a) * t).toString(16)).slice(-2); }
+  return out;
+}
+function ds_cfScaleColor(n, min, max, sc) { // 중간 색이 있으면 (최소+최대)/2 를 기준으로 두 구간
+  var t = max > min ? (n - min) / (max - min) : 0;
+  if (!sc.mid) return ds_cfMix(sc.min, sc.max, t);
+  return t <= 0.5 ? ds_cfMix(sc.min, sc.mid, t * 2) : ds_cfMix(sc.mid, sc.max, (t - 0.5) * 2);
+}
+// → { '행:열': { band, bg, color, b, i, u, s } }. 규칙은 위에서부터 처음 맞는 하나만 적용(구글 시트와 같음)
+function ds_cfOverlay(rows, columns, cf, banding, valueOf, visible) {
+  var out = {}, done = {};
+  var each = function(span, fn) { for (var i = span.r1; i <= span.r2; i++) { if (!ds_isDataRow(rows[i])) continue; for (var j = span.c1; j <= span.c2; j++) fn(i, j, i + ':' + j); } };
+  (banding || []).forEach(function(b) {
+    var span = ds_cfSpan(b, rows, columns);
+    if (!span) return;
+    var list = [];
+    for (var i = span.r1; i <= span.r2; i++) if (ds_isDataRow(rows[i]) && !(visible && visible[i] === false)) list.push(i);
+    var n = 0;
+    list.forEach(function(i, k) {
+      var color = b.header && k === 0 ? b.header : b.footer && k === list.length - 1 ? b.footer : (n++ % 2 ? b.even : b.odd);
+      for (var j = span.c1; j <= span.c2; j++) (out[i + ':' + j] = out[i + ':' + j] || {}).band = color;
+    });
+  });
+  (cf || []).forEach(function(rule) {
+    var span = ds_cfSpan(rule, rows, columns);
+    if (!span) return;
+    var min = Infinity, max = -Infinity, nums = {};
+    if (rule.kind === 'scale') each(span, function(i, j, key) { var v = valueOf(i, j), n = String(v).trim() ? ds_parseNumber(v) : NaN; if (!isNaN(n)) { nums[key] = n; min = Math.min(min, n); max = Math.max(max, n); } });
+    each(span, function(i, j, key) {
+      var o = out[key] = out[key] || {}; // 범위 안 칸은 조건이 안 맞아도 항목을 만들어, 값이 바뀌면 원래 모양으로 되돌릴 수 있게 한다
+      if (done[key]) return;
+      if (rule.kind === 'scale') { if (nums[key] !== undefined) { o.bg = ds_cfScaleColor(nums[key], min, max, rule.scale); done[key] = 1; } }
+      else if (ds_cfCondMatch(valueOf(i, j), rule.cond)) { Object.assign(o, rule.style); done[key] = 1; }
+    });
+  });
+  return out;
+}
+function ds_cfPaint(ds) {
+  ds = ds || findDataSheet(_dsEditId);
+  var sheet = ds && _dsActiveSheet(ds), body = document.getElementById('ds-editor-body');
+  if (!sheet || !body || !((sheet.cf || []).length || (sheet.banding || []).length)) return;
+  var env = ds_formulaEnv(ds.rows, ds.columns), areas = {};
+  body.querySelectorAll('textarea.ds-cell-input').forEach(function(ta) { areas[ta.dataset.rowIdx + ':' + ta.dataset.colId] = ta; });
+  var valueOf = function(i, j) {
+    var row = ds.rows[i], col = ds.columns[j], raw = row && row.cells && row.cells[col.id] != null ? String(row.cells[col.id]) : '';
+    if (/^\s*=/.test(raw) && raw.trim().length > 1) { var r = ds_formulaValue(raw, env); return r.err ? r.err : ds_fmlText(r.v); }
+    return raw;
+  };
+  var map = ds_cfOverlay(ds.rows, ds.columns, sheet.cf, sheet.banding, valueOf, ds_visibleRows(ds));
+  Object.keys(map).forEach(function(key) {
+    var at = key.split(':'), i = +at[0], col = ds.columns[+at[1]], ta = col && areas[i + ':' + col.id], td = ta && ta.closest('td');
+    if (!td) return;
+    var o = map[key], base = ds_getCellStyle(ds.rows[i], col.id);
+    td.style.backgroundColor = o.bg || base.bg || o.band || '';
+    td.querySelectorAll('textarea.ds-cell-input, .ds-cell-rich').forEach(function(el) {
+      el.style.color = o.color || base.color || '';
+      ['b', 'i', 'u', 's'].forEach(function(k) { el.classList.toggle('ds-cell-' + k, !!(o[k] || base[k])); });
+    });
+  });
+}
+(function() { // 칸을 고치는 동안·끝낸 뒤에도 조건을 다시 계산
+  var queued = false;
+  function later(e) {
+    if (queued || currentPage !== 'datasheet' || !e.target.closest || !e.target.closest('#ds-editor-body')) return;
+    queued = true;
+    requestAnimationFrame(function() { queued = false; ds_cfPaint(); });
+  }
+  document.addEventListener('input', later); document.addEventListener('focusout', later);
+})();
+function ds_cfSelection(ds) { // 선택한 칸 → { rows:[id], cols:[id] } 또는 null
+  var rows = [], cols = [], seenR = {}, seenC = {};
+  (ds_getTextAlignTargetCells(ds) || []).forEach(function(c) {
+    if (!ds_isDataRow(c.row) || !c.colId || c.colId === DS_ROW_COL) return;
+    if (!seenR[c.row.id]) { seenR[c.row.id] = 1; rows.push(c.row.id); }
+    if (!seenC[c.colId]) { seenC[c.colId] = 1; cols.push(c.colId); }
+  });
+  return rows.length && cols.length ? { rows: rows, cols: cols } : null;
+}
+function ds_cfRangeLabel(item, ds) { var s = item && ds_cfSpan(item, ds.rows, ds.columns); return s ? ds_colLetters(s.c1) + (s.r1 + 1) + ':' + ds_colLetters(s.c2) + (s.r2 + 1) : '(없음)'; }
+function ds_dialogShow(id) {
+  var dlg = document.getElementById(id);
+  document.getElementById(id.replace('-dialog', '-backdrop')).classList.add('open'); dlg.classList.add('open');
+  var base = getEditorCenterRect(), r = dlg.getBoundingClientRect();
+  dlg.style.left = Math.max(16, base.left + (base.width - r.width) / 2) + 'px';
+  dlg.style.top = Math.max(16, Math.min(base.top + (base.height - r.height) / 2, window.innerHeight - r.height - 16)) + 'px';
+}
+function ds_dialogHide(id) { document.getElementById(id)?.classList.remove('open'); document.getElementById(id.replace('-dialog', '-backdrop'))?.classList.remove('open'); }
+function ds_saveStyleRules() { // 저장 → Ctrl+Z 한 번, 화면 다시 그리기
+  var viewport = ds_captureEditorViewport();
+  _dsForceNextHistoryCommit = true; persist(); renderDataSheetEditor(); ds_restoreEditorViewport(viewport);
+}
+var _dsCfState = null; // { sel, editId }
+function ds_openCfDialog() {
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds);
+  if (!sheet) return;
+  var sel = ds_cfSelection(ds);
+  if (!sel && !(sheet.cf || []).length) { if (typeof rubyToast === 'function') rubyToast('조건부 서식을 적용할 칸을 먼저 선택하세요.'); return; }
+  _dsCfState = { sel: sel, editId: null };
+  ds_cfFillForm(null);
+  ds_dialogShow('ds-cf-dialog');
+}
+function ds_cfFillForm(rule) {
+  var ds = findDataSheet(_dsEditId), sheet = _dsActiveSheet(ds), $ = function(id) { return document.getElementById(id); };
+  _dsCfState.editId = rule ? rule.id : null;
+  $('ds-cf-range').textContent = '적용 범위: ' + (rule ? ds_cfRangeLabel(rule, ds) : ds_cfRangeLabel(_dsCfState.sel, ds));
+  $('ds-cf-resel-wrap').style.display = rule && _dsCfState.sel ? '' : 'none'; $('ds-cf-resel').checked = false;
+  $('ds-cf-delete').style.display = rule ? '' : 'none';
+  $('ds-cf-kind').value = rule ? rule.kind : 'single';
+  var cond = (rule && rule.cond) || { type: 'notempty', a: '', b: '' }, st = (rule && rule.style) || { bg: '#b7e1cd' }, sc = (rule && rule.scale) || { min: '#ffffff', mid: '', max: '#57bb8a' };
+  $('ds-cf-cond').value = cond.type; $('ds-cf-a').value = cond.a; $('ds-cf-b2').value = cond.b;
+  ['b', 'i', 'u', 's'].forEach(function(k) { $('ds-cf-' + k).checked = !!st[k]; });
+  $('ds-cf-color-on').checked = !!st.color; $('ds-cf-color').value = st.color || '#000000';
+  $('ds-cf-bg-on').checked = !!st.bg; $('ds-cf-bg').value = st.bg || '#b7e1cd';
+  $('ds-cf-min').value = sc.min; $('ds-cf-mid-on').checked = !!sc.mid; $('ds-cf-mid').value = sc.mid || '#ffd666'; $('ds-cf-max').value = sc.max;
+  ds_cfSyncForm();
+  var list = $('ds-cf-list');
+  list.textContent = '';
+  (sheet.cf || []).forEach(function(r, i) {
+    var row = document.createElement('div'); row.className = 'ds-cf-item' + (rule && rule.id === r.id ? ' active' : '');
+    var name = document.createElement('button'); name.type = 'button'; name.className = 'ds-cf-name';
+    var label = r.kind === 'scale' ? '색상 스케일' : DS_CF_CONDS.filter(function(k) { return k[0] === r.cond.type; })[0][1] + (r.cond.a && !/empty/.test(r.cond.type) ? ' ' + r.cond.a + (r.cond.type === 'between' ? '~' + r.cond.b : '') : '');
+    name.textContent = ds_cfRangeLabel(r, ds) + ' · ' + label; name.title = '이 규칙 편집';
+    name.style.background = r.kind === 'scale' ? 'linear-gradient(90deg,' + [r.scale.min, r.scale.mid, r.scale.max].filter(Boolean).join(',') + ')' : (r.style.bg || '');
+    if (r.style && r.style.color) name.style.color = r.style.color;
+    name.onclick = function() { ds_cfFillForm(r); };
+    row.appendChild(name);
+    [[-1, '↑', '우선순위 올리기'], [1, '↓', '우선순위 내리기']].forEach(function(m) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'ds-cf-move'; b.textContent = m[1]; b.title = m[2]; b.disabled = i + m[0] < 0 || i + m[0] >= sheet.cf.length;
+      b.onclick = function() { var t = sheet.cf[i + m[0]]; sheet.cf[i + m[0]] = r; sheet.cf[i] = t; ds_saveStyleRules(); ds_cfFillForm(rule ? sheet.cf.find(function(x) { return x.id === rule.id; }) : null); };
+      row.appendChild(b);
+    });
+    list.appendChild(row);
+  });
+}
+function ds_cfSyncForm() {
+  var $ = function(id) { return document.getElementById(id); }, scale = $('ds-cf-kind').value === 'scale', t = $('ds-cf-cond').value;
+  $('ds-cf-single').style.display = scale ? 'none' : ''; $('ds-cf-scale').style.display = scale ? '' : 'none';
+  $('ds-cf-a').style.display = /empty/.test(t) ? 'none' : ''; $('ds-cf-b2').style.display = t === 'between' ? '' : 'none';
+}
+function ds_applyCfDialog() {
+  var st = _dsCfState, ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds), $ = function(id) { return document.getElementById(id); };
+  if (!st || !sheet) return;
+  var list = (sheet.cf || []).slice(), old = list.find(function(r) { return r.id === st.editId; });
+  var range = old && !$('ds-cf-resel').checked ? old : st.sel;
+  if (!range) { if (typeof rubyToast === 'function') rubyToast('적용할 칸을 먼저 선택하세요.'); return; }
+  var style = { color: $('ds-cf-color-on').checked ? $('ds-cf-color').value : '', bg: $('ds-cf-bg-on').checked ? $('ds-cf-bg').value : '' };
+  ['b', 'i', 'u', 's'].forEach(function(k) { style[k] = $('ds-cf-' + k).checked; });
+  var rule = ds_normCf([{ id: old ? old.id : mkId(), rows: range.rows, cols: range.cols, kind: $('ds-cf-kind').value, cond: { type: $('ds-cf-cond').value, a: $('ds-cf-a').value, b: $('ds-cf-b2').value }, style: style, scale: { min: $('ds-cf-min').value, mid: $('ds-cf-mid-on').checked ? $('ds-cf-mid').value : '', max: $('ds-cf-max').value } }], ds.rows, ds.columns)[0];
+  if (!rule) { if (typeof rubyToast === 'function') rubyToast('적용할 서식을 하나 이상 고르세요.'); return; }
+  if (old) list[list.indexOf(old)] = rule; else list.push(rule);
+  sheet.cf = list;
+  ds_dialogHide('ds-cf-dialog');
+  ds_saveStyleRules();
+}
+function ds_deleteCfRule() {
+  var st = _dsCfState, ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds);
+  if (!st || !sheet) return;
+  sheet.cf = (sheet.cf || []).filter(function(r) { return r.id !== st.editId; });
+  ds_dialogHide('ds-cf-dialog');
+  ds_saveStyleRules();
+}
+var DS_BAND_PRESETS = [['#bdbdbd', '#ffffff', '#f3f3f3'], ['#a4c2f4', '#ffffff', '#e8f0fe'], ['#b6d7a8', '#ffffff', '#ebf5e6'], ['#ffe599', '#ffffff', '#fff7db'], ['#f4b6b6', '#ffffff', '#fdecec']]; // [머리글, 첫 색, 둘째 색]
+var _dsBandState = null; // { range, hits:[id] }
+function ds_openBandDialog() {
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds), $ = function(id) { return document.getElementById(id); };
+  if (!sheet) return;
+  var sel = ds_cfSelection(ds);
+  if (!sel) { if (typeof rubyToast === 'function') rubyToast('색을 입힐 칸을 먼저 선택하세요.'); return; }
+  var s = ds_cfSpan(sel, ds.rows, ds.columns);
+  var hits = (sheet.banding || []).filter(function(b) { var t = ds_cfSpan(b, ds.rows, ds.columns); return t && !(t.r2 < s.r1 || t.r1 > s.r2 || t.c2 < s.c1 || t.c1 > s.c2); });
+  var cur = hits[0], single = sel.rows.length === 1 && sel.cols.length === 1;
+  _dsBandState = { range: cur && single ? cur : sel, hits: hits.map(function(b) { return b.id; }) };
+  $('ds-band-range').textContent = '적용 범위: ' + ds_cfRangeLabel(_dsBandState.range, ds);
+  $('ds-band-delete').style.display = cur ? '' : 'none';
+  var v = cur || { header: DS_BAND_PRESETS[0][0], footer: '', odd: DS_BAND_PRESETS[0][1], even: DS_BAND_PRESETS[0][2] };
+  $('ds-band-header-on').checked = !!v.header; $('ds-band-header').value = v.header || DS_BAND_PRESETS[0][0];
+  $('ds-band-footer-on').checked = !!v.footer; $('ds-band-footer').value = v.footer || DS_BAND_PRESETS[0][0];
+  $('ds-band-odd').value = v.odd; $('ds-band-even').value = v.even;
+  var box = $('ds-band-presets'); box.textContent = '';
+  DS_BAND_PRESETS.forEach(function(pr, i) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'ds-band-preset'; b.title = '기본 스타일 ' + (i + 1); b.setAttribute('aria-label', b.title);
+    b.style.background = 'linear-gradient(' + pr[0] + ' 0 33%,' + pr[1] + ' 33% 66%,' + pr[2] + ' 66%)';
+    b.onclick = function() { $('ds-band-header').value = pr[0]; $('ds-band-footer').value = pr[0]; $('ds-band-odd').value = pr[1]; $('ds-band-even').value = pr[2]; $('ds-band-header-on').checked = true; };
+    box.appendChild(b);
+  });
+  ds_dialogShow('ds-band-dialog');
+}
+function ds_applyBandDialog(remove) {
+  var st = _dsBandState, ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds), $ = function(id) { return document.getElementById(id); };
+  if (!st || !sheet) return;
+  var list = (sheet.banding || []).filter(function(b) { return st.hits.indexOf(b.id) < 0; });
+  if (remove !== true) list = list.concat(ds_normBanding([{ rows: st.range.rows, cols: st.range.cols, header: $('ds-band-header-on').checked ? $('ds-band-header').value : '', footer: $('ds-band-footer-on').checked ? $('ds-band-footer').value : '', odd: $('ds-band-odd').value, even: $('ds-band-even').value }], ds.rows, ds.columns));
+  sheet.banding = list;
+  ds_dialogHide('ds-band-dialog');
+  ds_saveStyleRules();
+}
+(function() {
+  function bind() {
+    if (window.__dsCfBound) return;
+    window.__dsCfBound = true;
+    var on = function(id, ev, fn) { var el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+    [['ds-cf', ds_applyCfDialog], ['ds-band', ds_applyBandDialog]].forEach(function(d) {
+      var hide = function() { ds_dialogHide(d[0] + '-dialog'); };
+      on(d[0] + '-submit', 'click', function() { d[1](); });
+      ['-cancel', '-close', '-backdrop'].forEach(function(x) { on(d[0] + x, 'click', hide); });
+      on(d[0] + '-dialog', 'keydown', function(e) { if (e.isComposing) return; if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); d[1](); } else if (e.key === 'Escape') { e.preventDefault(); hide(); } });
+    });
+    var cond = document.getElementById('ds-cf-cond');
+    if (cond) DS_CF_CONDS.forEach(function(k) { var o = document.createElement('option'); o.value = k[0]; o.textContent = k[1]; cond.appendChild(o); });
+    on('ds-cf-cond', 'change', ds_cfSyncForm); on('ds-cf-kind', 'change', ds_cfSyncForm);
+    on('ds-cf-delete', 'click', ds_deleteCfRule); on('ds-cf-new', 'click', function() { ds_cfFillForm(null); });
+    on('ds-band-delete', 'click', function() { ds_applyBandDialog(true); });
+    [['ds-cf-color', 'ds-cf-color-on'], ['ds-cf-bg', 'ds-cf-bg-on'], ['ds-cf-mid', 'ds-cf-mid-on'], ['ds-band-header', 'ds-band-header-on'], ['ds-band-footer', 'ds-band-footer-on']].forEach(function(x) { on(x[0], 'input', function() { document.getElementById(x[1]).checked = true; }); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind();
+})();
 // ── 시트 안 찾기·바꾸기(#400) ──
 // o = { matchCase, whole(셀 전체 일치), regex, formulas(수식 글자까지 검색) }. 빈 검색어·잘못된 정규식·빈 글자와 맞는 정규식은 null
 function ds_findRegex(q, o) {
