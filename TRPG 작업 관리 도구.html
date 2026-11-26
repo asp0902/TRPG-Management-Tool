@@ -43231,6 +43231,10 @@ function ds_getSelectedCellRangeInfo(ds) {
   var rowTo = Math.max(startRowIdx, endRowIdx);
   var colFrom = Math.min(colStart, colEnd);
   var colTo = Math.max(colStart, colEnd);
+  if (typeof ds_activeMerges === 'function' && ds_activeMerges(ds).length) { // 병합에 걸치면 병합 전체(#420)
+    var ex = ds_mergeExpand(ds_mergeMap(ds.rows, ds.columns, ds_activeMerges(ds)).anchors, rowFrom, rowTo, colFrom, colTo);
+    rowFrom = ex.r0; rowTo = ex.r1; colFrom = ex.c0; colTo = ex.c1;
+  }
   var rowIdxs = [];
   var fv = ds_visibleRows(ds); // 필터로 숨긴 행은 범위·복사·지우기·서식에서 건너뜀(#391)
   for (var r = rowFrom; r <= rowTo; r++) {
@@ -43744,7 +43748,9 @@ function ds_snapshotClip(ds, text) {
   var m = ds_getClipboardSelectionMatrix(ds);
   if (!m) { _dsInternalClip = null; return; }
   var clone = function(x) { return x == null ? null : JSON.parse(JSON.stringify(x)); };
-  _dsInternalClip = { text: text, matrix: m.rowIdxs.map(function(ri) {
+  var clipMap = ds_mergeMap(ds.rows, ds.columns, ds_activeMerges(ds)), clipMerges = []; // 복사한 범위 안의 병합(상대 위치, #420)
+  Object.keys(clipMap.anchors).forEach(function(k) { var at = k.split(':'), a = clipMap.anchors[k], i = m.rowIdxs.indexOf(+at[0]), j = m.colIds.indexOf((ds.columns[+at[1]] || {}).id); if (i >= 0 && j >= 0 && i + a.rs <= m.rowIdxs.length && j + a.cs <= m.colIds.length) clipMerges.push({ r: i, c: j, rs: a.rs, cs: a.cs }); });
+  _dsInternalClip = { text: text, merges: clipMerges, matrix: m.rowIdxs.map(function(ri) {
     var row = ds.rows[ri];
     return m.colIds.map(function(cid) { return { v: row && row.cells && row.cells[cid] != null ? String(row.cells[cid]) : '', st: clone(row && row.cellStyles && row.cellStyles[cid]), al: row && row.cellAligns ? row.cellAligns[cid] || null : null, rc: row && row.cellRich ? row.cellRich[cid] || null : null, ru: clone(ds_ruleOf(row, cid)) }; });
   }) };
@@ -43776,6 +43782,15 @@ function ds_pasteInternal(mode, transpose) {
       if (mode === 'all' || mode === 'rules') { if (cell.ru) row.cellRules[cid] = cl(cell.ru); else delete row.cellRules[cid]; }
     });
   });
+  if (mode === 'all') { // 대상 범위의 병합은 풀고, 원본에 병합이 있었으면 같은 모양으로(#420)
+    var pSheet = _dsActiveSheet(ds), dstRows = rowIdxs.map(function(i) { return ds.rows[i].id; });
+    pSheet.merges = (pSheet.merges || []).filter(function(x) { return !(x.r.some(function(id) { return dstRows.indexOf(id) >= 0; }) && x.c.some(function(id) { return colIds.indexOf(id) >= 0; })); });
+    if (!transpose && !fillSel) (clip.merges || []).forEach(function(x) {
+      var idxs = rowIdxs.slice(x.r, x.r + x.rs), cids = colIds.slice(x.c, x.c + x.cs);
+      if (idxs.length !== x.rs || cids.length !== x.cs || idxs.some(function(i, k) { return i !== idxs[0] + k || !ds_isDataRow(ds.rows[i]); })) return;
+      pSheet.merges.push({ r: idxs.map(function(i) { return ds.rows[i].id; }), c: cids });
+    });
+  }
   _dsActiveRowIdx = rowIdxs[0]; _dsActiveCellRowIdx = rowIdxs[0]; _dsActiveCellColId = colIds[0]; _dsCellEditMode = false;
   ds_setSelectedCellRange(rowIdxs[0], colIds[0], rowIdxs[rowIdxs.length - 1], colIds[colIds.length - 1]);
   _dsForceNextHistoryCommit = true;
@@ -44441,6 +44456,7 @@ function ds_positionFillHandle() {
   var anchor = ds_getFillAnchorCell();
   if (!anchor) { els.h.classList.remove('visible'); return; }
   var ta = ds_getCellTextarea(anchor.rowIdx, anchor.colId);
+  if (!ta) { var fds = findDataSheet(_dsEditId), fm = fds && ds_mergeAt(fds, anchor.rowIdx, ds_getColumnIndex(fds, anchor.colId)); if (fm) ta = ds_getCellTextarea(fm.i, fds.columns[fm.j].id); } // 병합 칸은 오른쪽 아래에(#420)
   var td = ta && ta.closest ? ta.closest('td') : null;
   if (!td) { els.h.classList.remove('visible'); return; }
   var b = body.getBoundingClientRect(), r = td.getBoundingClientRect();
@@ -44528,6 +44544,8 @@ function ds_fillEnd(e) {
   if (tgt.axis === 'v') { var fillVis = ds_visibleRows(ds); tgt = { axis: 'v', rows: tgt.rows.filter(function(i) { return fillVis[i]; }) }; } // 필터로 가린·숨긴 행은 채우지 않음(#417)
   else tgt = { axis: 'h', cols: tgt.cols.filter(function(id) { var c = ds.columns.find(function(x) { return x.id === id; }); return c && !c.hidden; }) };
   if (!(tgt.rows || tgt.cols).length) { ds_positionFillHandle(); return; }
+  var fillMap = ds_mergeMap(ds.rows, ds.columns, ds_activeMerges(ds));
+  var covered = function(ri, cid) { return !!fillMap.covered[ri + ':' + ds_getColumnIndex(ds, cid)]; }; // 덮인 칸은 채우지 않음(#420)
   function copyFmt(srcRowIdx, srcColId, dstRow, dstColId) {
     var srcRow = ds.rows[srcRowIdx];
     var al = ds_getCellTextAlign(srcRow, srcColId);
@@ -44549,7 +44567,7 @@ function ds_fillEnd(e) {
       var vals = _dsFillValues(seq, tgt.rows.length);
       tgt.rows.forEach(function(ri, i) {
         var row = ds.rows[ri];
-        if (!ds_isDataRow(row)) return;
+        if (!ds_isDataRow(row) || covered(ri, colId)) return;
         if (!row.cells || typeof row.cells !== 'object') row.cells = {};
         row.cells[colId] = vals[i];
         copyFmt(seed.rowIdxs[i % seed.rowIdxs.length], colId, row, colId);
@@ -44562,6 +44580,7 @@ function ds_fillEnd(e) {
       var seq = seed.colIds.map(function(cid) { return _dsCellVal(ds, ri, cid); });
       var vals = _dsFillValues(seq, tgt.cols.length);
       tgt.cols.forEach(function(cid, i) {
+        if (covered(ri, cid)) return;
         if (!row.cells || typeof row.cells !== 'object') row.cells = {};
         row.cells[cid] = vals[i];
         copyFmt(ri, seed.colIds[i % seed.colIds.length], row, cid);
@@ -45146,7 +45165,10 @@ function ds_toggleHeaderEditMode() {
 function _dsRenderFlatTable(ds) {
   var cols = ds.columns || [];
   var rows = ds.rows || [];
-  var mergeMap = ds_mergeMap(rows, cols, ds_activeMerges(ds)); // 셀 병합(#395)
+  var mergeVis = ds_visibleRows(ds), mergeMap = ds_mergeMap(rows, cols, ds_activeMerges(ds).filter(function(m) { // 셀 병합(#395). 첫 행이 가려졌는데 아래 행이 보이면 이번 화면에서는 풀어 그림(칸이 밀리지 않게, #420)
+    var shownRows = m.r.map(function(id) { return rows.findIndex(function(r) { return r.id === id; }); }).filter(function(i) { return i >= 0 && mergeVis[i]; });
+    return !shownRows.length || (rows[shownRows[0]] || {}).id === m.r[0];
+  }));
   var fenv = ds_formulaEnv(rows, cols); // 수식(#397): 렌더마다 전체 재계산(칸별 캐시)
   var flt = ds_activeFilter(ds), fltVis = ds_visibleRows(ds); // 필터(#391)·행 숨기기(#393)
   var lastVisCol = -1, lastVisRow = -1;
@@ -45271,7 +45293,7 @@ function _dsRenderFlatTable(ds) {
       var cssText = ds_cellStyleCss(cst);
       var styleAttr = cssText ? ' style="' + esc(cssText) + ';"' : '';
       var tdCss = (cst.bg ? 'background-color:' + esc(cst.bg) + ';' : '') + (cst.bd ? esc(ds_borderCss(cst.bd)) + ';' : '');
-      return '<td' + cellClassAttr + (mspan ? ' rowspan="' + mspan.rs + '" colspan="' + mspan.cs + '"' : '') + (tdCss ? ' style="' + tdCss + '"' : '') + ' data-col-id="' + esc(c.id) + '" oncontextmenu="ds_openRowMenu(event,' + rowIdx + ',\'' + esc(c.id) + '\')">'
+      return '<td' + cellClassAttr + (mspan ? ' rowspan="' + mspan.rs + '" colspan="' + mspan.cs + '" onmousedown="if(event.target===this)ds_handleCellMouseDown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" ondblclick="if(event.target===this)ds_enterCellEditMode(' + rowIdx + ',\'' + esc(c.id) + '\')"' : '') + (tdCss ? ' style="' + tdCss + '"' : '') + ' data-col-id="' + esc(c.id) + '" oncontextmenu="ds_openRowMenu(event,' + rowIdx + ',\'' + esc(c.id) + '\')">'
         + '<textarea class="ds-cell-input ds-cell-align-' + textAlign + editClass + styleClass + '"' + styleAttr + ' rows="1" data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '" onmousedown="ds_handleCellMouseDown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" ondblclick="ds_enterCellEditMode(' + rowIdx + ',\'' + esc(c.id) + '\')" onkeydown="ds_handleCellKeydown(event,' + rowIdx + ',\'' + esc(c.id) + '\')" onbeforeinput="ds_handleCellBeforeInput(event,this)" oncompositionstart="ds_handleCellCompositionStart(this)" onpaste="ds_handleCellPaste(event,this)" oninput="ds_handleCellInput(this)" onfocus="ds_handleCellFocus(this)" onblur="ds_autosizeCell(this)">' + esc(val) + '</textarea>'
         + ((richHtml || fmtText !== null || wrapMode === 'overflow') ? '<div class="ds-cell-rich ds-cell-align-' + textAlign + styleClass + '"' + styleAttr + ' data-row-idx="' + rowIdx + '" data-col-id="' + esc(c.id) + '">' + ds_viewInner(richHtml || (fmtText !== null ? esc(fmtText) : ds_richFromText(val)), wrapMode, ds_overflowWidthFor(cols, row, ci)) + '</div>' : '')
         + ruleHtml
@@ -45318,8 +45340,10 @@ function ds_insertColumnAt(colId, after) {
   var idx = ds.columns.findIndex(function(c) { return c.id === colId; });
   if (idx < 0) idx = ds.columns.length - 1;
   var insertAt = after ? idx + 1 : idx;
-  ds.columns.splice(insertAt, 0, { id: mkId(), name: '', width: 160 });
+  var colIdsBefore = ds.columns.map(function(c) { return c.id; }), newColId = mkId();
+  ds.columns.splice(insertAt, 0, { id: newColId, name: '', width: 160 });
   var fSheet = _dsActiveSheet(ds);
+  if (fSheet) fSheet.merges = ds_mergeAfterInsert(fSheet.merges, colIdsBefore, insertAt, newColId, 'c');
   if (fSheet) fSheet.frozenCols = ds_freezeAfterInsert(fSheet.frozenCols || 0, insertAt);
   persist();
   renderDataSheetEditor();
@@ -45334,6 +45358,7 @@ function ds_removeColumn(colId) {
     ds.columns.splice(_rmIdx, 1);
     var fSheet = _dsActiveSheet(ds);
     if (fSheet) fSheet.frozenCols = ds_freezeAfterRemove(fSheet.frozenCols || 0, [_rmIdx]);
+    if (fSheet) fSheet.merges = ds_mergeAfterRemove(fSheet.merges, [colId], 'c');
   }
   (ds.rows || []).forEach(function(r) {
     if (r.cells) delete r.cells[colId];
@@ -45823,7 +45848,8 @@ function _dsDragEnd() {
     var from = ctx.fromIdx;
     var to = ctx.dropIndex;
     var insertAt = to > from ? to - 1 : to;
-    if (insertAt !== from && from >= 0 && from < ds.rows.length) {
+    if (insertAt !== from && from >= 0 && from < ds.rows.length && ds_moveBreaksMerge(ds_activeMerges(ds), ds.rows.map(function(r) { return r.id; }), from, insertAt, 'r')) { if (typeof rubyToast === 'function') rubyToast('병합된 칸이 흩어지는 이동은 할 수 없습니다. 먼저 병합을 해제하세요.'); }
+    else if (insertAt !== from && from >= 0 && from < ds.rows.length) {
       var movedRow = ds.rows.splice(from, 1)[0];
       ds.rows.splice(insertAt, 0, movedRow);
       _dsSelectedRowIdxs = [insertAt];
@@ -45841,7 +45867,8 @@ function _dsDragEnd() {
     var cFrom = ctx.fromIdx;
     var cTo = ctx.dropIndex;
     var cInsertAt = cTo > cFrom ? cTo - 1 : cTo;
-    if (cInsertAt !== cFrom && cFrom >= 0 && cFrom < ds.columns.length) {
+    if (cInsertAt !== cFrom && cFrom >= 0 && cFrom < ds.columns.length && ds_moveBreaksMerge(ds_activeMerges(ds), ds.columns.map(function(c) { return c.id; }), cFrom, cInsertAt, 'c')) { if (typeof rubyToast === 'function') rubyToast('병합된 칸이 흩어지는 이동은 할 수 없습니다. 먼저 병합을 해제하세요.'); }
+    else if (cInsertAt !== cFrom && cFrom >= 0 && cFrom < ds.columns.length) {
       var movedCol = ds.columns.splice(cFrom, 1)[0];
       ds.columns.splice(cInsertAt, 0, movedCol);
       _dsSelectedColIds = [movedCol.id];
@@ -45933,9 +45960,12 @@ function ds_insertRowAt(rowIdx, after, asCategory) {
   if (insertAt < 0) insertAt = 0;
   if (insertAt > ds.rows.length) insertAt = ds.rows.length;
   var fSheet = _dsActiveSheet(ds);
+  var rowIdsBefore = ds.rows.map(function(r) { return r.id; }), newRowId = mkId(), grown = ds_mergeAfterInsert(fSheet && fSheet.merges, rowIdsBefore, insertAt, newRowId, 'r');
+  if (asCategory && grown.some(function(m) { return m.r.indexOf(newRowId) >= 0; })) { if (typeof rubyToast === 'function') rubyToast('병합된 칸 가운데에는 카테고리 행을 넣을 수 없습니다.'); return; }
   if (fSheet) fSheet.frozenRows = ds_freezeAfterInsert(fSheet.frozenRows || 0, insertAt);
+  if (fSheet) fSheet.merges = grown;
   ds.rows.splice(insertAt, 0, {
-    id: mkId(),
+    id: newRowId,
     isCategory: !!asCategory,
     categoryName: asCategory ? '새 카테고리' : '',
     rowName: '',
@@ -48513,6 +48543,48 @@ function ds_mergePlan(mode, from, to, c1, c2) {
   else if (mode === 'vert') { for (j = c1; j <= c2; j++) if (to > from) out.push({ r0: from, r1: to, c0: j, c1: j }); }
   return out;
 }
+// ── 병합 2차(#420) 순수 함수. ids = 현재 순서의 행 또는 열 id, axis = 'r' | 'c' ──
+function ds_mergeAfterInsert(merges, ids, insertAt, newId, axis) { // 병합 가운데에 끼우면 늘어남(경계 밖은 그대로)
+  return (merges || []).map(function(m) {
+    var at = m[axis].map(function(id) { return ids.indexOf(id); }), first = Math.min.apply(null, at), last = Math.max.apply(null, at);
+    if (first < 0 || !(insertAt > first && insertAt <= last)) return m;
+    var out = { r: m.r.slice(), c: m.c.slice() };
+    out[axis].splice(insertAt - first, 0, newId);
+    return out;
+  });
+}
+function ds_mergeAfterRemove(merges, removedIds, axis) { // 지운 만큼 줄어듦(첫 행·열을 지워도 남은 칸 유지), 한 칸이 되면 병합 해제
+  var gone = {};
+  removedIds.forEach(function(id) { gone[id] = 1; });
+  return (merges || []).map(function(m) {
+    var out = { r: m.r.slice(), c: m.c.slice() };
+    out[axis] = out[axis].filter(function(id) { return !gone[id]; });
+    return out.r.length && out.c.length && (out.r.length > 1 || out.c.length > 1) ? out : null;
+  }).filter(Boolean);
+}
+function ds_moveBreaksMerge(merges, ids, from, insertAt, axis) { // from 을 빼서 insertAt 에 넣으면 병합이 흩어지는가
+  var next = ids.slice(), moved = next.splice(from, 1)[0];
+  next.splice(insertAt, 0, moved);
+  return (merges || []).some(function(m) {
+    if (m[axis].length < 2) return false;
+    var start = next.indexOf(m[axis][0]);
+    return start >= 0 && ids.indexOf(m[axis][0]) >= 0 && m[axis].some(function(id, k) { return next[start + k] !== id; });
+  });
+}
+function ds_mergeExpand(anchors, r0, r1, c0, c1) { // 범위가 병합에 걸치면 병합 전체를 포함할 때까지 넓힘
+  for (var changed = true; changed;) {
+    changed = false;
+    Object.keys(anchors).forEach(function(k) {
+      var at = k.split(':'), i = +at[0], j = +at[1], i1 = i + anchors[k].rs - 1, j1 = j + anchors[k].cs - 1;
+      if (i1 < r0 || i > r1 || j1 < c0 || j > c1) return;
+      if (i < r0 || i1 > r1 || j < c0 || j1 > c1) { r0 = Math.min(r0, i); r1 = Math.max(r1, i1); c0 = Math.min(c0, j); c1 = Math.max(c1, j1); changed = true; }
+    });
+  }
+  return { r0: r0, r1: r1, c0: c0, c1: c1 };
+}
+function ds_mergeCrossesFreeze(anchors, rows, cols) { // 고정 경계(위 rows 행, 왼쪽 cols 열)를 가로지르는 병합이 있는가
+  return Object.keys(anchors).some(function(k) { var at = k.split(':'), i = +at[0], j = +at[1]; return (rows > i && rows < i + anchors[k].rs) || (cols > j && cols < j + anchors[k].cs); });
+}
 function ds_activeMerges(ds) { var sh = _dsActiveSheet(ds); return sh && sh.merges ? sh.merges : []; }
 function ds_mergeAt(ds, rowIdx, colIdx) { // (행, 열 번호) 칸이 속한 병합의 왼쪽 위 칸 { i, j, rs, cs } (없으면 null)
   var map = ds_mergeMap(ds.rows || [], ds.columns || [], ds_activeMerges(ds)), k, parts, i, j;
@@ -48534,6 +48606,9 @@ function ds_mergeCells(mode) { // 툴바 「셀 병합」: all / horiz / vert / 
   if (mode === 'none') { sheet.merges = keep; return ds_afterMergeChange(); }
   for (var i = info.rowFrom; i <= info.rowTo; i++) if (!ds_isDataRow(ds.rows[i])) { alert('카테고리·메모 행이 포함된 범위는 병합할 수 없습니다.'); return; }
   if (info.rowFrom === info.rowTo && info.colFrom === info.colTo) return;
+  var newAnchors = {};
+  ds_mergePlan(mode, info.rowFrom, info.rowTo, info.colFrom, info.colTo).forEach(function(p) { newAnchors[p.r0 + ':' + p.c0] = { rs: p.r1 - p.r0 + 1, cs: p.c1 - p.c0 + 1 }; });
+  if (ds_mergeCrossesFreeze(newAnchors, sheet.frozenRows || 0, sheet.frozenCols || 0)) { alert('고정 경계를 가로지르는 병합은 할 수 없습니다. 고정을 먼저 해제하세요.'); return; }
   var plan = ds_mergePlan(mode, info.rowFrom, info.rowTo, info.colFrom, info.colTo), lost = false;
   plan.forEach(function(p) { // 왼쪽 위 칸 외의 값이 있으면 확인
     for (var a = p.r0; a <= p.r1; a++) for (var b = p.c0; b <= p.c1; b++) if ((a !== p.r0 || b !== p.c0) && String((ds.rows[a].cells || {})[ds.columns[b].id] || '').trim()) lost = true;
@@ -48786,8 +48861,10 @@ function ds_removeRows(idxs) { // 한 번에 지우고 persist() 도 한 번 →
   var removed = Array.from(new Set(idxs)).filter(function(i) { return ds.rows[i]; }).sort(function(a, b) { return a - b; });
   if (!removed.length) return;
   var viewport = ds_captureEditorViewport();
+  var removedIds = removed.map(function(i) { return ds.rows[i].id; });
   for (var k = removed.length - 1; k >= 0; k--) ds.rows.splice(removed[k], 1);
   var fSheet = _dsActiveSheet(ds);
+  if (fSheet) fSheet.merges = ds_mergeAfterRemove(fSheet.merges, removedIds, 'r');
   if (fSheet) fSheet.frozenRows = ds_freezeAfterRemove(fSheet.frozenRows || 0, removed);
   _dsActiveRowIdx = _dsActiveRowIdx === null ? null : ds_rowShift(_dsActiveRowIdx, removed);
   _dsSelectedRowIdxs = _dsSelectedRowIdxs.map(function(i) { return ds_rowShift(i, removed); }).filter(function(i) { return i !== null; });
@@ -48848,6 +48925,7 @@ function ds_setFreeze(kind, n) {
     var r = _dsActiveCellRowIdx !== null ? _dsActiveCellRowIdx : _dsActiveRowIdx;
     n = kind === 'rows' ? (r === null ? 0 : r + 1) : (_dsActiveCellColId ? ds_getColumnIndex(ds, _dsActiveCellColId) + 1 : 0);
   }
+  if (ds_mergeCrossesFreeze(ds_mergeMap(ds.rows, ds.columns, sheet.merges || []).anchors, kind === 'rows' ? ds_normFreeze(n, ds.rows.length) : 0, kind === 'cols' ? ds_normFreeze(n, ds.columns.length) : 0)) { _dsHideFormatMenus(); if (typeof rubyToast === 'function') rubyToast('병합된 칸을 가로질러 고정할 수 없습니다.'); return; }
   if (kind === 'rows') sheet.frozenRows = ds_normFreeze(n, ds.rows.length); else sheet.frozenCols = ds_normFreeze(n, ds.columns.length);
   var viewport = ds_captureEditorViewport();
   _dsHideFormatMenus();
@@ -48988,7 +49066,7 @@ function ds_openRowMenu(e, rowIdx, colId) {
   var row = ds.rows[rowIdx];
   if (!row) return;
   var rangeInfo = ds_getSelectedCellRangeInfo(ds);
-  var keepRange = !!(rangeInfo && colId && rangeInfo.rowCount > 1 && rangeInfo.rowIdxs.indexOf(rowIdx) >= 0 && rangeInfo.colIds.indexOf(colId) >= 0); // 여러 행에 걸친 셀 범위 안 우클릭: 범위 유지(#384)
+  var keepRange = !!(rangeInfo && colId && rangeInfo.cellCount > 1 && rangeInfo.rowIdxs.indexOf(rowIdx) >= 0 && rangeInfo.colIds.indexOf(colId) >= 0); // 여러 칸 범위 안 우클릭: 범위 유지(#384, 한 행 여러 칸도 — 가로 병합 #420)
   if (!row.isCategory && colId && !keepRange) {
     ds_setActiveCell(rowIdx, colId);
   } else if (keepRange) {
@@ -49050,6 +49128,10 @@ function ds_openRowMenu(e, rowIdx, colId) {
     if (row.cellNotes && row.cellNotes[colId]) insItems.push({ label: '메모 삭제', action: function() { delete row.cellNotes[colId]; ds_saveStyleRules(); } });
     if (row.cellImg && row.cellImg[colId]) insItems.push({ label: '이미지 삭제', action: function() { delete row.cellImg[colId]; ds_saveStyleRules(); } });
     fzItems = fzItems.concat(insItems);
+  }
+  if (colId && ds_isDataRow(row)) {
+    var inMerge = !!ds_mergeAt(ds, rowIdx, ds_getColumnIndex(ds, colId)), multiSel = !!ds_getSelectedCellRangeInfo(ds);
+    if (multiSel || inMerge) fzItems = fzItems.concat([{ sep: true }, { label: '셀 병합 · 모두', disabled: !multiSel, action: function() { ds_mergeCells('all'); } }, { label: '셀 병합 · 가로로', disabled: !multiSel, action: function() { ds_mergeCells('horiz'); } }, { label: '셀 병합 · 세로로', disabled: !multiSel, action: function() { ds_mergeCells('vert'); } }, { label: '병합 해제', action: function() { ds_mergeCells('none'); } }]);
   }
   var grpRows = keepRange ? rangeInfo.rowIdxs : (_dsSelectedRowIdxs.includes(rowIdx) ? _dsSelectedRowIdxs.slice() : [rowIdx]);
   _dsShowContextMenu(e.clientX, e.clientY, items.concat(fzItems, ds_groupMenuItems('rows', grpRows)));
