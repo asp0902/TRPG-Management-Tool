@@ -7231,6 +7231,10 @@ body.block-pointer-dragging {
 .ds-float-close:hover { color: #ef4444; }
 .ds-float-body { padding: 6px 8px; min-height: 0; }
 .ds-slicer { width: 200px; }
+/* 차트(#411) */
+.ds-chart { resize: both; overflow: hidden; min-width: 240px; min-height: 180px; }
+.ds-chart-body { flex: 1; padding: 0; overflow: hidden; }
+.ds-chart-body svg { display: block; }
 .ds-slicer-links { display: flex; gap: 8px; margin-bottom: 4px; }
 .ds-slicer-links button { border: none; background: none; padding: 0; color: #1a73e8; font: inherit; cursor: pointer; }
 .ds-slicer-list { max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
@@ -9008,6 +9012,29 @@ select.sh-field-input,
     <div class="link-insert-actions">
       <button type="button" class="link-insert-btn primary" id="ds-csv-submit">실행</button>
       <button type="button" class="link-insert-btn cancel" id="ds-csv-cancel">취소</button>
+    </div>
+  </div>
+
+  <!-- 데이터 시트 차트 편집 팝업(#411): 삭제(왼쪽) [실행] [취소] -->
+  <div id="ds-chart-backdrop" class="link-insert-backdrop"></div>
+  <div id="ds-chart-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-chart-title">
+    <div class="link-insert-head">
+      <h2 id="ds-chart-title" class="link-insert-title">차트</h2>
+      <div class="link-insert-head-actions"><button type="button" class="link-insert-close" id="ds-chart-close" aria-label="닫기">×</button></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-body ds-style-body">
+      <div id="ds-chart-range"></div>
+      <div class="ds-style-row"><label for="ds-chart-type">종류</label><select id="ds-chart-type"><option value="bar">막대</option><option value="line">선</option><option value="pie">원형</option><option value="scatter">분산형</option></select></div>
+      <div class="ds-style-row"><input type="text" id="ds-chart-name" class="link-insert-input" placeholder="차트 제목" aria-label="차트 제목"></div>
+      <label><input type="checkbox" id="ds-chart-resel"> 범위를 현재 선택으로 바꾸기</label>
+      <div class="ds-style-row"><label><input type="checkbox" id="ds-chart-legend"> 범례 표시</label><label><input type="checkbox" id="ds-chart-color-on"> 첫 계열 색</label><input type="color" id="ds-chart-color" aria-label="첫 계열 색"></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-actions">
+      <button type="button" class="link-insert-btn cancel" id="ds-chart-delete" style="margin-right:auto;">삭제</button>
+      <button type="button" class="link-insert-btn primary" id="ds-chart-submit">실행</button>
+      <button type="button" class="link-insert-btn cancel" id="ds-chart-cancel">취소</button>
     </div>
   </div>
 
@@ -41637,6 +41664,7 @@ function normalizeDataSheetSheet(sheet) {
     locked: !!sheet.locked,
     zoom: ds_normZoom(sheet.zoom), // 확대·축소(#409)
     slicers: ds_normSlicers(sheet.slicers, columns), // 슬라이서(#410)
+    charts: ds_normCharts(sheet.charts, rows, columns), // 차트(#411)
     hideGrid: !!sheet.hideGrid,
     headerEditMode: sheet.headerEditMode === 'rows' ? 'rows' : 'columns',
     rowHeaderWidth: ds_normalizeRowHeaderWidth(sheet.rowHeaderWidth),
@@ -42738,6 +42766,7 @@ function renderDataSheetEditor() {
   ds_viewPaint(); // 확대·축소·격자선(#409): 다른 칠하기보다 먼저
   ds_hoverHide();
   ds_slicerPaint(); // 슬라이서(#410)
+  ds_chartPaint(); // 차트(#411)
   ds_insertPaint(); // 셀 메모·이미지(#407)
   ds_groupPaint(); // 행·열 그룹(#404)
   ds_rotPaint(); // 텍스트 회전(#403)
@@ -42873,7 +42902,7 @@ function ds_duplicateSheet(sheetId) {
     r.id = nid;
     ['cells', 'cellAligns', 'cellRich', 'cellStyles', 'cellRules', 'cellNotes', 'cellImg'].forEach(function(f) { if (r[f] && typeof r[f] === 'object') r[f] = remapKeys(r[f], colIdMap); });
   });
-  [].concat(clone.cf || [], clone.banding || []).forEach(function(x) { x.id = mkId(); x.rows = x.rows.map(function(id) { return rowIdMap[id]; }); x.cols = x.cols.map(function(id) { return colIdMap[id]; }); });
+  [].concat(clone.cf || [], clone.banding || [], clone.charts || []).forEach(function(x) { x.id = mkId(); x.rows = x.rows.map(function(id) { return rowIdMap[id]; }); x.cols = x.cols.map(function(id) { return colIdMap[id]; }); });
   if (clone.groups) { (clone.groups.rows || []).forEach(function(g) { g.ids = g.ids.map(function(id) { return rowIdMap[id]; }); }); (clone.groups.cols || []).forEach(function(g) { g.ids = g.ids.map(function(id) { return colIdMap[id]; }); }); }
   (clone.slicers || []).forEach(function(x) { x.id = mkId(); x.colId = colIdMap[x.colId]; });
   (clone.merges || []).forEach(function(m) { m.r = m.r.map(function(id) { return rowIdMap[id]; }); m.c = m.c.map(function(id) { return colIdMap[id]; }); });
@@ -42991,7 +43020,8 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + opt('ds-clean-option', '', 'ds_trimWhitespace()', 'fa-eraser', '공백 제거')
     + opt('ds-clean-option', '', 'ds_openCleanDialog(' + String.fromCharCode(39) + 'split' + String.fromCharCode(39) + ')', 'fa-table-columns', '텍스트를 열로 분할…');
   var insertMenu = [['link', '링크 삽입 (Ctrl+K)', 'fa-link'], ['note', '셀 메모', 'fa-note-sticky'], ['img', '셀 안 이미지', 'fa-image'], ['char', '특수문자 삽입', 'fa-icons']].map(function(a) { return opt('ds-insert-option', '', 'ds_openInsert(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('')
-    + opt('ds-insert-option', '', 'ds_addSlicer()', 'fa-sliders', '슬라이서 추가');
+    + opt('ds-insert-option', '', 'ds_addSlicer()', 'fa-sliders', '슬라이서 추가')
+    + opt('ds-insert-option', '', 'ds_addChart()', 'fa-chart-column', '차트');
   var mergeMenu = [['all', '모두 병합', 'fa-object-group'], ['horiz', '가로로 병합', 'fa-arrows-left-right'], ['vert', '세로로 병합', 'fa-arrows-up-down'], ['none', '병합 해제', 'fa-object-ungroup']].map(function(a) { return opt('ds-merge-option', '', 'ds_mergeCells(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('');
   var borderMenu = [['all', '모두', 'fa-border-all'], ['inner', '안쪽', 'fa-border-none'], ['hinner', '가로 안쪽', 'fa-grip-lines'], ['vinner', '세로 안쪽', 'fa-grip-lines-vertical'], ['outer', '바깥쪽', 'fa-square'], ['left', '왼쪽', 'fa-arrow-left'], ['top', '위쪽', 'fa-arrow-up'], ['right', '오른쪽', 'fa-arrow-right'], ['bottom', '아래쪽', 'fa-arrow-down'], ['clear', '테두리 지우기', 'fa-ban']].map(function(a) { return opt('ds-border-option', '', 'ds_applyBorder(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('')
     + '<div class="ds-border-ctl" onmousedown="event.stopPropagation()"><select id="ds-border-style" onchange="_dsBorderStyle=this.value" title="선 종류" aria-label="선 종류">' + [['thin', '얇게'], ['med', '보통'], ['thick', '굵게'], ['dot', '점선'], ['dash', '파선'], ['double', '이중선']].map(function(a) { return '<option value="' + a[0] + '"' + (a[0] === _dsBorderStyle ? ' selected' : '') + '>' + a[1] + '</option>'; }).join('') + '</select><input type="color" id="ds-border-color" value="' + _dsBorderColor + '" oninput="_dsBorderColor=this.value" title="선 색" aria-label="선 색"></div>';
@@ -47322,6 +47352,10 @@ function ds_setView(key, value) { // 'zoom' | 'hideGrid'
 function ds_toggleGrid() { var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds); if (sheet) ds_setView('hideGrid', !sheet.hideGrid); }
 // ── 떠 있는 카드(슬라이서 #410 · 차트 #411): 시트 위에 겹쳐 두고 제목 줄을 끌어 옮긴다. 위치는 시트 데이터에 저장 ──
 function ds_floatPos(v, def) { var n = Math.round(Number(v)); return isNaN(n) ? def : Math.max(0, Math.min(20000, n)); }
+function ds_floatFind(id) { // 현재 시트의 슬라이서·차트를 id 로
+  var ds = findDataSheet(_dsEditId), sh = ds && _dsActiveSheet(ds);
+  return sh ? (sh.slicers || []).concat(sh.charts || []).find(function(x) { return x.id === id; }) || null : null;
+}
 function ds_floatCard(item, title, onClose) { // → { card, head, body }
   var el = function(tag, cls, text) { var n = document.createElement(tag); n.className = cls; if (text !== undefined) n.textContent = text; return n; };
   var card = el('div', 'ds-float'), head = el('div', 'ds-float-head'), name = el('span', 'ds-float-title', title), close = el('button', 'ds-float-close', '×'), body = el('div', 'ds-float-body');
@@ -47332,9 +47366,10 @@ function ds_floatCard(item, title, onClose) { // → { card, head, body }
   head.addEventListener('mousedown', function(e) {
     if (e.button !== 0 || e.target.closest('button')) return;
     e.preventDefault();
-    var sx = e.clientX, sy = e.clientY, ox = item.x, oy = item.y, moved = false;
-    var move = function(ev) { moved = true; item.x = ds_floatPos(ox + ev.clientX - sx, ox); item.y = ds_floatPos(oy + ev.clientY - sy, oy); card.style.left = item.x + 'px'; card.style.top = item.y + 'px'; };
-    var up = function() { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); if (moved) { _dsForceNextHistoryCommit = true; persist(); } };
+    var sx = e.clientX, sy = e.clientY, target = ds_floatFind(item.id) || item, ox = target.x, oy = target.y, moved = false; // 저장 객체는 실행 취소 등으로 바뀔 수 있어 id 로 다시 찾는다
+    var nx = ox, ny = oy;
+    var move = function(ev) { moved = true; nx = ds_floatPos(ox + ev.clientX - sx, ox); ny = ds_floatPos(oy + ev.clientY - sy, oy); card.style.left = nx + 'px'; card.style.top = ny + 'px'; };
+    var up = function() { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); if (!moved) return; var cur = ds_floatFind(item.id) || item; cur.x = nx; cur.y = ny; _dsForceNextHistoryCommit = true; persist(); };
     document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
   });
   return { card: card, head: head, body: body };
@@ -47402,6 +47437,217 @@ function ds_slicerPaint() {
     list.scrollTop = _dsSlicerScroll[sl.id] || 0;
   });
 }
+// ── 차트(#411): 외부 라이브러리 없이 SVG. sheet.charts = [{ id, type, rows:[행 id], cols:[열 id], title, legend, color, x, y, w, h }] ──
+var DS_CHART_TYPES = [['bar', '막대'], ['line', '선'], ['pie', '원형'], ['scatter', '분산형']];
+var DS_CHART_COLORS = ['#4285f4', '#ea4335', '#fbbc04', '#34a853', '#ff6d01', '#46bdc6', '#7b61ff', '#f06292', '#8d6e63', '#607d8b'];
+function ds_normCharts(list, rows, columns) {
+  var v = ds_cfValidIds(rows, columns);
+  return (Array.isArray(list) ? list : []).map(function(x) {
+    if (!x || typeof x !== 'object') return null;
+    var out = { id: String(x.id || mkId()), type: DS_CHART_TYPES.some(function(t) { return t[0] === x.type; }) ? x.type : 'bar', rows: ds_cfIds(x.rows, v.r), cols: ds_cfIds(x.cols, v.c), title: String(x.title || '').slice(0, 120), legend: x.legend !== false, color: ds_cfColor(x.color), x: ds_floatPos(x.x, 40), y: ds_floatPos(x.y, 40), w: Math.max(240, Math.min(1600, Math.round(Number(x.w)) || 460)), h: Math.max(180, Math.min(1200, Math.round(Number(x.h)) || 300)) };
+    return out.rows.length && out.cols.length ? out : null;
+  }).filter(Boolean).slice(0, 20);
+}
+// 순수 함수: 값 표 → { labels, series:[{ name, values }] }. 첫 열 = 항목(열이 하나면 번호), 첫 행이 글자이고 아래에 숫자가 있으면 계열 이름
+function ds_chartData(matrix) {
+  if (!matrix.length || !matrix[0].length) return { labels: [], series: [] };
+  var num = function(v) { return String(v).trim() === '' ? NaN : ds_parseNumber(v); };
+  var width = matrix[0].length, first = width > 1 ? 1 : 0, header = false;
+  for (var j = first; j < width; j++) if (isNaN(num(matrix[0][j])) && String(matrix[0][j]).trim() && matrix.slice(1).some(function(r) { return !isNaN(num(r[j])); })) header = true;
+  var body = header ? matrix.slice(1) : matrix, series = [];
+  for (var k = first; k < width; k++) {
+    var values = body.map(function(r) { var n = num(r[k]); return isNaN(n) ? null : n; });
+    if (values.some(function(x) { return x !== null; })) series.push({ name: header ? String(matrix[0][k]) : '계열 ' + (series.length + 1), values: values });
+  }
+  return { labels: body.map(function(r, i) { return first ? String(r[0]) : String(i + 1); }), series: series };
+}
+function ds_niceTicks(min, max, count) { // 0 을 포함하는 보기 좋은 눈금
+  min = Math.min(0, min); max = Math.max(0, max);
+  if (max === min) max = min + 1;
+  var raw = (max - min) / (count || 5), mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag, step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * mag, out = [];
+  for (var v = Math.floor(min / step) * step; v < max + step * 0.999; v += step) out.push(Math.round(v * 1e9) / 1e9);
+  return out;
+}
+function ds_svgEsc(v) { return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, ''); }
+function ds_chartSvg(chart, data, w, h) {
+  var T = function(x, y, text, extra) { return '<text x="' + x + '" y="' + y + '" ' + (extra || '') + '>' + ds_svgEsc(text) + '</text>'; };
+  var cut = function(t, n) { t = String(t); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+  var color = function(i) { return i === 0 && chart.color ? chart.color : DS_CHART_COLORS[i % DS_CHART_COLORS.length]; };
+  var out = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" font-family="sans-serif" font-size="11" fill="#444"><rect width="' + w + '" height="' + h + '" fill="#fff"/>';
+  var top = chart.title ? 28 : 10, bottom = chart.legend ? 24 : 6;
+  if (chart.title) out += T(w / 2, 18, chart.title, 'text-anchor="middle" font-size="14" font-weight="bold" fill="#222"');
+  var S = data.series, legend = [];
+  if (!S.length) return out + T(w / 2, h / 2, '표시할 숫자가 없습니다.', 'text-anchor="middle"') + '</svg>';
+  if (chart.type === 'pie') {
+    var vals = S[0].values.map(function(v) { return v > 0 ? v : 0; }), sum = vals.reduce(function(a, b) { return a + b; }, 0);
+    var cx = w / 2, cy = top + (h - top - bottom) / 2, r = Math.max(10, Math.min(w - 20, h - top - bottom - 10) / 2), a = -Math.PI / 2;
+    if (!sum) return out + T(w / 2, h / 2, '양수 값이 없습니다.', 'text-anchor="middle"') + '</svg>';
+    vals.forEach(function(v, i) {
+      if (!v) return;
+      var f = v / sum, b = a + f * Math.PI * 2, c = DS_CHART_COLORS[i % DS_CHART_COLORS.length], tip = '<title>' + ds_svgEsc(data.labels[i] + ': ' + v + ' (' + Math.round(f * 1000) / 10 + '%)') + '</title>';
+      if (f > 0.9999) out += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + c + '">' + tip + '</circle>';
+      else out += '<path d="M' + cx + ' ' + cy + 'L' + (cx + r * Math.cos(a)).toFixed(2) + ' ' + (cy + r * Math.sin(a)).toFixed(2) + 'A' + r + ' ' + r + ' 0 ' + (f > 0.5 ? 1 : 0) + ' 1 ' + (cx + r * Math.cos(b)).toFixed(2) + ' ' + (cy + r * Math.sin(b)).toFixed(2) + 'Z" fill="' + c + '" stroke="#fff">' + tip + '</path>';
+      if (f >= 0.06) out += T((cx + r * 0.65 * Math.cos((a + b) / 2)).toFixed(1), (cy + r * 0.65 * Math.sin((a + b) / 2) + 4).toFixed(1), Math.round(f * 100) + '%', 'text-anchor="middle" fill="#fff" font-weight="bold"');
+      legend.push([data.labels[i], c]);
+      a = b;
+    });
+  } else {
+    var scatter = chart.type === 'scatter', all = [];
+    S.forEach(function(s) { s.values.forEach(function(v) { if (v !== null) all.push(v); }); });
+    var ticks = ds_niceTicks(Math.min.apply(null, all), Math.max.apply(null, all), 5), lo = ticks[0], hi = ticks[ticks.length - 1];
+    var left = 48, right = 12, pw = w - left - right, ph = h - top - bottom - 20;
+    var Y = function(v) { return top + ph - (v - lo) / (hi - lo) * ph; };
+    ticks.forEach(function(t) { var y = Y(t).toFixed(1); out += '<line x1="' + left + '" y1="' + y + '" x2="' + (w - right) + '" y2="' + y + '" stroke="' + (t === 0 ? '#999' : '#e8e8e8') + '"/>' + T(left - 6, +y + 4, t.toLocaleString('en-US'), 'text-anchor="end"'); });
+    var n = data.labels.length, slot = pw / Math.max(1, n);
+    if (scatter) {
+      var xs = data.labels.map(function(l) { var v = ds_parseNumber(l); return isNaN(v) ? null : v; }), numeric = xs.filter(function(v) { return v !== null; });
+      var useIdx = !numeric.length, xv = useIdx ? data.labels.map(function(_, i) { return i + 1; }) : xs, xt = ds_niceTicks(Math.min.apply(null, useIdx ? xv : numeric), Math.max.apply(null, useIdx ? xv : numeric), 5), x0 = xt[0], x1 = xt[xt.length - 1];
+      var X = function(v) { return left + (v - x0) / (x1 - x0) * pw; };
+      xt.forEach(function(t) { out += T(X(t).toFixed(1), top + ph + 15, t.toLocaleString('en-US'), 'text-anchor="middle"'); });
+      S.forEach(function(s, k) { s.values.forEach(function(v, i) { if (v !== null && xv[i] !== null) out += '<circle cx="' + X(xv[i]).toFixed(1) + '" cy="' + Y(v).toFixed(1) + '" r="4" fill="' + color(k) + '"><title>' + ds_svgEsc(s.name + ' (' + xv[i] + ', ' + v + ')') + '</title></circle>'; }); });
+    } else {
+      var every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / 56))));
+      data.labels.forEach(function(l, i) { if (i % every === 0) out += T((left + slot * (i + 0.5)).toFixed(1), top + ph + 15, cut(l, 10), 'text-anchor="middle"'); });
+      if (chart.type === 'bar') {
+        var bw = Math.max(1, slot * 0.8 / S.length);
+        S.forEach(function(s, k) { s.values.forEach(function(v, i) { if (v === null) return; var y = Y(Math.max(v, 0)), hh = Math.abs(Y(v) - Y(0)); out += '<rect x="' + (left + slot * i + slot * 0.1 + bw * k).toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + hh.toFixed(1) + '" fill="' + color(k) + '"><title>' + ds_svgEsc(data.labels[i] + ' · ' + s.name + ': ' + v) + '</title></rect>'; }); });
+      } else {
+        S.forEach(function(s, k) {
+          var d = '', pen = false;
+          s.values.forEach(function(v, i) { if (v === null) { pen = false; return; } var x = (left + slot * (i + 0.5)).toFixed(1), y = Y(v).toFixed(1); d += (pen ? 'L' : 'M') + x + ' ' + y; pen = true; out += '<circle cx="' + x + '" cy="' + y + '" r="3" fill="' + color(k) + '"><title>' + ds_svgEsc(data.labels[i] + ' · ' + s.name + ': ' + v) + '</title></circle>'; });
+          out += '<path d="' + d + '" fill="none" stroke="' + color(k) + '" stroke-width="2"/>';
+        });
+      }
+    }
+    S.forEach(function(s, k) { legend.push([s.name, color(k)]); });
+  }
+  if (chart.legend) {
+    var items = legend.slice(0, 12), each = (w - 16) / Math.max(1, items.length), chars = Math.max(2, Math.floor((each - 18) / 8));
+    items.forEach(function(it, i) { var x = 8 + each * i; out += '<rect x="' + x.toFixed(1) + '" y="' + (h - 16) + '" width="10" height="10" fill="' + it[1] + '"/>' + T((x + 14).toFixed(1), h - 7, cut(it[0], chars)); });
+  }
+  return out + '</svg>';
+}
+function ds_chartMatrix(ds, chart) { // 범위의 현재 값(수식은 결과). 숨긴 행·필터로 가린 행 제외
+  var span = ds_cfSpan(chart, ds.rows, ds.columns), out = [];
+  if (!span) return out;
+  var env = ds_formulaEnv(ds.rows, ds.columns), vis = ds_visibleRows(ds);
+  for (var i = span.r1; i <= span.r2; i++) {
+    var row = ds.rows[i];
+    if (!ds_isDataRow(row) || !vis[i]) continue;
+    var line = [];
+    for (var j = span.c1; j <= span.c2; j++) {
+      var raw = row.cells && row.cells[ds.columns[j].id] != null ? String(row.cells[ds.columns[j].id]) : '';
+      if (/^\s*=/.test(raw) && raw.trim().length > 1) { var r = ds_formulaValue(raw, env); raw = r.err ? '' : ds_fmlText(r.v); }
+      line.push(raw);
+    }
+    out.push(line);
+  }
+  var names = [], any = false; // 범위 첫 줄이 머리글이 아니고 열 이름이 있으면 열 이름을 계열 이름으로
+  for (var k = span.c1; k <= span.c2; k++) { names.push(ds.columns[k].name || ''); if (ds.columns[k].name) any = true; }
+  if (any && out.length && names.length > 1 && ds_chartData([out[0], out[0]]).series.length === names.length - 1) out.unshift(names);
+  return out;
+}
+function ds_chartDraw(ds, chart, box) {
+  var svg = ds_chartSvg(chart, ds_chartData(ds_chartMatrix(ds, chart)), chart.w, chart.h - 30);
+  if (box._svg !== svg) { box._svg = svg; box.innerHTML = svg; }
+}
+function ds_curChart(id) { var sh = _dsActiveSheet(findDataSheet(_dsEditId)); return sh && (sh.charts || []).find(function(c) { return c.id === id; }); }
+function ds_chartPaint() {
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds), host = document.getElementById('ds-editor-body');
+  if (!sheet || !host) return;
+  (sheet.charts || []).forEach(function(ch) {
+    var f = ds_floatCard(ch, ch.title || (DS_CHART_TYPES.filter(function(t) { return t[0] === ch.type; })[0][1] + ' 차트'), function() { var cur = _dsActiveSheet(findDataSheet(_dsEditId)); cur.charts = (cur.charts || []).filter(function(c) { return c.id !== ch.id; }); ds_saveStyleRules(); });
+    f.card.classList.add('ds-chart');
+    f.card.style.width = ch.w + 'px'; f.card.style.height = ch.h + 'px';
+    [['fa-pen', '차트 편집', function() { ds_openChartDialog(ch.id); }], ['fa-download', 'PNG 내려받기', function() { ds_chartPng(ch.id); }]].forEach(function(b) {
+      var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'ds-float-close'; btn.title = b[1]; btn.setAttribute('aria-label', b[1]); btn.innerHTML = '<i class="fa-solid ' + b[0] + '" aria-hidden="true"></i>'; btn.onclick = b[2];
+      f.head.insertBefore(btn, f.head.lastChild);
+    });
+    f.body.className += ' ds-chart-body';
+    host.appendChild(f.card);
+    ds_chartDraw(ds, ch, f.body);
+    f.card.addEventListener('mouseup', function() { // 오른쪽 아래 모서리로 크기 조절 → 저장
+      var c = ds_curChart(ch.id), w = f.card.offsetWidth, h = f.card.offsetHeight;
+      if (!c || (Math.abs(w - c.w) < 2 && Math.abs(h - c.h) < 2)) return;
+      c.w = Math.max(240, w); c.h = Math.max(180, h); _dsForceNextHistoryCommit = true; persist(); ds_chartDraw(findDataSheet(_dsEditId), c, f.body);
+    });
+  });
+}
+function ds_chartRefresh() {
+  var ds = findDataSheet(_dsEditId);
+  document.querySelectorAll('#ds-editor-body .ds-chart').forEach(function(card) { var ch = ds && ds_curChart(card.dataset.id); if (ch) ds_chartDraw(ds, ch, card.querySelector('.ds-chart-body')); });
+}
+function ds_chartPng(id) {
+  var ds = findDataSheet(_dsEditId), ch = ds_curChart(id);
+  if (!ch) return;
+  var w = ch.w, h = ch.h - 30, img = new Image();
+  img.onload = function() {
+    var canvas = document.createElement('canvas'); canvas.width = w * 2; canvas.height = h * 2;
+    var g = canvas.getContext('2d'); g.scale(2, 2); g.drawImage(img, 0, 0, w, h);
+    canvas.toBlob(function(blob) {
+      var a = document.createElement('a'), url = URL.createObjectURL(blob);
+      a.href = url; a.download = (ch.title || '차트').replace(/[\\\/:*?"<>|]/g, '_') + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+    }, 'image/png');
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(ds_chartSvg(ch, ds_chartData(ds_chartMatrix(ds, ch)), w, h));
+}
+function ds_addChart() {
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds);
+  _dsHideFormatMenus();
+  if (!sheet) return;
+  var sel = ds_cfSelection(ds);
+  if (!sel || (sel.rows.length === 1 && sel.cols.length === 1)) sel = { rows: ds.rows.filter(ds_isDataRow).map(function(r) { return r.id; }), cols: ds.columns.filter(function(c) { return !c.hidden; }).map(function(c) { return c.id; }) };
+  if (!sel.rows.length || !sel.cols.length) return;
+  var body = document.getElementById('ds-editor-body'), n = (sheet.charts || []).length;
+  var chart = ds_normCharts([{ rows: sel.rows, cols: sel.cols, type: 'bar', x: (body ? body.scrollLeft + Math.max(40, body.clientWidth - 500) : 400) - n * 24, y: (body ? body.scrollTop : 0) + 40 + n * 24 }], ds.rows, ds.columns)[0];
+  sheet.charts = (sheet.charts || []).concat(chart);
+  ds_saveStyleRules();
+  ds_openChartDialog(chart.id);
+}
+var _dsChartEdit = null;
+function ds_openChartDialog(id) {
+  var ch = ds_curChart(id), ds = findDataSheet(_dsEditId), $ = function(x) { return document.getElementById(x); };
+  if (!ch) return;
+  _dsChartEdit = id;
+  $('ds-chart-range').textContent = '데이터 범위: ' + ds_cfRangeLabel(ch, ds);
+  $('ds-chart-resel').checked = false;
+  $('ds-chart-type').value = ch.type; $('ds-chart-name').value = ch.title; $('ds-chart-legend').checked = ch.legend;
+  $('ds-chart-color-on').checked = !!ch.color; $('ds-chart-color').value = ch.color || DS_CHART_COLORS[0];
+  ds_dialogShow('ds-chart-dialog');
+}
+function ds_applyChartDialog(remove) {
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds), ch = ds_curChart(_dsChartEdit), $ = function(x) { return document.getElementById(x); };
+  if (!sheet || !ch) return;
+  if (remove === true) sheet.charts = sheet.charts.filter(function(c) { return c !== ch; });
+  else {
+    if ($('ds-chart-resel').checked) { var sel = ds_cfSelection(ds); if (sel) { ch.rows = sel.rows; ch.cols = sel.cols; } }
+    ch.type = $('ds-chart-type').value; ch.title = $('ds-chart-name').value.trim().slice(0, 120); ch.legend = $('ds-chart-legend').checked;
+    ch.color = $('ds-chart-color-on').checked ? $('ds-chart-color').value : '';
+  }
+  ds_dialogHide('ds-chart-dialog');
+  ds_saveStyleRules();
+}
+(function() {
+  function bind() {
+    if (window.__dsChartBound) return;
+    window.__dsChartBound = true;
+    var on = function(id, ev, fn) { var el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+    var hide = function() { ds_dialogHide('ds-chart-dialog'); };
+    on('ds-chart-submit', 'click', function() { ds_applyChartDialog(); });
+    on('ds-chart-delete', 'click', function() { ds_applyChartDialog(true); });
+    ['ds-chart-cancel', 'ds-chart-close', 'ds-chart-backdrop'].forEach(function(id) { on(id, 'click', hide); });
+    on('ds-chart-dialog', 'keydown', function(e) { if (e.isComposing) return; if (e.key === 'Escape') { e.preventDefault(); hide(); } else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); ds_applyChartDialog(); } });
+    on('ds-chart-color', 'input', function() { document.getElementById('ds-chart-color-on').checked = true; });
+    var queued = false, later = function(e) { // 값이 바뀌면 다시 그림
+      if (queued || currentPage !== 'datasheet' || !e.target.closest || !e.target.closest('#ds-editor-body')) return;
+      queued = true; setTimeout(function() { queued = false; ds_chartRefresh(); }, 120);
+    };
+    document.addEventListener('input', later); document.addEventListener('focusout', later);
+  }
+  if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind(); }
+})();
 // ── 시트 안 찾기·바꾸기(#400) ──
 // o = { matchCase, whole(셀 전체 일치), regex, formulas(수식 글자까지 검색) }. 빈 검색어·잘못된 정규식·빈 글자와 맞는 정규식은 null
 function ds_findRegex(q, o) {
