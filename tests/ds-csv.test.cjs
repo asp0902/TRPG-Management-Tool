@@ -17,5 +17,5 @@ ok(J(ctx.ds_csvMatrix(sheet)) === J([['이름', ''], ['분류', ''], ['2', 'x'],
 ok(ctx.ds_csvMatrix({ columns: [{ id: 'a', name: '' }], rows: [{ cells: { a: '1' } }] }).length === 1, '열 이름이 모두 비면 머리글 줄 없음');
 const enc = new TextEncoder().encode('한글,1');
 ok(ctx.ds_decodeText(enc) === '한글,1' && ctx.ds_decodeText(new Uint8Array([0xc7, 0xd1, 0xb1, 0xdb])) === '한글', 'UTF-8, 아니면 EUC-KR');
-ok(/'\\ufeff' \+ ds_csvSerialize/.test(html) && /label: 'CSV 내보내기'/.test(html) && /label: 'CSV\/TSV 가져오기…'/.test(html), 'BOM·탭 메뉴 연결');
+ok(/'\\ufeff' \+ ds_csvSerialize/.test(html) && /label: 'CSV 내보내기'/.test(html) && /label: 'CSV\/TSV\/xlsx 가져오기…'/.test(html), 'BOM·탭 메뉴 연결');
 process.exit(f ? 1 : 0);

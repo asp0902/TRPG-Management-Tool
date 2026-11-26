@@ -8997,12 +8997,12 @@ select.sh-field-input,
   <div id="ds-csv-backdrop" class="link-insert-backdrop"></div>
   <div id="ds-csv-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-csv-title">
     <div class="link-insert-head">
-      <h2 id="ds-csv-title" class="link-insert-title">CSV/TSV 가져오기</h2>
+      <h2 id="ds-csv-title" class="link-insert-title">파일 가져오기</h2>
       <div class="link-insert-head-actions"><button type="button" class="link-insert-close" id="ds-csv-close" aria-label="닫기">×</button></div>
     </div>
     <hr class="link-insert-divider">
     <div class="link-insert-body ds-style-body">
-      <input type="file" id="ds-csv-file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" aria-label="가져올 파일">
+      <input type="file" id="ds-csv-file" accept=".csv,.tsv,.txt,.xlsx,text/csv,text/tab-separated-values" aria-label="가져올 파일">
       <div id="ds-csv-info" style="font-size:12px;color:#666;"></div>
       <div class="ds-style-row"><label for="ds-csv-mode">방식</label><select id="ds-csv-mode"><option value="new">새 시트로</option><option value="replace">현재 시트 바꾸기</option><option value="paste">선택한 칸부터 붙이기</option></select></div>
       <div class="ds-style-row"><label for="ds-csv-sep">구분자</label><select id="ds-csv-sep"><option value="auto">자동</option><option value="comma">쉼표 ,</option><option value="tab">탭</option><option value="semicolon">세미콜론 ;</option></select></div>
@@ -42945,7 +42945,8 @@ function ds_openSheetTabMenu(e, sheetId) {
     { label: '시트 복제', action: function() { ds_duplicateSheet(sheetId); } },
     { sep: true },
     { label: 'CSV 내보내기', action: function() { ds_exportCsv(sheetId); } },
-    { label: 'CSV/TSV 가져오기…', action: function() { ds_switchSheet(sheetId); ds_openCsvImport(); } },
+    { label: '엑셀(xlsx) 내보내기 · 모든 시트', action: function() { ds_exportXlsx(); } },
+    { label: 'CSV/TSV/xlsx 가져오기…', action: function() { ds_switchSheet(sheetId); ds_openCsvImport(); } },
     { sep: true },
     { label: '색상 변경…', action: function() { ds_pickSheetColor(sheetId); } },
     { label: '색상 지우기', disabled: !target.color, action: function() { ds_setSheetColor(sheetId, ''); } },
@@ -47257,12 +47258,13 @@ function ds_exportCsv(sheetId) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
 }
-var _dsCsvText = null, _dsCsvName = '';
+var _dsCsvText = null, _dsCsvName = '', _dsXlsxFiles = null;
 function ds_openCsvImport() {
   var $ = function(id) { return document.getElementById(id); };
   if (!findDataSheet(_dsEditId)) return;
-  _dsCsvText = null; _dsCsvName = '';
-  $('ds-csv-file').value = ''; $('ds-csv-info').textContent = 'CSV·TSV 파일을 고르세요.';
+  _dsCsvText = null; _dsCsvName = ''; _dsXlsxFiles = null;
+  $('ds-csv-mode').disabled = false; $('ds-csv-sep').disabled = false;
+  $('ds-csv-file').value = ''; $('ds-csv-info').textContent = 'CSV·TSV·엑셀(xlsx) 파일을 고르세요.';
   $('ds-csv-mode').value = 'new'; $('ds-csv-sep').value = 'auto'; $('ds-csv-header').checked = true; $('ds-csv-header').disabled = false;
   ds_dialogShow('ds-csv-dialog');
 }
@@ -47283,6 +47285,15 @@ function ds_csvSheet(matrix, hasHeader, name) { // 표 → 새 시트 객체
 }
 function ds_applyCsvImport() {
   var ds = findDataSheet(_dsEditId), $ = function(id) { return document.getElementById(id); }, toast = function(m) { if (typeof rubyToast === 'function') rubyToast(m); };
+  if (ds && _dsXlsxFiles) { // 엑셀: 시트마다 새 시트로
+    var read;
+    try { read = ds_xlsxRead(_dsXlsxFiles, $('ds-csv-header').checked); } catch (e) { toast(e.message); return; }
+    if (!read.length) { toast('가져올 시트가 없습니다.'); return; }
+    var added = read.map(function(src) { var sh = ds_xlsxToSheet(src, _dsUniqueSheetName(ds, src.name)); ds.sheets.push(sh); return sh; });
+    _dsBindActiveSheet(ds, added.find(function(s) { return !s.hidden; }) || added[0]);
+    ds_dialogHide('ds-csv-dialog'); ds_saveStyleRules(); toast(added.length + '개 시트를 가져왔습니다.');
+    return;
+  }
   var matrix = ds_csvRows();
   if (!ds || !matrix.length) { toast('가져올 내용이 없습니다.'); return; }
   var mode = $('ds-csv-mode').value, header = $('ds-csv-header').checked, name = _dsCsvName.replace(/\.[^.]+$/, '') || '가져온 시트', active = _dsActiveSheet(ds);
@@ -47319,6 +47330,15 @@ function ds_applyCsvImport() {
     on('ds-csv-file', 'change', function() {
       var file = this.files && this.files[0];
       if (!file) return;
+      var $ = function(id) { return document.getElementById(id); }, isXlsx = /\.xlsx$/i.test(file.name);
+      _dsXlsxFiles = null; _dsCsvText = null; $('ds-csv-mode').disabled = isXlsx; $('ds-csv-sep').disabled = isXlsx; $('ds-csv-header').disabled = !isXlsx && $('ds-csv-mode').value === 'paste';
+      if (isXlsx) {
+        $('ds-csv-mode').value = 'new';
+        if (file.size > 10 * 1024 * 1024) { $('ds-csv-info').textContent = '10MB 이하 파일만 가져올 수 있습니다.'; return; }
+        $('ds-csv-info').textContent = '읽는 중…';
+        ds_xlsxFiles(file).then(function(files) { var list = ds_xlsxRead(files, false); _dsXlsxFiles = files; _dsCsvName = file.name; $('ds-csv-info').textContent = file.name + ' · 시트 ' + list.length + '개를 새 시트로 가져옵니다.'; }).catch(function(e) { $('ds-csv-info').textContent = '읽지 못했습니다: ' + e.message; });
+        return;
+      }
       if (file.size > 5 * 1024 * 1024) { document.getElementById('ds-csv-info').textContent = '5MB 이하 파일만 가져올 수 있습니다.'; _dsCsvText = null; return; }
       file.arrayBuffer().then(function(buf) { _dsCsvText = ds_decodeText(buf); _dsCsvName = file.name; ds_csvInfo(); });
     });
@@ -47648,6 +47668,200 @@ function ds_applyChartDialog(remove) {
   }
   if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind(); }
 })();
+// ── 엑셀(xlsx) 가져오기·내보내기(#412): 외부 라이브러리 없이 ZIP(첨부 백업의 buildZipBlob·readZipEntries) + XML. 값·기본 서식·열 너비·병합·여러 시트 ──
+function ds_xmlEsc(v) { return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f￾￿]/g, ''); }
+function ds_xmlDecode(v) { return String(v).replace(/&(#x?[0-9a-fA-F]+|lt|gt|amp|quot|apos);/g, function(m, g) { if (g[0] === '#') { var n = g[1] === 'x' || g[1] === 'X' ? parseInt(g.slice(2), 16) : parseInt(g.slice(1), 10); return n > 0 && n < 0x110000 ? String.fromCodePoint(n) : ''; } return { lt: '<', gt: '>', amp: '&', quot: '"', apos: "'" }[g]; }); }
+// 작은 XML 해석기: → { name, attrs, kids, text }. 이름·속성의 접두사(x: r:)는 뗀다(r:id → id)
+function ds_xmlParse(src) {
+  var root = { name: '', attrs: {}, kids: [], text: '' }, stack = [root], m;
+  var re = /<!\[CDATA\[([\s\S]*?)\]\]>|<!--[\s\S]*?-->|<[?!][^>]*>|<(\/?)([^\s\/>]+)((?:\s+[^\s=\/>]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>|([^<]+)/g;
+  while ((m = re.exec(src))) {
+    var top = stack[stack.length - 1];
+    if (m[1] !== undefined) { top.text += m[1]; continue; }
+    if (m[6] !== undefined) { top.text += ds_xmlDecode(m[6]); continue; }
+    if (m[3] === undefined) continue;
+    if (m[2]) { if (stack.length > 1) stack.pop(); continue; }
+    var node = { name: m[3].replace(/^.*:/, ''), attrs: {}, kids: [], text: '' }, a, ar = /([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
+    while ((a = ar.exec(m[4] || ''))) { var key = a[1].replace(/^.*:/, ''); if (!(key in node.attrs) || a[1].indexOf(':') >= 0) node.attrs[key] = ds_xmlDecode(a[2] !== undefined ? a[2] : a[3]); }
+    top.kids.push(node);
+    if (!m[5]) stack.push(node);
+  }
+  return root;
+}
+function ds_xmlFind(node, name, out) { out = out || []; node.kids.forEach(function(k) { if (k.name === name) out.push(k); else ds_xmlFind(k, name, out); }); return out; }
+function ds_xmlKid(node, name) { return node ? node.kids.find(function(k) { return k.name === name; }) : undefined; }
+function ds_xlsxSerial(text) { var m = /^\s*(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\s*$/.exec(text); return m ? Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(1899, 11, 30)) / 86400000) : null; }
+function ds_xlsxDate(serial) { var d = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86400000); return d.toISOString().slice(0, 10); }
+function ds_xlsxSheetName(name, used) {
+  var base = String(name || '시트').replace(/[\[\]:*?\/\\]/g, ' ').replace(/^'+|'+$/g, '').trim().slice(0, 31) || '시트', out = base, n = 2;
+  while (used[out.toLowerCase()]) out = base.slice(0, 31 - String(n).length - 1) + ' ' + (n++);
+  used[out.toLowerCase()] = true;
+  return out;
+}
+// 순수 함수: 시트 목록 → xlsx 안의 파일 [{ name, text }]
+function ds_xlsxBuild(sheets) {
+  var fonts = ['<font><sz val="11"/><name val="맑은 고딕"/></font>'], fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>'], numFmts = [], xfs = ['<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'], cache = {};
+  var idx = function(list, item) { var i = list.indexOf(item); if (i < 0) i = list.push(item) - 1; return i; };
+  var styleOf = function(st, align) {
+    var key = JSON.stringify([st.b, st.i, st.u, st.s, st.color, st.bg, st.nf, align, st.wrap]);
+    if (cache[key] !== undefined) return cache[key];
+    var font = idx(fonts, '<font>' + (st.b ? '<b/>' : '') + (st.i ? '<i/>' : '') + (st.s ? '<strike/>' : '') + (st.u ? '<u/>' : '') + '<sz val="11"/>' + (st.color && st.color.length === 7 ? '<color rgb="FF' + st.color.slice(1).toUpperCase() + '"/>' : '') + '<name val="맑은 고딕"/></font>');
+    var fill = st.bg && st.bg.length === 7 ? idx(fills, '<fill><patternFill patternType="solid"><fgColor rgb="FF' + st.bg.slice(1).toUpperCase() + '"/><bgColor indexed="64"/></patternFill></fill>') : 0;
+    var fmt = 0, nf = st.nf;
+    if (nf) {
+      var d = nf.d !== undefined ? nf.d : (nf.t === 'pct' ? 0 : nf.t === 'cur' ? (nf.c === '$' ? 2 : 0) : 2), dec = d ? '.' + new Array(d + 1).join('0') : '', int = nf.th === false ? '0' : '#,##0';
+      var code = nf.t === 'date' ? 'yyyy-mm-dd' : nf.t === 'pct' ? int + dec + '%' : nf.t === 'cur' ? '"' + (nf.c === '$' ? '$' : '₩') + '"' + int + dec : int + dec;
+      fmt = 164 + idx(numFmts, code);
+    }
+    var al = (align && align !== 'left') || st.wrap !== 'clip' ? '<alignment' + (align && align !== 'left' ? ' horizontal="' + align + '"' : '') + ' vertical="top"' + (!st.wrap ? ' wrapText="1"' : '') + '/>' : '';
+    cache[key] = xfs.push('<xf numFmtId="' + fmt + '" fontId="' + font + '" fillId="' + fill + '" borderId="0" xfId="0" applyFont="1" applyFill="1" applyNumberFormat="1"' + (al ? ' applyAlignment="1">' + al + '</xf>' : '/>')) - 1;
+    return cache[key];
+  };
+  var used = {}, files = [], names = [];
+  sheets.forEach(function(sheet, si) {
+    var cols = sheet.columns || [], rows = sheet.rows || [], header = cols.some(function(c) { return c.name; }), off = header ? 1 : 0, env = ds_formulaEnv(rows, cols), data = [];
+    var cellXml = function(r, c, value, s) {
+      var ref = ds_colLetters(c) + (r + 1), sa = s ? ' s="' + s + '"' : '';
+      if (value === '' || value === null) return s ? '<c r="' + ref + '"' + sa + '/>' : '';
+      if (typeof value === 'number') return '<c r="' + ref + '"' + sa + '><v>' + value + '</v></c>';
+      if (typeof value === 'boolean') return '<c r="' + ref + '"' + sa + ' t="b"><v>' + (value ? 1 : 0) + '</v></c>';
+      return '<c r="' + ref + '"' + sa + ' t="inlineStr"><is><t xml:space="preserve">' + ds_xmlEsc(String(value).slice(0, 32767)) + '</t></is></c>';
+    };
+    if (header) data.push('<row r="1">' + cols.map(function(c, j) { return cellXml(0, j, c.name || '', styleOf({ b: true }, 'center')); }).join('') + '</row>');
+    rows.forEach(function(row, i) {
+      var cells = cols.map(function(c, j) {
+        if (row.isCategory || row.isMemo) return j ? '' : cellXml(i + off, 0, (row.isCategory ? row.categoryName : row.memoText) || '', styleOf(row.isCategory ? { b: true } : { i: true }));
+        var st = ds_normalizeCellStyle(row.cellStyles && row.cellStyles[c.id]), raw = row.cells && row.cells[c.id] != null ? String(row.cells[c.id]) : '', value = raw;
+        if (/^\s*=/.test(raw) && raw.trim().length > 1) { var res = ds_formulaValue(raw, env); value = res.err ? res.err : res.v === null ? '' : res.v; }
+        if (typeof value === 'string' && value !== '') {
+          var serial = st.nf && st.nf.t === 'date' ? ds_xlsxSerial(value) : null;
+          if (serial !== null) value = serial;
+          else if (st.nf && st.nf.t !== 'date' && !isNaN(ds_parseNumber(value))) value = ds_parseNumber(value);
+          else if (/^-?(0|[1-9]\d{0,14})(\.\d+)?$/.test(value)) value = Number(value); // 앞자리 0·긴 숫자는 글자로
+        }
+        var align = row.cellAligns && row.cellAligns[c.id];
+        return cellXml(i + off, j, value, ds_hasCellStyle(st) || (align && align !== 'left') ? styleOf(st, align) : 0);
+      }).join('');
+      data.push('<row r="' + (i + off + 1) + '"' + (row.hidden ? ' hidden="1"' : '') + (row.height ? ' ht="' + (row.height * 0.75).toFixed(2) + '" customHeight="1"' : '') + '>' + cells + '</row>');
+    });
+    var map = ds_mergeMap(rows, cols, sheet.merges || []), merges = Object.keys(map.anchors).map(function(k) { var at = k.split(':'), m = map.anchors[k], r = +at[0] + off, c = +at[1]; return '<mergeCell ref="' + ds_colLetters(c) + (r + 1) + ':' + ds_colLetters(c + m.cs - 1) + (r + m.rs) + '"/>'; });
+    names.push(ds_xlsxSheetName(sheet.name, used));
+    files.push({ name: 'xl/worksheets/sheet' + (si + 1) + '.xml', text: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+      + '<cols>' + cols.map(function(c, j) { return '<col min="' + (j + 1) + '" max="' + (j + 1) + '" width="' + Math.max(1, ((c.width || 160) - 5) / 7).toFixed(2) + '" customWidth="1"' + (c.hidden ? ' hidden="1"' : '') + '/>'; }).join('') + '</cols>'
+      + '<sheetData>' + data.join('') + '</sheetData>' + (merges.length ? '<mergeCells count="' + merges.length + '">' + merges.join('') + '</mergeCells>' : '') + '</worksheet>' });
+  });
+  var X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>', R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  files.push({ name: 'xl/styles.xml', text: X + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + (numFmts.length ? '<numFmts count="' + numFmts.length + '">' + numFmts.map(function(c, i) { return '<numFmt numFmtId="' + (164 + i) + '" formatCode="' + ds_xmlEsc(c) + '"/>'; }).join('') + '</numFmts>' : '') + '<fonts count="' + fonts.length + '">' + fonts.join('') + '</fonts><fills count="' + fills.length + '">' + fills.join('') + '</fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="' + xfs.length + '">' + xfs.join('') + '</cellXfs></styleSheet>' });
+  files.push({ name: 'xl/workbook.xml', text: X + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="' + R + '"><sheets>' + names.map(function(n, i) { return '<sheet name="' + ds_xmlEsc(n) + '" sheetId="' + (i + 1) + '"' + (sheets[i].hidden ? ' state="hidden"' : '') + ' r:id="rId' + (i + 1) + '"/>'; }).join('') + '</sheets></workbook>' });
+  files.push({ name: 'xl/_rels/workbook.xml.rels', text: X + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + names.map(function(n, i) { return '<Relationship Id="rId' + (i + 1) + '" Type="' + R + '/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>'; }).join('') + '<Relationship Id="rId' + (names.length + 1) + '" Type="' + R + '/styles" Target="styles.xml"/></Relationships>' });
+  files.push({ name: '_rels/.rels', text: X + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="' + R + '/officeDocument" Target="xl/workbook.xml"/></Relationships>' });
+  files.push({ name: '[Content_Types].xml', text: X + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' + names.map(function(n, i) { return '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'; }).join('') + '</Types>' });
+  return files;
+}
+function ds_xlsxRef(ref) { var m = /^\$?([A-Z]{1,3})\$?(\d+)$/.exec(String(ref || '')); return m ? { c: ds_colFromLetters(m[1]), r: +m[2] - 1 } : null; }
+// 순수 함수: xlsx 안의 파일(Map 이름 → 글자) → [{ name, hidden, columns:[{name,width,hidden}], rows:[{cells:[], styles:[], aligns:[], hidden}], merges:[[r1,c1,r2,c2]] }]
+function ds_xlsxRead(files, hasHeader) {
+  var get = function(n) { var t = files.get(n); return t === undefined ? null : ds_xmlParse(t); };
+  var wb = get('xl/workbook.xml');
+  if (!wb) throw new Error('xlsx 파일이 아닙니다.');
+  var rels = {};
+  var rx = get('xl/_rels/workbook.xml.rels');
+  if (rx) ds_xmlFind(rx, 'Relationship').forEach(function(r) { rels[r.attrs.Id] = r.attrs.Target; });
+  var shared = [], ss = get('xl/sharedStrings.xml');
+  var textOf = function(node) { return ds_xmlFind(node, 't').filter(function(t) { return true; }).map(function(t) { return t.text; }).join(''); };
+  if (ss) ds_xmlFind(ss, 'si').forEach(function(si) { shared.push(textOf({ kids: si.kids.filter(function(k) { return k.name !== 'rPh'; }) })); });
+  var styles = [], st = get('xl/styles.xml');
+  if (st) {
+    var codes = {};
+    ds_xmlFind(st, 'numFmt').forEach(function(n) { codes[n.attrs.numFmtId] = n.attrs.formatCode; });
+    var list = function(group, item) { var g = ds_xmlFind(st, group)[0]; return g ? g.kids.filter(function(k) { return k.name === item; }) : []; };
+    var fonts = list('fonts', 'font'), fills = list('fills', 'fill');
+    var rgb = function(node) { var v = node && node.attrs.rgb; return v && /^[0-9a-fA-F]{8}$/.test(v) ? '#' + v.slice(2).toLowerCase() : ''; };
+    list('cellXfs', 'xf').forEach(function(xf) {
+      var s = {}, font = fonts[+xf.attrs.fontId], fill = fills[+xf.attrs.fillId], id = +xf.attrs.numFmtId, code = codes[id] || '';
+      if (font) { [['b', 'b'], ['i', 'i'], ['u', 'u'], ['strike', 's']].forEach(function(p) { var k = ds_xmlKid(font, p[0]); if (k && k.attrs.val !== '0' && k.attrs.val !== 'false') s[p[1]] = true; }); var c = rgb(ds_xmlKid(font, 'color')); if (c && c !== '#000000') s.color = c; }
+      var pf = ds_xmlKid(fill, 'patternFill');
+      if (pf && pf.attrs.patternType === 'solid') { var bg = rgb(ds_xmlKid(pf, 'fgColor')); if (bg) s.bg = bg; }
+      var plain = code.replace(/"[^"]*"|\[[^\]]*\]|\\./g, ''), isDate = (id >= 14 && id <= 22) || /[yd]/i.test(plain);
+      var dm = /\.(0+)/.exec(plain), dec = dm ? dm[1].length : 0;
+      if (isDate) s.nf = { t: 'date' };
+      else if (id === 9 || id === 10 || /%/.test(plain)) s.nf = { t: 'pct', d: id === 10 ? 2 : dec };
+      else if (/[₩$]/.test(code)) s.nf = { t: 'cur', c: code.indexOf('₩') >= 0 ? '₩' : '$', d: dec };
+      else if (id >= 1 && id <= 4 || /0/.test(plain)) s.nf = { t: 'num', d: id === 2 || id === 4 ? 2 : dec, th: id === 3 || id === 4 || plain.indexOf(',') >= 0 };
+      if (s.nf && s.nf.t === 'num' && s.nf.th) delete s.nf.th; else if (s.nf && s.nf.t === 'num') s.nf.th = false;
+      var al = ds_xmlKid(xf, 'alignment'), h = al && al.attrs.horizontal;
+      styles.push({ st: s, align: h === 'center' || h === 'right' || h === 'justify' ? h : '' });
+    });
+  }
+  return ds_xmlFind(wb, 'sheet').slice(0, 30).map(function(sh) {
+    var target = String(rels[sh.attrs.id] || '').replace(/^\//, ''), path = target.indexOf('xl/') === 0 ? target : 'xl/' + target, x = get(path);
+    var rows = [], width = 0, columns = [], merges = [];
+    if (x) {
+      var next = 0;
+      ds_xmlFind(x, 'row').forEach(function(row) {
+        var r = row.attrs.r ? +row.attrs.r - 1 : next;
+        next = r + 1;
+        if (r < 0 || r >= DS_CSV_MAX_ROWS + 1) return;
+        while (rows.length <= r) rows.push({ cells: [], styles: [], aligns: [] });
+        var out = rows[r], cn = 0;
+        if (row.attrs.hidden === '1') out.hidden = true;
+        row.kids.filter(function(k) { return k.name === 'c'; }).forEach(function(c) {
+          var ref = ds_xlsxRef(c.attrs.r), j = ref ? ref.c : cn;
+          cn = j + 1;
+          if (j >= DS_CSV_MAX_COLS) return;
+          var style = styles[+c.attrs.s || 0], type = c.attrs.t, v = ds_xmlKid(c, 'v'), f = ds_xmlKid(c, 'f'), value = '';
+          if (type === 's') value = shared[v ? +v.text : -1] || '';
+          else if (type === 'inlineStr') { var is = ds_xmlKid(c, 'is'); value = is ? textOf(is) : ''; }
+          else if (type === 'b') value = v ? (v.text === '1' ? 'TRUE' : 'FALSE') : '';
+          else if (v) { value = v.text; if (type !== 'str' && type !== 'e' && value !== '') { var n = Number(value); if (style && style.st.nf && style.st.nf.t === 'date' && n > 0 && n < 2958466) value = ds_xlsxDate(n); else if (!isNaN(n)) value = String(parseFloat(n.toPrecision(15))); } }
+          else if (f && f.text) value = '=' + f.text; // 계산 결과가 저장되지 않은 파일만 수식 글자로
+          out.cells[j] = value;
+          if (style && Object.keys(style.st).length) out.styles[j] = style.st;
+          if (style && style.align) out.aligns[j] = style.align;
+          if (value !== '' || out.styles[j]) width = Math.max(width, j + 1);
+        });
+      });
+      ds_xmlFind(x, 'mergeCell').slice(0, 2000).forEach(function(m) { var parts = String(m.attrs.ref || '').split(':'), a = ds_xlsxRef(parts[0]), b = ds_xlsxRef(parts[1]); if (a && b && b.r < DS_CSV_MAX_ROWS && b.c < DS_CSV_MAX_COLS) { merges.push([a.r, a.c, b.r, b.c]); width = Math.max(width, b.c + 1); } });
+      ds_xmlFind(x, 'col').forEach(function(c) { for (var j = +c.attrs.min - 1; j < Math.min(+c.attrs.max, DS_CSV_MAX_COLS); j++) columns[j] = { width: c.attrs.width ? Math.round(+c.attrs.width * 7 + 5) : 160, hidden: c.attrs.hidden === '1' }; });
+    }
+    width = Math.max(1, width);
+    var head = hasHeader && rows.length ? rows.shift() : null;
+    if (head) merges = merges.filter(function(m) { return m[0] > 0; }).map(function(m) { return [m[0] - 1, m[1], m[2] - 1, m[3]]; });
+    var cols = [];
+    for (var j = 0; j < width; j++) cols.push({ name: head ? String(head.cells[j] || '') : '', width: columns[j] ? columns[j].width : 160, hidden: !!(columns[j] && columns[j].hidden) });
+    return { name: sh.attrs.name || '시트', hidden: !!sh.attrs.state && sh.attrs.state !== 'visible', columns: cols, rows: rows, merges: merges };
+  });
+}
+function ds_xlsxToSheet(src, name) { // 읽은 표 → 앱의 시트 객체
+  var columns = src.columns.map(function(c) { return { id: mkId(), name: c.name, width: c.width, hidden: c.hidden }; });
+  var rows = src.rows.map(function(r) {
+    var row = { id: mkId(), cells: {}, cellStyles: {}, cellAligns: {}, hidden: !!r.hidden };
+    columns.forEach(function(c, j) { if (r.cells[j] !== undefined && r.cells[j] !== '') row.cells[c.id] = r.cells[j]; if (r.styles[j]) row.cellStyles[c.id] = r.styles[j]; if (r.aligns[j]) row.cellAligns[c.id] = r.aligns[j]; });
+    return row;
+  });
+  var merges = src.merges.map(function(m) { var rs = rows.slice(m[0], m[2] + 1).map(function(r) { return r.id; }), cs = columns.slice(m[1], m[3] + 1).map(function(c) { return c.id; }); return rs.length === m[2] - m[0] + 1 ? { r: rs, c: cs } : null; }).filter(Boolean);
+  return normalizeDataSheetSheet({ name: name, hidden: src.hidden, columns: columns, rows: rows, merges: merges });
+}
+function ds_exportXlsx() {
+  var ds = findDataSheet(_dsEditId);
+  if (!ds) return Promise.resolve();
+  var entries = ds_xlsxBuild(ds.sheets).map(function(f) { return { name: f.name, blob: new Blob([f.text]) }; });
+  return buildZipBlob(entries).then(function(zip) {
+    var a = document.createElement('a'), url = URL.createObjectURL(new Blob([zip], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.href = url; a.download = (ds.title || '데이터 시트').replace(/[\\\/:*?"<>|]/g, '_') + '.xlsx';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+  }).catch(function(e) { if (typeof rubyToast === 'function') rubyToast('내보내기에 실패했습니다: ' + e.message); });
+}
+function ds_xlsxFiles(file) { // → Promise<Map 이름 → 글자>. 풀었을 때 크기 제한
+  return readZipEntries(file).then(function(entries) {
+    var out = new Map(), total = 0, chain = Promise.resolve();
+    Array.from(entries.keys()).filter(function(n) { return /^xl\/(workbook\.xml|styles\.xml|sharedStrings\.xml|_rels\/workbook\.xml\.rels|worksheets\/[^\/]+\.xml)$/.test(n); }).forEach(function(n) {
+      chain = chain.then(function() { return entries.get(n).blob(); }).then(function(b) { total += b.size; if (total > 60 * 1024 * 1024) throw new Error('압축을 풀면 너무 큽니다.'); return b.text(); }).then(function(t) { out.set(n, t); });
+    });
+    return chain.then(function() { return out; });
+  });
+}
 // ── 시트 안 찾기·바꾸기(#400) ──
 // o = { matchCase, whole(셀 전체 일치), regex, formulas(수식 글자까지 검색) }. 빈 검색어·잘못된 정규식·빈 글자와 맞는 정규식은 null
 function ds_findRegex(q, o) {
