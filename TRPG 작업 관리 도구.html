@@ -9038,6 +9038,27 @@ select.sh-field-input,
     </div>
   </div>
 
+  <!-- 데이터 시트 인쇄 팝업(#413): [실행] [취소] -->
+  <div id="ds-print-backdrop" class="link-insert-backdrop"></div>
+  <div id="ds-print-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-print-title">
+    <div class="link-insert-head">
+      <h2 id="ds-print-title" class="link-insert-title">인쇄·PDF</h2>
+      <div class="link-insert-head-actions"><button type="button" class="link-insert-close" id="ds-print-close" aria-label="닫기">×</button></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-body ds-style-body">
+      <div class="ds-style-row"><label for="ds-print-range">범위</label><select id="ds-print-range"><option value="sheet">현재 시트</option><option value="selection">선택한 범위</option></select></div>
+      <div class="ds-style-row"><label for="ds-print-orient">용지 방향</label><select id="ds-print-orient"><option value="portrait">세로</option><option value="landscape">가로</option></select></div>
+      <div class="ds-style-row"><label><input type="checkbox" id="ds-print-fit" checked> 너비에 맞춤</label><label><input type="checkbox" id="ds-print-grid" checked> 격자선</label></div>
+      <div style="font-size:12px;color:#777;">PDF 는 인쇄 창에서 대상을 「PDF로 저장」으로 고르세요.</div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-actions">
+      <button type="button" class="link-insert-btn primary" id="ds-print-submit">실행</button>
+      <button type="button" class="link-insert-btn cancel" id="ds-print-cancel">취소</button>
+    </div>
+  </div>
+
   <!-- 데이터 시트 범위 정렬 팝업(#390): [실행] [취소] 순서 -->
   <div id="ds-sort-backdrop" class="link-insert-backdrop"></div>
   <div id="ds-sort-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-sort-title">
@@ -43038,6 +43059,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + btn('ds-find-btn', 'ds_findOpen(true)', '찾기·바꾸기 (Ctrl+F / Ctrl+H)', 'fa-magnifying-glass')
     + btn('ds-paint-btn', 'ds_paintClick(event)', '서식 복사 (두 번 누르면 계속, Esc 종료)', 'fa-paintbrush')
     + btn('ds-grid-btn', 'ds_toggleGrid()', '격자선 숨기기', 'fa-border-none')
+    + btn('ds-print-btn', 'ds_openPrintDialog()', '인쇄·PDF (Ctrl+P)', 'fa-print')
     + SEP
     + '<div class="tb-font-wrap">'
     + '<button type="button" id="ds-font-trigger" class="tb-select tb-select-font tb-font-trigger" title="글꼴" aria-label="셀 글꼴" aria-haspopup="listbox" aria-controls="ds-font-menu" aria-expanded="false"' + NOFOCUS + ' onclick="ds_toggleFontMenu(event)"><span class="tb-font-trigger-label" id="ds-font-trigger-label">글꼴</span><i class="fa-solid fa-chevron-down tb-control-chevron" aria-hidden="true"></i></button>'
@@ -47862,6 +47884,112 @@ function ds_xlsxFiles(file) { // → Promise<Map 이름 → 글자>. 풀었을 �
     return chain.then(function() { return out; });
   });
 }
+// ── 인쇄·PDF(#413): 현재 시트(또는 선택 범위)를 인쇄용 표로 만들어 숨은 iframe 에서 브라우저 인쇄(PDF 저장은 브라우저 기능) ──
+var DS_PRINT_WIDTH = { portrait: 718, landscape: 1046 }; // A4, 여백 10mm, 96dpi 기준 인쇄 가능 너비(px)
+function ds_printScale(total, orientation, fit) { var avail = DS_PRINT_WIDTH[orientation] || DS_PRINT_WIDTH.portrait; return fit && total > avail ? Math.floor(avail / total * 1000) / 1000 : 1; }
+// o = { title, orientation, fit, grid, rows:[행 번호], cols:[열 번호], visible:[행 표시 여부] } → 완결된 HTML 문서 문자열
+function ds_printHtml(sheet, o) {
+  var rows = sheet.rows || [], columns = sheet.columns || [], env = ds_formulaEnv(rows, columns);
+  var cols = o.cols.filter(function(j) { return columns[j] && !columns[j].hidden; });
+  var list = o.rows.filter(function(i) { return rows[i] && !rows[i].hidden && !(o.visible && o.visible[i] === false); });
+  var widths = cols.map(function(j) { return columns[j].width || 160; }), total = widths.reduce(function(a, b) { return a + b; }, 0) || 1;
+  var map = ds_mergeMap(rows, columns, sheet.merges || []);
+  var overlay = ds_cfOverlay(rows, columns, sheet.cf, sheet.banding, function(i, j) { var r = rows[i], raw = r && r.cells && r.cells[columns[j].id] != null ? String(r.cells[columns[j].id]) : ''; if (/^\s*=/.test(raw) && raw.trim().length > 1) { var v = ds_formulaValue(raw, env); return v.err ? v.err : ds_fmlText(v.v); } return raw; }, o.visible);
+  var tr = function(i) {
+    var row = rows[i], h = row.height ? ' style="height:' + row.height + 'px"' : '';
+    if (row.isCategory || row.isMemo) {
+      var text = row.isCategory ? row.categoryName : row.memoText, rich = row.isMemo ? ds_getCellRich(row, '__row', row.memoText) : '';
+      return '<tr' + h + '><td class="' + (row.isCategory ? 'cat' : 'memo') + '" colspan="' + cols.length + '">' + (rich || ds_richFromText(text || '')) + '</td></tr>';
+    }
+    return '<tr' + h + '>' + cols.map(function(j) {
+      var key = i + ':' + j, span = '';
+      if (map.covered[key]) return '';
+      var m = map.anchors[key];
+      if (m) { var cs = cols.filter(function(c) { return c >= j && c < j + m.cs; }).length, rs = list.filter(function(r) { return r >= i && r < i + m.rs; }).length; span = (cs > 1 ? ' colspan="' + cs + '"' : '') + (rs > 1 ? ' rowspan="' + rs + '"' : ''); }
+      var col = columns[j], raw = row.cells && row.cells[col.id] != null ? String(row.cells[col.id]) : '', st = ds_normalizeCellStyle(row.cellStyles && row.cellStyles[col.id]), ov = overlay[key] || {};
+      var richCell = ds_getCellRich(row, col.id, raw), disp = richCell ? null : ds_cellDisplay(raw, st.nf, env), body = richCell || ds_richFromText(disp ? disp.text : raw);
+      var css = [], deco = [(ov.u || st.u) ? 'underline' : '', (ov.s || st.s) ? 'line-through' : ''].filter(Boolean).join(' ');
+      var bg = ov.bg || st.bg || ov.band, color = ov.color || st.color, align = row.cellAligns && row.cellAligns[col.id], text = ds_cellStyleCss(st);
+      if (text) css.push(text);
+      if (color) css.push('color:' + color);
+      if (bg) css.push('background-color:' + bg);
+      if (ov.b || st.b) css.push('font-weight:700');
+      if (ov.i || st.i) css.push('font-style:italic');
+      if (deco) css.push('text-decoration:' + deco);
+      if (align && align !== 'left') css.push('text-align:' + align);
+      if (row.verticalAlign && row.verticalAlign !== 'top') css.push('vertical-align:' + row.verticalAlign);
+      if (st.wrap === 'clip') css.push('white-space:nowrap');
+      if (st.bd) css.push(ds_borderCss(st.bd));
+      var img = row.cellImg && row.cellImg[col.id] ? '<img src="' + ds_xmlEsc(row.cellImg[col.id]) + '" alt="">' : '';
+      var rot = st.rot === undefined ? '' : st.rot === 'stack' ? 'writing-mode:vertical-rl;text-orientation:upright' : 'display:inline-block;' + (st.rot === 90 ? 'writing-mode:vertical-rl;transform:rotate(180deg)' : st.rot === -90 ? 'writing-mode:vertical-rl' : 'transform:rotate(' + (-st.rot) + 'deg)');
+      return '<td' + span + (css.length ? ' style="' + ds_xmlEsc(css.join(';')) + '"' : '') + '>' + img + (rot ? '<span style="' + rot + '">' + body + '</span>' : body) + '</td>';
+    }).join('') + '</tr>';
+  };
+  // 반복 머리글: 열 이름 줄 + 고정 행(병합이 경계를 넘지 않을 때)
+  var frozen = sheet.frozenRows || 0, crosses = Object.keys(map.anchors).some(function(k) { var i = +k.split(':')[0]; return i < frozen && i + map.anchors[k].rs > frozen; });
+  var headRows = crosses ? [] : list.filter(function(i) { return i < frozen; }), bodyRows = list.filter(function(i) { return headRows.indexOf(i) < 0; });
+  var names = cols.some(function(j) { return columns[j].name; }) ? '<tr>' + cols.map(function(j) { return '<th>' + ds_xmlEsc(columns[j].name || '') + '</th>'; }).join('') + '</tr>' : '';
+  var scale = ds_printScale(total, o.orientation, o.fit), P = o.scope ? o.scope + ' ' : '';
+  var rule = function(sel, body) { return sel.split(',').map(function(x) { return P + x; }).join(',') + '{' + body + '}'; };
+  var css = '@page{size:A4 ' + (o.orientation === 'landscape' ? 'landscape' : 'portrait') + ';margin:10mm}'
+    + rule('*', 'box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact')
+    + (o.scope || 'body') + '{margin:0;font-family:"Pretendard","맑은 고딕",sans-serif;font-size:13px;color:#222;background:#fff}'
+    + rule('h1', 'font-size:15px;margin:0 0 8px') + rule('table', 'border-collapse:collapse;table-layout:fixed;width:' + total + 'px;zoom:' + scale) + rule('thead', 'display:table-header-group') + rule('tr', 'break-inside:avoid')
+    + rule('td,th', 'border:' + (o.grid ? '1px solid #cfcfcf' : '0 solid transparent') + ';padding:5px 8px;vertical-align:top;white-space:pre-wrap;overflow-wrap:anywhere;overflow:hidden;line-height:1.45')
+    + rule('th', 'background:#f0f0f0;font-size:12px;text-align:center') + rule('td.cat', 'font-weight:700;background:#f3f4f6') + rule('td.memo', 'font-style:italic;color:#78350f;background:#fffbeb') + rule('img', 'display:block;max-width:100%;max-height:120px;margin:0 auto') + rule('a', 'color:#1155cc');
+  var body = '<h1>' + ds_xmlEsc(o.title || '') + '</h1><table><colgroup>' + widths.map(function(w) { return '<col style="width:' + w + 'px">'; }).join('') + '</colgroup>'
+    + ((names || headRows.length) ? '<thead>' + names + headRows.map(function(i) { return tr(i); }).join('') + '</thead>' : '') + '<tbody>' + bodyRows.map(function(i) { return tr(i); }).join('') + '</tbody></table>';
+  if (o.scope) return { css: css, body: body };
+  return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>' + ds_xmlEsc(o.title || '데이터 시트') + '</title><style>' + css + '</style></head><body>' + body + '</body></html>';
+}
+function ds_openPrintDialog() {
+  var ds = findDataSheet(_dsEditId), $ = function(id) { return document.getElementById(id); };
+  if (!ds) return;
+  var sel = ds_paintSelection(ds), multi = !!sel && (sel.rows.length > 1 || sel.cols.length > 1);
+  $('ds-print-range').value = multi ? 'selection' : 'sheet';
+  $('ds-print-range').options[1].disabled = !sel;
+  _dsPrintSel = sel;
+  ds_dialogShow('ds-print-dialog');
+}
+var _dsPrintSel = null;
+function ds_applyPrintDialog() {
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds), $ = function(id) { return document.getElementById(id); };
+  if (!sheet) return;
+  var part = $('ds-print-range').value === 'selection' && _dsPrintSel;
+  var out = ds_printHtml(sheet, { scope: '#ds-print-root', title: (ds.title || '데이터 시트') + (ds.sheets.length > 1 ? ' - ' + sheet.name : ''), orientation: $('ds-print-orient').value, fit: $('ds-print-fit').checked, grid: $('ds-print-grid').checked,
+    rows: part ? _dsPrintSel.rows : ds.rows.map(function(_, i) { return i; }), cols: part ? _dsPrintSel.cols : ds.columns.map(function(_, j) { return j; }), visible: ds_visibleRows(ds) });
+  ds_dialogHide('ds-print-dialog');
+  ds_printCleanup();
+  var root = document.createElement('div'), style = document.createElement('style');
+  root.id = 'ds-print-root'; root.innerHTML = out.body; // 칸 글자는 이스케이프, 서식은 허용 태그만(ds_getCellRich)
+  style.id = 'ds-print-style';
+  style.textContent = '#ds-print-root{display:none}@media print{html,body.ds-printing{height:auto!important;overflow:visible!important;background:#fff!important}body.ds-printing>*:not(#ds-print-root){display:none!important}body.ds-printing>#ds-print-root{display:block!important}' + out.css + '}';
+  document.head.appendChild(style); document.body.appendChild(root); document.body.classList.add('ds-printing');
+  window.addEventListener('afterprint', ds_printCleanup, { once: true });
+  var imgs = Array.from(root.querySelectorAll('img')).map(function(img) { return img.complete ? null : new Promise(function(res) { img.onload = img.onerror = res; }); });
+  Promise.race([Promise.all(imgs), new Promise(function(res) { setTimeout(res, 3000); })]).then(function() { window.print(); });
+}
+function ds_printCleanup() {
+  document.getElementById('ds-print-root')?.remove();
+  document.getElementById('ds-print-style')?.remove();
+  document.body.classList.remove('ds-printing');
+}
+(function() {
+  function bind() {
+    if (window.__dsPrintBound) return;
+    window.__dsPrintBound = true;
+    var on = function(id, ev, fn) { var el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+    var hide = function() { ds_dialogHide('ds-print-dialog'); };
+    on('ds-print-submit', 'click', ds_applyPrintDialog);
+    ['ds-print-cancel', 'ds-print-close', 'ds-print-backdrop'].forEach(function(id) { on(id, 'click', hide); });
+    on('ds-print-dialog', 'keydown', function(e) { if (e.key === 'Escape') { e.preventDefault(); hide(); } else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); ds_applyPrintDialog(); } });
+    document.addEventListener('keydown', function(e) { // 데이터 시트에서 Ctrl+P → 시트 인쇄 창
+      if (currentPage !== 'datasheet' || !_dsEditId || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || String(e.key).toLowerCase() !== 'p') return;
+      e.preventDefault(); e.stopPropagation(); ds_openPrintDialog();
+    }, true);
+  }
+  if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind(); }
+})();
 // ── 시트 안 찾기·바꾸기(#400) ──
 // o = { matchCase, whole(셀 전체 일치), regex, formulas(수식 글자까지 검색) }. 빈 검색어·잘못된 정규식·빈 글자와 맞는 정규식은 null
 function ds_findRegex(q, o) {
