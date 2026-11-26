@@ -9079,6 +9079,25 @@ select.sh-field-input,
     </div>
   </div>
 
+  <!-- 데이터 시트 값 하나 입력(#427, prompt 대체): [취소] [확인] -->
+  <div id="ds-ask-backdrop" class="link-insert-backdrop"></div>
+  <div id="ds-ask-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-ask-title">
+    <div class="link-insert-head">
+      <h2 id="ds-ask-title" class="link-insert-title"></h2>
+      <div class="link-insert-head-actions"><button type="button" class="link-insert-close" id="ds-ask-close" aria-label="닫기">×</button></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-body">
+      <input id="ds-ask-input" class="link-insert-input" aria-labelledby="ds-ask-title" aria-describedby="ds-ask-error" autocomplete="off" style="width:100%;box-sizing:border-box;">
+      <div id="ds-ask-error" role="alert" style="min-height:18px;margin-top:4px;font-size:12px;color:#b91c1c;"></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-actions">
+      <button type="button" class="link-insert-btn cancel" id="ds-ask-cancel">취소</button>
+      <button type="button" class="link-insert-btn primary" id="ds-ask-ok">확인</button>
+    </div>
+  </div>
+
   <!-- 데이터 시트 인쇄 팝업(#413): [실행] [취소] -->
   <div id="ds-print-backdrop" class="link-insert-backdrop"></div>
   <div id="ds-print-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-print-title">
@@ -46456,7 +46475,7 @@ function ds_viewName(views, base) { // 겹치지 않는 이름
   return name;
 }
 function ds_activeFilter(ds) { var h = ds_filterHolder(_dsActiveSheet(ds)); return h && h.filter ? h.filter : null; }
-function ds_viewAction(kind, id) { // new / use / close / rename / copy / delete
+function ds_viewAction(kind, id, newName) { // new / use / close / rename / copy / delete
   var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds);
   _dsHideFormatMenus();
   if (!sheet) return;
@@ -46469,9 +46488,13 @@ function ds_viewAction(kind, id) { // new / use / close / rename / copy / delete
   else if (kind === 'copy') add(ds_viewName(views, cur.name + ' 복사본'), cur.filter);
   else if (kind === 'delete') { sheet.filterViews = views.filter(function(v) { return v !== cur; }); sheet.activeViewId = ''; }
   else if (kind === 'rename') {
-    var input = prompt('필터 보기 이름', cur.name);
-    if (input === null || !input.trim() || input.trim() === cur.name) return;
-    cur.name = ds_viewName(views.filter(function(v) { return v !== cur; }), input.trim().slice(0, 60));
+    if (newName === undefined) { // 이름을 묻고 다시 부른다(그 사이 시트 객체가 바뀌어도 다시 찾는다)
+      ds_ask({ title: '필터 보기 이름', value: cur.name, attrs: { maxlength: 60 }, required: true }, function(value) { ds_viewAction('rename', id, value); });
+      return;
+    }
+    var name = String(newName).trim().slice(0, 60);
+    if (!name || name === cur.name) return;
+    cur.name = ds_viewName(views.filter(function(v) { return v !== cur; }), name);
   }
   _dsSelectedCellRange = null;
   var viewport = ds_captureEditorViewport();
@@ -46751,6 +46774,36 @@ function ds_dialogShow(id) {
   if (first) { first.focus(); setTimeout(function() { if (dlg.classList.contains('open') && !dlg.contains(document.activeElement)) first.focus(); }, 0); }
 }
 function ds_dialogHide(id) { document.getElementById(id)?.classList.remove('open'); document.getElementById(id.replace('-dialog', '-backdrop'))?.classList.remove('open'); }
+// 값 하나를 묻는 창(#427). opts: { title, type, value, attrs, required, check(값) → 오류 문구 }, ok(값)
+function ds_ask(opts, ok) {
+  var $ = function(id) { return document.getElementById('ds-ask-' + id); };
+  var input = $('input'), error = $('error'), okBtn = $('ok'), dlg = $('dialog');
+  var close = function() { ds_dialogHide('ds-ask-dialog'); };
+  var sync = function() { error.textContent = ''; okBtn.disabled = !!opts.required && !input.value.trim(); };
+  var submit = function() {
+    if (okBtn.disabled) return;
+    var message = opts.check ? opts.check(input.value) : '';
+    if (message) { error.textContent = message; input.focus(); input.select(); return; }
+    close(); ok(input.value);
+  };
+  ['min', 'max', 'step', 'maxlength'].forEach(function(name) { input.removeAttribute(name); });
+  $('title').textContent = opts.title;
+  input.type = opts.type || 'text';
+  Object.keys(opts.attrs || {}).forEach(function(name) { input.setAttribute(name, opts.attrs[name]); });
+  input.value = opts.value == null ? '' : opts.value;
+  input.oninput = sync;
+  okBtn.onclick = submit;
+  $('cancel').onclick = close; $('close').onclick = close; $('backdrop').onclick = close;
+  dlg.onkeydown = function(e) {
+    e.stopPropagation();
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229 && (e.target === input || e.target === okBtn)) { e.preventDefault(); submit(); }
+  };
+  if (typeof _dsHideFormatMenus === 'function') _dsHideFormatMenus(); // 연 메뉴가 창 뒤에 남지 않게
+  sync();
+  ds_dialogShow('ds-ask-dialog');
+  input.select();
+}
 function ds_saveStyleRules() { // 저장 → Ctrl+Z 한 번, 화면 다시 그리기
   var viewport = ds_captureEditorViewport();
   _dsForceNextHistoryCommit = true; persist(); renderDataSheetEditor(); ds_restoreEditorViewport(viewport);
@@ -46986,10 +47039,10 @@ function ds_rotPaint() {
 }
 function ds_applyCellRot(v) {
   if (v === 'custom') {
-    var input = prompt('회전 각도를 입력하세요. (-90 ~ 90, 양수는 위로)', '30');
-    if (input === null) return;
-    v = ds_normRot(input);
-    if (v === undefined && Number(input) !== 0) { if (typeof rubyToast === 'function') rubyToast('-90 부터 90 사이의 각도를 입력하세요.'); return; }
+    ds_ask({ title: '회전 각도 (-90 ~ 90, 양수는 위로)', type: 'number', value: '30', attrs: { min: -90, max: 90, step: 1 },
+      check: function(raw) { var n = Number(raw); return raw.trim() && n >= -90 && n <= 90 ? '' : '-90 부터 90 사이의 각도를 입력하세요.'; } },
+      function(raw) { ds_applyCellRot(Number(raw)); });
+    return;
   }
   var rot = ds_normRot(v);
   _dsMutateCellStyles(function(cur, cell) { if (cell.colId === DS_ROW_COL) return; if (rot === undefined) delete cur.rot; else cur.rot = rot; });
