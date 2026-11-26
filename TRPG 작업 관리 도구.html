@@ -4228,6 +4228,11 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 [contenteditable] ol { list-style-type: decimal; }
 [contenteditable] ol ol { list-style-type: lower-alpha; }
 [contenteditable] ol ol ol { list-style-type: lower-roman; }
+/* 목차 개요(#426) */
+.toc-item.toc-heading { font-size: 12px; color: #555; padding-top: 3px; padding-bottom: 3px; }
+.rb-toc-heading { display: block; width: 100%; padding: 3px 10px 3px 14px; border: 0; background: transparent; text-align: left; font: inherit; font-size: 11px; color: #777; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.rb-toc-heading:hover { background: rgba(127,127,127,0.18); }
+.toc-item.toc-heading.toc-heading-1, .rb-toc-heading.toc-heading-1 { font-weight: 700; }
 /* 번호 목록 스타일(#424): 가장 바깥 ol 의 data-tb-num. 편집기 밖(보기·내보내기)에서도 같은 모양이 되도록 [contenteditable] 로 한정하지 않는다.
    단계는 앱의 들여쓰기(li[data-list-indent]) 와 중첩 ol 둘 다 같은 규칙으로 센다 */
 ol[data-tb-num] { counter-reset: tbl0 tbl1 tbl2; }
@@ -16533,17 +16538,112 @@ function openScriptTocItemMenu(e, blockId) {
   return false;
 }
 
+// 목차 개요(#426): 본문 글 속 제목(제목·제목 1~3)
+function tocHeadingsInHtml(html) {
+  if (typeof html !== 'string' || html.indexOf('<') < 0) return [];
+  const out = [], re = /<(h[1-3]|p)\b([^>]*)>([\s\S]*?)<\/\1\s*>/gi;
+  const ent = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"' };
+  let m;
+  while ((m = re.exec(html))) {
+    const tag = m[1].toLowerCase();
+    if (tag === 'p' && !/\bclass\s*=\s*"[^"]*\btb-title\b/i.test(m[2])) continue;
+    const text = m[3].replace(/<(rt|rp)\b[^>]*>[\s\S]*?<\/\1>/gi, '').replace(/<br\b[^>]*>/gi, ' ').replace(/<[^>]*>/g, '')
+      .replace(/&(#x?[0-9a-f]+|\w+);/gi, (all, k) => k[0] === '#' ? String.fromCodePoint(Math.min(0x10ffff, parseInt(k.slice(/x/i.test(k[1]) ? 2 : 1), /x/i.test(k[1]) ? 16 : 10) || 32)) : (ent[k.toLowerCase()] ?? all))
+      .replace(/[\s ​]+/g, ' ').trim();
+    if (text) out.push({ level: tag === 'p' ? 1 : Number(tag[1]), text });
+  }
+  return out;
+}
+// 문서 순서의 목차 줄: {id}(listed 블록) · {level,text,owner(가장 가까운 listed 블록),top,nth}
+function tocBlockOutline(blocks, listed) {
+  const out = [], seen = new Set(), first = ['chName', 'title', 'name', 'content'];
+  (blocks || []).forEach(top => {
+    const count = new Map();
+    (function visit(node, owner) {
+      if (typeof node === 'string') {
+        tocHeadingsInHtml(node).forEach(h => {
+          const key = h.level + ' ' + h.text, nth = count.get(key) || 0;
+          count.set(key, nth + 1);
+          out.push({ level: h.level, text: h.text, owner, top: top.id, nth });
+        });
+        return;
+      }
+      if (!node || typeof node !== 'object' || seen.has(node)) return;
+      seen.add(node);
+      if (node.id && listed.has(node.id)) { owner = node.id; out.push({ id: node.id }); }
+      const keys = Object.keys(node).filter(k => !/memo|css|note/i.test(k));
+      first.filter(k => keys.includes(k)).concat(keys.filter(k => !first.includes(k))).forEach(k => visit(node[k], owner));
+    })(top, null);
+  });
+  return out;
+}
+var _tocHeadings = [], _rbTocHeadings = [], _tocRefreshTimer = null;
+function tocFindHeadingEl(containerId, h) {
+  const top = Array.from(document.querySelectorAll('#' + containerId + ' .block')).find(el => el.dataset.id === h.top);
+  if (!top) return null;
+  return Array.from(top.querySelectorAll('h1,h2,h3,p.tb-title')).filter(el => {
+    const found = tocHeadingsInHtml(el.outerHTML)[0];
+    return found && found.level === h.level && found.text === h.text && !!el.closest('[contenteditable]');
+  })[h.nth] || null;
+}
+function tocRevealHeading(containerId, h) {
+  const el = h && tocFindHeadingEl(containerId, h);
+  if (!el) return false;
+  for (let wrap = el.closest('.toggle-content-wrap.collapsed'); wrap; wrap = el.closest('.toggle-content-wrap.collapsed')) { // 접힌 토글 펼치기
+    const block = wrap.closest('.block');
+    if (!block) break;
+    toggleScriptToggleBlock(block.dataset.id, block.querySelector('.toggle-block-head'), containerId);
+    if (wrap.classList.contains('collapsed')) break;
+  }
+  const section = el.closest('.roll-sub.collapsed');
+  if (section) syncRollSectionUI(section, false);
+  const editor = el.closest('[contenteditable="true"]');
+  if (editor) {
+    editor.focus({ preventScroll: true });
+    const range = document.createRange(), sel = window.getSelection();
+    range.selectNodeContents(el); range.collapse(false);
+    sel.removeAllRanges(); sel.addRange(range);
+  }
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.animate?.([{ backgroundColor: '#fde68a' }, { backgroundColor: '#fde68a', offset: 0.6 }, { backgroundColor: 'transparent' }], 1600); // 본문 HTML 은 바꾸지 않는다
+  return true;
+}
+function rbJumpToHeading(index) {
+  const h = _rbTocHeadings[index];
+  if (!h) return;
+  if (h.chapterId !== currentChapterId) rbSelectChapter(h.chapterId);
+  else { currentRulebookTocId = h.chapterId; }
+  setTimeout(() => tocRevealHeading('rb-blocks-container', h), 120);
+}
+document.addEventListener('input', event => { // 글을 고치면 목차도 갱신
+  if (!event.target?.closest?.('#blocks-container, #rb-blocks-container')) return;
+  clearTimeout(_tocRefreshTimer);
+  _tocRefreshTimer = setTimeout(() => {
+    if (currentPage === 'rulebook') renderRbChapterList();
+    else if (currentPage === 'script' && cur()) renderToc(cur().blocks || []);
+  }, 300);
+});
+
 function renderToc(blocks) {
   const list = document.getElementById('toc-list');
   if (!list) return;
   const items = getScriptTocItems(blocks);
-  if (!items.length) {
+  const itemById = new Map(items.map(b => [b.id, b]));
+  const outline = tocBlockOutline(blocks, new Set(itemById.keys()));
+  _tocHeadings = [];
+  if (!outline.length) {
     list.innerHTML = '<div class="toc-empty">목차 항목 없음</div>';
     return;
   }
   const badgeClass = { intro: 'toc-badge-intro', chapter: 'toc-badge-chapter', branch: 'toc-badge-branch', roll: 'toc-badge-roll', ending: 'toc-badge-ending' };
   const badgeLabel = { intro: '인트로', chapter: '제목', branch: '분기', roll: '판정', ending: '엔딩' };
-  list.innerHTML = items.map(b => {
+  let lastRank = -1; // 제목 들여쓰기 기준: 바로 앞 블록 항목
+  list.innerHTML = outline.map(row => {
+    if (!row.id) {
+      const index = _tocHeadings.push(row) - 1;
+      return `<button class="toc-item toc-heading toc-heading-${row.level}" style="--toc-indent:${(lastRank + row.level) * 16}px" onclick="tocRevealHeading('blocks-container',_tocHeadings[${index}])"><span class="toc-label" title="${esc(row.text)}">${esc(row.text)}</span></button>`;
+    }
+    const b = itemById.get(row.id);
     let label = '';
     if (b.type === 'intro') label = '인트로';
     else if (b.type === 'chapter') label = [b.chNum, b.chName].filter(Boolean).join(' ') || '제목';
@@ -16552,6 +16652,7 @@ function renderToc(blocks) {
     else if (b.type === 'ending') label = b.name || '엔딩';
     else label = rbGetTocTitleFromBlock(b);
     const rank = getScriptTocRank(b.id);
+    lastRank = rank;
     const badgeColor = getScriptTocBadgeColor(b.id);
     const badgeStyle = badgeColor ? ` style="background:${badgeColor};color:${getScriptTocBadgeTextColor(badgeColor)}"` : '';
     return `<button class="toc-item" style="--toc-indent:${rank * 16}px" onclick="tocScrollTo('${b.id}')" oncontextmenu="return openScriptTocItemMenu(event,'${b.id}')">
@@ -49666,12 +49767,28 @@ function renderRbChapterList() {
       + foldBtn
       + '</button>';
   }
+  var anchorIds = new Set(chapters.map(function(c) { return c.targetBlockId; }).filter(Boolean));
+  var outlines = new Map(); // 챕터 id → 본문 제목 줄(#426)
+  chapters.forEach(function(c) { if (!c.targetBlockId) outlines.set(c.id, tocBlockOutline(c.blocks, anchorIds).filter(function(row) { return !row.id; })); });
+  _rbTocHeadings = [];
+  function headingsHtml(c, depth) {
+    var rows = [];
+    if (!c.targetBlockId) rows = (outlines.get(c.id) || []).filter(function(row) { return !row.owner; }).map(function(row) { return Object.assign({ chapterId: c.id }, row); });
+    else outlines.forEach(function(list, chapterId) {
+      list.forEach(function(row) { if (row.owner === c.targetBlockId) rows.push(Object.assign({ chapterId: chapterId }, row)); });
+    });
+    return rows.map(function(row) {
+      var index = _rbTocHeadings.push(row) - 1;
+      var pad = 14 + (Math.min(Math.max(depth, 0), 6) + row.level) * 16;
+      return '<button class="rb-toc-heading toc-heading-' + row.level + '" style="padding-left:' + pad + 'px" onclick="rbJumpToHeading(' + index + ')" title="' + esc(row.text) + '">' + esc(row.text) + '</button>';
+    }).join('');
+  }
   function renderChapterBranch(parentId, depth, trail) {
     return (childMap.get(parentId) || []).map(function(c) {
       if (trail.has(c.id)) return '';
       var nextTrail = new Set(trail);
       nextTrail.add(c.id);
-      var html = chapterItemHtml(c, depth);
+      var html = chapterItemHtml(c, depth) + headingsHtml(c, depth);
       if (!c.tocCollapsed) html += renderChapterBranch(c.id, depth + 1, nextTrail);
       return html;
     }).join('');
