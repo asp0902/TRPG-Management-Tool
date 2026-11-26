@@ -3272,7 +3272,7 @@ ruby > rt { font-size: 0.5em; line-height: 1; font-weight: 400; }
   color: #000;
 }
 .tb-select-wide { width: 82px; } /* 블록 유형 */
-.tb-block-type-wrap { --tb-block-type-w: 62px; position: relative; width: var(--tb-block-type-w); height: 24px; flex: 0 0 var(--tb-block-type-w); }
+.tb-block-type-wrap { --tb-block-type-w: 84px; position: relative; width: var(--tb-block-type-w); height: 24px; flex: 0 0 var(--tb-block-type-w); }
 .tb-block-type-trigger {
   position: relative; display: flex; align-items: center; justify-content: flex-start;
   width: var(--tb-block-type-w); height: 24px; padding: 0 18px 0 8px; font: inherit; font-size: 11px;
@@ -3283,24 +3283,24 @@ ruby > rt { font-size: 0.5em; line-height: 1; font-weight: 400; }
 .tb-block-type-trigger .tb-control-chevron { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); }
 .tb-block-type-trigger:focus { border-color: #000; outline: none; }
 .tb-block-type-menu {
-  position: fixed; z-index: 10062; width: var(--tb-block-type-w); padding: 2px 0; margin: 0;
+  position: fixed; z-index: 10062; width: 200px; padding: 4px 0; margin: 0;
   border: 1px solid #bbb; border-radius: 4px; background: #fff;
   box-shadow: 0 5px 16px rgba(0,0,0,0.16); list-style: none;
 }
 .tb-block-type-menu[hidden] { display: none; }
 .tb-block-type-option {
-  display: flex; align-items: center; justify-content: center; width: 100%; height: 26px;
-  padding: 0; border: 0; background: #fff; color: #222; font: inherit; font-size: 11px;
-  line-height: 26px; text-align: center; cursor: pointer;
+  display: flex; align-items: center; justify-content: flex-start; width: 100%; min-height: 30px;
+  padding: 3px 12px 3px 30px; position: relative; border: 0; background: #fff; color: #222; font: inherit; font-size: 14px;
+  line-height: 1.3; text-align: left; white-space: nowrap; cursor: pointer;
 }
-.tb-block-type-option:hover, .tb-block-type-option:focus, .tb-block-type-option[aria-selected="true"] {
-  background: #e9e9e9; outline: none;
-}
-/* 블록 유형 메뉴 미리보기(#419): 각 유형 모양의 축소판 */
-.tb-block-type-option[data-value="h1"] { font-size: 15px; font-weight: 800; color: #111; }
-.tb-block-type-option[data-value="h2"] { font-size: 13px; font-weight: 700; color: #111; }
-.tb-block-type-option[data-value="h3"] { font-size: 12px; font-weight: 700; color: #222; }
-.tb-block-type-option[data-value="h4"] { font-size: 11px; font-weight: 700; color: #6b7280; letter-spacing: 0.02em; }
+.tb-block-type-option:hover, .tb-block-type-option:focus { background: #e9e9e9; outline: none; }
+.tb-block-type-option[aria-selected="true"]::before { content: '✓'; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 13px; font-weight: 400; color: #222; }
+/* 스타일 메뉴 미리보기(#425): 편집기에 적용되는 모양 그대로 */
+.tb-block-type-option[data-value="title"] { font-size: 30px; font-weight: 400; color: #111; }
+.tb-block-type-option[data-value="h4"] { font-size: 16px; font-weight: 400; color: #6b7280; }
+.tb-block-type-option[data-value="h1"] { font-size: 26px; font-weight: 800; color: #111; }
+.tb-block-type-option[data-value="h2"] { font-size: 21px; font-weight: 700; color: #111; }
+.tb-block-type-option[data-value="h3"] { font-size: 17px; font-weight: 700; color: #222; }
 .tb-select-font { width: 120px; } /* 글꼴 */
 .tb-lh-wrap { position: relative; width: 52px; height: 24px; flex: 0 0 52px; }
 #format-bar .tb-select-lh {
@@ -3712,13 +3712,14 @@ body.is-block-range-selecting * {
   /* 글꼴 span([style*="font-family"])이 line-height:0 을 주고 이 미리보기를 품으면 0 을 상속해 얇은 선으로 접힌다. 편집 칸 기본 줄 높이로 되돌린다. */
   line-height: 1.4;
 }
-/* 블록 유형(#419): 제목 1~3·소제목을 본문(14px/400)과 크기·굵기·색·여백으로 분명히 구분. 태그는 그대로(CSS만), 편집기(contenteditable) 공통 */
-[contenteditable="true"] h1, [contenteditable="true"] h2, [contenteditable="true"] h3, [contenteditable="true"] h4 { line-height: 1.3; }
-[contenteditable="true"] h1 { font-size: 26px; font-weight: 800; color: #111; margin: 0.9em 0 0.35em; padding-bottom: 0.2em; border-bottom: 1px solid #e5e5e5; }
-[contenteditable="true"] h2 { font-size: 21px; font-weight: 700; color: #111; margin: 0.8em 0 0.3em; }
-[contenteditable="true"] h3 { font-size: 17px; font-weight: 700; color: #222; margin: 0.6em 0 0.2em; }
-[contenteditable="true"] h4 { font-size: 14px; font-weight: 700; color: #6b7280; letter-spacing: 0.02em; margin: 0.5em 0 0.15em; }
-[contenteditable="true"] > h1:first-child, [contenteditable="true"] > h2:first-child, [contenteditable="true"] > h3:first-child, [contenteditable="true"] > h4:first-child { margin-top: 0; }
+/* 문단 스타일(#419·#425): 제목·부제목·제목 1~3 을 일반 텍스트(14px/400)와 구분. 저장은 태그/클래스(CSS만). 보기 모드(contenteditable="false")에도 같은 모양 */
+[contenteditable] h1, [contenteditable] h2, [contenteditable] h3, [contenteditable] h4 { line-height: 1.3; }
+[contenteditable] h1 { font-size: 26px; font-weight: 800; color: #111; margin: 0.9em 0 0.35em; padding-bottom: 0.2em; border-bottom: 1px solid #e5e5e5; }
+[contenteditable] h2 { font-size: 21px; font-weight: 700; color: #111; margin: 0.8em 0 0.3em; }
+[contenteditable] h3 { font-size: 17px; font-weight: 700; color: #222; margin: 0.6em 0 0.2em; }
+[contenteditable] h4 { font-size: 16px; font-weight: 400; color: #6b7280; margin: 0.5em 0 0.4em; }
+p.tb-title { font-size: 30px; font-weight: 400; color: #111; line-height: 1.3; margin: 0 0 0.3em; }
+[contenteditable] > h1:first-child, [contenteditable] > h2:first-child, [contenteditable] > h3:first-child, [contenteditable] > h4:first-child { margin-top: 0; }
 [contenteditable="true"] span[style*="font-family"]:not(:has(:is(br, div, p, li, ul, ol, blockquote, h1, h2, h3, h4))) { line-height: 0; }
 [contenteditable="true"][style*="Nanum Myeongjo"],
 [contenteditable="true"] [style*="Nanum Myeongjo"] {
@@ -8660,25 +8661,25 @@ select.sh-field-input,
       <!-- 헤더 종류 / 글자 크기 -->
       <div class="tb-block-type-wrap">
       <select id="tb-block-type" hidden aria-hidden="true" tabindex="-1">
-        <option value="">단락</option>
-        <option value="p">본문</option>
+        <option value="">일반 텍스트</option>
+        <option value="title">제목</option>
+        <option value="h4">부제목</option>
         <option value="h1">제목 1</option>
         <option value="h2">제목 2</option>
         <option value="h3">제목 3</option>
-        <option value="h4">소제목</option>
       </select>
-      <button type="button" class="tb-block-type-trigger" id="tb-block-type-trigger" title="블록 유형"
+      <button type="button" class="tb-block-type-trigger" id="tb-block-type-trigger" title="스타일" aria-label="스타일"
         aria-haspopup="listbox" aria-expanded="false" aria-controls="tb-block-type-menu"
         onmousedown="event.preventDefault();tbCaptureFormatTarget()" onclick="tbToggleBlockTypeMenu()"
-        onkeydown="tbBlockTypeTriggerKeydown(event)"><span id="tb-block-type-label">단락</span><i class="fa-solid fa-chevron-down tb-control-chevron" aria-hidden="true"></i></button>
-      <div class="tb-block-type-menu" id="tb-block-type-menu" role="listbox" aria-label="블록 유형" hidden
+        onkeydown="tbBlockTypeTriggerKeydown(event)"><span id="tb-block-type-label">일반 텍스트</span><i class="fa-solid fa-chevron-down tb-control-chevron" aria-hidden="true"></i></button>
+      <div class="tb-block-type-menu" id="tb-block-type-menu" role="listbox" aria-label="스타일" hidden
         onkeydown="tbBlockTypeMenuKeydown(event)">
-        <button type="button" class="tb-block-type-option" role="option" data-value="">단락</button>
-        <button type="button" class="tb-block-type-option" role="option" data-value="p">본문</button>
+        <button type="button" class="tb-block-type-option" role="option" data-value="">일반 텍스트</button>
+        <button type="button" class="tb-block-type-option" role="option" data-value="title">제목</button>
+        <button type="button" class="tb-block-type-option" role="option" data-value="h4">부제목</button>
         <button type="button" class="tb-block-type-option" role="option" data-value="h1">제목 1</button>
         <button type="button" class="tb-block-type-option" role="option" data-value="h2">제목 2</button>
         <button type="button" class="tb-block-type-option" role="option" data-value="h3">제목 3</button>
-        <button type="button" class="tb-block-type-option" role="option" data-value="h4">소제목</button>
       </div>
       </div>
       <div class="tb-font-wrap">
@@ -30869,7 +30870,7 @@ function tbRedo() {
   historyRedo();
 }
 
-const BLOCK_TYPE_CSS = { h1:'font-size:26px;font-weight:800;color:#111', h2:'font-size:21px;font-weight:700;color:#111', h3:'font-size:17px;font-weight:700;color:#222', h4:'font-size:14px;font-weight:700;color:#6b7280;letter-spacing:0.02em' }; /* 편집기 공통 h1~h4 CSS(#419)와 같은 크기·굵기·색 */
+const BLOCK_TYPE_CSS = { title:'font-size:30px;font-weight:400;color:#111', h1:'font-size:26px;font-weight:800;color:#111', h2:'font-size:21px;font-weight:700;color:#111', h3:'font-size:17px;font-weight:700;color:#222', h4:'font-size:16px;font-weight:400;color:#6b7280' }; /* 편집기 공통 CSS(#419·#425)와 같은 크기·굵기·색 */
 // 제목으로 바꿀 때 안쪽에 박힌 inline font-size는 지운다.
 // 남겨두면 제목 크기보다 우선해서 제목 유형이 안 먹은 것처럼 보인다
 // (예전 execCommand 정렬이 span에 font-size:14px를 심어둔 경우).
@@ -30918,30 +30919,37 @@ function tbApplyQuoteBlockType(root, range, tagName) {
   savedFormatTarget = { type: 'ce', ta: root, range: nextRange.cloneRange() };
   return true;
 }
+function tbSelectedTextBlocks(root) { // 선택(커서)에 걸친 문단·제목 요소
+  const sel = window.getSelection(), range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
+  if (!root || !range) return [];
+  return Array.from(root.querySelectorAll('p,h1,h2,h3,h4')).filter(el => { try { return range.intersectsNode(el); } catch (e) { return false; } });
+}
+// val: ''(일반 텍스트) · 'title'(제목) · 'h4'(부제목) · 'h1'~'h3'
 function tbBlockType(val) {
-  if (!val) return;
   if (isCE()) {
     restoreCERange();
     const ce = lastFocusedTA;
     const selection = window.getSelection();
     const range = selection && selection.rangeCount ? selection.getRangeAt(0) : null;
-    if (!range || !tbApplyQuoteBlockType(ce, range, val)) document.execCommand('formatBlock', false, val);
-    if (/^h[1-4]$/i.test(val)) {
-      const sel = window.getSelection();
-      const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
-      ce?.querySelectorAll('h1,h2,h3,h4').forEach(h => {
-        let hit = !range;
-        try { hit = hit || range.intersectsNode(h); } catch (e) { hit = true; }
-        if (hit) tbStripInlineFontSize(h);
-      });
+    let tag = val === 'title' ? 'p' : val;
+    if (!val) { // 제목 태그만 해제한다. 이미 일반 텍스트면 바꾸지 않는다
+      const blocks = tbSelectedTextBlocks(ce);
+      if (blocks.some(el => el.tagName !== 'P')) tag = getQuoteForRange(ce, range) ? 'p' : 'div';
+      else if (!blocks.some(el => el.classList.contains('tb-title'))) return;
     }
-    lastFocusedTA?.dispatchEvent(new Event('input', { bubbles: true }));
+    if (tag && (!range || !tbApplyQuoteBlockType(ce, range, tag))) document.execCommand('formatBlock', false, tag);
+    tbSelectedTextBlocks(ce).forEach(el => {
+      el.classList.toggle('tb-title', val === 'title' && el.tagName === 'P');
+      if (!el.getAttribute('class')) el.removeAttribute('class');
+      if (val) tbStripInlineFontSize(el);
+    });
+    ce?.dispatchEvent(new Event('input', { bubbles: true }));
   }
   else { const css = BLOCK_TYPE_CSS[val]; if (css) tbWrap(css); }
   // 적용 후 빈 값으로 되돌리지 않고 현재 서식을 그대로 표시한다.
   setTimeout(tbSyncBlockTypeSelect, 0);
 }
-// 캐럿이 놓인 곳의 문단 서식(h1~h4 / p)을 알아낸다. 감싸는 요소가 없으면 '단락'('').
+// 캐럿이 놓인 곳의 문단 서식(제목 / h1~h4)을 알아낸다. 그 밖은 일반 텍스트('').
 function tbGetCurrentBlockFormat() {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return '';
@@ -30950,7 +30958,9 @@ function tbGetCurrentBlockFormat() {
   const ce = el?.closest?.('[contenteditable="true"]');
   if (!ce) return '';
   const fmt = el.closest('h1,h2,h3,h4,p');
-  return fmt && ce.contains(fmt) ? fmt.tagName.toLowerCase() : '';
+  if (!fmt || !ce.contains(fmt)) return '';
+  if (fmt.tagName === 'P') return fmt.classList.contains('tb-title') ? 'title' : ''; // 예전 「본문(p)」 은 일반 텍스트
+  return fmt.tagName.toLowerCase();
 }
 function tbSyncBlockTypeSelect() {
   const select = document.getElementById('tb-block-type');
@@ -30964,7 +30974,7 @@ function tbSyncBlockTypeControl() {
   const label = document.getElementById('tb-block-type-label');
   const menu = document.getElementById('tb-block-type-menu');
   if (!select || !label || !menu) return;
-  label.textContent = select.selectedOptions[0]?.textContent || '단락';
+  label.textContent = select.selectedOptions[0]?.textContent || '일반 텍스트';
   menu.querySelectorAll('[role="option"]').forEach(option => {
     option.setAttribute('aria-selected', String(option.dataset.value === select.value));
   });
@@ -31000,7 +31010,7 @@ function tbChooseBlockType(value) {
   if (!select) return;
   select.value = value;
   tbCloseBlockTypeMenu(true);
-  if (value) tbBlockType(value);
+  tbBlockType(value);
   tbSyncBlockTypeControl();
 }
 function tbBlockTypeTriggerKeydown(event) {
@@ -31175,7 +31185,7 @@ function tbFindCollapsedFontTarget(root, range) {
   const node = range?.startContainer;
   const el = node?.nodeType === 3 ? node.parentElement : node;
   if (!el) return root;
-  const heading = el.closest?.('h1,h2,h3,h4');
+  const heading = el.closest?.('h1,h2,h3,h4,p.tb-title');
   if (heading && heading !== root && root.contains(heading)) return heading;
   const block = el.closest?.('p,li,blockquote,div,span');
   if (block && block !== root && block.contentEditable !== 'true' && root.contains(block)) return block;

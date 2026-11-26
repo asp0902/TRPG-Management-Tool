@@ -22,7 +22,7 @@ assert.match(html, /li\|blockquote\|b/, '정보 탭 저장값은 blockquote를 H
 assert.match(html, /function tbApplyQuoteBlockType\(root, range, tagName\)/, '인용 내부 문단 유형 적용 경로가 필요합니다.');
 assert.match(
   html,
-  /!tbApplyQuoteBlockType\(ce, range, val\)\) document\.execCommand\('formatBlock'/,
+  /!tbApplyQuoteBlockType\(ce, range, tag\)\)\) document\.execCommand\('formatBlock'/,
   '인용 외곽 블록은 formatBlock 교체 대상에서 제외해야 합니다.',
 );
 assert.match(html, /function makeQuoteChildBlockTargetKey\(/, '인용 전용 하위 블록 저장 경로가 필요합니다.');
