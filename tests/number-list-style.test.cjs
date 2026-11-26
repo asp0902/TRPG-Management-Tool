@@ -21,4 +21,5 @@ const press = merged => { const attrs = {}, list = { hasAttribute: n => n in att
     document: { queryCommandState: () => false, execCommand() {} }, window: { getSelection: () => ({ rangeCount: 1, getRangeAt: () => ({}) }) } };
   vm.createContext(c); const from = html.indexOf('function tbInsertNumbered'); vm.runInContext(html.slice(from, html.indexOf('const ta = lastFocusedTA', from)) + '}', c); c.tbInsertNumbered(); return attrs['data-tb-num']; };
 ok(press(false) === 'decimal' && press(true) === undefined, '본체 버튼 생성 → data-tb-num="decimal", 기존 목록 불변');
+ok(html.includes("const current = ctx?.list?.hasAttribute('data-tb-num') ?"), '속성 없는 기존 목록은 카드 강조 없음');
 process.exit(f ? 1 : 0);

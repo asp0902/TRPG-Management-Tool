@@ -32299,7 +32299,7 @@ function tbApplyNumberPreset(preset) { // 메뉴에서 고름: 목록 안이면 
 }
 function tbOpenNumberMenu(button) {
   const rect = button.getBoundingClientRect(), ctx = tbNumberContext();
-  const current = ctx?.list ? tbValidNumPreset(ctx.list.getAttribute('data-tb-num')) : '';
+  const current = ctx?.list?.hasAttribute('data-tb-num') ? tbValidNumPreset(ctx.list.getAttribute('data-tb-num')) : ''; // 속성 없는 기존 목록은 강조 없음
   tbCloseCtxMenu();
   const menu = document.createElement('div');
   menu.className = 'tb-ctx-menu tb-num-menu';
