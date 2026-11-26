@@ -1,0 +1,16 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+let n = 0; const ctx = { mkId: () => 'n' + (++n), ds_isDataRow: r => !!(r && !r.isCategory && !r.isMemo), ds_sortCompare: (a, b) => String(a).localeCompare(String(b), 'ko') }; vm.createContext(ctx);
+const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
+vm.runInContext(cut('function ds_floatPos', 'function ds_floatCard') + cut('function ds_normSlicers', 'function ds_slicerApply'), ctx);
+const J = JSON.stringify;
+const norm = ctx.ds_normSlicers([{ colId: 'a', x: -5, y: 'x' }, { colId: 'gone' }, null], [{ id: 'a' }]);
+ok(norm.length === 1 && norm[0].x === 0 && norm[0].y === 40 && ctx.ds_normSlicers(undefined, []).length === 0, '정규화: 없는 열 제거·위치 범위 정리·옛 데이터');
+const rows = [{ cells: { a: '나' } }, { cells: { a: '가' } }, { isMemo: true }, { cells: { a: '나' } }, { cells: {} }];
+ok(J(ctx.ds_slicerValues(rows, 'a')) === J([{ key: '', count: 1 }, { key: '가', count: 1 }, { key: '나', count: 2 }]), '값 목록·개수(메모 행 제외)');
+ok(J(ctx.ds_slicerFilter(null, 'a', ['가'])) === '{"cols":{"a":{"hide":["가"]}}}', '필터가 없으면 새로 만듦');
+const base = { cols: { a: { hide: ['x'], cond: { type: 'notempty' } }, b: { hide: ['y'] } } };
+ok(J(ctx.ds_slicerFilter(base, 'a', [])) === '{"cols":{"a":{"cond":{"type":"notempty"}},"b":{"hide":["y"]}}}' && J(ctx.ds_slicerFilter(base, 'b', [])) === '{"cols":{"a":{"hide":["x"],"cond":{"type":"notempty"}}}}' && J(base.cols.a.hide) === '["x"]', '조건 필터·다른 열은 유지, 원본 불변');
+ok(/slicers: ds_normSlicers\(sheet\.slicers, columns\)/.test(html) && /ds_slicerPaint\(\); \/\/ 슬라이서/.test(html) && /'ds_addSlicer\(\)'/.test(html) && /x\.colId = colIdMap\[x\.colId\]/.test(html), '저장·렌더·메뉴·시트 복제 연결');
+process.exit(f ? 1 : 0);
