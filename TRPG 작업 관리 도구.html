@@ -7176,7 +7176,7 @@ body.block-pointer-dragging {
 .ds-cf-item button:disabled { opacity: .35; cursor: default; }
 .ds-band-preset { width: 40px; height: 34px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; padding: 0; }
 .ds-painting table.ds-table td, .ds-painting table.ds-table td textarea { cursor: copy; }
-#ds-paint-btn.active { background: #111; color: #fff; }
+#ds-paint-btn.active { background: #e0e0e0; color: #000; }
 /* 텍스트 회전(#403) */
 .ds-table td.ds-rot:not(.ds-rich-editing):not(:has(textarea.ds-cell-editing)) textarea.ds-cell-input { position: absolute; inset: 0; width: 100%; height: 100% !important; opacity: 0; }
 .ds-table td.ds-rot:not(.ds-rich-editing):not(:has(textarea.ds-cell-editing)) .ds-cell-rich { display: flex; align-items: center; overflow: hidden; }
@@ -7218,6 +7218,11 @@ body.block-pointer-dragging {
 .ds-char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(32px, 1fr)); gap: 3px; }
 .ds-char-grid button { height: 32px; border: 1px solid #e5e5e5; border-radius: 4px; background: #fff; font-size: 16px; cursor: pointer; }
 .ds-char-grid button:hover { background: #111; color: #fff; }
+/* 확대·축소·격자선(#409): 격자선은 굵기를 0 으로(칸에 직접 준 테두리가 이긴다) */
+.ds-statusbar-zoom { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; color: #444; font: inherit; font-size: 12px; padding: 1px 4px; cursor: pointer; }
+.ds-table.ds-nogrid tbody td:not(.ds-row-num) { border-width: 0; }
+.ds-table.ds-nogrid td.ds-frozen-col:not(.ds-frozen-col-last):not(.ds-frozen-row-last), .ds-table.ds-nogrid td.ds-frozen-row:not(.ds-frozen-row-last):not(.ds-frozen-col-last) { box-shadow: none; }
+#ds-grid-btn.active { background: #e0e0e0; color: #000; }
 .ds-statusbar-stat { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; color: #444; font: inherit; font-size: 12px; font-weight: 700; padding: 1px 8px; cursor: pointer; }
 .ds-statusbar-stat:hover { background: #f3f4f6; border-color: #bbb; }
 .ds-statusbar-selection { color: #a0a0a0; font-weight: 600; }
@@ -41616,6 +41621,8 @@ function normalizeDataSheetSheet(sheet) {
     color: typeof sheet.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(sheet.color) ? sheet.color.toLowerCase() : '', // 탭 색(#405)
     hidden: !!sheet.hidden,
     locked: !!sheet.locked,
+    zoom: ds_normZoom(sheet.zoom), // 확대·축소(#409)
+    hideGrid: !!sheet.hideGrid,
     headerEditMode: sheet.headerEditMode === 'rows' ? 'rows' : 'columns',
     rowHeaderWidth: ds_normalizeRowHeaderWidth(sheet.rowHeaderWidth),
     columns: columns,
@@ -42713,6 +42720,7 @@ function renderDataSheetEditor() {
   ds_updateDataSheetStatusbar(ds);
   ds_renderSheetTabs(ds);
   body.innerHTML = _dsRenderFlatTable(ds);
+  ds_viewPaint(); // 확대·축소·격자선(#409): 다른 칠하기보다 먼저
   ds_hoverHide();
   ds_insertPaint(); // 셀 메모·이미지(#407)
   ds_groupPaint(); // 행·열 그룹(#404)
@@ -42943,6 +42951,7 @@ function ds_updateDataSheetStatusbar(ds) {
   tabsBar.innerHTML = '<div class="ds-statusbar">'
     + (function() { var vals = ds_selectionValues(ds); if (!vals) return ''; var st = ds_statsOf(vals); if (!st.count) return ''; var kind = ds_statKind(); var label = DS_STAT_KINDS.filter(function(k) { return k[0] === kind; })[0][1]; return '<button type="button" class="ds-statusbar-stat" onmousedown="event.preventDefault()" onclick="ds_openStatMenu(event)" title="통계 종류 선택">' + label + ': ' + esc(ds_statText(st, kind) || '-') + '</button>'; })()
     + '<span class="ds-statusbar-selection">' + esc(selectionText) + '</span>'
+    + (function() { var sh = _dsActiveSheet(ds), z = ds_normZoom(sh && sh.zoom), list = DS_ZOOMS.indexOf(z) >= 0 ? DS_ZOOMS : DS_ZOOMS.concat(z).sort(function(a, b) { return a - b; }); return '<select class="ds-statusbar-zoom" aria-label="확대·축소" title="확대·축소" onchange="ds_setView(\'zoom\', this.value)">' + list.map(function(v) { return '<option value="' + v + '"' + (v === z ? ' selected' : '') + '>' + v + '%</option>'; }).join('') + '</select>'; })()
     + '<span class="ds-statusbar-info">' + colCount + '열 · ' + (ds_activeFilter(ds) && Object.keys(ds_activeFilter(ds).cols).length ? ds_visibleRows(ds).filter(function(v, i) { return v && ds_isDataRow(ds.rows[i]); }).length + '/' + dataCount + '행 표시' : dataCount + '행') + ' · 카테고리 ' + catCount + '개</span>'
     + '</div>';
 }
@@ -42979,6 +42988,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + btn('ds-redo-btn', 'tbRedo()', '다시 실행 (Ctrl+Shift+Z)', 'fa-rotate-right')
     + btn('ds-find-btn', 'ds_findOpen(true)', '찾기·바꾸기 (Ctrl+F / Ctrl+H)', 'fa-magnifying-glass')
     + btn('ds-paint-btn', 'ds_paintClick(event)', '서식 복사 (두 번 누르면 계속, Esc 종료)', 'fa-paintbrush')
+    + btn('ds-grid-btn', 'ds_toggleGrid()', '격자선 숨기기', 'fa-border-none')
     + SEP
     + '<div class="tb-font-wrap">'
     + '<button type="button" id="ds-font-trigger" class="tb-select tb-select-font tb-font-trigger" title="글꼴" aria-label="셀 글꼴" aria-haspopup="listbox" aria-controls="ds-font-menu" aria-expanded="false"' + NOFOCUS + ' onclick="ds_toggleFontMenu(event)"><span class="tb-font-trigger-label" id="ds-font-trigger-label">글꼴</span><i class="fa-solid fa-chevron-down tb-control-chevron" aria-hidden="true"></i></button>'
@@ -45292,7 +45302,7 @@ function ds_openSizeDialog(kind, ids) {
   var vals = ids.map(function(id) {
     if (kind === 'col') { var c = ds.columns.find(function(x) { return x.id === id; }); return c ? ds_getDataColumnWidth(c) : null; }
     var tr = document.querySelector('#ds-editor-body tr[data-row-idx="' + id + '"]'), r = ds.rows[id];
-    return r ? Math.round(r.height || (tr ? tr.getBoundingClientRect().height : 32)) : null;
+    return r ? Math.round(r.height || (tr ? tr.getBoundingClientRect().height / ds_zoomFactor() : 32)) : null;
   });
   var same = vals.every(function(v) { return v === vals[0]; });
   document.getElementById('ds-size-title').textContent = kind === 'col' ? (ids.length > 1 ? '열 ' + ids.length + '개 크기 조절' : '열 크기 조절') : (ids.length > 1 ? '행 ' + ids.length + '개 크기 조절' : '행 크기 조절');
@@ -45372,7 +45382,7 @@ function _dsColResizeMove(e) {
   if (!ctx) return;
   var ds = findDataSheet(_dsEditId);
   if (!ds) return;
-  var w = ds_clampSize('col', e.clientX - ctx.left);
+  var w = ds_clampSize('col', (e.clientX - ctx.left) / ds_zoomFactor());
   ds_setColWidths(ds, ctx.targets, w);
   ds_scheduleAutosizeVisibleCells();
 }
@@ -45401,7 +45411,7 @@ function _dsRowHeaderResizeMove(e) {
   var ds = findDataSheet(_dsEditId);
   var sheet = _dsActiveSheet(ds);
   if (!sheet) return;
-  var w = ds_normalizeRowHeaderWidth(e.clientX - ctx.left);
+  var w = ds_normalizeRowHeaderWidth((e.clientX - ctx.left) / ds_zoomFactor());
   sheet.rowHeaderWidth = w;
   var table = document.querySelector('#ds-editor-body table.ds-table');
   if (table) {
@@ -45425,7 +45435,7 @@ function ds_startRowResize(e, rowIdx) {
   var ds = findDataSheet(_dsEditId);
   if (!ds || isNaN(rowIdx) || !ds.rows[rowIdx]) return;
   var tr = document.querySelector('#ds-editor-body tr[data-row-idx="' + rowIdx + '"]');
-  var startH = tr ? tr.getBoundingClientRect().height : (ds.rows[rowIdx].height || 32);
+  var startH = tr ? tr.getBoundingClientRect().height : (ds.rows[rowIdx].height || 32) * ds_zoomFactor();
   _dsRowResizeCtx = { rowIdx: rowIdx, targets: ds_fitTargetCols(rowIdx, _dsSelectedRowIdxs), startY: e.clientY, startH: startH }; // 선택된 행의 경계면 선택된 행 모두(#388)
   document.body.classList.add('ds-row-resizing');
   document.addEventListener('mousemove', _dsRowResizeMove);
@@ -45436,7 +45446,7 @@ function _dsRowResizeMove(e) {
   if (!ctx) return;
   var ds = findDataSheet(_dsEditId);
   if (!ds || !ds.rows[ctx.rowIdx]) return;
-  ds_setRowHeights(ds, ctx.targets, ds_clampSize('row', ctx.startH + (e.clientY - ctx.startY)));
+  ds_setRowHeights(ds, ctx.targets, ds_clampSize('row', (ctx.startH + (e.clientY - ctx.startY)) / ds_zoomFactor())); // startH 는 화면 px
 }
 function _dsRowResizeEnd() {
   document.removeEventListener('mousemove', _dsRowResizeMove);
@@ -47270,6 +47280,28 @@ function ds_applyCsvImport() {
   }
   if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind(); }
 })();
+// ── 확대·축소·격자선(#409): 시트별 sheet.zoom(50~200) · sheet.hideGrid. 표에 CSS zoom 을 걸고, 화면 px 로 잰 값은 ds_zoomFactor 로 나눠 표 px 로 쓴다 ──
+var DS_ZOOMS = [50, 75, 90, 100, 125, 150, 175, 200];
+function ds_normZoom(v) { var n = Math.round(Number(v)); return isNaN(n) || !n ? 100 : Math.max(50, Math.min(200, n)); }
+function ds_zoomFactor() { var ds = typeof _dsEditId !== 'undefined' && _dsEditId ? findDataSheet(_dsEditId) : null, sh = ds && _dsActiveSheet(ds); return ds_normZoom(sh && sh.zoom) / 100; }
+function ds_viewPaint() {
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds), wrap = document.querySelector('#ds-editor-body .ds-table-wrap');
+  if (!sheet || !wrap) return;
+  var z = ds_zoomFactor();
+  wrap.style.zoom = z === 1 ? '' : String(z);
+  var table = wrap.querySelector('table.ds-table');
+  if (table) table.classList.toggle('ds-nogrid', !!sheet.hideGrid);
+  var btn = document.getElementById('ds-grid-btn');
+  if (btn) { btn.classList.toggle('active', !!sheet.hideGrid); btn.setAttribute('aria-pressed', String(!!sheet.hideGrid)); }
+}
+function ds_setView(key, value) { // 'zoom' | 'hideGrid'
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds);
+  if (!sheet) return;
+  sheet[key] = key === 'zoom' ? ds_normZoom(value) : !!value;
+  var viewport = ds_captureEditorViewport();
+  _dsForceNextHistoryCommit = true; persist(); renderDataSheetEditor(); ds_restoreEditorViewport(viewport);
+}
+function ds_toggleGrid() { var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds); if (sheet) ds_setView('hideGrid', !sheet.hideGrid); }
 // ── 시트 안 찾기·바꾸기(#400) ──
 // o = { matchCase, whole(셀 전체 일치), regex, formulas(수식 글자까지 검색) }. 빈 검색어·잘못된 정규식·빈 글자와 맞는 정규식은 null
 function ds_findRegex(q, o) {
@@ -48085,7 +48117,8 @@ function ds_applyFreeze() {
     });
     if (!c.hidden) left += (cg && cg.children[i + 1] ? parseFloat(cg.children[i + 1].style.width) : 0) || ds_getDataColumnWidth(c);
   });
-  var top = head ? head.getBoundingClientRect().height : 0; // 소수 높이 그대로(배율에서 offsetHeight 반올림 오차 방지)
+  var z = typeof ds_zoomFactor === 'function' ? ds_zoomFactor() : 1;
+  var top = head ? head.getBoundingClientRect().height / z : 0; // 소수 높이 그대로(배율에서 offsetHeight 반올림 오차 방지)
   Array.prototype.forEach.call(table.tBodies[0] ? table.tBodies[0].rows : [], function(tr) {
     var idx = parseInt(tr.dataset.rowIdx, 10), on = !isNaN(idx) && idx < fr;
     Array.prototype.forEach.call(tr.cells, function(td) {
@@ -48093,7 +48126,7 @@ function ds_applyFreeze() {
       td.classList.toggle('ds-frozen-row-last', on && idx === fr - 1);
       td.style.top = on ? (top - 1) + 'px' : ''; // 위 칸과 1px 겹침
     });
-    if (on) top += tr.getBoundingClientRect().height;
+    if (on) top += tr.getBoundingClientRect().height / z - 1; // 고정 행끼리도 1px 겹쳐 틈으로 아래 내용이 비치지 않게
   });
 }
 document.addEventListener('input', function(e) { // 고정 행 높이가 글자 입력으로 바뀌면 다음 고정 행 위치를 다시 계산

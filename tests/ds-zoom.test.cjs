@@ -1,0 +1,13 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const ctx = {}; vm.createContext(ctx);
+vm.runInContext(html.slice(html.indexOf('var DS_ZOOMS'), html.indexOf('function ds_viewPaint')), ctx);
+const N = ctx.ds_normZoom;
+ok(N(undefined) === 100 && N('') === 100 && N('abc') === 100 && N(0) === 100, '옛 데이터·잘못된 값은 100%');
+ok(N(10) === 50 && N(999) === 200 && N('125') === 125 && N(87.6) === 88, '50~200% 로 제한');
+ok(ctx.ds_zoomFactor() === 1, '편집기가 없으면 1배');
+ok(/zoom: ds_normZoom\(sheet\.zoom\)/.test(html) && /hideGrid: !!sheet\.hideGrid/.test(html) && /ds_viewPaint\(\); \/\/ 확대·축소/.test(html) && /class="ds-statusbar-zoom"/.test(html), '시트별 저장·상태 표시줄 선택·렌더 연결');
+ok(/getBoundingClientRect\(\)\.height \/ z/.test(html) && /\(e\.clientX - ctx\.left\) \/ ds_zoomFactor\(\)/.test(html) && /\(ctx\.startH \+ \(e\.clientY - ctx\.startY\)\) \/ ds_zoomFactor\(\)/.test(html), '고정 위치·열/행 크기 조절은 배율로 나눔');
+ok(/\.ds-table\.ds-nogrid tbody td:not\(\.ds-row-num\) \{ border-width: 0; \}/.test(html), '격자선만 숨김(칸 테두리 서식 유지)');
+process.exit(f ? 1 : 0);
