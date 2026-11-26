@@ -7201,6 +7201,7 @@ body.block-pointer-dragging {
 .ds-sheet-color { position: absolute; left: 4px; right: 4px; bottom: 1px; height: 3px; border-radius: 2px; pointer-events: none; }
 .ds-sheet-lock { font-size: 10px; margin-right: 5px; color: #888; }
 #ds-editor-body.ds-locked #ds-fill-handle, #ds-editor-body.ds-locked .ds-row-add-row { display: none; }
+.ds-clean-option, .ds-rot-option { white-space: nowrap; }
 .ds-statusbar-stat { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; color: #444; font: inherit; font-size: 12px; font-weight: 700; padding: 1px 8px; cursor: pointer; }
 .ds-statusbar-stat:hover { background: #f3f4f6; border-color: #bbb; }
 .ds-statusbar-selection { color: #a0a0a0; font-weight: 600; }
@@ -8900,6 +8901,33 @@ select.sh-field-input,
       <button type="button" class="link-insert-btn cancel" id="ds-band-delete" style="margin-right:auto;">삭제</button>
       <button type="button" class="link-insert-btn primary" id="ds-band-submit">실행</button>
       <button type="button" class="link-insert-btn cancel" id="ds-band-cancel">취소</button>
+    </div>
+  </div>
+
+  <!-- 데이터 시트 데이터 정리 팝업(#406): [실행] [취소] -->
+  <div id="ds-clean-backdrop" class="link-insert-backdrop"></div>
+  <div id="ds-clean-dialog" class="link-insert-dialog" role="dialog" aria-modal="true" aria-labelledby="ds-clean-title">
+    <div class="link-insert-head">
+      <h2 id="ds-clean-title" class="link-insert-title">데이터 정리</h2>
+      <div class="link-insert-head-actions"><button type="button" class="link-insert-close" id="ds-clean-close" aria-label="닫기">×</button></div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-body ds-style-body">
+      <div id="ds-clean-range"></div>
+      <div id="ds-clean-dedup">
+        <div class="ds-style-row"><label><input type="checkbox" id="ds-clean-header"> 첫 행은 머리글</label></div>
+        <div>기준 열</div>
+        <div id="ds-clean-cols" class="ds-style-row"></div>
+        <div style="color:#b91c1c;font-size:12px;">중복인 행은 행 전체가 삭제됩니다. (Ctrl+Z 로 복원)</div>
+      </div>
+      <div id="ds-clean-split">
+        <div class="ds-style-row"><label for="ds-clean-sep">구분자</label><select id="ds-clean-sep"><option value="auto">자동</option><option value="comma">쉼표 ,</option><option value="semicolon">세미콜론 ;</option><option value="period">마침표 .</option><option value="space">공백</option><option value="custom">사용자 지정</option></select><input type="text" id="ds-clean-custom" class="link-insert-input" aria-label="사용자 지정 구분자" style="display:none;"></div>
+      </div>
+    </div>
+    <hr class="link-insert-divider">
+    <div class="link-insert-actions">
+      <button type="button" class="link-insert-btn primary" id="ds-clean-submit">실행</button>
+      <button type="button" class="link-insert-btn cancel" id="ds-clean-cancel">취소</button>
     </div>
   </div>
 
@@ -42853,6 +42881,9 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
   var SEP = '<div class="tb-sep"></div>';
   var numFmtMenu = [['auto', '자동(서식 없음)', 'fa-ban'], ['num', '일반 숫자 1,000.12', 'fa-hashtag'], ['pct', '백분율 %', 'fa-percent'], ['cur-w', '통화 ₩', 'fa-won-sign'], ['cur-d', '통화 $', 'fa-dollar-sign'], ['date', '날짜 YYYY-MM-DD', 'fa-calendar-days'], ['dec+', '소수 자리 늘리기 .00', 'fa-arrow-right'], ['dec-', '소수 자리 줄이기 .0', 'fa-arrow-left'], ['th', '천 단위 구분 켜기/끄기', 'fa-ellipsis']].map(function(a) { return opt('ds-numfmt-option', '', 'ds_applyNumFmt(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('');
   var rotMenu = [['0', '없음', 'fa-ban'], ['45', '위로 기울이기', 'fa-arrow-up-right-dots'], ['-45', '아래로 기울이기', 'fa-arrow-down-wide-short'], ['stack', '세로 쌓기', 'fa-grip-lines-vertical'], ['90', '위로 회전', 'fa-rotate-left'], ['-90', '아래로 회전', 'fa-rotate-right'], ['custom', '사용자 지정 각도', 'fa-pen']].map(function(a) { return opt('ds-rot-option', '', 'ds_applyCellRot(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('');
+  var cleanMenu = opt('ds-clean-option', '', 'ds_openCleanDialog(' + String.fromCharCode(39) + 'dedup' + String.fromCharCode(39) + ')', 'fa-clone', '중복 항목 삭제…')
+    + opt('ds-clean-option', '', 'ds_trimWhitespace()', 'fa-eraser', '공백 제거')
+    + opt('ds-clean-option', '', 'ds_openCleanDialog(' + String.fromCharCode(39) + 'split' + String.fromCharCode(39) + ')', 'fa-table-columns', '텍스트를 열로 분할…');
   var mergeMenu = [['all', '모두 병합', 'fa-object-group'], ['horiz', '가로로 병합', 'fa-arrows-left-right'], ['vert', '세로로 병합', 'fa-arrows-up-down'], ['none', '병합 해제', 'fa-object-ungroup']].map(function(a) { return opt('ds-merge-option', '', 'ds_mergeCells(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('');
   var borderMenu = [['all', '모두', 'fa-border-all'], ['inner', '안쪽', 'fa-border-none'], ['hinner', '가로 안쪽', 'fa-grip-lines'], ['vinner', '세로 안쪽', 'fa-grip-lines-vertical'], ['outer', '바깥쪽', 'fa-square'], ['left', '왼쪽', 'fa-arrow-left'], ['top', '위쪽', 'fa-arrow-up'], ['right', '오른쪽', 'fa-arrow-right'], ['bottom', '아래쪽', 'fa-arrow-down'], ['clear', '테두리 지우기', 'fa-ban']].map(function(a) { return opt('ds-border-option', '', 'ds_applyBorder(' + String.fromCharCode(39) + a[0] + String.fromCharCode(39) + ')', a[2], a[1]); }).join('')
     + '<div class="ds-border-ctl" onmousedown="event.stopPropagation()"><select id="ds-border-style" onchange="_dsBorderStyle=this.value" title="선 종류" aria-label="선 종류">' + [['thin', '얇게'], ['med', '보통'], ['thick', '굵게'], ['dot', '점선'], ['dash', '파선'], ['double', '이중선']].map(function(a) { return '<option value="' + a[0] + '"' + (a[0] === _dsBorderStyle ? ' selected' : '') + '>' + a[1] + '</option>'; }).join('') + '</select><input type="color" id="ds-border-color" value="' + _dsBorderColor + '" oninput="_dsBorderColor=this.value" title="선 색" aria-label="선 색"></div>';
@@ -42892,6 +42923,7 @@ function ds_renderFormatToolbar(toolbarEl, ds) { // 모양은 본문 서식 도�
     + picker('merge', '셀 병합', 'fa-object-group', mergeMenu)
     + picker('numfmt', '숫자 형식', 'fa-hashtag', numFmtMenu)
     + picker('rot', '텍스트 회전', 'fa-text-slash', rotMenu)
+    + picker('clean', '데이터 정리', 'fa-broom', cleanMenu)
     + btn('ds-cf-btn', 'ds_openCfDialog()', '조건부 서식', 'fa-wand-magic-sparkles')
     + btn('ds-band-btn', 'ds_openBandDialog()', '교차 색상', 'fa-bars-staggered')
     + SEP
@@ -46227,6 +46259,9 @@ function ds_dialogShow(id) {
   var base = getEditorCenterRect(), r = dlg.getBoundingClientRect();
   dlg.style.left = Math.max(16, base.left + (base.width - r.width) / 2) + 'px';
   dlg.style.top = Math.max(16, Math.min(base.top + (base.height - r.height) / 2, window.innerHeight - r.height - 16)) + 'px';
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); // 칸에 남은 포커스를 대화상자로(Enter·Esc 가 대화상자에 가도록)
+  var first = Array.from(dlg.querySelectorAll('.link-insert-body select, .link-insert-body input, .link-insert-actions .primary')).find(function(el) { return el.offsetParent !== null; });
+  if (first) { first.focus(); setTimeout(function() { if (dlg.classList.contains('open') && !dlg.contains(document.activeElement)) first.focus(); }, 0); }
 }
 function ds_dialogHide(id) { document.getElementById(id)?.classList.remove('open'); document.getElementById(id.replace('-dialog', '-backdrop'))?.classList.remove('open'); }
 function ds_saveStyleRules() { // 저장 → Ctrl+Z 한 번, 화면 다시 그리기
@@ -46688,6 +46723,143 @@ function ds_openHiddenSheets(e) {
   e.stopPropagation();
   _dsShowContextMenu(r.left, Math.max(8, r.top - list.length * 30 - 14), list.map(function(s) { return { label: s.name + ' 다시 보이기', action: function() { ds_setSheetHidden(s.id, false); } }; }));
 }
+// ── 데이터 정리(#406): 중복 항목 삭제·공백 제거·텍스트를 열로 분할. 선택 범위(한 칸이면 시트 전체) ──
+// 순수 함수: 기준 값 목록(행마다 배열) → 지울 위치. 앞뒤 공백·대소문자는 무시하고 먼저 나온 행을 남긴다
+function ds_dedupPlan(keys, hasHeader) {
+  var seen = new Set(), out = [];
+  keys.forEach(function(k, i) {
+    if (hasHeader && i === 0) return;
+    var s = JSON.stringify(k.map(function(v) { return String(v == null ? '' : v).trim().toLowerCase(); }));
+    if (seen.has(s)) out.push(i); else seen.add(s);
+  });
+  return out;
+}
+// 순수 함수: 줄마다 앞뒤 공백 제거, 연속 공백·탭은 한 칸 → 바꿀 구간 [{s,e,t}] (글자 서식 유지용)
+function ds_trimRanges(text) {
+  var out = [], re = /[ \t 　]+/g, m;
+  text = String(text);
+  while ((m = re.exec(text))) {
+    var s = m.index, e = s + m[0].length, edge = s === 0 || text[s - 1] === '\n' || e === text.length || text[e] === '\n';
+    var t = edge ? '' : ' ';
+    if (m[0] !== t) out.push({ s: s, e: e, t: t });
+  }
+  return out;
+}
+var DS_SPLIT_SEPS = { comma: ',', semicolon: ';', period: '.', space: ' ' };
+function ds_detectSep(values) { // 자동: 쉼표·세미콜론·탭·공백 중 가장 많은 칸에 있는 것(같으면 앞의 것). 마침표는 소수 때문에 자동에서 제외
+  var best = null, bestN = 0;
+  [',', ';', '\t', ' '].forEach(function(sep) {
+    var n = values.filter(function(v) { return String(v).trim().indexOf(sep) >= 0; }).length;
+    if (n > bestN) { best = sep; bestN = n; }
+  });
+  return best;
+}
+function ds_splitText(v, sep) { v = String(v).trim(); return !sep || !v ? [v] : (sep === ' ' ? v.split(/ +/) : v.split(sep)).map(function(x) { return x.trim(); }); }
+function ds_cleanScope(ds) { // → { rows: 데이터 행 번호, cols: 열 번호 }
+  var sel = ds_paintSelection(ds);
+  if (sel && (sel.rows.length > 1 || sel.cols.length > 1)) return sel;
+  var rows = [], cols = [];
+  ds.rows.forEach(function(r, i) { if (ds_isDataRow(r)) rows.push(i); });
+  ds.columns.forEach(function(c, j) { if (!c.hidden) cols.push(j); });
+  return { rows: rows, cols: cols, current: sel ? sel.cols[0] : null };
+}
+function ds_cellText(ds, i, j) { var r = ds.rows[i], c = ds.columns[j]; return r && r.cells && r.cells[c.id] != null ? String(r.cells[c.id]) : ''; }
+function ds_trimWhitespace() {
+  var ds = findDataSheet(_dsEditId);
+  if (!ds) return;
+  var sc = ds_cleanScope(ds), n = 0;
+  sc.rows.forEach(function(i) {
+    sc.cols.forEach(function(j) {
+      var text = ds_cellText(ds, i, j), row = ds.rows[i], id = ds.columns[j].id;
+      if (!text || /^\s*=/.test(text)) return;
+      var ranges = ds_trimRanges(text);
+      if (!ranges.length) return;
+      var rich = ds_getCellRich(row, id, text);
+      row.cells[id] = ds_findApply(text, ranges);
+      if (rich) { var nr = ds_findApplyRich(rich, ranges); if (nr) row.cellRich[id] = nr; else delete row.cellRich[id]; }
+      n++;
+    });
+  });
+  _dsHideFormatMenus();
+  if (n) ds_saveStyleRules();
+  if (typeof rubyToast === 'function') rubyToast(n ? n + '개 칸의 공백을 정리했습니다.' : '정리할 공백이 없습니다.');
+}
+var _dsCleanState = null;
+function ds_openCleanDialog(mode) {
+  var ds = findDataSheet(_dsEditId), $ = function(id) { return document.getElementById(id); };
+  if (!ds) return;
+  _dsHideFormatMenus();
+  var sc = ds_cleanScope(ds);
+  if (mode === 'split') { // 분할은 한 열만: 선택의 첫 열(전체 범위면 활성 칸의 열)
+    var col = sc.current !== undefined && sc.current !== null ? sc.current : (ds_paintSelection(ds) ? sc.cols[0] : null);
+    if (col === null) { if (typeof rubyToast === 'function') rubyToast('분할할 열의 칸을 먼저 선택하세요.'); return; }
+    sc = { rows: sc.rows, cols: [col] };
+  }
+  if (!sc.rows.length) return;
+  _dsCleanState = { mode: mode, scope: sc };
+  $('ds-clean-title').textContent = mode === 'dedup' ? '중복 항목 삭제' : '텍스트를 열로 분할';
+  $('ds-clean-range').textContent = '대상: ' + ds_colLetters(sc.cols[0]) + (sc.rows[0] + 1) + ':' + ds_colLetters(sc.cols[sc.cols.length - 1]) + (sc.rows[sc.rows.length - 1] + 1);
+  $('ds-clean-dedup').style.display = mode === 'dedup' ? '' : 'none';
+  $('ds-clean-split').style.display = mode === 'split' ? '' : 'none';
+  if (mode === 'dedup') {
+    $('ds-clean-header').checked = false;
+    var box = $('ds-clean-cols'); box.textContent = '';
+    sc.cols.forEach(function(j) {
+      var label = document.createElement('label'), cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = true; cb.value = String(j);
+      label.appendChild(cb);
+      label.appendChild(document.createTextNode(' ' + ds_colLetters(j) + (ds.columns[j].name ? ' · ' + ds.columns[j].name : '')));
+      box.appendChild(label);
+    });
+  } else { $('ds-clean-sep').value = 'auto'; $('ds-clean-custom').value = ''; $('ds-clean-custom').style.display = 'none'; }
+  ds_dialogShow('ds-clean-dialog');
+}
+function ds_applyCleanDialog() {
+  var st = _dsCleanState, ds = findDataSheet(_dsEditId), $ = function(id) { return document.getElementById(id); };
+  var toast = function(m) { if (typeof rubyToast === 'function') rubyToast(m); };
+  if (!st || !ds) return;
+  var sc = st.scope;
+  if (st.mode === 'dedup') {
+    var cols = Array.from(document.querySelectorAll('#ds-clean-cols input:checked')).map(function(x) { return +x.value; });
+    if (!cols.length) { toast('기준 열을 하나 이상 고르세요.'); return; }
+    var del = ds_dedupPlan(sc.rows.map(function(i) { return cols.map(function(j) { return ds_cellText(ds, i, j); }); }), $('ds-clean-header').checked).map(function(k) { return sc.rows[k]; });
+    ds_dialogHide('ds-clean-dialog');
+    if (del.length) { _dsForceNextHistoryCommit = true; ds_removeRows(del); }
+    toast(del.length ? del.length + '개 행을 삭제했습니다.' : '중복 항목이 없습니다.');
+    return;
+  }
+  var j = sc.cols[0], pick = $('ds-clean-sep').value, values = sc.rows.map(function(i) { return ds_cellText(ds, i, j); });
+  var plain = values.filter(function(v) { return !/^\s*=/.test(v); });
+  var sep = pick === 'auto' ? ds_detectSep(plain) : pick === 'custom' ? $('ds-clean-custom').value : DS_SPLIT_SEPS[pick];
+  if (!sep) { toast(pick === 'custom' ? '구분자를 입력하세요.' : '구분자를 찾지 못했습니다.'); return; }
+  var parts = values.map(function(v) { return /^\s*=/.test(v) ? null : ds_splitText(v, sep); });
+  var width = parts.reduce(function(m, x) { return Math.max(m, x ? x.length : 1); }, 1);
+  if (width < 2) { toast('나눌 내용이 없습니다.'); return; }
+  var overwrite = sc.rows.some(function(i, k) { return parts[k] && parts[k].some(function(_, d) { return d > 0 && j + d < ds.columns.length && ds_cellText(ds, i, j + d); }); });
+  if (overwrite && !confirm('오른쪽 열의 내용을 덮어씁니다. 계속할까요?')) return;
+  while (ds.columns.length < j + width) ds.columns.push({ id: mkId(), name: '', width: 160, hidden: false });
+  sc.rows.forEach(function(i, k) {
+    if (!parts[k] || parts[k].length < 2) return;
+    var row = ds.rows[i];
+    if (!row.cells) row.cells = {};
+    parts[k].forEach(function(v, d) { var id = ds.columns[j + d].id; row.cells[id] = v; if (row.cellRich) delete row.cellRich[id]; });
+  });
+  ds_dialogHide('ds-clean-dialog');
+  ds_saveStyleRules();
+}
+(function() {
+  function bind() {
+    if (window.__dsCleanBound) return;
+    window.__dsCleanBound = true;
+    var on = function(id, ev, fn) { var el = document.getElementById(id); if (el) el.addEventListener(ev, fn); };
+    var hide = function() { ds_dialogHide('ds-clean-dialog'); };
+    on('ds-clean-submit', 'click', ds_applyCleanDialog);
+    ['ds-clean-cancel', 'ds-clean-close', 'ds-clean-backdrop'].forEach(function(id) { on(id, 'click', hide); });
+    on('ds-clean-sep', 'change', function() { var c = document.getElementById('ds-clean-custom'); c.style.display = this.value === 'custom' ? '' : 'none'; if (this.value === 'custom') c.focus(); });
+    on('ds-clean-dialog', 'keydown', function(e) { if (e.isComposing) return; if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); ds_applyCleanDialog(); } else if (e.key === 'Escape') { e.preventDefault(); hide(); } });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind); else bind();
+})();
 // ── 시트 안 찾기·바꾸기(#400) ──
 // o = { matchCase, whole(셀 전체 일치), regex, formulas(수식 글자까지 검색) }. 빈 검색어·잘못된 정규식·빈 글자와 맞는 정규식은 null
 function ds_findRegex(q, o) {

@@ -8,7 +8,7 @@ ok(P(1, 1, [1, 2], [0, 1], [0, 1, 2, 3], [0, 1, 2]) === '10<00 11<00 20<00 21<00
 ok(P(1, 2, [0], [0, 1, 2, 3], [0], [0, 1, 2, 3]) === '00<00 01<01 02<00 03<01', '원본을 바둑판처럼 반복');
 ok(P(2, 2, [2], [1], [0, 2, 3, 5], [0, 1, 3]) === '21<00 23<01 31<10 33<11', '대상이 한 칸이면 원본 크기만큼(숨긴 행·열 건너뜀)');
 ok(P(3, 3, [3], [2], [0, 1, 2, 3], [0, 1, 2]) === '32<00', '표 끝에서는 있는 만큼만(행·열 추가 안 함)');
-const apply = html.slice(html.indexOf('function ds_paintApply'), html.indexOf('// ── 시트 안 찾기·바꾸기(#400)'));
+const apply = html.slice(html.indexOf('function ds_paintApply'), html.indexOf('(function() {', html.indexOf('function ds_paintApply')));
 ok(/cellStyles/.test(apply) && /cellAligns/.test(apply) && !/\.cells\b|cellRich|cellRules/.test(apply), '서식·가로 맞춤만 바꿈(값·글자 서식·데이터 확인 그대로)');
 ok(/_dsForceNextHistoryCommit = true; persist\(\)/.test(apply) && /if \(!_dsPaint\.keep\) _dsPaint = null/.test(apply), '한 번에 저장·한 번 적용 후 해제(계속 모드 제외)');
 ok(/'ds-paint-btn', 'ds_paintClick\(event\)'/.test(html) && /e\.key === 'Escape' && !e\.isComposing/.test(html) && /ds_paintUi\(\); \/\/ 서식 복사/.test(html), '버튼·Esc 종료·렌더 뒤 상태 유지');

@@ -1,0 +1,17 @@
+const fs = require('fs'), path = require('path'), vm = require('vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8').split(String.fromCharCode(13, 10)).join(String.fromCharCode(10));
+let f = 0; const ok = (c, m) => { if (!c) { f++; console.log('FAIL', m); } else console.log('ok', m); };
+const ctx = {}; vm.createContext(ctx);
+const cut = (a, b) => html.slice(html.indexOf(a), html.indexOf(b));
+vm.runInContext(cut('function ds_findApply(text', '// 서식 HTML 의 글자 범위') + cut('function ds_dedupPlan', 'function ds_cleanScope'), ctx);
+const J = JSON.stringify;
+ok(J(ctx.ds_dedupPlan([['a', '1'], ['A ', '1'], ['a', '2'], ['a', '1']], false)) === '[1,3]', '중복: 앞뒤 공백·대소문자 무시, 첫 행 유지');
+ok(J(ctx.ds_dedupPlan([['x'], ['x'], ['x']], true)) === '[2]' && J(ctx.ds_dedupPlan([], false)) === '[]', '머리글 행은 비교·삭제에서 제외');
+ok(J(ctx.ds_dedupPlan([['a', 'b'], ['a b', '']], false)) === '[]', '열 경계가 다르면 중복 아님');
+const trim = s => ctx.ds_findApply(s, ctx.ds_trimRanges(s));
+ok(trim('  가   나\t다  ') === '가 나 다' && trim(' 첫 줄 \n  둘째   줄  ') === '첫 줄\n둘째 줄' && trim('그대로 두기') === '그대로 두기' && trim('　전각  ') === '전각', '앞뒤·연속 공백 정리, 줄바꿈 유지');
+ok(ctx.ds_trimRanges('a b').length === 0, '바꿀 것이 없으면 구간 없음');
+ok(ctx.ds_detectSep(['a,b', 'c,d e']) === ',' && ctx.ds_detectSep(['a b', 'c d', 'e;f']) === ' ' && ctx.ds_detectSep(['1.5', '2.5']) === null, '구분자 자동(마침표 제외)');
+ok(J(ctx.ds_splitText(' a, b ,c ', ',')) === '["a","b","c"]' && J(ctx.ds_splitText('a   b', ' ')) === '["a","b"]' && J(ctx.ds_splitText('a--b', '--')) === '["a","b"]' && J(ctx.ds_splitText('', ',')) === '[""]', '분할');
+ok(/picker\('clean', '데이터 정리'/.test(html) && /id="ds-clean-dialog"/.test(html) && /confirm\('오른쪽 열의 내용을 덮어씁니다/.test(html) && /ds_removeRows\(del\)/.test(html), '메뉴·팝업·덮어쓰기 확인·삭제 연결');
+process.exit(f ? 1 : 0);
