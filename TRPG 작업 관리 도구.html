@@ -4227,9 +4227,32 @@ ul[data-tb-bullet="custom"] > li::marker { letter-spacing: 0.054em; }
 [contenteditable] ol { list-style-type: decimal; }
 [contenteditable] ol ol { list-style-type: lower-alpha; }
 [contenteditable] ol ol ol { list-style-type: lower-roman; }
-[contenteditable] ol { list-style-type: decimal; }
-[contenteditable] ol ol { list-style-type: lower-alpha; }
-[contenteditable] ol ol ol { list-style-type: lower-roman; }
+/* 번호 목록 스타일(#424): 가장 바깥 ol 의 data-tb-num. 편집기 밖(보기·내보내기)에서도 같은 모양이 되도록 [contenteditable] 로 한정하지 않는다.
+   단계는 앱의 들여쓰기(li[data-list-indent]) 와 중첩 ol 둘 다 같은 규칙으로 센다 */
+ol[data-tb-num] { counter-reset: tbl0 tbl1 tbl2; }
+ol[data-tb-num] > li:not([data-list-indent]) { counter-increment: tbl0; counter-set: tbl1 0 tbl2 0; }
+ol[data-tb-num] > li[data-list-indent="1"], ol[data-tb-num] > li > ol > li:not([data-list-indent]) { counter-increment: tbl1; counter-set: tbl2 0; }
+ol[data-tb-num] > li[data-list-indent]:not([data-list-indent="1"]), ol[data-tb-num] > li > ol > li[data-list-indent], ol[data-tb-num] > li > ol > li ol > li { counter-increment: tbl2; }
+ol[data-tb-num] > li:not([data-list-indent])::marker { content: var(--tb-n0); }
+ol[data-tb-num] > li[data-list-indent="1"]::marker, ol[data-tb-num] > li > ol > li:not([data-list-indent])::marker { content: var(--tb-n1); }
+ol[data-tb-num] > li[data-list-indent]:not([data-list-indent="1"])::marker, ol[data-tb-num] > li > ol > li[data-list-indent]::marker, ol[data-tb-num] > li > ol > li ol > li::marker { content: var(--tb-n2); }
+ol[data-tb-num="decimal"] { --tb-n0: counter(tbl0, decimal) ". "; --tb-n1: counter(tbl1, lower-alpha) ". "; --tb-n2: counter(tbl2, lower-roman) ". "; }
+ol[data-tb-num="paren"] { --tb-n0: counter(tbl0, decimal) ") "; --tb-n1: counter(tbl1, lower-alpha) ") "; --tb-n2: counter(tbl2, lower-roman) ") "; }
+ol[data-tb-num="outline"] { --tb-n0: counter(tbl0, decimal) ". "; --tb-n1: counter(tbl0, decimal) "." counter(tbl1, decimal) ". "; --tb-n2: counter(tbl0, decimal) "." counter(tbl1, decimal) "." counter(tbl2, decimal) ". "; padding-left: 2.6em; }
+ol[data-tb-num="upper"] { --tb-n0: counter(tbl0, upper-alpha) ". "; --tb-n1: counter(tbl1, lower-alpha) ". "; --tb-n2: counter(tbl2, lower-roman) ". "; }
+ol[data-tb-num="roman"] { --tb-n0: counter(tbl0, upper-roman) ". "; --tb-n1: counter(tbl1, upper-alpha) ". "; --tb-n2: counter(tbl2, decimal) ". "; padding-left: 2.2em; }
+ol[data-tb-num="zero"] { --tb-n0: counter(tbl0, decimal-leading-zero) ". "; --tb-n1: counter(tbl1, lower-alpha) ". "; --tb-n2: counter(tbl2, lower-roman) ". "; padding-left: 2em; }
+ol[data-tb-num="outline"] ol { padding-left: 2.6em; }
+.tb-split { display: inline-flex; align-items: center; }
+.tb-split .tb-split-caret { width: 14px; min-width: 14px; padding: 0; font-size: 9px; }
+.tb-num-menu { width: 336px; padding: 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tb-num-card { display: flex; flex-direction: column; gap: 7px; padding: 10px 8px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; font: inherit; font-size: 11px; color: #333; }
+.tb-num-card:hover { background: #f3f4f6; }
+.tb-num-card.active { border: 2px solid #111; padding: 9px 7px; }
+.tb-num-card span { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.tb-num-card span::after { content: ''; flex: 1; height: 3px; border-radius: 2px; background: #d1d5db; }
+.tb-num-card span:nth-child(2) { padding-left: 10px; }
+.tb-num-card span:nth-child(3) { padding-left: 20px; }
 /* 최상위 callout 블록 자신의 플로팅 액션만 숨김 (하위 블록은 유지) */
 .block.block-callout:not(.block-child) > .block-actions { display: none !important; }
 /* branch 블록 외곽 박스 제거 */
@@ -8713,7 +8736,7 @@ select.sh-field-input,
       <div class="tb-sep"></div>
       <!-- 글머리 기호 / 번호 목록 / 들여쓰기 / 내어쓰기 -->
       <button class="tb-btn" id="tb-list-ul-btn" onmousedown="event.preventDefault();tbCaptureFormatTarget()" onclick="tbOpenBulletMenu(this)" title="글머리 기호" aria-haspopup="menu"><i class="fa-solid fa-list-ul"></i></button>
-      <button class="tb-btn" id="tb-list-ol-btn" onclick="tbInsertNumbered()" title="번호 목록"><i class="fa-solid fa-list-ol"></i></button>
+      <span class="tb-split"><button class="tb-btn" id="tb-list-ol-btn" onmousedown="event.preventDefault();tbCaptureFormatTarget()" onclick="tbInsertNumbered()" title="번호 목록"><i class="fa-solid fa-list-ol"></i></button><button class="tb-btn tb-split-caret" id="tb-list-ol-caret" onmousedown="event.preventDefault();tbCaptureFormatTarget()" onclick="tbOpenNumberMenu(this)" title="번호 목록 스타일" aria-label="번호 목록 스타일" aria-haspopup="menu"><i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button></span>
       <button class="tb-btn" id="tb-indent-btn" onclick="tbIndent(1)" title="들여쓰기(Tab)"><i class="fa-solid fa-indent"></i></button>
       <button class="tb-btn" id="tb-outdent-btn" onclick="tbIndent(-1)" title="내어쓰기 (Shift+Tab)"><i class="fa-solid fa-outdent"></i></button>
       <!-- 줄간격 -->
@@ -32107,8 +32130,83 @@ function tbOpenBulletMenu(button) {
     input.focus();
   });
 }
+// 번호 목록 스타일(#424): [프리셋, 이름, 1·2·3단계 미리보기]
+const TB_NUM_PRESETS = [
+  ['decimal', '1. a. i.', ['1.', 'a.', 'i.']], ['paren', '1) a) i)', ['1)', 'a)', 'i)']], ['outline', '1. 1.1. 1.2.1.', ['1.', '1.1.', '1.2.1.']],
+  ['upper', 'A. a. i.', ['A.', 'a.', 'i.']], ['roman', 'I. A. 1.', ['I.', 'A.', '1.']], ['zero', '01. a. i.', ['01.', 'a.', 'i.']],
+];
+function tbValidNumPreset(value) { return TB_NUM_PRESETS.some(preset => preset[0] === value) ? value : 'decimal'; }
+function tbLastNumPreset() { try { return tbValidNumPreset(localStorage.getItem('tb-num-preset')); } catch (e) { return 'decimal'; } }
+// 노드를 감싼 가장 바깥 ol(편집 영역 root 안). 없으면 null
+function tbOuterOrderedList(node, root) {
+  let el = node && node.nodeType === 1 ? node : node?.parentElement, found = null;
+  while (el && el !== root) { if (el.tagName === 'OL') found = el; el = el.parentElement; }
+  return el === root ? found : null;
+}
+function tbNumberContext() { // 서식 대상 편집 영역과 커서가 든 번호 목록
+  const target = tbResolveFormatTarget();
+  const root = target?.type === 'ce' ? target.ta : (isCE() ? lastFocusedTA : null);
+  if (!root) return null;
+  if (document.activeElement !== root) { root.focus(); if (target?.range) { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(target.range); } }
+  const sel = window.getSelection(), node = sel?.rangeCount ? sel.getRangeAt(0).startContainer : null;
+  return { root, list: node ? tbOuterOrderedList(node, root) : null };
+}
+function tbApplyNumberPreset(preset) { // 메뉴에서 고름: 목록 안이면 그 목록 전체, 밖이면 새 목록
+  preset = tbValidNumPreset(preset);
+  try { localStorage.setItem('tb-num-preset', preset); } catch (e) {}
+  const ctx = tbNumberContext();
+  if (!ctx) { tbInsertNumbered(); return; }
+  let list = ctx.list;
+  if (!list) {
+    document.execCommand('insertOrderedList', false, null);
+    const sel = window.getSelection();
+    list = sel?.rangeCount ? tbOuterOrderedList(sel.getRangeAt(0).startContainer, ctx.root) : null;
+  }
+  if (!list) return;
+  list.setAttribute('data-tb-num', preset);
+  list.querySelectorAll('ol[data-tb-num]').forEach(inner => inner.removeAttribute('data-tb-num'));
+  ctx.root.dispatchEvent(new Event('input', { bubbles: true }));
+}
+function tbOpenNumberMenu(button) {
+  const rect = button.getBoundingClientRect(), ctx = tbNumberContext();
+  const current = ctx?.list ? tbValidNumPreset(ctx.list.getAttribute('data-tb-num')) : '';
+  tbCloseCtxMenu();
+  const menu = document.createElement('div');
+  menu.className = 'tb-ctx-menu tb-num-menu';
+  TB_NUM_PRESETS.forEach(([id, name, marks]) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'tb-num-card' + (id === current ? ' active' : '');
+    card.dataset.num = id;
+    card.title = name;
+    card.setAttribute('aria-label', '번호 스타일 ' + name);
+    if (id === current) card.setAttribute('aria-pressed', 'true');
+    marks.forEach(mark => { const line = document.createElement('span'); line.textContent = mark; card.appendChild(line); });
+    card.onclick = () => { tbCloseCtxMenu(); tbApplyNumberPreset(id); };
+    menu.appendChild(card);
+  });
+  menu.style.left = Math.max(8, Math.min(rect.left - 30, window.innerWidth - 344)) + 'px';
+  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.onmousedown = event => event.preventDefault();
+  document.body.appendChild(menu);
+  _ctxMenu = menu;
+  setTimeout(() => {
+    _ctxMenuCloseHandler = event => { if (!menu.contains(event.target) && !button.contains(event.target)) tbCloseCtxMenu(); };
+    document.addEventListener('mousedown', _ctxMenuCloseHandler);
+  });
+}
 function tbInsertNumbered() {
-  if (isCE()) { document.execCommand('insertOrderedList', false, null); return; }
+  if (isCE()) { // 본체 버튼: 목록 안이면 해제, 밖이면 마지막으로 쓴 스타일로 만들기
+    const ctx = tbNumberContext();
+    const inList = document.queryCommandState('insertOrderedList');
+    document.execCommand('insertOrderedList', false, null);
+    if (!inList && ctx) {
+      const sel = window.getSelection(), list = sel?.rangeCount ? tbOuterOrderedList(sel.getRangeAt(0).startContainer, ctx.root) : null;
+      const preset = tbLastNumPreset();
+      if (list && !list.hasAttribute('data-tb-num') && preset !== 'decimal') { list.setAttribute('data-tb-num', preset); ctx.root.dispatchEvent(new Event('input', { bubbles: true })); }
+    }
+    return;
+  }
   const ta = lastFocusedTA; if (!ta) return;
   ta.focus();
   const pos = ta.selectionStart;
@@ -39789,7 +39887,7 @@ function sanitizeCssMacroPreviewHtml(value) {
   wrap.innerHTML = String(value || '');
   wrap.querySelectorAll('script,style,iframe,object,embed,link,meta').forEach(node => node.remove());
   const allowedTags = new Set(['a', 'b', 'strong', 'i', 'em', 'u', 's', 'span', 'div', 'p', 'br', 'img', 'hr', 'table', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th', 'ul', 'ol', 'li', 'blockquote', 'small', 'sub', 'sup', 'center']);
-  const allowedAttrs = new Set(['data-tb-bullet', 'data-tb-bullet-img', 'style', 'href', 'src', 'target', 'rel', 'colspan', 'rowspan', 'align', 'width', 'height', 'alt', 'class', 'title']);
+  const allowedAttrs = new Set(['data-tb-bullet', 'data-tb-bullet-img', 'data-tb-num', 'style', 'href', 'src', 'target', 'rel', 'colspan', 'rowspan', 'align', 'width', 'height', 'alt', 'class', 'title']);
   wrap.querySelectorAll('*').forEach(node => {
     const tag = String(node.tagName || '').toLowerCase();
     if (!allowedTags.has(tag)) {
