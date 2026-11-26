@@ -15,4 +15,10 @@ ok(html.includes('ol[data-tb-num] > li[data-list-indent="1"]::marker') && html.i
 ok((html.match(/\[contenteditable\] ol ol ol \{ list-style-type: lower-roman; \}/g) || []).length === 1, '중복 규칙 정리(속성 없는 목록은 기존 모양)');
 ok(!/^\[contenteditable\].*data-tb-num/m.test(html), '번호 스타일은 편집기 밖에서도 적용');
 ok(/'data-tb-bullet-img', 'data-tb-num',/.test(html) && /id="tb-list-ol-caret"/.test(html), '정리(sanitizer) 허용·분할 버튼');
+// 본체 버튼: 새 목록에는 data-tb-num(처음에는 decimal), 합쳐진 기존 목록은 그대로
+const press = merged => { const attrs = {}, list = { hasAttribute: n => n in attrs, setAttribute: (n, v) => { attrs[n] = v; } };
+  const c = { isCE: () => true, tbLastNumPreset: () => 'decimal', tbNumberContext: () => ({ root: { querySelectorAll: () => merged ? [list] : [], dispatchEvent() {} } }), tbOuterOrderedList: () => list, Event: class {},
+    document: { queryCommandState: () => false, execCommand() {} }, window: { getSelection: () => ({ rangeCount: 1, getRangeAt: () => ({}) }) } };
+  vm.createContext(c); const from = html.indexOf('function tbInsertNumbered'); vm.runInContext(html.slice(from, html.indexOf('const ta = lastFocusedTA', from)) + '}', c); c.tbInsertNumbered(); return attrs['data-tb-num']; };
+ok(press(false) === 'decimal' && press(true) === undefined, '본체 버튼 생성 → data-tb-num="decimal", 기존 목록 불변');
 process.exit(f ? 1 : 0);

@@ -32329,11 +32329,12 @@ function tbInsertNumbered() {
   if (isCE()) { // 본체 버튼: 목록 안이면 해제, 밖이면 마지막으로 쓴 스타일로 만들기
     const ctx = tbNumberContext();
     const inList = document.queryCommandState('insertOrderedList');
+    const before = new Set(ctx ? ctx.root.querySelectorAll('ol') : []); // 붙어 있는 기존 목록에 합쳐지면 그 목록은 건드리지 않는다
     document.execCommand('insertOrderedList', false, null);
     if (!inList && ctx) {
       const sel = window.getSelection(), list = sel?.rangeCount ? tbOuterOrderedList(sel.getRangeAt(0).startContainer, ctx.root) : null;
       const preset = tbLastNumPreset();
-      if (list && !list.hasAttribute('data-tb-num') && preset !== 'decimal') { list.setAttribute('data-tb-num', preset); ctx.root.dispatchEvent(new Event('input', { bubbles: true })); }
+      if (list && !before.has(list) && !list.hasAttribute('data-tb-num')) { list.setAttribute('data-tb-num', preset); ctx.root.dispatchEvent(new Event('input', { bubbles: true })); }
     }
     return;
   }
