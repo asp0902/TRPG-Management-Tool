@@ -7196,6 +7196,11 @@ body.block-pointer-dragging {
 .ds-grp-box-col.after { right: auto; left: 2px; }
 .ds-grp-btn { width: 13px; height: 13px; padding: 0; border: 1px solid #1a73e8; border-radius: 2px; background: #fff; color: #1a73e8; font-size: 10px; line-height: 11px; cursor: pointer; }
 .ds-grp-btn:hover { background: #1a73e8; color: #fff; }
+/* 시트 탭 색·보호(#405) */
+.ds-sheet-tab { position: relative; }
+.ds-sheet-color { position: absolute; left: 4px; right: 4px; bottom: 1px; height: 3px; border-radius: 2px; pointer-events: none; }
+.ds-sheet-lock { font-size: 10px; margin-right: 5px; color: #888; }
+#ds-editor-body.ds-locked #ds-fill-handle, #ds-editor-body.ds-locked .ds-row-add-row { display: none; }
 .ds-statusbar-stat { border: 1px solid #e0e0e0; border-radius: 4px; background: #fff; color: #444; font: inherit; font-size: 12px; font-weight: 700; padding: 1px 8px; cursor: pointer; }
 .ds-statusbar-stat:hover { background: #f3f4f6; border-color: #bbb; }
 .ds-statusbar-selection { color: #a0a0a0; font-weight: 600; }
@@ -11693,6 +11698,7 @@ async function persistNow() {
   return await queuePersistPayload(makeStatePayload());
 }
 function persist(options = {}) {
+  if (typeof ds_guardProtected === 'function') ds_guardProtected(); // 보호된 시트 변경 되돌리기(#405)
   if (isCharacterSheetPopupMode()) {
     queueCharacterSheetPopupPersist();
     return;
@@ -41518,6 +41524,9 @@ function normalizeDataSheetSheet(sheet) {
   return {
     id: sheet.id || mkId(),
     name: typeof sheet.name === 'string' && sheet.name.trim() ? sheet.name : '시트1',
+    color: typeof sheet.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(sheet.color) ? sheet.color.toLowerCase() : '', // 탭 색(#405)
+    hidden: !!sheet.hidden,
+    locked: !!sheet.locked,
     headerEditMode: sheet.headerEditMode === 'rows' ? 'rows' : 'columns',
     rowHeaderWidth: ds_normalizeRowHeaderWidth(sheet.rowHeaderWidth),
     columns: columns,
@@ -42606,6 +42615,7 @@ function renderDataSheetEditor() {
   ds_cfPaint(ds); // 조건부 서식·교차 색상(#401)
   ds_findPaint(); // 찾기 강조 다시 칠하기(#400)
   ds_paintUi(); // 서식 복사 상태(#402)
+  ds_lockPaint(); // 시트 보호(#405)
   // 초기 자동 높이
   requestAnimationFrame(function() {
     ds_autosizeVisibleCells();
@@ -42635,7 +42645,11 @@ function ds_renderSheetTabs(ds) {
   var bar = document.getElementById('ds-sheet-tabs');
   if (!bar) return;
   if (!ds || !Array.isArray(ds.sheets) || !ds.sheets.length) { bar.innerHTML = ''; return; }
+  var shownId = ds_visibleSheetId(ds.sheets, ds.activeSheetId);
+  if (shownId !== ds.activeSheetId) { _dsBindActiveSheet(ds, ds_sheetById(shownId) || ds.sheets[0]); setTimeout(renderDataSheetEditor, 0); }
+  var hiddenCount = ds.sheets.filter(function(s) { return s.hidden; }).length;
   var html = ds.sheets.map(function(s) {
+    if (s.hidden) return '';
     var active = s.id === ds.activeSheetId;
     var sid = esc(JSON.stringify(s.id));
     if (_dsRenameSheetId === s.id) {
@@ -42651,10 +42665,13 @@ function ds_renderSheetTabs(ds) {
       + 'onclick="ds_handleSheetTabClick(event,' + sid + ')" ondblclick="ds_startRenameSheet(' + sid + ')" '
       + 'oncontextmenu="ds_openSheetTabMenu(event,' + sid + ')" '
       + 'title="' + esc(s.name || '') + ' (더블클릭: 이름 변경 · 우클릭: 메뉴)">'
+      + (s.locked ? '<i class="fa-solid fa-lock ds-sheet-lock" aria-label="보호됨"></i>' : '')
       + '<span class="ds-sheet-tab-name">' + esc(s.name || '시트') + '</span>'
+      + (s.color ? '<span class="ds-sheet-color" style="background:' + esc(s.color) + ';"></span>' : '')
       + '</div>';
   }).join('');
   html += '<button class="ds-sheet-add" title="시트 추가" onclick="ds_addSheet()">＋ 시트</button>';
+  if (hiddenCount) html += '<button class="ds-sheet-add ds-sheet-hidden-btn" title="숨긴 시트 다시 보이기" onclick="ds_openHiddenSheets(event)">숨긴 시트 ' + hiddenCount + ' ▸</button>';
   bar.innerHTML = html;
   var renameInput = bar.querySelector('.ds-sheet-tab-rename');
   if (renameInput) { renameInput.focus(); renameInput.select(); }
@@ -42732,6 +42749,7 @@ function ds_duplicateSheet(sheetId) {
   (clone.merges || []).forEach(function(m) { m.r = m.r.map(function(id) { return rowIdMap[id]; }); m.c = m.c.map(function(id) { return colIdMap[id]; }); });
   if (clone.filter && clone.filter.cols) clone.filter.cols = remapKeys(clone.filter.cols, colIdMap);
   clone.id = mkId();
+  clone.locked = false; clone.hidden = false; // 복사본은 보호·숨김 해제(#405)
   clone.name = _dsUniqueSheetName(ds, (src.name || '시트') + ' 복사본');
   var newSheet = normalizeDataSheetSheet(clone);
   ds.sheets.splice(idx + 1, 0, newSheet);
@@ -42746,6 +42764,7 @@ function ds_deleteSheet(sheetId) {
   var idx = ds.sheets.findIndex(function(s) { return s.id === sheetId; });
   if (idx < 0) return;
   var s = ds.sheets[idx];
+  if (s.locked) { if (typeof rubyToast === 'function') rubyToast('보호된 시트는 삭제할 수 없습니다.'); return; }
   if (!confirm('시트 "' + (s.name || '시트') + '"를 삭제할까요? 이 시트의 모든 열·행 데이터가 함께 사라집니다.')) return;
   ds.sheets.splice(idx, 1);
   if (ds.activeSheetId === sheetId) {
@@ -42760,10 +42779,16 @@ function ds_openSheetTabMenu(e, sheetId) {
   var ds = findDataSheet(_dsEditId);
   if (!ds || !Array.isArray(ds.sheets)) return;
   if (!ds.sheets.some(function(s) { return s.id === sheetId; })) return;
-  var canDelete = ds.sheets.length > 1;
+  var target = ds_sheetById(sheetId), visibleCount = ds.sheets.filter(function(s) { return !s.hidden; }).length;
+  var canDelete = ds.sheets.length > 1 && !target.locked;
   var items = [
     { label: '이름 변경', action: function() { ds_startRenameSheet(sheetId); } },
     { label: '시트 복제', action: function() { ds_duplicateSheet(sheetId); } },
+    { sep: true },
+    { label: '색상 변경…', action: function() { ds_pickSheetColor(sheetId); } },
+    { label: '색상 지우기', disabled: !target.color, action: function() { ds_setSheetColor(sheetId, ''); } },
+    { label: '시트 숨기기', disabled: visibleCount <= 1, action: function() { ds_setSheetHidden(sheetId, true); } },
+    { label: target.locked ? '시트 보호 해제' : '시트 보호(편집 잠금)', action: function() { ds_setSheetLocked(sheetId, !target.locked); } },
     { sep: true },
     { label: '시트 삭제', danger: true, disabled: !canDelete, action: function() { ds_deleteSheet(sheetId); } },
   ];
@@ -46567,6 +46592,102 @@ function ds_groupPaint() { // 머리글에 그룹 막대(단계만큼 두꺼움)
     });
   });
 }
+// ── 시트 탭 색·숨기기·보호(#405) ──
+// 보이는 시트가 하나도 없으면 첫 시트를 보이고, 활성 시트가 숨김이면 보이는 시트로 → 활성 시트 id
+function ds_visibleSheetId(sheets, activeId) {
+  if (!sheets.some(function(s) { return !s.hidden; })) sheets[0].hidden = false;
+  var i = sheets.findIndex(function(s) { return s.id === activeId; });
+  if (i < 0) i = 0;
+  for (var d = 0; d < sheets.length; d++) { // 가까운 시트(오른쪽 먼저)
+    if (sheets[i + d] && !sheets[i + d].hidden) return sheets[i + d].id;
+    if (sheets[i - d] && !sheets[i - d].hidden) return sheets[i - d].id;
+  }
+  return sheets[0].id;
+}
+// 보호 대상 내용(숨김 상태는 보기 설정이라 제외)
+function ds_lockSnapshot(sheet) {
+  return JSON.stringify({ columns: sheet.columns, rows: sheet.rows, merges: sheet.merges || [], cf: sheet.cf || [], banding: sheet.banding || [] }, function(k, v) { return k === 'hidden' ? undefined : v; });
+}
+// 보호된 내용이 바뀌었으면 되돌린다(배열은 그대로 두고 내용만 교체해 ds.rows 별칭 유지) → 되돌렸으면 true
+function ds_lockRestore(sheet, snap) {
+  if (ds_lockSnapshot(sheet) === snap) return false;
+  var old = JSON.parse(snap);
+  ['columns', 'rows'].forEach(function(key) {
+    var hidden = {};
+    sheet[key].forEach(function(x) { hidden[x.id] = !!x.hidden; });
+    old[key].forEach(function(x) { x.hidden = !!hidden[x.id]; });
+    sheet[key].length = 0;
+    Array.prototype.push.apply(sheet[key], old[key]);
+  });
+  sheet.merges = old.merges; sheet.cf = old.cf; sheet.banding = old.banding;
+  return true;
+}
+var _dsLockSnaps = typeof WeakMap === 'function' ? new WeakMap() : null; // 시트 객체 → 보호 시점 내용. 새 객체(불러오기·동기화·실행 취소)는 새로 기록
+function ds_guardProtected() { // persist() 직전에 한 곳에서 검사: 입력·붙여넣기·서식·행열 변경 등 모든 경로
+  if (!_dsLockSnaps || !_dsEditId) return;
+  var ds = findDataSheet(_dsEditId), reverted = false;
+  ((ds && ds.sheets) || []).forEach(function(sh) {
+    if (!sh.locked) { _dsLockSnaps.delete(sh); return; }
+    var snap = _dsLockSnaps.get(sh);
+    if (snap === undefined) _dsLockSnaps.set(sh, ds_lockSnapshot(sh));
+    else if (ds_lockRestore(sh, snap)) reverted = true;
+  });
+  if (reverted) setTimeout(function() {
+    if (typeof rubyToast === 'function') rubyToast('보호된 시트입니다. 시트 탭 우클릭 → 보호 해제 후 수정하세요.');
+    if (currentPage === 'datasheet') { var viewport = ds_captureEditorViewport(); renderDataSheetEditor(); ds_restoreEditorViewport(viewport); }
+  }, 0);
+}
+function ds_lockEnsure() { // 기준 내용이 없는 보호 시트(객체가 새로 만들어진 경우)는 사용자 조작 직전에 기록
+  if (!_dsLockSnaps || typeof currentPage === 'undefined' || currentPage !== 'datasheet' || !_dsEditId) return;
+  var ds = findDataSheet(_dsEditId);
+  ((ds && ds.sheets) || []).forEach(function(sh) { if (sh.locked && !_dsLockSnaps.has(sh)) _dsLockSnaps.set(sh, ds_lockSnapshot(sh)); });
+}
+if (typeof document !== 'undefined' && document.addEventListener) ['mousedown', 'keydown', 'beforeinput', 'paste', 'drop'].forEach(function(t) { document.addEventListener(t, ds_lockEnsure, true); });
+function ds_lockPaint() { // 보호된 시트는 칸을 읽기 전용으로
+  var ds = findDataSheet(_dsEditId), sheet = ds && _dsActiveSheet(ds), body = document.getElementById('ds-editor-body');
+  if (!sheet || !body) return;
+  body.classList.toggle('ds-locked', !!sheet.locked);
+  if (!sheet.locked) return;
+  if (_dsLockSnaps && _dsLockSnaps.get(sheet) === undefined) _dsLockSnaps.set(sheet, ds_lockSnapshot(sheet));
+  body.querySelectorAll('textarea, input').forEach(function(el) { el.readOnly = true; });
+}
+function ds_sheetById(sheetId) { var ds = findDataSheet(_dsEditId); return ds && ds.sheets ? ds.sheets.find(function(s) { return s.id === sheetId; }) : null; }
+function ds_setSheetColor(sheetId, color) {
+  var sh = ds_sheetById(sheetId);
+  if (!sh) return;
+  sh.color = ds_cfColor(color);
+  _dsForceNextHistoryCommit = true; persist(); renderDataSheetEditor();
+}
+function ds_pickSheetColor(sheetId) {
+  var sh = ds_sheetById(sheetId), input = document.createElement('input');
+  if (!sh) return;
+  input.type = 'color'; input.value = sh.color || '#1a73e8'; input.style.cssText = 'position:fixed;left:0;bottom:0;opacity:0;';
+  input.onchange = function() { ds_setSheetColor(sheetId, input.value); input.remove(); };
+  input.onblur = function() { setTimeout(function() { input.remove(); }, 200); };
+  document.body.appendChild(input); input.focus(); input.click();
+}
+function ds_setSheetHidden(sheetId, hidden) {
+  var ds = findDataSheet(_dsEditId), sh = ds_sheetById(sheetId);
+  if (!sh) return;
+  if (hidden && ds.sheets.filter(function(s) { return !s.hidden; }).length <= 1) { if (typeof rubyToast === 'function') rubyToast('마지막 보이는 시트는 숨길 수 없습니다.'); return; }
+  sh.hidden = hidden;
+  var next = hidden ? ds_visibleSheetId(ds.sheets, ds.activeSheetId) : sheetId; // 다시 보이면 그 시트로 이동
+  if (next !== ds.activeSheetId) _dsBindActiveSheet(ds, ds_sheetById(next));
+  _dsForceNextHistoryCommit = true; persist(); renderDataSheetEditor();
+}
+function ds_setSheetLocked(sheetId, locked) {
+  var sh = ds_sheetById(sheetId);
+  if (!sh) return;
+  sh.locked = locked;
+  if (_dsLockSnaps) { if (locked) _dsLockSnaps.set(sh, ds_lockSnapshot(sh)); else _dsLockSnaps.delete(sh); }
+  _dsForceNextHistoryCommit = true; persist(); renderDataSheetEditor();
+}
+function ds_openHiddenSheets(e) {
+  var ds = findDataSheet(_dsEditId), r = e.currentTarget.getBoundingClientRect();
+  var list = ((ds && ds.sheets) || []).filter(function(s) { return s.hidden; });
+  e.stopPropagation();
+  _dsShowContextMenu(r.left, Math.max(8, r.top - list.length * 30 - 14), list.map(function(s) { return { label: s.name + ' 다시 보이기', action: function() { ds_setSheetHidden(s.id, false); } }; }));
+}
 // ── 시트 안 찾기·바꾸기(#400) ──
 // o = { matchCase, whole(셀 전체 일치), regex, formulas(수식 글자까지 검색) }. 빈 검색어·잘못된 정규식·빈 글자와 맞는 정규식은 null
 function ds_findRegex(q, o) {
@@ -46582,7 +46703,7 @@ function ds_findCells(sheets, re, o) {
   if (!re) return out;
   o = o || {};
   sheets.forEach(function(sh, si) {
-    if (o.sheetIdx !== undefined && o.sheetIdx !== null && o.sheetIdx !== si) return;
+    if (sh.hidden || (o.sheetIdx !== undefined && o.sheetIdx !== null && o.sheetIdx !== si)) return;
     var vis = o.visible ? o.visible(sh, si) : null;
     (sh.rows || []).forEach(function(row, ri) {
       if (!ds_isDataRow(row) || row.hidden || (vis && vis[ri] === false)) return;
