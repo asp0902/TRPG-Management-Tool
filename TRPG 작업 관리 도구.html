@@ -8041,6 +8041,12 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-dnd-save-roll:hover { border-color: #999; background: #f1f1f1; }
 .sh-dnd-save-result { color: #222; font-size: 13px; }
 .sh-dnd-roll-checks:has(.sh-dnd-save-result:empty) { gap: 0; }
+.sh-dnd-death-saves { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid #e8e8e8; }
+.sh-dnd-death-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.sh-dnd-death-marks { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+.sh-dnd-death-marks input { margin: 0; accent-color: #111; }
+.sh-dnd-death-saves button:disabled { opacity: .5; cursor: default; }
+.sh-dnd-death-saves output:empty { display: none; }
 /* Repeatable section */
 .sh-repeat-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .sh-repeat-table th { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; text-align: left; padding: 4px 6px; border-bottom: 1px solid #ebebeb; background: #fafafa; }
@@ -53502,7 +53508,8 @@ function renderCharacterSheet(chId) {
             var eraSelectAttr = tpl.key === 'coc7e' && sec.id === 'basic' && f.id === 'eraType' ? ' data-coc-era-select="1"' : '';
             inputHtml = '<select class="sh-field-input"' + eraSelectAttr + ' onchange="' + esc(onInput) + '">' + opts + '</select>';
         } else {
-            inputHtml = '<input class="sh-field-input" type="' + (f.type === 'number' ? 'number' : 'text') + '" value="' + esc(String(val)) + '" oninput="' + esc(onInput) + '">';
+            var hpAttr = tpl.key === 'dnd5e' && sec.id === 'combat' && f.id === 'hpCur' ? ' data-dnd-current-hp' : '';
+            inputHtml = '<input class="sh-field-input" type="' + (f.type === 'number' ? 'number' : 'text') + '" value="' + esc(String(val)) + '"' + hpAttr + ' oninput="' + esc(onInput) + '">';
         }
         var fieldStyle = '';
         if (f.fullWidth || (f.type === 'textarea' && !f.keepGridWidth)) {
@@ -53546,6 +53553,7 @@ function renderCharacterSheet(chId) {
         ageAdjHtml = '<div id="age-adj-' + esc(sheetId) + '">' + getCoc7eAgeAdjust(sectionData.age) + '</div>';
       }
       var sectionBodyHtml = '<div class="' + gridClass + '">' + fieldsHtml + '</div>' + ageAdjHtml;
+      if (tpl.key === 'dnd5e' && sec.id === 'combat') sectionBodyHtml += renderDnd5eDeathSaves(chId, sheetId);
       if (sec.id === 'basic') {
         var portraitClass = 'ch-sheet-basic-portrait' + ((tpl.key === 'numenera' || tpl.key === 'cypher' || tpl.key === 'coc7e') ? ' is-square' : '');
         var portraitHtml = renderCharacterSheetPortrait(ch, activeSheet, portraitClass);
@@ -53558,6 +53566,7 @@ function renderCharacterSheet(chId) {
   }).join('');
 
   bodyEl.innerHTML = tabsWrap + '<div class="sh-sheet-content' + (tpl.key === 'insane' ? ' sh-sheet-insane' : '') + '">' + sectionsHtml + '</div>';
+  if (tpl.key === 'dnd5e') refreshDnd5eDeathSaves(bodyEl.querySelector('.sh-dnd-death-saves'), sheetData.combat || {});
   if (tpl.key === 'coc7e') {
     var financeSection = bodyEl.querySelector('.sh-coc-misc-section');
     var skillsWrap = bodyEl.querySelector('.sh-coc-skills-wrap');
@@ -56060,6 +56069,7 @@ function applyDnd5eBuilder() {
   });
   sheet.data.combat.hpMax = d.hp;
   sheet.data.combat.hpCur = d.hp;
+  delete sheet.data.combat.deathSaves;
   sheet.data.combat.speed = d.speed;
   sheet.data.combat.hitDice = d.hitDice;
   sheet.data.features.features = 'D&D 5E 2014 빌더 적용'
@@ -56293,6 +56303,96 @@ function rollDnd5eCheck(chId, sheetId, button) {
   var bonus = getDnd5eRollCheck(sheet.data || {}, item).bonus;
   var roll = evalDiceFormula('1d20');
   result.textContent = item.label + (isSkill ? ' 판정' : ' 내성') + ' · d20 ' + roll + ' ' + formatDnd5eSigned(bonus) + ' = ' + (roll + bonus);
+}
+
+function getDnd5eDeathSaves(combat) {
+  var saved = combat.deathSaves || {};
+  return {
+    successes: Math.max(0, Math.min(3, parseInt(saved.successes, 10) || 0)),
+    failures: Math.max(0, Math.min(3, parseInt(saved.failures, 10) || 0)),
+    stable: saved.stable === true,
+  };
+}
+
+function isDnd5eAtZeroHp(combat) {
+  var hp = String(combat.hpCur ?? '').trim();
+  return hp !== '' && Number(hp) === 0;
+}
+
+function renderDnd5eDeathSaves(chId, sheetId) {
+  var args = JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',';
+  var marks = [{ key: 'successes', label: '성공' }, { key: 'failures', label: '실패' }].map(function(group) {
+    var boxes = [1, 2, 3].map(function(mark) {
+      var change = 'updateDnd5eDeathSaves(' + args + JSON.stringify(group.key) + ',this)';
+      return '<input type="checkbox" data-death-mark="' + group.key + '" value="' + mark + '"'
+        + ' aria-label="죽음 내성 ' + group.label + ' ' + mark + '회" onchange="' + esc(change) + '">';
+    }).join('');
+    return '<div class="sh-dnd-death-marks" role="group" aria-label="' + group.label + '"><span>' + group.label + '</span>' + boxes + '</div>';
+  }).join('');
+  var buttons = [{ key: 'roll', label: '굴림' }, { key: 'stabilize', label: '안정화' }, { key: 'reset', label: '초기화' }].map(function(action) {
+    var click = 'updateDnd5eDeathSaves(' + args + JSON.stringify(action.key) + ',this)';
+    return '<button type="button" class="sh-dnd-save-roll" data-death-action="' + action.key + '"'
+      + ' aria-label="죽음 내성 ' + action.label + '" onclick="' + esc(click) + '">' + action.label + '</button>';
+  }).join('');
+  return '<div class="sh-dnd-death-saves" data-ch-id="' + esc(chId) + '" data-sheet-id="' + esc(sheetId) + '">'
+    + '<div class="sh-field-label">죽음 내성</div><div class="sh-dnd-death-controls">' + marks + buttons + '</div>'
+    + '<output class="sh-dnd-save-result" aria-live="polite"></output></div>';
+}
+
+function refreshDnd5eDeathSaves(panel, combat, message = '') {
+  if (!panel) return;
+  var saves = getDnd5eDeathSaves(combat);
+  var atZero = isDnd5eAtZeroHp(combat);
+  var canRoll = atZero && !saves.stable && saves.failures < 3;
+  panel.querySelectorAll('[data-death-mark]').forEach(function(input) {
+    input.checked = Number(input.value) <= saves[input.dataset.deathMark];
+    input.disabled = !atZero || (input.dataset.deathMark === 'successes' && !canRoll);
+  });
+  panel.querySelector('[data-death-action="roll"]').disabled = !canRoll;
+  panel.querySelector('[data-death-action="stabilize"]').disabled = !canRoll;
+  panel.querySelector('[data-death-action="reset"]').disabled = !(saves.successes || saves.failures || saves.stable);
+  panel.querySelector('output').textContent = message || (saves.stable ? '안정화' : saves.failures === 3 ? '사망' : atZero ? '' : '현재 HP가 0일 때 굴릴 수 있습니다.');
+}
+
+function updateDnd5eDeathSaves(chId, sheetId, action, control) {
+  var ch = state.characters.find(function(c) { return c.id === chId; });
+  var sheet = ch?.sheets?.find(function(s) { return s.id === sheetId && s.templateKey === 'dnd5e'; });
+  var combat = sheet?.data?.combat;
+  var panel = control.closest('.sh-dnd-death-saves');
+  if (!combat || !panel || control.disabled) return;
+  if (action !== 'reset' && !isDnd5eAtZeroHp(combat)) return;
+
+  var saves = getDnd5eDeathSaves(combat);
+  var message = '';
+  if (action === 'reset') {
+    delete combat.deathSaves;
+  } else if (action === 'stabilize') {
+    combat.deathSaves = { stable: true };
+  } else if (action === 'roll') {
+    if (saves.stable || saves.failures === 3) return;
+    var roll = evalDiceFormula('1d20');
+    if (roll === 20) {
+      combat.hpCur = '1';
+      delete combat.deathSaves;
+      var hpInput = panel.closest('.sh-section')?.querySelector('[data-dnd-current-hp]');
+      if (hpInput) hpInput.value = '1';
+      message = 'd20 20 · HP 1 회복';
+    } else if (roll >= 10) {
+      saves.successes += 1;
+      combat.deathSaves = saves.successes === 3 ? { stable: true } : saves;
+      message = 'd20 ' + roll + (saves.successes === 3 ? ' · 성공 3회 · 안정화' : ' · 성공');
+    } else {
+      saves.failures = Math.min(3, saves.failures + (roll === 1 ? 2 : 1));
+      combat.deathSaves = saves;
+      message = 'd20 ' + roll + (roll === 1 ? ' · 실패 2회' : ' · 실패') + (saves.failures === 3 ? ' · 사망' : '');
+    }
+  } else if (action === 'successes' || action === 'failures') {
+    saves[action] = Number(control.value) - (control.checked ? 0 : 1);
+    saves.stable = false;
+    combat.deathSaves = saves.successes === 3 ? { stable: true } : saves;
+  }
+  refreshDnd5eDeathSaves(panel, combat, message);
+  persist();
 }
 
 function autoResizeDnd5ePersonalityTextarea(el) {
@@ -56870,6 +56970,11 @@ function saveSheetField(chId, sheetId, sectionId, fieldId, value) {
     sectionData.level = classAndLevel.level;
   }
   sectionData[fieldId] = value;
+  if (sheet.templateKey === 'dnd5e' && sectionId === 'combat' && fieldId === 'hpCur') {
+    if (Number(value) > 0) delete sectionData.deathSaves;
+    var panel = document.querySelector('.sh-dnd-death-saves');
+    if (panel?.dataset.chId === chId && panel.dataset.sheetId === sheetId) refreshDnd5eDeathSaves(panel, sectionData);
+  }
   // syncTarget: 'name' 역방향 반영
   var tpl = SHEET_TEMPLATES[sheet.templateKey];
   if (tpl) {
