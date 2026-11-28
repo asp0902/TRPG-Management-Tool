@@ -7636,25 +7636,11 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
   .ch-sheet-basic-portrait.is-square { aspect-ratio: 1 / 1; align-self: flex-start; }
   .ch-sheet-basic-fields { width: 100%; }
 }
-.sh-dnd-basic-wrap { display: flex; align-items: stretch; gap: 14px; min-width: 0; }
-.sh-dnd-basic-tables { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(220px, 0.8fr); gap: 12px; align-items: stretch; }
-.sh-dnd-basic-table-shell { border: 1px solid #e4e4e4; border-radius: 8px; overflow: hidden; background: #fff; min-width: 0; }
-.sh-dnd-basic-table { width: 100%; height: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
-.sh-dnd-basic-table th { width: 92px; background: #fafafa; color: #777; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; text-align: left; padding: 6px 8px; border-right: 1px solid #ededed; border-bottom: 1px solid #f0f0f0; vertical-align: middle; white-space: nowrap; }
-.sh-dnd-basic-table td { padding: 5px 6px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
-.sh-dnd-basic-table tr:last-child th,
-.sh-dnd-basic-table tr:last-child td { border-bottom: none; }
-.sh-dnd-basic-input { width: 100%; height: 28px; box-sizing: border-box; border: 1px solid #dedede; border-radius: 6px; padding: 0 8px; font-size: 13px; line-height: 28px; font-family: inherit; color: #222; outline: none; background: #fff; }
-.sh-dnd-basic-input:focus { border-color: #111; }
-.sh-dnd-basic-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; min-width: 0; }
-.sh-dnd-basic-input.is-num { text-align: center; padding: 0 4px; appearance: textfield; }
-.sh-dnd-basic-input.is-num::-webkit-outer-spin-button,
-.sh-dnd-basic-input.is-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.sh-dnd-basic-table.is-side th { width: 86px; }
-@media(max-width:860px) {
-  .sh-dnd-basic-wrap { flex-direction: column; }
-  .sh-dnd-basic-tables { grid-template-columns: 1fr; }
-}
+.sh-dnd-basic-grid .sh-field, .sh-dnd-basic-grid .sh-field-input { min-width: 0; }
+.sh-dnd-basic-passive { grid-column: span 2; }
+.sh-dnd-basic-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px; }
+@media(max-width:860px) { .sh-dnd-basic-wrap { flex-direction: column; } }
+@media(max-width:540px) { .sh-dnd-basic-grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* Field grid */
 .sh-field-grid { display: grid; gap: 8px 12px; }
 .sh-field-grid.cols-1 { grid-template-columns: 1fr; }
@@ -10451,13 +10437,14 @@ const SHEET_TEMPLATES = {
       { id: 'basic', label: '기본 정보', customType: 'dnd5e-basic', fields: [
         { id: 'charName', label: '캐릭터명', type: 'text', syncTarget: 'name' },
         { id: 'playerName', label: '플레이어명', type: 'text' },
-        { id: 'class', label: '클래스&레벨', type: 'text' },
-        { id: 'race', label: '종족', type: 'text' },
-        { id: 'background', label: '배경', type: 'text' },
-        { id: 'alignment', label: '성향', type: 'text' },
+        { id: 'level', label: '레벨', type: 'number' },
         { id: 'xp', label: '경험치', type: 'number' },
+        { id: 'class', label: '클래스', type: 'text' },
+        { id: 'race', label: '종족', type: 'text' },
         { id: 'inspiration', label: '고양감', type: 'text' },
         { id: 'profBonus', label: '숙련 보너스', type: 'number' },
+        { id: 'background', label: '배경', type: 'text' },
+        { id: 'alignment', label: '성향', type: 'text' },
         { id: 'passivePerceptionText', label: '상시 감지 텍스트', type: 'text' },
         { id: 'passivePerception', label: '상시 감지', type: 'number' },
       ]},
@@ -56045,7 +56032,8 @@ function applyDnd5eBuilder() {
   if (!sheet.data.abilities || typeof sheet.data.abilities !== 'object' || Array.isArray(sheet.data.abilities)) sheet.data.abilities = {};
   if (!sheet.data.combat || typeof sheet.data.combat !== 'object' || Array.isArray(sheet.data.combat)) sheet.data.combat = {};
   if (!sheet.data.features || typeof sheet.data.features !== 'object' || Array.isArray(sheet.data.features)) sheet.data.features = {};
-  sheet.data.basic.class = d.cls.label + ' Lv.' + d.state.level;
+  sheet.data.basic.class = d.cls.label;
+  sheet.data.basic.level = d.state.level;
   sheet.data.basic.race = d.race.label;
   sheet.data.basic.background = d.bg.label;
   sheet.data.basic.profBonus = d.prof;
@@ -56071,54 +56059,43 @@ function applyDnd5eBuilder() {
 }
 
 // ── D&D 5판 기본 정보 섹션 렌더러 ───────────────────────────
+function getDnd5eBasicClassAndLevel(data) {
+  var className = String(data.class ?? '');
+  if (data.level != null) return { className, level: data.level };
+  var match = className.match(/^(.*?)\s*(?:\b(?:lv\.?|level)|레벨)\s*:?\s*(\d+)\s*$/i)
+    || className.match(/^(.*?)\s+(\d+)\s*레벨\s*$/)
+    || className.match(/^([^\d/+,]+?)\s+(\d+)\s*$/);
+  // 여러 클래스의 레벨이 섞인 기록은 입력한 텍스트 그대로 보관한다.
+  return match && !/\d/.test(match[1]) ? { className: match[1].trim(), level: match[2] } : { className, level: '' };
+}
+
 function renderDnd5eBasicSection(sec, sectionData, sheetData, chId, sheetId) {
   sectionData = (sectionData && typeof sectionData === 'object' && !Array.isArray(sectionData)) ? sectionData : {};
   sheetData = (sheetData && typeof sheetData === 'object' && !Array.isArray(sheetData)) ? sheetData : {};
   var ch = state.characters.find(function(c) { return c.id === chId; }) || {};
   var sheet = (ch.sheets || []).find(function(item) { return item.id === sheetId; });
-  var combatData = (sheetData.combat && typeof sheetData.combat === 'object' && !Array.isArray(sheetData.combat)) ? sheetData.combat : {};
-  var leftFields = [
-    { id: 'charName', label: '캐릭터명', type: 'text' },
-    { id: 'playerName', label: '플레이어명', type: 'text' },
-    { id: 'class', label: '클래스&레벨', type: 'text' },
-    { id: 'race', label: '종족', type: 'text' },
-    { id: 'background', label: '배경', type: 'text' },
-    { id: 'alignment', label: '성향', type: 'text' },
-  ];
-  var rightFields = [
-    { id: 'xp', label: '경험치', type: 'number' },
-    { id: 'inspiration', label: '고양감', type: 'text' },
-    { id: 'profBonus', label: '숙련 보너스', type: 'number', fallbackSection: combatData },
-    { id: 'passivePerception', label: '상시 감지', type: 'split', textId: 'passivePerceptionText' },
-  ];
-  function getVal(field) {
-    if (sectionData[field.id] !== undefined && sectionData[field.id] !== null) return sectionData[field.id];
-    if (field.fallbackSection && field.fallbackSection[field.id] !== undefined && field.fallbackSection[field.id] !== null) return field.fallbackSection[field.id];
-    if (field.id === 'charName') return ch.name || '';
-    return '';
+  var classAndLevel = getDnd5eBasicClassAndLevel(sectionData);
+  var values = { ...sectionData, class: classAndLevel.className, level: classAndLevel.level };
+  values.charName ??= ch.name;
+  values.profBonus ??= sheetData.combat?.profBonus;
+  function renderInput(fieldId, type, label) {
+    var handler = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + JSON.stringify(fieldId) + ',this.value)';
+    return '<input class="sh-field-input" type="' + type + '" aria-label="' + esc(label) + '"'
+      + ' value="' + esc(String(values[fieldId] ?? '')) + '" oninput="' + esc(handler) + '">';
   }
-  function renderRows(fields) {
-    return fields.map(function(field) {
-      var val = getVal(field);
-      var handler = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + JSON.stringify(field.id) + ',this.value)';
-      if (field.type === 'split') {
-        var textVal = sectionData[field.textId] !== undefined && sectionData[field.textId] !== null ? sectionData[field.textId] : '';
-        var textHandler = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + JSON.stringify(field.textId) + ',this.value)';
-        return '<tr><th>' + esc(field.label) + '</th><td><div class="sh-dnd-basic-split">'
-          + '<input class="sh-dnd-basic-input" type="text" value="' + esc(String(textVal)) + '" oninput="' + esc(textHandler) + '">'
-          + '<input class="sh-dnd-basic-input is-num" type="number" value="' + esc(String(val)) + '" oninput="' + esc(handler) + '">'
-          + '</div></td></tr>';
-      }
-      return '<tr><th>' + esc(field.label) + '</th><td><input class="sh-dnd-basic-input" type="' + (field.type === 'number' ? 'number' : 'text') + '" value="' + esc(String(val)) + '" oninput="' + esc(handler) + '"></td></tr>';
-    }).join('');
-  }
+  var fields = sec.fields.filter(function(field) { return field.id !== 'passivePerceptionText'; }).map(function(field) {
+    var label = '<span class="sh-field-label">' + esc(field.label) + '</span>';
+    if (field.id === 'passivePerception') {
+      return '<div class="sh-field sh-dnd-basic-passive" role="group" aria-label="상시 감지">' + label
+        + '<div class="sh-dnd-basic-split">' + renderInput('passivePerceptionText', 'text', '상시 감지 텍스트')
+        + renderInput(field.id, 'number', '상시 감지 수치') + '</div></div>';
+    }
+    return '<label class="sh-field">' + label + renderInput(field.id, field.type, field.label) + '</label>';
+  }).join('');
   var portraitHtml = renderCharacterSheetPortrait(ch, sheet, 'ch-sheet-basic-portrait');
   return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'
-    + '<div class="sh-section-body"><div class="sh-dnd-basic-wrap">' + portraitHtml
-      + '<div class="sh-dnd-basic-tables">'
-        + '<div class="sh-dnd-basic-table-shell"><table class="sh-dnd-basic-table"><tbody>' + renderRows(leftFields) + '</tbody></table></div>'
-        + '<div class="sh-dnd-basic-table-shell"><table class="sh-dnd-basic-table is-side"><tbody>' + renderRows(rightFields) + '</tbody></table></div>'
-      + '</div>'
+    + '<div class="sh-section-body"><div class="ch-sheet-basic-wrap sh-dnd-basic-wrap">' + portraitHtml
+      + '<div class="ch-sheet-basic-fields sh-dnd-basic-grid sh-field-grid cols-4 has-separator">' + fields + '</div>'
     + '</div></div></div>';
 }
 
@@ -56767,7 +56744,13 @@ function saveSheetField(chId, sheetId, sectionId, fieldId, value) {
   if (!sheet) return;
   if (!sheet.data) sheet.data = {};
   if (!sheet.data[sectionId] || typeof sheet.data[sectionId] !== 'object' || Array.isArray(sheet.data[sectionId])) sheet.data[sectionId] = {};
-  sheet.data[sectionId][fieldId] = value;
+  var sectionData = sheet.data[sectionId];
+  if (sheet.templateKey === 'dnd5e' && sectionId === 'basic' && (fieldId === 'class' || fieldId === 'level') && sectionData.level == null) {
+    var classAndLevel = getDnd5eBasicClassAndLevel(sectionData);
+    sectionData.class = classAndLevel.className;
+    sectionData.level = classAndLevel.level;
+  }
+  sectionData[fieldId] = value;
   // syncTarget: 'name' 역방향 반영
   var tpl = SHEET_TEMPLATES[sheet.templateKey];
   if (tpl) {
