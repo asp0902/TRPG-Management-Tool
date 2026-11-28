@@ -7637,7 +7637,7 @@ body.ds-dragging-active, body.ds-dragging-active * { cursor: grabbing !important
   .ch-sheet-basic-fields { width: 100%; }
 }
 .sh-dnd-basic-grid .sh-field, .sh-dnd-basic-grid .sh-field-input { min-width: 0; }
-.sh-dnd-basic-passive { grid-column: span 2; }
+.sh-dnd-basic-passive, .sh-dnd-basic-memo { grid-column: span 2; }
 .sh-dnd-basic-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px; }
 @media(max-width:860px) { .sh-dnd-basic-wrap { flex-direction: column; } }
 @media(max-width:540px) { .sh-dnd-basic-grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -10473,10 +10473,12 @@ const SHEET_TEMPLATES = {
         { id: 'race', label: '종족', type: 'text' },
         { id: 'inspiration', label: '고양감', type: 'text' },
         { id: 'profBonus', label: '숙련 보너스', type: 'number' },
-        { id: 'background', label: '배경', type: 'text' },
+        { id: 'age', label: '나이', type: 'text' },
         { id: 'alignment', label: '성향', type: 'text' },
         { id: 'passivePerceptionText', label: '상시 감지 텍스트', type: 'text' },
         { id: 'passivePerception', label: '상시 감지', type: 'number' },
+        { id: 'background', label: '배경', type: 'textarea' },
+        { id: 'proficienciesAndLanguages', label: '기타 숙련 및 언어', type: 'textarea' },
       ]},
       { id: 'abilities', label: '능력치', customType: 'dnd5e-abilities' },
       { id: 'savingThrows', label: '내성 굴림', customType: 'dnd5e-saving-throws' },
@@ -56088,7 +56090,10 @@ function applyDnd5eBuilder() {
   sheet.data.basic.class = d.cls.label;
   sheet.data.basic.level = d.state.level;
   sheet.data.basic.race = d.race.label;
-  sheet.data.basic.background = d.bg.label;
+  var background = String(sheet.data.basic.background ?? '');
+  if (!background.trim() || Object.values(_DND5E_BUILDER_BACKGROUNDS).some(function(bg) { return bg.label === background; })) {
+    sheet.data.basic.background = d.bg.label;
+  }
   sheet.data.basic.profBonus = d.prof;
   sheet.data.basic.passivePerceptionText = '감지';
   sheet.data.basic.passivePerception = d.passivePerception;
@@ -56139,6 +56144,10 @@ function renderDnd5eBasicSection(sec, sectionData, sheetData, chId, sheetId) {
   values.profBonus ??= sheetData.combat?.profBonus;
   function renderInput(fieldId, type, label) {
     var handler = 'saveSheetField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + JSON.stringify(fieldId) + ',this.value)';
+    if (type === 'textarea') {
+      return '<textarea class="sh-dnd-personality-textarea" rows="3" spellcheck="false" aria-label="' + esc(label) + '"'
+        + ' oninput="' + esc(handler + ';autoResizeDnd5ePersonalityTextarea(this)') + '">\n' + esc(String(values[fieldId] ?? '')) + '</textarea>';
+    }
     return '<input class="sh-field-input" type="' + type + '" aria-label="' + esc(label) + '"'
       + ' value="' + esc(String(values[fieldId] ?? '')) + '" oninput="' + esc(handler) + '">';
   }
@@ -56149,7 +56158,8 @@ function renderDnd5eBasicSection(sec, sectionData, sheetData, chId, sheetId) {
         + '<div class="sh-dnd-basic-split">' + renderInput('passivePerceptionText', 'text', '상시 감지 텍스트')
         + renderInput(field.id, 'number', '상시 감지 수치') + '</div></div>';
     }
-    return '<label class="sh-field">' + label + renderInput(field.id, field.type, field.label) + '</label>';
+    return '<label class="sh-field' + (field.type === 'textarea' ? ' sh-dnd-basic-memo' : '') + '">'
+      + label + renderInput(field.id, field.type, field.label) + '</label>';
   }).join('');
   var portraitHtml = renderCharacterSheetPortrait(ch, sheet, 'ch-sheet-basic-portrait');
   return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'

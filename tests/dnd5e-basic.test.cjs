@@ -12,7 +12,8 @@ const context = vm.createContext({ state: { characters: [character] }, persist: 
   esc: value => String(value).replaceAll('"', '&quot;'),
 });
 const fieldOrder = [
-  'charName', 'playerName', 'level', 'xp', 'class', 'race', 'inspiration', 'profBonus', 'background', 'alignment', 'passivePerceptionText', 'passivePerception',
+  'charName', 'playerName', 'level', 'xp', 'class', 'race', 'inspiration', 'profBonus', 'age', 'alignment',
+  'passivePerceptionText', 'passivePerception', 'background', 'proficienciesAndLanguages',
 ];
 const sectionMarkup = html.slice(html.indexOf("customType: 'dnd5e-basic'"), html.indexOf("customType: 'dnd5e-abilities'"));
 const fields = [...sectionMarkup.matchAll(/\{ id: '([^']+)', label: '([^']+)', type: '([^']+)'(?:, syncTarget: '([^']+)')?/g)]
@@ -33,6 +34,9 @@ assert.match(rendered, /aria-label="레벨" value="7"/);
 assert.match(rendered, /aria-label="숙련 보너스" value="3"/);
 assert.match(rendered, /aria-label="상시 감지 텍스트" value="감지\(청각\)"/);
 assert.match(rendered, /aria-label="상시 감지 수치" value="13"/);
+assert.match(rendered, /<input[^>]+aria-label="나이"/);
+assert.match(rendered, /<textarea[^>]+aria-label="배경"/);
+assert.match(rendered, /<textarea[^>]+aria-label="기타 숙련 및 언어"/);
 assert.equal(legacy.data.basic.class, '파이터 Lv.7');
 assert.equal(legacy.data.basic.level, undefined);
 
