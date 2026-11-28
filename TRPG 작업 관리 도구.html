@@ -6939,6 +6939,7 @@ body.block-pointer-dragging {
 .github-sync-status { min-height: 36px; padding: 8px 10px; border: 1px solid #e5e7eb; border-radius: 6px; background: #f8fafc; color: #555; font-size: 12px; line-height: 1.5; }
 .github-sync-status.success { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
 .github-sync-status.error { border-color: #fecaca; background: #fef2f2; color: #b91c1c; }
+#github-sync-status.error { white-space: pre-line; }
 .github-sync-modal-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .github-sync-modal-actions button { flex: 1 1 140px; }
 .github-sync-disconnect { margin-right: auto; color: #b91c1c; }
@@ -10264,7 +10265,7 @@ select.sh-field-input,
         자동 동기화 사용
       </label>
       <p class="github-sync-help">
-        변경 데이터는 최대 5분 간격으로 업로드됩니다. 토큰에는 asp0902/TRPG-Management-Tool-data 저장소의
+        변경 데이터는 최대 5분 간격으로 업로드됩니다.<br>토큰에는 asp0902/TRPG-Management-Tool-data 저장소의
         <strong>Contents 읽기/쓰기</strong> 권한만 부여하세요.
         <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">토큰 만들기</a>
       </p>
@@ -27000,7 +27001,7 @@ function setGitHubSyncStatus(message, type = '') {
   githubSyncStatusType = type;
   const status = document.getElementById('github-sync-status');
   if (status) {
-    status.textContent = message;
+    status.textContent = type === 'error' ? message.replace(/(to be processed\.)[ \t]+/gi, '$1\n') : message;
     status.classList.toggle('success', type === 'success');
     status.classList.toggle('error', type === 'error');
   }
@@ -27030,7 +27031,7 @@ function openGitHubSyncModal() {
   gdriveFieldRefresh();
   const lastAt = localStorage.getItem(GITHUB_SYNC_LAST_AT_KEY);
   const failText = githubSyncFailureText();
-  setGitHubSyncStatus(failText ? `동기화 실패 — ${failText}${lastAt ? ` · 마지막 성공: ${new Date(lastAt).toLocaleString()}` : ''}` : (githubSyncStatus || (lastAt ? `마지막 동기화: ${new Date(lastAt).toLocaleString()}` : '연결되지 않음')), failText ? 'error' : githubSyncStatusType);
+  setGitHubSyncStatus(failText ? `동기화 실패\n— ${failText}${lastAt ? `\n마지막 성공: ${new Date(lastAt).toLocaleString()}` : ''}` : (githubSyncStatus || (lastAt ? `마지막 동기화: ${new Date(lastAt).toLocaleString()}` : '연결되지 않음')), failText ? 'error' : githubSyncStatusType);
   document.getElementById('github-sync-backdrop')?.classList.add('open');
   setTimeout(() => input?.focus(), 0);
 }
@@ -27069,8 +27070,9 @@ function scheduleGitHubSync() {
 }
 // 요청에 시간 제한이 없으면 큰 업로드가 멈춰도 오류 없이 영원히 「동기화 중」으로 남아 이후 동기화가 모두 같은 요청을 기다린다(#358). 기본 60초, 업로드는 본문 크기에 비례.
 const GITHUB_SYNC_TIMEOUT_MS = 60 * 1000;
-const GITHUB_SYNC_MAX_BODY_BYTES = 95 * 1024 * 1024;
-const GITHUB_SYNC_PART_BYTES = 40 * 1024 * 1024;
+// Contents API 에서 40 MiB 는 422 로 거절되고 16 MiB 쓰기·읽기는 확인됐다.
+const GITHUB_SYNC_API_FILE_BYTES = 16 * 1024 * 1024;
+const GITHUB_SYNC_LEGACY_PART_BYTES = 40 * 1024 * 1024;
 const GITHUB_SYNC_PART_FORMAT = 'trpg-tool-split-v1';
 const GITHUB_SYNC_PENDING_KEY = 'trpg-github-sync-pending';
 const GITHUB_SYNC_FAIL_KEY = 'trpg-github-sync-fail';
@@ -27087,7 +27089,7 @@ function githubSyncFailureInfo() { try { return JSON.parse(localStorage.getItem(
 function githubSyncFailureText(rec = githubSyncFailureInfo(), now = Date.now()) {
   if (!rec) return '';
   const days = Math.floor((now - Date.parse(rec.firstAt)) / 86400000);
-  return `${rec.count}회 연속 실패${days >= 1 ? `(${days}일째)` : ''} · 마지막 실패 ${new Date(rec.at).toLocaleString()} · ${rec.message}`;
+  return `${rec.count}회 연속 실패${days >= 1 ? `(${days}일째)` : ''} · 마지막 실패 ${new Date(rec.at).toLocaleString()}\n${rec.message}`;
 }
 async function githubSyncRequest(url, options = {}, readBody) {
   const token = getGitHubSyncToken();
@@ -27165,16 +27167,17 @@ async function getGitHubSyncRemote(meta) {
   return { ...meta, data };
 }
 async function readGitHubSyncParts(manifest) {
-  const { trpgSyncFormat, savedAt, size, parts } = manifest;
+  const { trpgSyncFormat, savedAt, size, parts, partBytes = GITHUB_SYNC_LEGACY_PART_BYTES } = manifest;
   if (trpgSyncFormat !== GITHUB_SYNC_PART_FORMAT || typeof savedAt !== 'string' || !Number.isFinite(Date.parse(savedAt))
+    || !Number.isSafeInteger(partBytes) || partBytes <= 0 || partBytes > GITHUB_SYNC_LEGACY_PART_BYTES
     || !Number.isSafeInteger(size) || size <= 0 || !Array.isArray(parts)
-    || parts.length !== Math.ceil(size / GITHUB_SYNC_PART_BYTES)
+    || parts.length !== Math.ceil(size / partBytes)
     || parts.some(sha => typeof sha !== 'string' || !/^[a-f0-9]{40}$/.test(sha))) {
     throw new Error('동기화 조각 목록 형식이 올바르지 않습니다.');
   }
   const blobs = [];
   for (const [index, sha] of parts.entries()) {
-    const expectedSize = Math.min(GITHUB_SYNC_PART_BYTES, size - index * GITHUB_SYNC_PART_BYTES);
+    const expectedSize = Math.min(partBytes, size - index * partBytes);
     const blob = await fetchGitHubBlob(`sync-state/${sha}`, expectedSize);
     if (blob.size !== expectedSize || await githubSyncBlobSha(blob) !== sha) {
       throw new Error(`동기화 조각 ${index + 1}/${parts.length}의 크기 또는 해시가 맞지 않습니다.`);
@@ -27213,8 +27216,8 @@ function githubSyncCountText() {
 }
 async function writeGitHubSyncParts(blob, savedAt) {
   const parts = [];
-  for (let offset = 0; offset < blob.size; offset += GITHUB_SYNC_PART_BYTES) {
-    const part = blob.slice(offset, offset + GITHUB_SYNC_PART_BYTES);
+  for (let offset = 0; offset < blob.size; offset += GITHUB_SYNC_API_FILE_BYTES) {
+    const part = blob.slice(offset, offset + GITHUB_SYNC_API_FILE_BYTES);
     const sha = await githubSyncBlobSha(part);
     const path = `sync-state/${sha}`;
     const url = githubContentsUrl(path);
@@ -27234,7 +27237,7 @@ async function writeGitHubSyncParts(blob, savedAt) {
     }
     parts.push(sha);
   }
-  return new Blob([JSON.stringify({ trpgSyncFormat: GITHUB_SYNC_PART_FORMAT, savedAt, size: blob.size, parts })]);
+  return new Blob([JSON.stringify({ trpgSyncFormat: GITHUB_SYNC_PART_FORMAT, savedAt, size: blob.size, partBytes: GITHUB_SYNC_API_FILE_BYTES, parts })]);
 }
 async function putGitHubSyncPayload(payload, sha = '') {
   githubSyncMark('stringify');
@@ -27248,12 +27251,11 @@ async function putGitHubSyncPayload(payload, sha = '') {
   if (sha) body.sha = sha;
   // 시각은 목록에 기록해 같은 내용으로 재시도하면 이미 올라간 조각을 재사용한다.
   const legacy = new Blob([JSON.stringify({ savedAt }).slice(0, -1), snapshot.size > 2 ? ',' : '', snapshot.slice(1)]);
-  const fits = Math.ceil(legacy.size / 3) * 4 + JSON.stringify(body).length <= GITHUB_SYNC_MAX_BODY_BYTES;
+  const fits = legacy.size <= GITHUB_SYNC_API_FILE_BYTES;
   if (!fits) githubSyncMark('upload-parts');
   const latest = fits ? legacy : await writeGitHubSyncParts(snapshot, savedAt);
+  if (latest.size > GITHUB_SYNC_API_FILE_BYTES) throw new Error('GitHub 최신본 요청이 업로드 한도를 초과했습니다.');
   body.content = await blobToBase64(latest);
-  const bodyText = JSON.stringify(body);
-  if (bodyText.length > GITHUB_SYNC_MAX_BODY_BYTES) throw new Error('GitHub 최신본 요청이 업로드 한도를 초과했습니다.');
   const expectedSha = await githubSyncBlobSha(latest);
   // GitHub가 최신본을 저장한 뒤 응답만 끊겨도 다음 동기화가 완료 여부를 확인할 수 있다.
   localStorage.setItem(GITHUB_SYNC_PENDING_KEY, JSON.stringify({ sha: expectedSha, savedAt }));
@@ -27261,7 +27263,7 @@ async function putGitHubSyncPayload(payload, sha = '') {
   const result = await githubSyncRequest(getGitHubSyncApiUrl(), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: bodyText,
+    body: JSON.stringify(body),
   }, response => response.json());
   if (result?.content?.sha !== expectedSha) {
     throw new Error('GitHub에서 최신본 업로드 결과를 확인하지 못했습니다. 다시 시도해 주세요.');
@@ -27524,7 +27526,7 @@ function syncGitHubState(options = {}) {
   githubSyncInFlight = runGitHubSync(options).catch(err => {
     console.error('GitHub sync failed:', err);
     const fail = githubSyncRecordFailure(err?.message || '동기화에 실패했습니다.');
-    setGitHubSyncStatus((err?.message || '동기화에 실패했습니다.') + ' — ' + githubSyncFailureText(fail), 'error');
+    setGitHubSyncStatus(`${fail.message}\n— ${githubSyncFailureText(fail)}`, 'error');
     githubSyncWarnLongFailure(fail);
     return false;
   }).then(ok => { if (ok === true) githubSyncClearFailure(); return ok; }).finally(() => {
@@ -35142,18 +35144,17 @@ async function removeAttachment(attId) {
   renderAttachmentList();
 }
 // ── 첨부 파일 GitHub 백업 ──
-// sync 브랜치 attachments/{sha256} 에 파일별로 올린다(Contents API: 파일 100MB 한도, 요청 본문은 base64 라 약 133%). 그래서 40MB 이상은 조각으로 나눈다:
-//   attachments/{sha256}.part0 … + attachments/{sha256}.json(조각 목록, 마지막에 올려 완료 표시). 받을 때 합쳐 sha256 을 검증한다.
+// sync 브랜치 attachments/{sha256} 에 파일별로 올리고 Contents API 요청 상한을 넘으면 분할한다.
+//   attachments/{sha256}.{조각 크기}.part0 … + attachments/{sha256}.json(마지막에 올리는 목록). 받을 때 합쳐 sha256 을 검증한다.
 // 같은 해시는 다시 올리지 않고(존재 확인), 실패하면 다음 동기화 때 이어서 다시 올린다. 파일 본문은 동기화 JSON 에 들어가지 않는다.
-const ATTACH_SPLIT_BYTES = 40 * 1024 * 1024;
+const ATTACH_SPLIT_BYTES = GITHUB_SYNC_API_FILE_BYTES;
 const attachBackupState = new Map(); // sha256 -> 'uploading' | 'error'
 let attachDoneSet = new Set();       // 업로드 완료한 sha256 (status 저장소와 동기)
 let attachLocalSet = new Set();      // 이 기기에 본문이 있는 sha256
 let attachSyncRunning = false;
 const githubContentsUrl = path => `https://api.github.com/repos/${GITHUB_SYNC_REPO}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
 async function githubFileExists(path) {
-  const response = await githubSyncRequest(`${githubContentsUrl(path)}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}`, { allow404: true });
-  return !!response;
+  return !!await getGitHubSyncFileMeta(githubContentsUrl(path));
 }
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
@@ -35468,17 +35469,19 @@ async function fetchGitHubBlob(path, size = 0) {
 async function uploadAttachmentToGitHub(sha, blob) {
   const base = `attachments/${sha}`;
   const message = `첨부 ${sha.slice(0, 8)}`;
-  if (blob.size < ATTACH_SPLIT_BYTES) {
-    if (!await githubFileExists(base)) await putGitHubFile(base, blob, message);
+  if (await githubFileExists(base) || await githubFileExists(`${base}.json`)) return;
+  if (blob.size <= ATTACH_SPLIT_BYTES) {
+    await putGitHubFile(base, blob, message);
     return;
   }
-  if (await githubFileExists(`${base}.json`)) return; // 목록이 있으면 조각은 모두 올라간 것
   const parts = [];
   for (let i = 0; i * ATTACH_SPLIT_BYTES < blob.size; i += 1) {
     const piece = blob.slice(i * ATTACH_SPLIT_BYTES, (i + 1) * ATTACH_SPLIT_BYTES);
-    const name = `${base}.part${i}`;
-    if (!await githubFileExists(name)) await putGitHubFile(name, piece, `${message} 조각 ${i}`);
-    parts.push({ name: `${sha}.part${i}`, size: piece.size });
+    // 이전 분할 크기로 중단된 업로드와 경로가 겹치지 않는다.
+    const name = `${sha}.${ATTACH_SPLIT_BYTES}.part${i}`;
+    const path = `attachments/${name}`;
+    if (!await githubFileExists(path)) await putGitHubFile(path, piece, `${message} 조각 ${i}`);
+    parts.push({ name, size: piece.size });
   }
   await putGitHubFile(`${base}.json`, new Blob([JSON.stringify({ sha256: sha, size: blob.size, chunkBytes: ATTACH_SPLIT_BYTES, parts })]), `${message} 목록`);
 }

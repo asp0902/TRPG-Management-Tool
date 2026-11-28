@@ -8,7 +8,7 @@ const vm = require('node:vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'TRPG 작업 관리 도구.html'), 'utf8');
 const cut = (start, end) => html.slice(html.indexOf(start), html.indexOf(end));
 const syncCode = cut('const GITHUB_SYNC_TIMEOUT_MS', 'const GITHUB_SYNC_STALE_MS')
-  .replace('95 * 1024 * 1024', '1024').replace('40 * 1024 * 1024', '128');
+  .replace('16 * 1024 * 1024', '1024').replace('40 * 1024 * 1024', '1536');
 const latest = 'trpg-tool.latest.json';
 const server = 'https://api.github.com/contents/';
 const savedAt = '2026-11-28T10:20:00.000Z';
@@ -41,10 +41,10 @@ function fixture() {
         if (options.headers.Accept === 'application/vnd.github.raw+json') return new Response(data);
         return Response.json({ sha: gitSha(data), size: data.length });
       }
-      assert.ok(options.body.length <= 1024);
       const { branch, content, sha } = JSON.parse(options.body);
       assert.equal(branch, 'sync');
       const data = Buffer.from(content, 'base64');
+      assert.ok(data.length <= 1024);
       puts.push(name);
       const failure = api.beforePut?.(name, data);
       if (failure) return Response.json({}, { status: failure });
@@ -54,8 +54,10 @@ function fixture() {
       return Response.json({ content: { sha: gitSha(data), size: data.length } }, { status: 201 });
     },
   });
-  vm.runInContext(syncCode + cut('async function putGitHubFile', '// 이미지 전용 공개 저장소')
-    + cut('async function fetchGitHubBlob', 'async function uploadAttachmentToGitHub'), context);
+  vm.runInContext(syncCode + 'const ATTACH_SPLIT_BYTES = GITHUB_SYNC_API_FILE_BYTES;'
+    + cut('async function githubFileExists', 'function blobToBase64')
+    + cut('async function putGitHubFile', '// 이미지 전용 공개 저장소')
+    + cut('async function fetchGitHubBlob', 'async function fetchAttachmentFromGitHub'), context);
   api.context = context;
   api.read = async () => (await context.getGitHubSyncRemote(await context.getGitHubSyncMeta())).data;
   api.write = (data, sha) => context.putGitHubSyncPayload(data, sha);
@@ -64,10 +66,10 @@ function fixture() {
 
 function largeState() {
   const prefix = '{"version":3,"scenarios":[{"id":"s","title":"';
-  const boundary = 'x'.repeat(127 - Buffer.byteLength(prefix)) + '🚀';
+  const boundary = 'x'.repeat(1023 - Buffer.byteLength(prefix)) + '🚀';
   return {
     savedAt, version: 3, scenarios: [{ id: 's', title: boundary }],
-    records: Array.from({ length: 14 }, (_, id) => ({ id, notes: `${id} ${'한글'.repeat(id + 1)}` })),
+    records: Array.from({ length: 14 }, (_, id) => ({ id, notes: `${id} ${'한글'.repeat((id + 1) * 14)}` })),
     bookmarks: [{ id: 'with-file', attachments: [{ sha256: '1'.repeat(64), size: 55 }] }],
     musicTracks: [{ id: 'music', attached: true, sha256: '2'.repeat(64) }],
     futureField: { other: '그대로' },
@@ -92,11 +94,48 @@ test('UTF-8 문자가 경계에 걸려도 나눈 전체 상태와 파일 참조�
   await api.write(data);
   const manifest = JSON.parse(api.files.get(latest));
   assert.equal(manifest.trpgSyncFormat, 'trpg-tool-split-v1');
+  assert.equal(manifest.partBytes, 1024);
   assert.ok(manifest.parts.length > 4);
   assert.equal(api.puts.at(-1), latest);
   const firstPart = api.files.get(`sync-state/${manifest.parts[0]}`);
-  assert.equal(firstPart[127], 0xf0, '4바이트 UTF-8 문자의 첫 바이트에서 조각이 잘린다');
+  assert.equal(firstPart[1023], 0xf0, '4바이트 UTF-8 문자의 첫 바이트에서 조각이 잘린다');
   assert.deepEqual(plain(await api.read()), data);
+});
+
+test('조각 크기를 기록하기 전의 분할 목록도 읽는다', async () => {
+  const api = fixture();
+  const { savedAt, ...state } = largeState();
+  const content = buffer(state);
+  const parts = [];
+  for (let offset = 0; offset < content.length; offset += 1536) {
+    const part = content.subarray(offset, offset + 1536);
+    const sha = gitSha(part);
+    api.files.set(`sync-state/${sha}`, part);
+    parts.push(sha);
+  }
+  api.files.set(latest, buffer({ trpgSyncFormat: 'trpg-tool-split-v1', savedAt, size: content.length, parts }));
+  assert.deepEqual(plain(await api.read()), { savedAt, ...state });
+});
+
+test('첨부를 작은 조각으로 올리고 이전 미완료 조각과 완성본을 구분한다', async () => {
+  const api = fixture();
+  const attachment = Buffer.alloc(2500, 7);
+  const sha = createHash('sha256').update(attachment).digest('hex');
+  const base = `attachments/${sha}`;
+  api.files.set(`${base}.part0`, Buffer.alloc(1536, 7));
+  await api.context.uploadAttachmentToGitHub(sha, new Blob([attachment]));
+  const manifest = JSON.parse(api.files.get(`${base}.json`));
+  assert.deepEqual(manifest.parts.map(part => part.size), [1024, 1024, 452]);
+  assert.ok(manifest.parts.every(part => part.name.startsWith(`${sha}.1024.part`)));
+  assert.deepEqual(Buffer.concat(manifest.parts.map(part => api.files.get(`attachments/${part.name}`))), attachment);
+  assert.equal(api.puts.at(-1), `${base}.json`);
+  api.puts.length = 0;
+  await api.context.uploadAttachmentToGitHub(sha, new Blob([attachment]));
+  assert.deepEqual(api.puts, []);
+  api.files.delete(`${base}.json`);
+  api.files.set(base, attachment);
+  await api.context.uploadAttachmentToGitHub(sha, new Blob([attachment]));
+  assert.deepEqual(api.puts, []);
 });
 
 test('중단 후에도 이전 최신본을 유지하고 재시도는 완료된 조각을 재사용한다', async () => {
@@ -137,7 +176,7 @@ test('손상되거나 빠진 조각과 잘못된 목록은 가져오기 전에 �
   await api.write(largeState());
   const manifest = JSON.parse(api.files.get(latest));
   const name = `sync-state/${manifest.parts[0]}`;
-  api.files.set(name, Buffer.alloc(128, 7));
+  api.files.set(name, Buffer.alloc(1024, 7));
   await assert.rejects(api.read(), /해시가 맞지 않습니다/);
   api.files.delete(name);
   await assert.rejects(api.read(), /404/);
