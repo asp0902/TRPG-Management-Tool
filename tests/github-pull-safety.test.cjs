@@ -8,17 +8,18 @@ const state = { musicTracks: [{ id: 'm' }, { id: 'n' }], bookmarks: [], scenario
 const ctx = {
   localStorage, state, console, setTimeout, clearTimeout, AbortController, Date, JSON, Math, Object, Array, String, Number,
   getGitHubSyncToken: () => 'tok', getGitHubSyncApiUrl: () => 'https://api/x', showToast: m => calls.push('toast:' + m), githubSyncMark: () => {},
-  fetch: (url, opt) => fetchImpl(url, opt), utf8ToBase64: t => t, makeImportPayloadRaw: d => Object.assign({ scenarios: [], musicTracks: [] }, d),
+  fetch: (url, opt) => fetchImpl(url, opt), makeImportPayloadRaw: d => Object.assign({ scenarios: [], musicTracks: [] }, d),
   confirm: () => confirmAnswer, saveProtectionSnapshot: async (p, reason) => { snapshots.push(reason); return true; }, makeStatePayload: () => ({ x: 1 }), bootMark: () => {},
   importPayloadHasData: () => true, replaceStateWithImportPayload: () => { replaced++; }, normalizeSidebarState: () => {}, persistNow: async () => { persisted++; return { savedAt: 'T' }; },
   rememberGitHubSync: () => {}, refreshAfterImport: () => {}, lastLocalSavedAt: new Date('2026-11-20T00:00:00Z').toISOString(), IMPORT_COLLECTION_KEYS: null, GITHUB_SYNC_BRANCH: 'sync',
+  githubSyncRevision: 0, makeImportSnapshot: () => ({ replaced }), restoreImportSnapshot: snapshot => { replaced = snapshot.replaced; },
 };
 vm.createContext(ctx);
-const code = cut('const IMPORT_COLLECTION_KEYS', 'function makeImportPayloadRaw') + cut('const GITHUB_SYNC_TIMEOUT_MS', 'async function githubSyncRequest') + cut('async function githubSyncRequest', 'async function getGitHubSyncMeta')
-  + cut('async function putGitHubSyncPayload', 'function rememberGitHubSync') + cut('const GITHUB_SYNC_STALE_MS', 'async function uploadGitHubSyncState') + cut('function replaceStateWithImportPayload', 'function mergeImportPayload');
+const code = cut('const IMPORT_COLLECTION_KEYS', 'function makeImportPayloadRaw') + cut('const GITHUB_SYNC_TIMEOUT_MS', 'async function getGitHubSyncFileMeta')
+  + cut('const GITHUB_SYNC_STALE_MS', 'async function uploadGitHubSyncState') + cut('function replaceStateWithImportPayload', 'function mergeImportPayload');
 // replaceStateWithImportPayload 는 state 전체를 건드리므로 별도 실행(위 mock 의 replace 카운터와 충돌하지 않게 이름 변경)
 const main = code.replace(/function replaceStateWithImportPayload[^]*$/, '');
-vm.runInContext(main + ';this.f={importAbsentKeys,githubSyncRecordFailure,githubSyncClearFailure,githubSyncFailureInfo,githubSyncFailureText,githubSyncRequest,putGitHubSyncPayload,githubSyncPullRisk,applyGitHubSyncRemote,githubSyncTimeoutMs}', ctx);
+vm.runInContext(main + ';this.f={importAbsentKeys,githubSyncRecordFailure,githubSyncClearFailure,githubSyncFailureInfo,githubSyncFailureText,githubSyncRequest,githubSyncPullRisk,applyGitHubSyncRemote,githubSyncTimeoutMs}', ctx);
 const fn = ctx.f;
 (async () => {
   // A. 키 없는 컬렉션
@@ -51,20 +52,23 @@ const fn = ctx.f;
   // 안전한 pull 은 확인·스냅샷 없이
   snapshots = []; replaced = 0; await fn.applyGitHubSyncRemote({ data: { savedAt: '2026-11-19T00:00:00Z', musicTracks: [{ id: 'z' }], scenarios: [1] }, sha: 'b', size: 10 }, false, { automatic: true });
   ok(replaced === 1 && snapshots.length === 0, '안전한 자동 pull 은 그대로 적용(스냅샷·확인 없음)');
+  ctx.persistNow = async () => { throw new Error('IndexedDB 쓰기 실패'); };
+  err = null; try { await fn.applyGitHubSyncRemote({ data: { savedAt: '2026-11-19T00:00:00Z', musicTracks: [{ id: 'z' }], scenarios: [1] }, sha: 'c', size: 10 }, false, { automatic: true }); } catch (e) { err = e.message; }
+  ok(replaced === 1 && err === 'IndexedDB 쓰기 실패', 'pull 저장 실패 시 교체 전 상태 복구');
   // D. 실패 기록·표시
   fn.githubSyncRecordFailure('GitHub 413: too large', Date.parse('2026-11-10T00:00:00Z')); const r2 = fn.githubSyncRecordFailure('시간 초과', Date.parse('2026-11-14T00:00:00Z'));
   ok(r2.count === 2 && r2.firstAt === '2026-11-10T00:00:00.000Z' && /2회 연속 실패\(4일째\)/.test(fn.githubSyncFailureText(r2, Date.parse('2026-11-14T00:00:00Z'))) && /시간 초과/.test(fn.githubSyncFailureText(r2)), '실패 기록: 횟수·처음 실패 시각·N일째·사유 표시');
   fn.githubSyncClearFailure(); ok(fn.githubSyncFailureInfo() === null && fn.githubSyncFailureText() === '', '성공하면 실패 기록 삭제');
-  // E. 시간 제한·크기 한도
+  // E. 시간 제한
   fetchImpl = (url, opt) => new Promise((resolve, reject) => { opt.signal.addEventListener('abort', () => { const e = new Error('aborted'); e.name = 'AbortError'; reject(e); }); });
   err = null; try { await fn.githubSyncRequest('https://x', { timeoutMs: 30 }); } catch (e) { err = e.message; }
   ok(/GitHub 요청 시간 초과/.test(err || ''), '응답이 없으면 시간 제한 후 오류(영원히 「동기화 중」에 머물지 않음)');
   ok(fn.githubSyncTimeoutMs(0) === 60000 && fn.githubSyncTimeoutMs(67 * 1048576) === 60000 + 67 * 1500, '업로드 시간 제한은 본문 크기에 비례(67MB → 160.5초)');
-  fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ content: { sha: 'S' } }) });
-  const big = { savedAt: new Date().toISOString(), blob: 'x'.repeat(96 * 1048576) };
-  err = null; try { await fn.putGitHubSyncPayload(big, ''); } catch (e) { err = e.message; }
-  ok(/너무 큽니다\(\d+MB\)/.test(err || ''), '본문이 95MB 를 넘으면 요청 전에 이유를 알림');
-  ok(await fn.putGitHubSyncPayload({ savedAt: new Date().toISOString(), a: 1 }, '') === 'S', '정상 크기 업로드는 그대로');
+  fetchImpl = async (_url, opt) => ({ ok: true, status: 200, blob: () => new Promise((resolve, reject) => {
+    opt.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+  }) });
+  err = null; try { await fn.githubSyncRequest('https://x', { timeoutMs: 30 }, response => response.blob()); } catch (e) { err = e.message; }
+  ok(/GitHub 요청 시간 초과/.test(err || ''), '헤더를 받은 뒤 본문이 멈춰도 시간 제한 적용');
   ok(/githubSyncClearFailure\(\); return ok;/.test(html) && /githubSyncWarnLongFailure\(fail\)/.test(html) && /동기화 실패: /.test(html), '동기화 성공 시 실패 기록 삭제·3일 이상 실패 경고·버튼 툴팁/모달에 실패 표시');
   process.exit(f ? 1 : 0);
 })();

@@ -26962,6 +26962,7 @@ const GITHUB_SYNC_IDLE_MS = 60 * 1000;
 const GITHUB_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 let githubSyncDirty = false;
 let githubSyncDirtySince = 0;
+let githubSyncRevision = 0;
 let githubSyncTimer = null;
 let githubSyncPollTimer = null;
 let githubSyncInFlight = null;
@@ -27049,6 +27050,7 @@ function startGitHubSyncTimers() {
   if (githubSyncDirty) scheduleGitHubSync();
 }
 function markGitHubSyncDirty() {
+  githubSyncRevision += 1;
   githubSyncDirty = true;
   if (!githubSyncDirtySince) githubSyncDirtySince = Date.now();
   scheduleGitHubSync();
@@ -27067,7 +27069,10 @@ function scheduleGitHubSync() {
 }
 // 요청에 시간 제한이 없으면 큰 업로드가 멈춰도 오류 없이 영원히 「동기화 중」으로 남아 이후 동기화가 모두 같은 요청을 기다린다(#358). 기본 60초, 업로드는 본문 크기에 비례.
 const GITHUB_SYNC_TIMEOUT_MS = 60 * 1000;
-const GITHUB_SYNC_MAX_BODY_BYTES = 95 * 1024 * 1024; // Contents API 파일 한도 100MB 에 근접하면 요청 전에 이유를 알려 준다
+const GITHUB_SYNC_MAX_BODY_BYTES = 95 * 1024 * 1024;
+const GITHUB_SYNC_PART_BYTES = 40 * 1024 * 1024;
+const GITHUB_SYNC_PART_FORMAT = 'trpg-tool-split-v1';
+const GITHUB_SYNC_PENDING_KEY = 'trpg-github-sync-pending';
 const GITHUB_SYNC_FAIL_KEY = 'trpg-github-sync-fail';
 const GITHUB_SYNC_FAIL_WARN_MS = 3 * 24 * 60 * 60 * 1000;
 function githubSyncTimeoutMs(bodyBytes = 0) { return GITHUB_SYNC_TIMEOUT_MS + Math.ceil(bodyBytes / 1048576) * 1500; }
@@ -27084,15 +27089,14 @@ function githubSyncFailureText(rec = githubSyncFailureInfo(), now = Date.now()) 
   const days = Math.floor((now - Date.parse(rec.firstAt)) / 86400000);
   return `${rec.count}회 연속 실패${days >= 1 ? `(${days}일째)` : ''} · 마지막 실패 ${new Date(rec.at).toLocaleString()} · ${rec.message}`;
 }
-async function githubSyncRequest(url, options = {}) {
+async function githubSyncRequest(url, options = {}, readBody) {
   const token = getGitHubSyncToken();
   if (!token) throw new Error('GitHub 토큰이 없습니다.');
   const controller = typeof AbortController === 'function' ? new AbortController() : null;
   const timeoutMs = options.timeoutMs || githubSyncTimeoutMs(typeof options.body === 'string' ? options.body.length : 0);
   const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
-  let response;
   try {
-    response = await fetch(url, {
+    const response = await fetch(url, {
     cache: 'no-store',
     ...options,
     signal: controller ? controller.signal : undefined,
@@ -27103,43 +27107,87 @@ async function githubSyncRequest(url, options = {}) {
       ...(options.headers || {}),
     },
   });
+    if (options.allow404 && response.status === 404) return null;
+    if (!response.ok) {
+      let detail = '';
+      try { detail = (await response.json())?.message || ''; } catch(e) {}
+      throw new Error(`GitHub ${response.status}${detail ? `: ${detail}` : ''}`);
+    }
+    return readBody ? await readBody(response) : response;
   } catch (err) {
     if (err && err.name === 'AbortError') throw new Error(`GitHub 요청 시간 초과(${Math.round(timeoutMs / 1000)}초): 네트워크가 느리거나 데이터가 너무 큽니다.`);
     throw err;
   } finally { if (timer) clearTimeout(timer); }
-  if (options.allow404 && response.status === 404) return null;
-  if (!response.ok) {
-    let detail = '';
-    try { detail = (await response.json())?.message || ''; } catch(e) {}
-    throw new Error(`GitHub ${response.status}${detail ? `: ${detail}` : ''}`);
+}
+async function getGitHubSyncFileMeta(url) {
+  const data = await githubSyncRequest(`${url}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}`, {
+    allow404: true,
+    headers: { Accept: 'application/vnd.github.object+json' },
+  }, response => response.json());
+  if (!data) return null;
+  if (!/^[a-f0-9]{40}$/.test(data.sha) || !Number.isSafeInteger(data.size) || data.size < 0) {
+    throw new Error('GitHub 파일 정보를 확인하지 못했습니다.');
   }
-  return response;
+  return { sha: data.sha, size: data.size };
 }
 async function getGitHubSyncMeta() {
-  const url = `${getGitHubSyncApiUrl()}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}`;
-  const response = await githubSyncRequest(url, { allow404: true });
-  if (!response) {
+  const meta = await getGitHubSyncFileMeta(getGitHubSyncApiUrl());
+  if (!meta) {
     // 토큰에 저장소 권한이 없어도 GitHub 는 404 를 돌려준다. 저장소에 접근되는지 먼저 확인한다.
     const repo = await githubSyncRequest(`https://api.github.com/repos/${GITHUB_SYNC_REPO}`, { allow404: true });
     if (!repo) throw new Error('토큰이 저장소에 접근할 수 없습니다. 토큰 권한과 저장소 이름을 확인하세요.');
     return { exists: false, sha: '', size: 0 };
   }
-  const data = await response.json();
-  return { exists: true, sha: data.sha || '', size: Number(data.size) || 0 };
+  return { exists: true, ...meta };
+}
+async function githubSyncBlobSha(blob) {
+  // Contents API 가 돌려주는 Git blob SHA 와 원본 바이트를 대조한다.
+  const bytes = await new Blob([`blob ${blob.size}\0`, blob]).arrayBuffer();
+  const digest = await crypto.subtle.digest('SHA-1', bytes);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 async function getGitHubSyncRemote(meta) {
   // 메타 요청과 다른 URL(&raw=sha)로 받아 같은 URL 의 캐시 응답이 섞이지 않게 한다.
   const url = `${getGitHubSyncApiUrl()}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}&raw=${encodeURIComponent(meta.sha || '1')}`;
-  const response = await githubSyncRequest(url, {
+  const blob = await githubSyncRequest(url, {
+    timeoutMs: githubSyncTimeoutMs(meta.size),
     headers: { Accept: 'application/vnd.github.raw+json' },
-  });
-  const text = await response.text();
+  }, response => response.blob());
+  if (blob.size !== meta.size || await githubSyncBlobSha(blob) !== meta.sha) {
+    throw new Error('GitHub 최신본이 읽는 동안 변경됐거나 파일이 올바르지 않습니다. 다시 시도해 주세요.');
+  }
   let data;
-  try { data = JSON.parse(text); }
+  try { data = JSON.parse(await blob.text()); }
   catch (err) { throw new Error('GitHub 최신본 JSON이 손상되었습니다.'); }
-  validateGitHubSyncRemoteData(data, meta, new TextEncoder().encode(text).length);
+  if (data?.trpgSyncFormat !== undefined) data = await readGitHubSyncParts(data);
+  validateGitHubSyncRemoteData(data, meta, blob.size);
   makeImportPayload(data);
   return { ...meta, data };
+}
+async function readGitHubSyncParts(manifest) {
+  const { trpgSyncFormat, savedAt, size, parts } = manifest;
+  if (trpgSyncFormat !== GITHUB_SYNC_PART_FORMAT || typeof savedAt !== 'string' || !Number.isFinite(Date.parse(savedAt))
+    || !Number.isSafeInteger(size) || size <= 0 || !Array.isArray(parts)
+    || parts.length !== Math.ceil(size / GITHUB_SYNC_PART_BYTES)
+    || parts.some(sha => typeof sha !== 'string' || !/^[a-f0-9]{40}$/.test(sha))) {
+    throw new Error('동기화 조각 목록 형식이 올바르지 않습니다.');
+  }
+  const blobs = [];
+  for (const [index, sha] of parts.entries()) {
+    const expectedSize = Math.min(GITHUB_SYNC_PART_BYTES, size - index * GITHUB_SYNC_PART_BYTES);
+    const blob = await fetchGitHubBlob(`sync-state/${sha}`, expectedSize);
+    if (blob.size !== expectedSize || await githubSyncBlobSha(blob) !== sha) {
+      throw new Error(`동기화 조각 ${index + 1}/${parts.length}의 크기 또는 해시가 맞지 않습니다.`);
+    }
+    blobs.push(blob);
+  }
+  let data;
+  try { data = JSON.parse(await new Blob(blobs).text()); }
+  catch (err) { throw new Error('동기화 조각의 JSON이 손상되었습니다.'); }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error('동기화 조각에 앱 데이터가 없습니다.');
+  }
+  return { ...data, savedAt };
 }
 const GITHUB_SYNC_DATA_KEYS = ['scenarios', 'records', 'catalog', 'cssMacros', 'folders', 'rulebooks', 'characters', 'bookmarks', 'dataSheets', 'musicTracks'];
 // 받은 값이 앱 데이터가 아니면(메타데이터 JSON, 빈 객체 …) 적용하지 않는다.
@@ -27163,40 +27211,83 @@ function importPayloadHasData(payload) {
 function githubSyncCountText() {
   return `시나리오 ${state.scenarios.length}개 · 기록 ${state.records.length}개 · CSS 매크로 ${state.cssMacros.length}개`;
 }
-function utf8ToBase64(text) {
-  const bytes = new TextEncoder().encode(text);
-  let binary = '';
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+async function writeGitHubSyncParts(blob, savedAt) {
+  const parts = [];
+  for (let offset = 0; offset < blob.size; offset += GITHUB_SYNC_PART_BYTES) {
+    const part = blob.slice(offset, offset + GITHUB_SYNC_PART_BYTES);
+    const sha = await githubSyncBlobSha(part);
+    const path = `sync-state/${sha}`;
+    const url = githubContentsUrl(path);
+    let existing = await getGitHubSyncFileMeta(url);
+    if (!existing) {
+      try {
+        const result = await putGitHubFile(path, part, `동기화 조각 ${sha.slice(0, 8)}`);
+        existing = result?.content;
+      } catch (err) {
+        if (!/^GitHub (409|422)\b/.test(err.message)) throw err;
+        existing = await getGitHubSyncFileMeta(url); // 같은 조각을 다른 기기가 먼저 올렸을 수 있다.
+        if (!existing) throw err;
+      }
+    }
+    if (existing?.sha !== sha || existing.size !== part.size) {
+      throw new Error(`동기화 조각 ${parts.length + 1}을 확인하지 못했습니다.`);
+    }
+    parts.push(sha);
   }
-  return btoa(binary);
+  return new Blob([JSON.stringify({ trpgSyncFormat: GITHUB_SYNC_PART_FORMAT, savedAt, size: blob.size, parts })]);
 }
 async function putGitHubSyncPayload(payload, sha = '') {
   githubSyncMark('stringify');
+  const { savedAt, ...data } = payload;
+  const snapshot = new Blob([JSON.stringify(data)]);
   const body = {
-    message: `자동 동기화 ${new Date(payload.savedAt).toLocaleString('ko-KR')}`,
-    content: utf8ToBase64(JSON.stringify(payload)),
+    message: `자동 동기화 ${new Date(savedAt).toLocaleString('ko-KR')}`,
+    content: '',
     branch: GITHUB_SYNC_BRANCH,
   };
   if (sha) body.sha = sha;
+  // 시각은 목록에 기록해 같은 내용으로 재시도하면 이미 올라간 조각을 재사용한다.
+  const legacy = new Blob([JSON.stringify({ savedAt }).slice(0, -1), snapshot.size > 2 ? ',' : '', snapshot.slice(1)]);
+  const fits = Math.ceil(legacy.size / 3) * 4 + JSON.stringify(body).length <= GITHUB_SYNC_MAX_BODY_BYTES;
+  if (!fits) githubSyncMark('upload-parts');
+  const latest = fits ? legacy : await writeGitHubSyncParts(snapshot, savedAt);
+  body.content = await blobToBase64(latest);
   const bodyText = JSON.stringify(body);
-  if (bodyText.length > GITHUB_SYNC_MAX_BODY_BYTES) throw new Error(`동기화 데이터가 너무 큽니다(${Math.round(bodyText.length / 1048576)}MB). GitHub 파일 한도(100MB)에 가까워 올리지 않았습니다. 큰 이미지·글꼴을 줄여 주세요.`);
+  if (bodyText.length > GITHUB_SYNC_MAX_BODY_BYTES) throw new Error('GitHub 최신본 요청이 업로드 한도를 초과했습니다.');
+  const expectedSha = await githubSyncBlobSha(latest);
+  // GitHub가 최신본을 저장한 뒤 응답만 끊겨도 다음 동기화가 완료 여부를 확인할 수 있다.
+  localStorage.setItem(GITHUB_SYNC_PENDING_KEY, JSON.stringify({ sha: expectedSha, savedAt }));
   githubSyncMark('upload');
-  const response = await githubSyncRequest(getGitHubSyncApiUrl(), {
+  const result = await githubSyncRequest(getGitHubSyncApiUrl(), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: bodyText,
-  });
-  const result = await response.json();
-  return result?.content?.sha || '';
+  }, response => response.json());
+  if (result?.content?.sha !== expectedSha) {
+    throw new Error('GitHub에서 최신본 업로드 결과를 확인하지 못했습니다. 다시 시도해 주세요.');
+  }
+  return result.content.sha;
 }
-function rememberGitHubSync(sha, syncedAt) {
+function recoverGitHubSyncPublication(meta) {
+  let pending;
+  try { pending = JSON.parse(localStorage.getItem(GITHUB_SYNC_PENDING_KEY) || 'null'); } catch (err) {}
+  if (meta.exists && pending?.sha === meta.sha && Number.isFinite(Date.parse(pending.savedAt))) {
+    localStorage.setItem(GITHUB_SYNC_LAST_SHA_KEY, pending.sha);
+    localStorage.setItem(GITHUB_SYNC_LAST_AT_KEY, pending.savedAt);
+    localStorage.removeItem(GITHUB_SYNC_PENDING_KEY);
+  }
+}
+function rememberGitHubSync(sha, syncedAt, revision = githubSyncRevision) {
   if (githubSyncTrace) githubSyncTrace.info.rememberedSha = sha || '';
   localStorage.setItem(GITHUB_SYNC_LAST_SHA_KEY, sha || '');
   localStorage.setItem(GITHUB_SYNC_LAST_AT_KEY, syncedAt || new Date().toISOString());
-  githubSyncDirty = false;
-  githubSyncDirtySince = 0;
+  localStorage.removeItem(GITHUB_SYNC_PENDING_KEY);
+  if (revision === githubSyncRevision) {
+    githubSyncDirty = false;
+    githubSyncDirtySince = 0;
+  } else {
+    scheduleGitHubSync();
+  }
 }
 const GITHUB_SYNC_STALE_MS = 3 * 24 * 60 * 60 * 1000; // 원격본이 로컬 마지막 저장보다 이만큼 오래됐으면 위험한 pull 로 본다
 const GITHUB_SYNC_LOSS_LABELS = { scenarios: '시나리오', records: '기록', catalog: '카탈로그', cssMacros: 'CSS 매크로', bookmarks: '북마크', musicTracks: 'MUSIC 곡', musicFolders: 'MUSIC 폴더', characters: '캐릭터', rulebooks: '룰북', dataSheets: '데이터 시트', folders: '폴더', characterFolders: '캐릭터 폴더', cssMacroFolders: 'CSS 매크로 폴더' };
@@ -27222,26 +27313,35 @@ async function applyGitHubSyncRemote(remote, refresh = true, options = {}) {
       : 'GitHub 최신본이 비어 있어 적용하지 않았습니다.');
   }
   bootMark('gh-payload-normalized');
-  replaceStateWithImportPayload(payload);
-  normalizeSidebarState({ promoteLegacyContent: true });
-  bootMark('gh-applied');
-  const saved = await persistNow();
+  const snapshot = makeImportSnapshot();
+  const revision = githubSyncRevision;
+  let saved;
+  try {
+    replaceStateWithImportPayload(payload);
+    normalizeSidebarState({ promoteLegacyContent: true });
+    bootMark('gh-applied');
+    saved = await persistNow();
+  } catch (err) {
+    restoreImportSnapshot(snapshot);
+    throw err;
+  }
   bootMark('gh-persisted');
-  rememberGitHubSync(remote.sha, saved.savedAt);
+  rememberGitHubSync(remote.sha, saved.savedAt, revision);
   githubSyncMark('refresh');
   if (refresh) refreshAfterImport(!options.keepView);
   bootMark('gh-refreshed');
 }
 async function uploadGitHubSyncState(meta, options = {}) {
   if (currentPage === 'script' && state.currentId) syncInfo({ commit: false });
-  if (!hasGitHubSyncData() && meta.exists && meta.size > 1024) {
+  if (!hasGitHubSyncData() && meta.exists && meta.size > 0) {
     const message = `이 기기의 데이터가 비어 있는데 GitHub에는 ${Math.round(meta.size / 1024)}KB의 데이터가 있습니다. 빈 데이터로 덮어쓰지 않았습니다.`;
     if (!options.manual || !confirm(`${message}\n\n정말 빈 데이터로 덮어쓸까요?`)) throw new Error(message);
   }
   githubSyncMark('persist');
+  const revision = githubSyncRevision;
   const payload = await persistNow();
   const sha = await putGitHubSyncPayload(payload, meta.exists ? meta.sha : '');
-  rememberGitHubSync(sha, payload.savedAt);
+  rememberGitHubSync(sha, payload.savedAt, revision);
 }
 async function runGitHubSync(options = {}) {
   if (appStateBlocked) return false; // 구 버전이 새 데이터를 덮어쓰지 않도록 동기화 중단(#356)
@@ -27251,6 +27351,7 @@ async function runGitHubSync(options = {}) {
   await flushPersist();
   bootMark('gh-sync-start');
   const meta = await getGitHubSyncMeta();
+  recoverGitHubSyncPublication(meta);
   githubSyncMark('download');
   bootMark('gh-meta-done');
   if (options.forcePull) {
@@ -27480,7 +27581,7 @@ function disconnectGitHubSync() {
   if (!getGitHubSyncToken()) return closeGitHubSyncModal();
   if (!confirm('이 기기에서 동기화 연결을 해제하시겠습니까?\nGitHub에 저장된 데이터는 삭제되지 않습니다.')) return;
   stopGitHubSyncTimers();
-  [GITHUB_SYNC_TOKEN_KEY, GITHUB_SYNC_ENABLED_KEY, GITHUB_SYNC_LAST_SHA_KEY, GITHUB_SYNC_LAST_AT_KEY].forEach(key => localStorage.removeItem(key));
+  [GITHUB_SYNC_TOKEN_KEY, GITHUB_SYNC_ENABLED_KEY, GITHUB_SYNC_LAST_SHA_KEY, GITHUB_SYNC_LAST_AT_KEY, GITHUB_SYNC_PENDING_KEY].forEach(key => localStorage.removeItem(key));
   githubSyncDirty = false;
   githubSyncDirtySince = 0;
   githubSyncStatus = '';
@@ -35063,10 +35164,10 @@ function blobToBase64(blob) {
   });
 }
 async function putGitHubFile(path, blob, message) {
-  await githubSyncRequest(githubContentsUrl(path), {
+  return await githubSyncRequest(githubContentsUrl(path), {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, content: await blobToBase64(blob), branch: GITHUB_SYNC_BRANCH }),
-  });
+  }, response => response.json());
 }
 // 이미지 전용 공개 저장소에 images/{sha256}.{ext} 로 올리고 raw URL 을 돌려준다. 이미 있으면 올리지 않는다(#243).
 function getGitHubImageRawUrl(path) {
@@ -35359,9 +35460,10 @@ function insertColorSplitMacro() {
   ta.dispatchEvent(new Event('input', { bubbles: true })); // 저장·미리보기 갱신
   closeColorSplitDialog();
 }
-async function fetchGitHubBlob(path) {
-  const response = await githubSyncRequest(`${githubContentsUrl(path)}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}&raw=1`, { headers: { Accept: 'application/vnd.github.raw+json' } });
-  return await response.blob();
+async function fetchGitHubBlob(path, size = 0) {
+  return await githubSyncRequest(`${githubContentsUrl(path)}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}&raw=1`, {
+    timeoutMs: githubSyncTimeoutMs(size), headers: { Accept: 'application/vnd.github.raw+json' },
+  }, response => response.blob());
 }
 async function uploadAttachmentToGitHub(sha, blob) {
   const base = `attachments/${sha}`;

@@ -44,6 +44,6 @@ assert.equal(guardContext.has({ scenarios: [], records: [] }), false);
 assert.equal(guardContext.has({ scenarios: [{}] }), true);
 assert.match(html, /토큰이 저장소에 접근할 수 없습니다/);
 assert.match(html, /if \(!importPayloadHasData\(payload\)\) \{[\s\S]*?throw new Error/, '빈 결과는 적용하지 않아야 합니다.');
-assert.match(html, /if \(!hasGitHubSyncData\(\) && meta\.exists && meta\.size > 1024\)/, '빈 로컬이 원격을 덮어쓰면 안 됩니다.');
+assert.match(html, /if \(!hasGitHubSyncData\(\) && meta\.exists && meta\.size > 0\)/, '빈 로컬이 크기가 작은 조각 목록도 덮어쓰면 안 됩니다.');
 
 console.log('github sync checks: OK');
