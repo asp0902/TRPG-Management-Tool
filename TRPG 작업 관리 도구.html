@@ -8047,6 +8047,10 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-dnd-death-marks input { margin: 0; accent-color: #111; }
 .sh-dnd-death-saves button:disabled { opacity: .5; cursor: default; }
 .sh-dnd-death-saves output:empty { display: none; }
+.sh-dnd-equipment-layout { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; min-width: 0; }
+.sh-dnd-equipment-layout > .sh-repeat-section { flex: 3 1 340px; min-width: 0; }
+.sh-dnd-equipment-layout > .sh-dnd-currency { flex: 1 1 180px; min-width: 0; }
+.sh-dnd-currency .sh-field-input:invalid { border-color: #b91c1c; }
 /* Repeatable section */
 .sh-repeat-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .sh-repeat-table th { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; text-align: left; padding: 4px 6px; border-bottom: 1px solid #ebebeb; background: #fafafa; }
@@ -53420,10 +53424,14 @@ function renderCharacterSheet(chId) {
         return '<label class="sh-hd-field" onclick="event.stopPropagation()"><span class="sh-hd-field-label">' + esc(hf.label) + '</span><input class="sh-cypher-limit-input" type="' + (hf.type === 'number' ? 'number' : 'text') + '" min="0" value="' + esc(String(hfVal)) + '" aria-label="' + esc(hf.ariaLabel || hf.label) + '" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" oninput="' + esc(hfHandler) + '"></label>';
       }).join('');
       if (headFieldsHtml) secHeaderHtml = secHeaderHtml.replace('class="sh-section-hd"', 'class="sh-section-hd sh-cypher-section-hd"').replace(/<\/div>$/, '<span class="sh-hd-fields">' + headFieldsHtml + '</span></div>');
-      return '<div class="sh-section sh-repeat-section"' + repeatAttrs + '>' + secHeaderHtml
+      var repeatSectionHtml = '<div class="sh-section sh-repeat-section"' + repeatAttrs + '>' + secHeaderHtml
         + '<div class="sh-section-body">' + (tpl.key === 'arianrhod2e' ? ar2eSummaryHtml(sheetData, sec.id, chId, sheetId) : '') + guideHtml + '<table class="sh-repeat-table"' + repeatAttrs + '>' + (isCocWeapons ? '<colgroup>' + [40, 11, 11, 6, 6, 6, 6, 6, 8].map(function(width) { return '<col style="width:' + width + '%">'; }).join('') + '</colgroup>' : (visibleFields.some(function(f) { return f.width; }) ? '<colgroup>' + visibleFields.map(function(f) { return f.width ? '<col style="width:' + (typeof f.width === 'number' ? f.width + 'px' : esc(f.width)) + '">' : '<col>'; }).join('') + '<col></colgroup>' : '')) + '<thead><tr>' + thHtml + '</tr></thead><tbody>' + pinnedHtml + rowsHtml + '</tbody></table>'
         + '<div class="sh-repeat-add-row"><button class="sh-repeat-add-btn" onclick="' + esc('addSheetRow(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ')') + '">＋ 항목 추가</button></div>'
         + '</div></div>';
+      if (tpl.key === 'dnd5e' && sec.id === 'equipment') {
+        return '<div class="sh-dnd-equipment-layout">' + repeatSectionHtml + renderDnd5eCurrency(sheetData.currency, chId, sheetId) + '</div>';
+      }
+      return repeatSectionHtml;
     } else {
       var sectionData = (sheetData[sec.id] && typeof sheetData[sec.id] === 'object') ? sheetData[sec.id] : {};
       var cols = sec.columns || 1;
@@ -56393,6 +56401,25 @@ function updateDnd5eDeathSaves(chId, sheetId, action, control) {
   }
   refreshDnd5eDeathSaves(panel, combat, message);
   persist();
+}
+
+function renderDnd5eCurrency(currency, chId, sheetId) {
+  var coins = [
+    { id: 'copper', label: '동화(Copper)' },
+    { id: 'silver', label: '은화(Silver)' },
+    { id: 'electrum', label: '호박금화(Electrum)' },
+    { id: 'gold', label: '금화(Gold)' },
+    { id: 'platinum', label: '백금화(Platinum)' },
+  ];
+  var args = JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',"currency",';
+  var fields = coins.map(function(coin) {
+    var handler = 'if(this.validity.valid)saveSheetField(' + args + JSON.stringify(coin.id) + ',this.value)';
+    return '<label class="sh-field"><span class="sh-field-label">' + esc(coin.label) + '</span>'
+      + '<input class="sh-field-input" type="number" min="0" step="1" placeholder="0" value="'
+      + esc(String(currency?.[coin.id] ?? '')) + '" oninput="' + esc(handler) + '"></label>';
+  }).join('');
+  return '<div class="sh-section sh-dnd-currency" data-section-id="currency"><div class="sh-section-hd">재화(Piece)</div>'
+    + '<div class="sh-section-body"><div class="sh-field-grid cols-1">' + fields + '</div></div></div>';
 }
 
 function autoResizeDnd5ePersonalityTextarea(el) {
