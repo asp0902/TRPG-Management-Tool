@@ -9,7 +9,7 @@ const legacy = { str: '15', str_bonus: '2.5', dex: '12', con: '8', con_bonus: '-
 const sheet = { id: 'sheet', templateKey: 'dnd5e', data: { abilities: { ...legacy } } };
 const state = { characters: [{ id: 'character', sheets: [sheet] }] };
 let saves = 0;
-const context = vm.createContext({ state, persist: () => { saves += 1; }, esc: value => String(value).replaceAll('"', '&quot;') });
+const context = vm.createContext({ state, document: { querySelector: () => null }, persist: () => { saves += 1; }, esc: value => String(value).replaceAll('"', '&quot;') });
 vm.runInContext(cut('const _DND5E_ABILITIES', 'function autoResizeDnd5ePersonalityTextarea')
   + cut('function saveDnd5eAbilityField', 'function saveCocWealthLedgerCell'), context);
 
