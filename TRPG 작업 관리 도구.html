@@ -8026,16 +8026,23 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
   .sh-dnd-personality-grid { grid-template-columns: 1fr; }
 }
 .sh-dnd-abilities { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(158px, 100%), 1fr)); gap: 8px; align-items: stretch; padding-bottom: 2px; }
+.sh-dnd-score-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: clamp(3px, .7vw, 8px); }
 .sh-dnd-ability { min-width: 0; border: 1px solid #e4e4e4; border-radius: 8px; background: #fafafa; padding: 8px; display: flex; flex-direction: column; gap: 6px; box-sizing: border-box; }
+.sh-dnd-score-grid .sh-dnd-ability { padding: clamp(3px, .7vw, 8px); }
 .sh-dnd-ability-label { font-size: 12px; font-weight: 800; color: #111; text-align: center; line-height: 1.2; white-space: nowrap; }
-.sh-dnd-ability-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; min-width: 0; }
+.sh-dnd-score-grid .sh-dnd-ability-label, .sh-dnd-ability-caption { white-space: normal; overflow-wrap: anywhere; }
+.sh-dnd-ability-values { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; min-width: 0; }
 .sh-dnd-ability-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.sh-dnd-ability-caption { font-size: 9px; font-weight: 700; color: #999; text-align: center; line-height: 1.1; white-space: nowrap; }
+.sh-dnd-ability-caption { font-size: 9px; font-weight: 700; color: #999; text-align: center; line-height: 1.1; }
 .sh-dnd-ability-input { width: 100%; height: 30px; min-width: 0; box-sizing: border-box; border: 1px solid #d8d8d8; border-radius: 6px; padding: 0 4px; font-size: 13px; line-height: 30px; font-family: inherit; color: #222; text-align: center; outline: none; background: #fff; appearance: textfield; }
 .sh-dnd-ability-input::-webkit-outer-spin-button,
 .sh-dnd-ability-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .sh-dnd-ability-input:focus { border-color: #111; }
 .sh-dnd-ability-input.is-final { background: #f1f1f1; color: #111; font-weight: 800; }
+@media(max-width:600px) {
+  .sh-dnd-score-grid .sh-dnd-ability-label { display: grid; place-content: center; min-height: 2.4em; }
+  .sh-dnd-score-grid .sh-dnd-ability-input { padding-inline: 2px; }
+}
 .sh-field-checkbox.sh-dnd-save-proficiency { justify-content: center; padding-top: 0; }
 .sh-dnd-save-roll { border: 1px solid #d8d8d8; border-radius: 6px; background: #fff; color: #222; padding: 5px; font: inherit; font-weight: 700; cursor: pointer; }
 .sh-dnd-save-roll:hover { border-color: #999; background: #f1f1f1; }
@@ -56263,7 +56270,7 @@ function renderDnd5eAbilitiesSection(sec, sectionData, chId, sheetId) {
     + '</div>';
   }).join('');
   return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'
-    + '<div class="sh-section-body"><div class="sh-dnd-abilities">' + cardsHtml + '</div></div></div>';
+    + '<div class="sh-section-body"><div class="sh-dnd-abilities sh-dnd-score-grid">' + cardsHtml + '</div></div></div>';
 }
 
 function getDnd5eCheckBonus(sheetData, key, proficient) {
