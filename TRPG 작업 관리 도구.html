@@ -10462,7 +10462,7 @@ const SHEET_TEMPLATES = {
         { id: 'hpTemp', label: 'HP 임시', type: 'number' },
         { id: 'ac', label: '방어도(AC)', type: 'number' },
         { id: 'initiative', label: '우선권(이니셔티브)', type: 'number' },
-        { id: 'speed', label: '이동속도', type: 'text' },
+        { id: 'speed', label: '이동속도(ft)', type: 'text' },
         { id: 'hitDice', label: 'HP 주사위', type: 'text' },
       ]},
       { id: 'attacks', label: '공격/주문', repeatable: true, fields: [
@@ -56010,7 +56010,7 @@ function renderDnd5eBuilder() {
     ['숙련 보너스', formatDnd5eSigned(d.prof)],
     ['HP', String(d.hp)],
     ['HP 주사위', d.hitDice],
-    ['이동속도', d.speed],
+    ['이동속도(ft)', d.speed],
     ['상시 감지', '감지 ' + d.passivePerception],
   ].map(function(row) {
     return '<div class="dnd-builder-preview-cell"><div class="dnd-builder-preview-k">' + esc(row[0]) + '</div><div class="dnd-builder-preview-v">' + esc(row[1]) + '</div></div>';
