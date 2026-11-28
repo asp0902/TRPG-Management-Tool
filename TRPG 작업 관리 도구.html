@@ -8039,10 +8039,10 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 @media(max-width:540px) {
   .sh-dnd-personality-grid { grid-template-columns: 1fr; }
 }
-.sh-dnd-abilities { display: grid; grid-template-columns: repeat(6, minmax(108px, 1fr)); gap: 8px; align-items: stretch; overflow-x: auto; padding-bottom: 2px; }
-.sh-dnd-ability { min-width: 108px; border: 1px solid #e4e4e4; border-radius: 8px; background: #fafafa; padding: 8px; display: flex; flex-direction: column; gap: 6px; box-sizing: border-box; }
+.sh-dnd-abilities { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(158px, 100%), 1fr)); gap: 8px; align-items: stretch; padding-bottom: 2px; }
+.sh-dnd-ability { min-width: 0; border: 1px solid #e4e4e4; border-radius: 8px; background: #fafafa; padding: 8px; display: flex; flex-direction: column; gap: 6px; box-sizing: border-box; }
 .sh-dnd-ability-label { font-size: 12px; font-weight: 800; color: #111; text-align: center; line-height: 1.2; white-space: nowrap; }
-.sh-dnd-ability-values { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; min-width: 0; }
+.sh-dnd-ability-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; min-width: 0; }
 .sh-dnd-ability-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .sh-dnd-ability-caption { font-size: 9px; font-weight: 700; color: #999; text-align: center; line-height: 1.1; white-space: nowrap; }
 .sh-dnd-ability-input { width: 100%; height: 30px; min-width: 0; box-sizing: border-box; border: 1px solid #d8d8d8; border-radius: 6px; padding: 0 4px; font-size: 13px; line-height: 30px; font-family: inherit; color: #222; text-align: center; outline: none; background: #fff; appearance: textfield; }
@@ -56052,9 +56052,8 @@ function applyDnd5eBuilder() {
   sheet.data.basic.passivePerceptionText = '감지';
   sheet.data.basic.passivePerception = d.passivePerception;
   _DND5E_ABILITIES.forEach(function(ability) {
-    var score = d.totals[ability.key];
-    sheet.data.abilities[ability.key] = String(score);
-    sheet.data.abilities[ability.key + '_bonus'] = formatDnd5eAbilityNumber((score - 10) / 2);
+    var base = d.state.abilities[ability.key];
+    setDnd5eAbilityParts(sheet.data.abilities, ability.key, String(base), String(d.totals[ability.key] - base));
   });
   sheet.data.combat.hpMax = d.hp;
   sheet.data.combat.hpCur = d.hp;
@@ -56140,44 +56139,60 @@ function formatDnd5eAbilityNumber(value) {
   return String(rounded).replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
 }
 
-function getDnd5eAbilityBonus(sectionData, abilityKey) {
-  sectionData = (sectionData && typeof sectionData === 'object') ? sectionData : {};
-  var bonusKey = abilityKey + '_bonus';
-  if (sectionData[bonusKey] !== undefined && sectionData[bonusKey] !== null && String(sectionData[bonusKey]) !== '') {
-    return String(sectionData[bonusKey]);
+function getDnd5eAbilityParts(data, key) {
+  if (key + '_base' in data) {
+    return {
+      base: String(data[key + '_base'] ?? ''),
+      adjustment: String(data[key + '_adjustment'] ?? ''),
+    };
   }
-  var savedScore = sectionData[abilityKey];
-  if (savedScore !== undefined && savedScore !== null && String(savedScore) !== '') {
-    var scoreNum = Number(savedScore);
-    if (isFinite(scoreNum)) return formatDnd5eAbilityNumber((scoreNum - 10) / 2);
+  // 옛 보정치는 10에 두 배를 더하는 값이었다. 표시되던 최종 수치를 그대로 복원한다.
+  var oldBonus = String(data[key + '_bonus'] ?? '');
+  if (oldBonus.trim() && Number.isFinite(Number(oldBonus))) {
+    var oldTotal = formatDnd5eAbilityNumber(10 + Number(oldBonus) * 2);
+    return { base: '10', adjustment: formatDnd5eAbilityNumber(Number(oldTotal) - 10) };
   }
-  return '';
+  var oldScore = String(data[key] ?? '');
+  return { base: oldScore.trim() && Number.isFinite(Number(oldScore)) ? oldScore : '10', adjustment: '' };
 }
 
-function getDnd5eAbilityScoreFromBonus(bonusValue) {
-  var bonus = Number(bonusValue);
-  if (!isFinite(bonus)) bonus = 0;
-  return formatDnd5eAbilityNumber(10 + (bonus * 2));
+function getDnd5eAbilityTotal(base, adjustment) {
+  if (base === '') return '';
+  return formatDnd5eAbilityNumber(Number(base) + Number(adjustment || 0));
+}
+
+function setDnd5eAbilityParts(data, key, base, adjustment) {
+  var score = getDnd5eAbilityTotal(base, adjustment);
+  data[key + '_base'] = base;
+  data[key + '_adjustment'] = adjustment;
+  data[key] = score;
+  data[key + '_bonus'] = score === '' ? '' : String((Number(score) - 10) / 2);
+  return score;
 }
 
 function renderDnd5eAbilitiesSection(sec, sectionData, chId, sheetId) {
   sectionData = (sectionData && typeof sectionData === 'object' && !Array.isArray(sectionData)) ? sectionData : {};
   var cardsHtml = _DND5E_ABILITIES.map(function(ability) {
-    var bonus = getDnd5eAbilityBonus(sectionData, ability.key);
-    var score = getDnd5eAbilityScoreFromBonus(bonus);
-    var handler = 'saveDnd5eAbilityBonus(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + JSON.stringify(ability.key) + ',this.value,this)';
+    var parts = getDnd5eAbilityParts(sectionData, ability.key);
+    var handlerStart = 'saveDnd5eAbilityField(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(ability.key) + ',';
+    var fields = [
+      { key: 'base', label: '기본 수치', value: parts.base },
+      { key: 'adjustment', label: '보정 수치', value: parts.adjustment },
+      { key: 'total', label: '최종 수치', value: getDnd5eAbilityTotal(parts.base, parts.adjustment) },
+    ].map(function(field) {
+      var isFinal = field.key === 'total';
+      var attrs = isFinal ? ' readonly tabindex="-1" data-dnd-final="' + esc(ability.key) + '"'
+        : ' oninput="' + esc(handlerStart + JSON.stringify(field.key) + ',this)') + '"';
+      if (field.key === 'adjustment') attrs += ' placeholder="0"';
+      return '<label class="sh-dnd-ability-field">'
+        + '<span class="sh-dnd-ability-caption">' + esc(field.label) + '</span>'
+        + '<input class="sh-dnd-ability-input' + (isFinal ? ' is-final' : '') + '" type="number" step="any"'
+        + ' aria-label="' + esc(ability.label + ' ' + field.label) + '" value="' + esc(field.value) + '"' + attrs + '>'
+        + '</label>';
+    }).join('');
     return '<div class="sh-dnd-ability">'
       + '<div class="sh-dnd-ability-label">' + esc(ability.label) + '</div>'
-      + '<div class="sh-dnd-ability-values">'
-        + '<div class="sh-dnd-ability-field">'
-          + '<div class="sh-dnd-ability-caption">보정치</div>'
-          + '<input class="sh-dnd-ability-input" type="number" step="any" value="' + esc(bonus) + '" placeholder="0" oninput="' + esc(handler) + '">'
-        + '</div>'
-        + '<div class="sh-dnd-ability-field">'
-          + '<div class="sh-dnd-ability-caption">최종</div>'
-          + '<input class="sh-dnd-ability-input is-final" type="number" value="' + esc(score) + '" readonly tabindex="-1" data-dnd-final="' + esc(ability.key) + '">'
-        + '</div>'
-      + '</div>'
+      + '<div class="sh-dnd-ability-values">' + fields + '</div>'
     + '</div>';
   }).join('');
   return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'
@@ -56830,22 +56845,19 @@ function saveArianrhod2eAbilityField(chId, sheetId, abilityKey, fieldKey, value,
   persist();
 }
 
-function saveDnd5eAbilityBonus(chId, sheetId, sectionId, abilityId, value, inputEl) {
+function saveDnd5eAbilityField(chId, sheetId, abilityId, field, inputEl) {
   var ch = state.characters.find(function(c) { return c.id === chId; });
   if (!ch) return;
   var sheet = (ch.sheets || []).find(function(s) { return s.id === sheetId; });
-  if (!sheet) return;
+  if (!sheet || sheet.templateKey !== 'dnd5e') return;
   if (!sheet.data) sheet.data = {};
-  if (!sheet.data[sectionId] || typeof sheet.data[sectionId] !== 'object' || Array.isArray(sheet.data[sectionId])) sheet.data[sectionId] = {};
-  var score = getDnd5eAbilityScoreFromBonus(value);
-  sheet.data[sectionId][abilityId + '_bonus'] = value;
-  sheet.data[sectionId][abilityId] = score;
+  if (!sheet.data.abilities || typeof sheet.data.abilities !== 'object' || Array.isArray(sheet.data.abilities)) sheet.data.abilities = {};
+  var parts = getDnd5eAbilityParts(sheet.data.abilities, abilityId);
+  parts[field] = inputEl.value;
+  var score = setDnd5eAbilityParts(sheet.data.abilities, abilityId, parts.base, parts.adjustment);
+  var finalInput = inputEl.closest('.sh-dnd-ability')?.querySelector('[data-dnd-final]');
+  if (finalInput) finalInput.value = score;
   persist();
-  if (inputEl && inputEl.closest) {
-    var card = inputEl.closest('.sh-dnd-ability');
-    var finalInput = card ? card.querySelector('[data-dnd-final="' + abilityId + '"]') : null;
-    if (finalInput) finalInput.value = score;
-  }
 }
 
 function saveCocWealthLedgerCell(chId, sheetId, sectionId, rowIdx, fieldId, value) {
