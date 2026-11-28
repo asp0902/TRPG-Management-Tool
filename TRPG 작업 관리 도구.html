@@ -8051,6 +8051,14 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-dnd-equipment-layout > .sh-repeat-section { flex: 3 1 340px; min-width: 0; }
 .sh-dnd-equipment-layout > .sh-dnd-currency { flex: 1 1 180px; min-width: 0; }
 .sh-dnd-currency .sh-field-input:invalid { border-color: #b91c1c; }
+.sh-dnd-rate-trigger { align-self: flex-start; padding: 0; border: 0; background: none; font-family: inherit; text-align: left; text-decoration: underline dotted; text-underline-offset: 2px; cursor: pointer; }
+.sh-section-hd .sh-dnd-rate-trigger { color: inherit; font: inherit; }
+.sh-dnd-rate-trigger:hover { color: #222; }
+.sh-dnd-rate-popup { box-sizing: border-box; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px); padding: 12px; border: 1px solid #ddd; border-radius: 10px; background: #fff; color: #222; box-shadow: 0 6px 24px #0003; }
+.sh-dnd-rate-popup-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.sh-dnd-rate-table { border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.sh-dnd-rate-table th, .sh-dnd-rate-table td { padding: 5px; border-bottom: 1px solid #eee; text-align: right; white-space: nowrap; }
+.sh-dnd-rate-table th:first-child { text-align: left; }
 /* Repeatable section */
 .sh-repeat-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .sh-repeat-table th { font-size: 10px; font-weight: 700; color: #999; letter-spacing: 0.04em; text-align: left; padding: 4px 6px; border-bottom: 1px solid #ebebeb; background: #fafafa; }
@@ -56405,21 +56413,38 @@ function updateDnd5eDeathSaves(chId, sheetId, action, control) {
 
 function renderDnd5eCurrency(currency, chId, sheetId) {
   var coins = [
-    { id: 'copper', label: '동화(Copper)' },
-    { id: 'silver', label: '은화(Silver)' },
-    { id: 'electrum', label: '호박금화(Electrum)' },
-    { id: 'gold', label: '금화(Gold)' },
-    { id: 'platinum', label: '백금화(Platinum)' },
+    { id: 'copper', label: '동화(Copper)', unit: 'CP', copper: 1 },
+    { id: 'silver', label: '은화(Silver)', unit: 'SP', copper: 10 },
+    { id: 'electrum', label: '호박금화(Electrum)', unit: 'EP', copper: 50 },
+    { id: 'gold', label: '금화(Gold)', unit: 'GP', copper: 100 },
+    { id: 'platinum', label: '백금화(Platinum)', unit: 'PP', copper: 1000 },
   ];
+  var popupId = 'dnd-currency-rates-' + sheetId;
+  var target = ' popovertarget="' + esc(popupId) + '"';
   var args = JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',"currency",';
   var fields = coins.map(function(coin) {
     var handler = 'if(this.validity.valid)saveSheetField(' + args + JSON.stringify(coin.id) + ',this.value)';
-    return '<label class="sh-field"><span class="sh-field-label">' + esc(coin.label) + '</span>'
-      + '<input class="sh-field-input" type="number" min="0" step="1" placeholder="0" value="'
-      + esc(String(currency?.[coin.id] ?? '')) + '" oninput="' + esc(handler) + '"></label>';
+    return '<div class="sh-field"><button type="button" class="sh-field-label sh-dnd-rate-trigger"' + target
+      + ' aria-label="' + esc(coin.label + ' 환산 비율') + '">' + esc(coin.label) + '</button>'
+      + '<input class="sh-field-input" type="number" min="0" step="1" placeholder="0" aria-label="' + esc(coin.label) + '" value="'
+      + esc(String(currency?.[coin.id] ?? '')) + '" oninput="' + esc(handler) + '"></div>';
   }).join('');
-  return '<div class="sh-section sh-dnd-currency" data-section-id="currency"><div class="sh-section-hd">재화(Piece)</div>'
-    + '<div class="sh-section-body"><div class="sh-field-grid cols-1">' + fields + '</div></div></div>';
+  var headers = coins.map(function(coin) { return '<th scope="col">' + coin.unit + '</th>'; }).join('');
+  var rows = coins.map(function(coin) {
+    var values = coins.map(function(other) {
+      var factor = coin.copper >= other.copper ? (coin.copper / other.copper).toLocaleString('en-US')
+        : '1/' + (other.copper / coin.copper).toLocaleString('en-US');
+      return '<td>' + factor + '</td>';
+    }).join('');
+    return '<tr><th scope="row">1 ' + coin.unit + '</th>' + values + '</tr>';
+  }).join('');
+  var popup = '<div class="sh-dnd-rate-popup" id="' + esc(popupId) + '" role="dialog" aria-labelledby="' + esc(popupId + '-title') + '" popover>'
+    + '<div class="sh-dnd-rate-popup-header"><strong id="' + esc(popupId + '-title') + '">화폐 환산 비율</strong>'
+    + '<button type="button" class="sh-dnd-save-roll"' + target + ' popovertargetaction="hide">닫기</button></div>'
+    + '<table class="sh-dnd-rate-table"><thead><tr><th scope="col">기준</th>' + headers + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+  return '<div class="sh-section sh-dnd-currency" data-section-id="currency"><div class="sh-section-hd">'
+    + '<button type="button" class="sh-dnd-rate-trigger"' + target + '>재화(Piece)</button></div>'
+    + '<div class="sh-section-body"><div class="sh-field-grid cols-1">' + fields + '</div></div>' + popup + '</div>';
 }
 
 function autoResizeDnd5ePersonalityTextarea(el) {
