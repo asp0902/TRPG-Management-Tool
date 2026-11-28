@@ -8044,6 +8044,12 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
   .sh-dnd-score-grid .sh-dnd-ability-input { padding-inline: 2px; }
 }
 .sh-field-checkbox.sh-dnd-save-proficiency { justify-content: center; padding-top: 0; }
+.sh-dnd-saving-throws .sh-dnd-save-proficiency { flex-wrap: wrap; gap: 3px; }
+.sh-dnd-saving-throws .sh-dnd-save-proficiency input { margin: 0; flex: none; }
+@media(max-width:600px) {
+  .sh-dnd-saving-throws .sh-dnd-save-proficiency input { width: 12px; height: 12px; }
+  .sh-dnd-saving-throws .sh-dnd-save-proficiency span { font-size: 10px; }
+}
 .sh-dnd-save-roll { border: 1px solid #d8d8d8; border-radius: 6px; background: #fff; color: #222; padding: 5px; font: inherit; font-weight: 700; cursor: pointer; }
 .sh-dnd-save-roll:hover { border-color: #999; background: #f1f1f1; }
 .sh-dnd-save-result { color: #222; font-size: 13px; }
@@ -56104,7 +56110,7 @@ function applyDnd5eBuilder() {
   sheet.data.basic.profBonus = d.prof;
   sheet.data.basic.passivePerceptionText = '감지';
   sheet.data.basic.passivePerception = d.passivePerception;
-  sheet.data.savingThrows = {};
+  if (!sheet.data.savingThrows || typeof sheet.data.savingThrows !== 'object' || Array.isArray(sheet.data.savingThrows)) sheet.data.savingThrows = {};
   if (!sheet.data.skills || typeof sheet.data.skills !== 'object' || Array.isArray(sheet.data.skills)) sheet.data.skills = {};
   sheet.data.skills.background = _DND5E_SKILLS.filter(function(skill) { return d.bg.traits.includes(skill.label); })
     .map(function(skill) { return skill.key; });
@@ -56311,30 +56317,46 @@ function renderDnd5eChecksSection(sec, sheetData, chId, sheetId) {
   var cards = (isSkill ? _DND5E_SKILLS : _DND5E_ABILITIES).map(function(item) {
     var check = getDnd5eRollCheck(sheetData, item);
     var heading = isSkill ? item.label + ' (' + item.ability.toUpperCase() + ')' : item.label;
-    var rollLabel = item.label + (isSkill ? ' 판정' : ' 내성 굴림');
     var proficiencyLabel = item.label + (isSkill ? ' 기술 숙련' : ' 내성 숙련');
     var change = 'saveSheetField(' + args + JSON.stringify(sec.id) + ',' + JSON.stringify(item.key) + ',this.checked)';
-    var roll = 'rollDnd5eCheck(' + args + 'this)';
+    var bonusText = formatDnd5eSigned(check.bonus);
+    var control;
+    if (isSkill) {
+      var rollLabel = item.label + ' 판정';
+      var roll = 'rollDnd5eCheck(' + args + 'this)';
+      control = '<button type="button" class="sh-dnd-save-roll" data-dnd-check="' + esc(item.key) + '" data-roll-label="' + esc(rollLabel) + '"'
+        + ' aria-label="' + esc(rollLabel + ' ' + bonusText) + '" onclick="' + esc(roll) + '">굴림 ' + esc(bonusText) + '</button>';
+    } else {
+      var bonusKey = item.key + '_bonus';
+      var save = 'if(this.validity.valid)saveSheetField(' + args + '"savingThrows",' + JSON.stringify(bonusKey) + ',this.value)';
+      control = '<input class="sh-dnd-ability-input" type="number" step="1" data-dnd-save-number="' + esc(item.key) + '"'
+        + ' aria-label="' + esc(item.label + ' 내성 수치') + '" title="비워 두면 자동 계산" placeholder="' + esc(bonusText) + '"'
+        + ' value="' + esc(String(sheetData.savingThrows?.[bonusKey] ?? '')) + '" oninput="' + esc(save) + '">';
+    }
     return '<div class="sh-dnd-ability">'
       + '<div class="sh-dnd-ability-label">' + esc(heading) + '</div>'
       + '<label class="sh-field-checkbox sh-dnd-save-proficiency"><input type="checkbox" aria-label="' + esc(proficiencyLabel) + '"'
       + (check.proficient ? ' checked' : '') + ' onchange="' + esc(change) + '"><span>숙련</span></label>'
-      + '<button type="button" class="sh-dnd-save-roll" data-dnd-check="' + esc(item.key) + '" data-roll-label="' + esc(rollLabel) + '"'
-      + ' aria-label="' + esc(rollLabel + ' ' + formatDnd5eSigned(check.bonus)) + '" onclick="' + esc(roll) + '">굴림 '
-      + esc(formatDnd5eSigned(check.bonus)) + '</button></div>';
+      + control + '</div>';
   }).join('');
   return '<div class="sh-section"><div class="sh-section-hd">' + esc(sec.label) + '</div>'
     + '<div class="sh-section-body sh-dnd-roll-checks ' + (isSkill ? 'sh-dnd-skills' : 'sh-dnd-saving-throws') + '"'
     + ' data-section-id="' + esc(sec.id) + '" data-ch-id="' + esc(chId) + '" data-sheet-id="' + esc(sheetId) + '">'
-    + '<div class="sh-dnd-abilities">' + cards + '</div><output class="sh-dnd-save-result" aria-live="polite"></output></div></div>';
+    + '<div class="sh-dnd-abilities' + (isSkill ? '' : ' sh-dnd-score-grid') + '">' + cards + '</div>'
+    + (isSkill ? '<output class="sh-dnd-save-result" aria-live="polite"></output>' : '') + '</div></div>';
 }
 
 function refreshDnd5eChecks(chId, sheet) {
   document.querySelectorAll('.sh-dnd-roll-checks').forEach(function(panel) {
     if (panel.dataset.chId !== chId || panel.dataset.sheetId !== sheet.id) return;
-    var items = panel.dataset.sectionId === 'skills' ? _DND5E_SKILLS : _DND5E_ABILITIES;
+    if (panel.dataset.sectionId === 'savingThrows') {
+      panel.querySelectorAll('[data-dnd-save-number]').forEach(function(input) {
+        input.placeholder = formatDnd5eSigned(getDnd5eSavingThrow(sheet.data, input.dataset.dndSaveNumber).bonus);
+      });
+      return;
+    }
     panel.querySelectorAll('[data-dnd-check]').forEach(function(button) {
-      var item = items.find(function(entry) { return entry.key === button.dataset.dndCheck; });
+      var item = _DND5E_SKILLS.find(function(entry) { return entry.key === button.dataset.dndCheck; });
       if (!item) return;
       var bonus = formatDnd5eSigned(getDnd5eRollCheck(sheet.data, item).bonus);
       button.textContent = '굴림 ' + bonus;
@@ -56346,14 +56368,13 @@ function refreshDnd5eChecks(chId, sheet) {
 function rollDnd5eCheck(chId, sheetId, button) {
   var ch = state.characters.find(function(c) { return c.id === chId; });
   var sheet = ch?.sheets?.find(function(s) { return s.id === sheetId && s.templateKey === 'dnd5e'; });
-  var panel = button.closest('.sh-dnd-roll-checks');
+  var panel = button.closest('.sh-dnd-skills');
   var result = panel?.querySelector('output');
-  var isSkill = panel?.dataset.sectionId === 'skills';
-  var item = (isSkill ? _DND5E_SKILLS : _DND5E_ABILITIES).find(function(entry) { return entry.key === button.dataset.dndCheck; });
+  var item = _DND5E_SKILLS.find(function(entry) { return entry.key === button.dataset.dndCheck; });
   if (!sheet || !result || !item) return;
   var bonus = getDnd5eRollCheck(sheet.data || {}, item).bonus;
   var roll = evalDiceFormula('1d20');
-  result.textContent = item.label + (isSkill ? ' 판정' : ' 내성') + ' · d20 ' + roll + ' ' + formatDnd5eSigned(bonus) + ' = ' + (roll + bonus);
+  result.textContent = item.label + ' 판정 · d20 ' + roll + ' ' + formatDnd5eSigned(bonus) + ' = ' + (roll + bonus);
 }
 
 function getDnd5eDeathSaves(combat) {

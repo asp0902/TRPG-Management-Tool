@@ -14,10 +14,11 @@ const sheet = { id: 'sheet', templateKey: 'dnd5e', data };
 const context = vm.createContext({
   state: { characters: [{ id: 'character', sheets: [sheet] }] },
   esc: value => String(value).replaceAll('"', '&quot;'),
-  evalDiceFormula: formula => { assert.equal(formula, '1d20'); return 12; },
+  document: { querySelectorAll: () => [] }, SHEET_TEMPLATES: {}, persist: () => {},
 });
 vm.runInContext(cut('function getDnd5eModifier', 'function getDnd5eBuilderDerived')
-  + cut('const _DND5E_ABILITIES', 'function autoResizeDnd5ePersonalityTextarea'), context);
+  + cut('const _DND5E_ABILITIES', 'function autoResizeDnd5ePersonalityTextarea')
+  + cut('function saveSheetField', 'function saveArianrhod2eVitalField'), context);
 
 const read = (key, candidate = data) => {
   const { proficient, bonus } = context.getDnd5eSavingThrow(candidate, key);
@@ -35,13 +36,20 @@ assert.deepEqual(read('con'), [true, 4]);
 
 const cards = context.renderDnd5eChecksSection({ id: 'savingThrows', label: '내성 굴림' }, data, 'character', 'sheet');
 assert.equal([...cards.matchAll(/type="checkbox"/g)].length, 6);
-assert.equal([...cards.matchAll(/data-dnd-check=/g)].length, 6);
+assert.equal([...cards.matchAll(/data-dnd-save-number=/g)].length, 6);
+assert.doesNotMatch(cards, /<button/);
+assert.match(cards, /sh-dnd-abilities sh-dnd-score-grid/);
 assert.match(cards, /aria-label="STR 근력 내성 숙련" onchange=/);
 assert.match(cards, /aria-label="DEX 민첩 내성 숙련" checked/);
+assert.match(cards, /data-dnd-save-number="str"[^>]+placeholder="\+2" value=""/);
 
-const output = { textContent: '' };
-const button = { dataset: { dndCheck: 'dex' }, closest: () => ({ dataset: { sectionId: 'savingThrows' }, querySelector: () => output }) };
-context.rollDnd5eCheck('character', 'sheet', button);
-assert.equal(output.textContent, 'DEX 민첩 내성 · d20 12 +2 = 14');
+context.saveSheetField('character', 'sheet', 'savingThrows', 'str_bonus', '0');
+context.saveSheetField('character', 'sheet', 'savingThrows', 'dex_bonus', '-3');
+const overrides = context.renderDnd5eChecksSection({ id: 'savingThrows', label: '내성 굴림' }, data, 'character', 'sheet');
+assert.match(overrides, /data-dnd-save-number="str"[^>]+placeholder="\+2" value="0"/);
+assert.match(overrides, /data-dnd-save-number="dex"[^>]+placeholder="\+2" value="-3"/);
+context.saveSheetField('character', 'sheet', 'savingThrows', 'str_bonus', '');
+assert.equal(data.savingThrows.str_bonus, '');
+assert.equal(data.savingThrows.dex, true);
 
 console.log('D&D 5e saving throw checks: OK');
