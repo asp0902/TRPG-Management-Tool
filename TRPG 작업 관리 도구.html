@@ -8050,6 +8050,13 @@ input.sk-score-total::-webkit-inner-spin-button, input.sk-score-total::-webkit-o
 .sh-dnd-equipment-layout { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; min-width: 0; }
 .sh-dnd-equipment-layout > .sh-repeat-section { flex: 3 1 340px; min-width: 0; }
 .sh-dnd-equipment-layout > .sh-dnd-currency { flex: 1 1 180px; min-width: 0; }
+.sh-dnd-equipment-layout .sh-repeat-table { table-layout: fixed; }
+.sh-dnd-equipment-layout .sh-repeat-table th:nth-child(2) { width: 12%; }
+.sh-dnd-equipment-layout .sh-repeat-table th:nth-child(3),
+.sh-dnd-equipment-layout .sh-repeat-table th:nth-child(5) { width: 19%; }
+.sh-dnd-equipment-layout .sh-repeat-input:invalid { border-color: #b91c1c; }
+.sh-dnd-equipment-layout td:has([data-dnd-row-weight]) { overflow-wrap: anywhere; }
+.sh-dnd-equipment-summary { display: flex; justify-content: flex-end; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
 .sh-dnd-currency .sh-field-input:invalid { border-color: #b91c1c; }
 .sh-dnd-rate-trigger { align-self: flex-start; padding: 0; border: 0; background: none; font-family: inherit; text-align: left; text-decoration: underline dotted; text-underline-offset: 2px; cursor: pointer; }
 .sh-section-hd .sh-dnd-rate-trigger { color: inherit; font: inherit; }
@@ -10491,6 +10498,7 @@ const SHEET_TEMPLATES = {
       { id: 'equipment', label: '장비/소지품', repeatable: true, fields: [
         { id: 'name', label: '이름', type: 'text' },
         { id: 'qty', label: '수량', type: 'number' },
+        { id: 'weight', label: '개당 무게(lb)', type: 'number' },
         { id: 'desc', label: '설명', type: 'text' },
       ]},
       { id: 'features', label: '특성/특기', fields: [
@@ -53299,6 +53307,7 @@ function renderCharacterSheet(chId) {
     if (sec.repeatable) {
       var rows = Array.isArray(sheetData[sec.id]) ? sheetData[sec.id] : [];
       var repeatAttrs = ' data-template-key="' + esc(tpl.key) + '" data-section-id="' + esc(sec.id) + '"';
+      var isDndEquipment = tpl.key === 'dnd5e' && sec.id === 'equipment';
       var isInsaneAbilities = tpl.key === 'insane' && sec.id === 'abilities';
       var isCocWeapons = tpl.key === 'coc7e' && sec.id === 'weapons';
       var isInsaneRelations = tpl.key === 'insane' && sec.id === 'relations';
@@ -53311,7 +53320,7 @@ function renderCharacterSheet(chId) {
         if (typeof f.width === 'number') return '<th style="width:' + f.width + 'px;min-width:' + f.width + 'px;max-width:' + f.width + 'px">' + esc(f.label) + '</th>'; // 열 폭 옵션(#327): 숫자=고정 px, 문자열('60%')=비율
         if (typeof f.width === 'string' && f.width) return '<th style="width:' + esc(f.width) + '">' + esc(f.label) + '</th>';
         return '<th>' + esc(f.label) + '</th>';
-      }).join('') + (isCocWeapons ? '<th></th>' : '<th style="width:28px;"></th>');
+      }).join('') + (isDndEquipment ? '<th>합계(lb)</th>' : '') + (isCocWeapons ? '<th></th>' : '<th style="width:28px;"></th>');
       var rowsHtml = rows.map(function(row, rowIdx) {
         var isCompletedCypherRow = tpl.key === 'cypher' && sec.id === 'cyphers' && isSheetCheckboxChecked(row.completed);
         var cells = visibleFields.map(function(f) {
@@ -53325,6 +53334,11 @@ function renderCharacterSheet(chId) {
           }
           var handler = 'saveSheetRepeatCell(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ',' + rowIdx + ',' + JSON.stringify(f.id) + ',this.value)';
           var extraAttr = '';
+          if (isDndEquipment && (f.id === 'qty' || f.id === 'weight')) {
+            handler = 'if(this.validity.valid)' + handler;
+            extraAttr = ' min="0" step="any" inputmode="decimal" aria-label="' + esc(f.label) + '"';
+            if (f.id === 'qty') extraAttr += ' placeholder="1"';
+          }
           if (isCocWeapons && f.id === 'name') {
             return '<td><div class="sh-coc-weapon-name"><input type="checkbox" class="sh-coc-weapon-detail-toggle"' + (String(row.era || '').trim() ? ' checked' : '') + ' aria-expanded="false" aria-label="특성 펼치기" title="특성 펼치기" onclick="toggleCocWeaponDetail(this)"><input class="sh-repeat-input" value="' + esc(String(val)) + '" oninput="' + esc(handler) + '"></div></td>';
           }
@@ -53373,6 +53387,7 @@ function renderCharacterSheet(chId) {
           effectRow = '<tr hidden data-coc-weapon-idx="' + rowIdx + '"' + cocWeaponDnd + '><td colspan="9"><label>특성<input class="sh-repeat-input" value="' + esc(String(row.era || '')) + '" oninput="' + esc(traitHandler) + '"></label></td></tr>';
         }
         var cocWeaponActions = isCocWeapons ? '<button type="button" class="sh-coc-weapon-drag" draggable="true" title="드래그하여 순서 변경" aria-label="드래그하여 순서 변경" ondragstart="cocWeaponDragStart(event,' + rowIdx + ')" ondragend="cocWeaponDragEnd()">⋮⋮</button>' : '';
+        if (isDndEquipment) cells += '<td><output data-dnd-row-weight="' + rowIdx + '">' + esc(formatDnd5eEquipmentRowWeight(row)) + '</output></td>';
         return '<tr' + (isCompletedCypherRow ? ' class="is-complete"' : '') + (isCocWeapons ? ' data-coc-weapon-idx="' + rowIdx + '"' + cocWeaponDnd : '') + '>' + cells + '<td' + (isCocWeapons ? ' class="sh-coc-weapon-actions" style="white-space:nowrap"' : '') + '>' + cocWeaponActions + '<button class="sh-repeat-del" onclick="' + esc(delHandler) + '">✕</button></td></tr>' + effectRow;
       }).join('');
       var isAr2eSkills = tpl.key === 'arianrhod2e' && sec.id === 'skills';
@@ -53432,11 +53447,14 @@ function renderCharacterSheet(chId) {
         return '<label class="sh-hd-field" onclick="event.stopPropagation()"><span class="sh-hd-field-label">' + esc(hf.label) + '</span><input class="sh-cypher-limit-input" type="' + (hf.type === 'number' ? 'number' : 'text') + '" min="0" value="' + esc(String(hfVal)) + '" aria-label="' + esc(hf.ariaLabel || hf.label) + '" onmousedown="event.stopPropagation()" onclick="event.stopPropagation()" oninput="' + esc(hfHandler) + '"></label>';
       }).join('');
       if (headFieldsHtml) secHeaderHtml = secHeaderHtml.replace('class="sh-section-hd"', 'class="sh-section-hd sh-cypher-section-hd"').replace(/<\/div>$/, '<span class="sh-hd-fields">' + headFieldsHtml + '</span></div>');
+      var weightSummary = isDndEquipment ? '<div class="sh-dnd-equipment-summary"><span>장비 총 무게</span>'
+        + '<output data-dnd-equipment-total data-ch-id="' + esc(chId) + '" data-sheet-id="' + esc(sheetId) + '">'
+        + esc(formatDnd5eEquipmentTotalWeight(rows)) + '</output></div>' : '';
       var repeatSectionHtml = '<div class="sh-section sh-repeat-section"' + repeatAttrs + '>' + secHeaderHtml
         + '<div class="sh-section-body">' + (tpl.key === 'arianrhod2e' ? ar2eSummaryHtml(sheetData, sec.id, chId, sheetId) : '') + guideHtml + '<table class="sh-repeat-table"' + repeatAttrs + '>' + (isCocWeapons ? '<colgroup>' + [40, 11, 11, 6, 6, 6, 6, 6, 8].map(function(width) { return '<col style="width:' + width + '%">'; }).join('') + '</colgroup>' : (visibleFields.some(function(f) { return f.width; }) ? '<colgroup>' + visibleFields.map(function(f) { return f.width ? '<col style="width:' + (typeof f.width === 'number' ? f.width + 'px' : esc(f.width)) + '">' : '<col>'; }).join('') + '<col></colgroup>' : '')) + '<thead><tr>' + thHtml + '</tr></thead><tbody>' + pinnedHtml + rowsHtml + '</tbody></table>'
         + '<div class="sh-repeat-add-row"><button class="sh-repeat-add-btn" onclick="' + esc('addSheetRow(' + JSON.stringify(chId) + ',' + JSON.stringify(sheetId) + ',' + JSON.stringify(sec.id) + ')') + '">＋ 항목 추가</button></div>'
-        + '</div></div>';
-      if (tpl.key === 'dnd5e' && sec.id === 'equipment') {
+        + weightSummary + '</div></div>';
+      if (isDndEquipment) {
         return '<div class="sh-dnd-equipment-layout">' + repeatSectionHtml + renderDnd5eCurrency(sheetData.currency, chId, sheetId) + '</div>';
       }
       return repeatSectionHtml;
@@ -56411,6 +56429,33 @@ function updateDnd5eDeathSaves(chId, sheetId, action, control) {
   persist();
 }
 
+function getDnd5eEquipmentRowWeight(row) {
+  var qtyText = String(row?.qty ?? '').trim();
+  var quantity = qtyText === '' ? 1 : Number(qtyText);
+  var weight = Number(row?.weight);
+  var subtotal = quantity * weight;
+  return quantity >= 0 && weight >= 0 && Number.isFinite(subtotal) ? subtotal : 0;
+}
+
+function formatDnd5eEquipmentRowWeight(row) {
+  if (!String(row?.weight ?? '').trim()) return '—';
+  return getDnd5eEquipmentRowWeight(row).toLocaleString('ko-KR', { maximumSignificantDigits: 12 });
+}
+
+function formatDnd5eEquipmentTotalWeight(rows) {
+  var total = rows.reduce(function(sum, row) { return sum + getDnd5eEquipmentRowWeight(row); }, 0);
+  return total.toLocaleString('ko-KR', { maximumSignificantDigits: 12 }) + ' lb';
+}
+
+function refreshDnd5eEquipmentWeight(chId, sheet, rowIdx) {
+  var total = document.querySelector('[data-dnd-equipment-total]');
+  if (!total || total.dataset.chId !== chId || total.dataset.sheetId !== sheet.id) return;
+  var rows = sheet.data.equipment;
+  var subtotal = total.closest('.sh-repeat-section')?.querySelector('[data-dnd-row-weight="' + rowIdx + '"]');
+  if (subtotal) subtotal.textContent = formatDnd5eEquipmentRowWeight(rows[rowIdx]);
+  total.textContent = formatDnd5eEquipmentTotalWeight(rows);
+}
+
 function renderDnd5eCurrency(currency, chId, sheetId) {
   var coins = [
     { id: 'copper', label: '동화(Copper)', unit: 'CP', copper: 1 },
@@ -57239,6 +57284,9 @@ function saveSheetRepeatCell(chId, sheetId, sectionId, rowIdx, fieldId, value) {
   sheet.data[sectionId][rowIdx][fieldId] = value;
   persist();
   if (sheet.templateKey === 'arianrhod2e') _ar2eRefreshCombatTotals(sheet.data); // 장비·아이템·스킬 값이 바뀌면 요약 갱신(#380)
+  if (sheet.templateKey === 'dnd5e' && sectionId === 'equipment' && (fieldId === 'qty' || fieldId === 'weight')) {
+    refreshDnd5eEquipmentWeight(chId, sheet, rowIdx);
+  }
 }
 
 // 반복 섹션 행 추가
