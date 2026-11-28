@@ -18,12 +18,13 @@ const gitSha = data => createHash('sha1').update(`blob ${data.length}\0`).update
 function fixture() {
   const files = new Map();
   const puts = [];
+  const putBodies = [];
   const gets = [];
   const imported = [];
   const storage = new Map();
-  const api = { files, puts, gets, imported, storage, scheduled: 0 };
+  const api = { files, puts, putBodies, gets, imported, storage, scheduled: 0, activePuts: 0, maxPuts: 0 };
   const context = vm.createContext({
-    Blob, crypto: webcrypto, AbortController, setTimeout, clearTimeout,
+    Blob, crypto: webcrypto, AbortController, setTimeout: (callback, delay) => setTimeout(callback, delay > 1000 ? delay : 0), clearTimeout,
     GITHUB_SYNC_BRANCH: 'sync', GITHUB_SYNC_LAST_SHA_KEY: 'sha', GITHUB_SYNC_LAST_AT_KEY: 'at',
     githubSyncTrace: null, githubSyncRevision: 0, githubSyncDirty: false, githubSyncDirtySince: 0,
     localStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
@@ -46,12 +47,19 @@ function fixture() {
       const data = Buffer.from(content, 'base64');
       assert.ok(data.length <= 1024);
       puts.push(name);
-      const failure = api.beforePut?.(name, data);
-      if (failure) return Response.json({}, { status: failure });
-      const previous = files.get(name);
-      if (previous && gitSha(previous) !== sha) return Response.json({}, { status: 409 });
-      files.set(name, data);
-      return Response.json({ content: { sha: gitSha(data), size: data.length } }, { status: 201 });
+      putBodies.push(options.body);
+      api.activePuts += 1;
+      api.maxPuts = Math.max(api.maxPuts, api.activePuts);
+      try {
+        const failure = await api.beforePut?.(name, data);
+        if (failure) return typeof failure === 'number' ? Response.json({}, { status: failure }) : failure;
+        const previous = files.get(name);
+        if (previous && gitSha(previous) !== sha) return Response.json({ message: 'file SHA is stale' }, { status: 409 });
+        files.set(name, data);
+        return Response.json({ content: { sha: gitSha(data), size: data.length } }, { status: 201 });
+      } finally {
+        api.activePuts -= 1;
+      }
     },
   });
   vm.runInContext(syncCode + 'const ATTACH_SPLIT_BYTES = GITHUB_SYNC_API_FILE_BYTES;'
@@ -214,4 +222,47 @@ test('최신본 저장 후 응답을 잃으면 원격 SHA로 완료를 확인하
   assert.equal(api.storage.get('sha'), meta.sha);
   assert.equal(api.storage.get('at'), data.savedAt);
   assert.equal(api.context.githubSyncDirty, true);
+});
+
+const branchMoved = () => Response.json({ message: `is at ${'a'.repeat(40)} but expected ${'b'.repeat(40)}` }, { status: 409 });
+
+test('데이터와 첨부 쓰기를 직렬화하고 브랜치 409는 같은 SHA 조건으로 다시 보낸다', async () => {
+  const api = fixture();
+  const old = buffer({ savedAt, records: [{ id: 'old' }] });
+  api.files.set(latest, old);
+  let latestCalls = 0;
+  api.beforePut = async name => {
+    await new Promise(resolve => setTimeout(resolve, 5));
+    if (name === latest && ++latestCalls === 1) return branchMoved();
+  };
+  const payload = { savedAt, records: [{ id: 'new' }] };
+  const attachment = new Blob(['file contents']);
+  await Promise.all([
+    api.write(payload, gitSha(old)),
+    api.context.uploadAttachmentToGitHub('1'.repeat(64), attachment),
+  ]);
+  assert.equal(api.maxPuts, 1);
+  assert.equal(latestCalls, 2);
+  const latestBodies = api.putBodies.filter((_, i) => api.puts[i] === latest);
+  assert.equal(latestBodies[0], latestBodies[1]);
+  assert.equal(JSON.parse(latestBodies[0]).sha, gitSha(old));
+  assert.deepEqual(plain(await api.read()), payload);
+});
+
+test('재시도 중 다른 기기가 최신본 자체를 바꾸면 그 데이터를 보존한다', async () => {
+  const api = fixture();
+  const old = buffer({ savedAt, records: [{ id: 'old' }] });
+  const concurrent = buffer({ savedAt, records: [{ id: 'other-device' }] });
+  api.files.set(latest, old);
+  api.beforePut = () => {
+    if (api.puts.length !== 1) return;
+    api.files.set(latest, concurrent);
+    return branchMoved();
+  };
+  await assert.rejects(api.write({ savedAt, records: [{ id: 'mine' }] }, gitSha(old)), /file SHA is stale/);
+  assert.equal(api.puts.length, 2);
+  assert.deepEqual(api.files.get(latest), concurrent);
+  api.beforePut = null;
+  await api.context.putGitHubFile('attachments/after-conflict', new Blob(['next']), 'test');
+  assert.equal(api.files.get('attachments/after-conflict').toString(), 'next');
 });

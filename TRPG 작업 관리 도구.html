@@ -27075,6 +27075,7 @@ const GITHUB_SYNC_API_FILE_BYTES = 16 * 1024 * 1024;
 const GITHUB_SYNC_LEGACY_PART_BYTES = 40 * 1024 * 1024;
 const GITHUB_SYNC_PART_FORMAT = 'trpg-tool-split-v1';
 const GITHUB_SYNC_PENDING_KEY = 'trpg-github-sync-pending';
+let githubSyncWriteTail = Promise.resolve();
 const GITHUB_SYNC_FAIL_KEY = 'trpg-github-sync-fail';
 const GITHUB_SYNC_FAIL_WARN_MS = 3 * 24 * 60 * 60 * 1000;
 function githubSyncTimeoutMs(bodyBytes = 0) { return GITHUB_SYNC_TIMEOUT_MS + Math.ceil(bodyBytes / 1048576) * 1500; }
@@ -27120,6 +27121,26 @@ async function githubSyncRequest(url, options = {}, readBody) {
     if (err && err.name === 'AbortError') throw new Error(`GitHub 요청 시간 초과(${Math.round(timeoutMs / 1000)}초): 네트워크가 느리거나 데이터가 너무 큽니다.`);
     throw err;
   } finally { if (timer) clearTimeout(timer); }
+}
+function githubSyncWrite(url, body) {
+  const write = async () => {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await githubSyncRequest(url, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body,
+        }, response => response.json());
+      } catch (err) {
+        const branchMoved = /^GitHub 409: is at [a-f0-9]{40} but expected [a-f0-9]{40}\b/i.test(err.message);
+        if (!branchMoved || attempt >= 3) throw err;
+        // 다른 기기가 브랜치를 앞서 갱신했어도 같은 파일 SHA 조건으로만 재시도한다.
+        await new Promise(resolve => setTimeout(resolve, 250 * 2 ** attempt + Math.random() * 250));
+      }
+    }
+  };
+  const result = githubSyncWriteTail.then(() => globalThis.navigator?.locks
+    ? navigator.locks.request('trpg-github-sync-write', write) : write());
+  githubSyncWriteTail = result.catch(() => {});
+  return result;
 }
 async function getGitHubSyncFileMeta(url) {
   const data = await githubSyncRequest(`${url}?ref=${encodeURIComponent(GITHUB_SYNC_BRANCH)}`, {
@@ -27221,17 +27242,8 @@ async function writeGitHubSyncParts(blob, savedAt) {
     const sha = await githubSyncBlobSha(part);
     const path = `sync-state/${sha}`;
     const url = githubContentsUrl(path);
-    let existing = await getGitHubSyncFileMeta(url);
-    if (!existing) {
-      try {
-        const result = await putGitHubFile(path, part, `동기화 조각 ${sha.slice(0, 8)}`);
-        existing = result?.content;
-      } catch (err) {
-        if (!/^GitHub (409|422)\b/.test(err.message)) throw err;
-        existing = await getGitHubSyncFileMeta(url); // 같은 조각을 다른 기기가 먼저 올렸을 수 있다.
-        if (!existing) throw err;
-      }
-    }
+    const existing = await getGitHubSyncFileMeta(url)
+      || (await putGitHubFile(path, part, `동기화 조각 ${sha.slice(0, 8)}`))?.content;
     if (existing?.sha !== sha || existing.size !== part.size) {
       throw new Error(`동기화 조각 ${parts.length + 1}을 확인하지 못했습니다.`);
     }
@@ -27260,11 +27272,7 @@ async function putGitHubSyncPayload(payload, sha = '') {
   // GitHub가 최신본을 저장한 뒤 응답만 끊겨도 다음 동기화가 완료 여부를 확인할 수 있다.
   localStorage.setItem(GITHUB_SYNC_PENDING_KEY, JSON.stringify({ sha: expectedSha, savedAt }));
   githubSyncMark('upload');
-  const result = await githubSyncRequest(getGitHubSyncApiUrl(), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  }, response => response.json());
+  const result = await githubSyncWrite(getGitHubSyncApiUrl(), JSON.stringify(body));
   if (result?.content?.sha !== expectedSha) {
     throw new Error('GitHub에서 최신본 업로드 결과를 확인하지 못했습니다. 다시 시도해 주세요.');
   }
@@ -35165,10 +35173,17 @@ function blobToBase64(blob) {
   });
 }
 async function putGitHubFile(path, blob, message) {
-  return await githubSyncRequest(githubContentsUrl(path), {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, content: await blobToBase64(blob), branch: GITHUB_SYNC_BRANCH }),
-  }, response => response.json());
+  const url = githubContentsUrl(path);
+  const body = JSON.stringify({ message, content: await blobToBase64(blob), branch: GITHUB_SYNC_BRANCH });
+  try {
+    return await githubSyncWrite(url, body);
+  } catch (err) {
+    if (!/^GitHub (409|422)\b/.test(err.message)) throw err;
+    // 동명 파일을 다른 기기가 먼저 올린 경우, 본문이 같을 때만 완료로 처리한다.
+    const existing = await getGitHubSyncFileMeta(url).catch(() => null);
+    if (existing?.size !== blob.size || existing.sha !== await githubSyncBlobSha(blob)) throw err;
+    return { content: existing };
+  }
 }
 // 이미지 전용 공개 저장소에 images/{sha256}.{ext} 로 올리고 raw URL 을 돌려준다. 이미 있으면 올리지 않는다(#243).
 function getGitHubImageRawUrl(path) {
