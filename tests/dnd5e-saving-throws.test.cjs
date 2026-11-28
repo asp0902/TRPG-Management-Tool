@@ -33,15 +33,15 @@ assert.deepEqual(read('str'), [false, 2]);
 assert.deepEqual(read('dex'), [true, 2]);
 assert.deepEqual(read('con'), [true, 4]);
 
-const cards = context.renderDnd5eSavingThrowsSection({ id: 'savingThrows', label: '내성 굴림' }, data, 'character', 'sheet');
+const cards = context.renderDnd5eChecksSection({ id: 'savingThrows', label: '내성 굴림' }, data, 'character', 'sheet');
 assert.equal([...cards.matchAll(/type="checkbox"/g)].length, 6);
-assert.equal([...cards.matchAll(/data-dnd-save=/g)].length, 6);
+assert.equal([...cards.matchAll(/data-dnd-check=/g)].length, 6);
 assert.match(cards, /aria-label="STR 근력 내성 숙련" onchange=/);
 assert.match(cards, /aria-label="DEX 민첩 내성 숙련" checked/);
 
 const output = { textContent: '' };
-const button = { dataset: { abilityLabel: 'DEX 민첩' }, closest: () => ({ querySelector: () => output }) };
-context.rollDnd5eSavingThrow('character', 'sheet', 'dex', button);
+const button = { dataset: { dndCheck: 'dex' }, closest: () => ({ dataset: { sectionId: 'savingThrows' }, querySelector: () => output }) };
+context.rollDnd5eCheck('character', 'sheet', button);
 assert.equal(output.textContent, 'DEX 민첩 내성 · d20 12 +2 = 14');
 
 console.log('D&D 5e saving throw checks: OK');
